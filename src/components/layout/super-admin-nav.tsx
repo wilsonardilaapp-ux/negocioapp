@@ -1,0 +1,53 @@
+
+"use client";
+
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import {
+  LayoutDashboard,
+  Users,
+  Server,
+  Box,
+  Activity,
+  Plug,
+  Settings,
+  BarChart,
+  FileText, // Importar el nuevo icono
+} from "lucide-react";
+
+import { SidebarMenu, SidebarMenuItem, SidebarMenuButton } from "@/components/ui/sidebar";
+
+const navItems = [
+  { href: "/superadmin", icon: LayoutDashboard, label: "Dashboard" },
+  { href: "/superadmin/usuarios", icon: Users, label: "Usuarios" },
+  { href: "/superadmin/blog", icon: FileText, label: "Blog" }, // Nuevo enlace
+  { href: "/superadmin/servicios", icon: Server, label: "Servicios" },
+  { href: "/superadmin/modulos", icon: Box, label: "Módulos" },
+  { href: "/superadmin/integraciones", icon: Plug, label: "Integraciones" },
+  { href: "/superadmin/monitoreo", icon: Activity, label: "Monitoreo" },
+  { href: "/superadmin/configuracion", icon: Settings, label: "Configuración" },
+  { href: "/superadmin/analytics", icon: BarChart, label: "Métricas" },
+];
+
+export function SuperAdminNav() {
+  const pathname = usePathname();
+
+  return (
+    <SidebarMenu>
+      {navItems.map((item) => (
+        <SidebarMenuItem key={item.href}>
+          <SidebarMenuButton
+            asChild
+            isActive={pathname.startsWith(item.href) && (item.href !== "/superadmin" || pathname === "/superadmin")}
+            tooltip={item.label}
+          >
+            <Link href={item.href}>
+              <item.icon />
+              <span>{item.label}</span>
+            </Link>
+          </SidebarMenuButton>
+        </SidebarMenuItem>
+      ))}
+    </SidebarMenu>
+  );
+}

@@ -1,0 +1,978 @@
+
+{
+  "entities": {
+    "User": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "User",
+      "type": "object",
+      "description": "Represents a user of the Negocio V03 platform.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the user entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "The full name of the user."
+        },
+        "email": {
+          "type": "string",
+          "description": "The email address of the user.",
+          "format": "email"
+        },
+        "role": {
+          "type": "string",
+          "description": "The role of the user (e.g., cliente_admin, staff, super_admin)."
+        },
+        "status": {
+          "type": "string",
+          "description": "The status of the user (e.g., active, inactive)."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "The date and time when the user was registered.",
+          "format": "date-time"
+        },
+        "lastLogin": {
+          "type": "string",
+          "description": "The date and time of the user's last login.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "email",
+        "role",
+        "status",
+        "createdAt",
+        "lastLogin"
+      ]
+    },
+    "SystemService": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "SystemService",
+      "type": "object",
+      "description": "Represents a system service within the Negocio V03 platform.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the system service entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "The name of the system service."
+        },
+        "status": {
+          "type": "string",
+          "description": "The status of the system service (e.g., active, inactive)."
+        },
+        "limit": {
+          "type": "number",
+          "description": "The usage limit for the system service."
+        },
+        "lastUpdate": {
+          "type": "string",
+          "description": "The date and time when the system service was last updated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "status",
+        "limit",
+        "lastUpdate"
+      ]
+    },
+    "Module": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Module",
+      "type": "object",
+      "description": "Represents a functional module within the Negocio V03 platform.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the module entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "The name of the module."
+        },
+        "description": {
+          "type": "string",
+          "description": "A brief description of the module's functionality."
+        },
+        "status": {
+          "type": "string",
+          "description": "The status of the module (e.g., active, inactive).",
+          "enum": [
+            "active",
+            "inactive"
+          ]
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "The date and time when the module was created.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "description",
+        "status",
+        "createdAt"
+      ]
+    },
+    "GlobalConfig": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "GlobalConfig",
+      "type": "object",
+      "description": "Represents the global configuration settings for the Negocio V03 platform.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the global config entity."
+        },
+        "maintenance": {
+          "type": "boolean",
+          "description": "Indicates whether the platform is in maintenance mode."
+        },
+        "allowUserRegistration": {
+          "type": "boolean",
+          "description": "Controls if new users can register through the login page."
+        },
+        "logoURL": {
+          "type": "string",
+          "description": "The URL of the platform's logo."
+        },
+        "theme": {
+          "type": "string",
+          "description": "The theme settings for the platform (e.g., colors, fonts)."
+        },
+        "supportEmail": {
+          "type": "string",
+          "description": "The email address for platform support.",
+          "format": "email"
+        },
+        "defaultLimits": {
+          "type": "number",
+          "description": "The default limits for various services and modules."
+        },
+        "mainBusinessId": {
+          "type": "string",
+          "description": "The ID of the business to display on the main landing page (root)."
+        }
+      },
+      "required": [
+        "id",
+        "maintenance",
+        "logoURL",
+        "theme",
+        "supportEmail",
+        "defaultLimits"
+      ]
+    },
+    "Business": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Business",
+      "type": "object",
+      "description": "Represents a business using the Negocio V03 platform.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the business entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "The name of the business."
+        },
+        "logoURL": {
+          "type": "string",
+          "description": "The URL of the business's logo."
+        },
+        "description": {
+          "type": "string",
+          "description": "A description of the business."
+        },
+        "googleAnalyticsId": {
+          "type": "string",
+          "description": "The Google Analytics ID for the business."
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "logoURL",
+        "description"
+      ]
+    },
+    "LandingPage": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "LandingPage",
+      "type": "object",
+      "description": "Represents a landing page created by a business on the Negocio V03 platform.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the landing page entity."
+        },
+        "businessId": {
+          "type": "string",
+          "description": "Reference to Business. (Relationship: Business 1:N LandingPage)"
+        },
+        "title": {
+          "type": "string",
+          "description": "The title of the landing page."
+        },
+        "content": {
+          "type": "string",
+          "description": "The content of the landing page (e.g., HTML, JSON)."
+        },
+        "seoDescription": {
+          "type": "string",
+          "description": "The SEO description for the landing page."
+        }
+      },
+      "required": [
+        "id",
+        "businessId",
+        "title",
+        "content",
+        "seoDescription"
+      ]
+    },
+    "Product": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Product",
+      "type": "object",
+      "description": "Represents a product listed in the Negocio V03 platform's catalog.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the product entity."
+        },
+        "businessId": {
+          "type": "string",
+          "description": "Reference to Business. (Relationship: Business 1:N Product)"
+        },
+        "name": {
+          "type": "string",
+          "description": "The name of the product."
+        },
+        "description": {
+          "type": "string",
+          "description": "A description of the product."
+        },
+        "price": {
+          "type": "number",
+          "description": "The price of the product."
+        },
+        "stock": {
+          "type": "number",
+          "description": "The stock quantity of the product."
+        },
+        "images": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "URLs of the product's images."
+        },
+        "rating": {
+          "type": "number",
+          "description": "Average product rating."
+        },
+        "ratingCount": {
+          "type": "number",
+          "description": "Number of ratings received."
+        },
+        "category": {
+            "type": "string",
+            "description": "Product category."
+        }
+      },
+      "required": [
+        "id",
+        "businessId",
+        "name",
+        "description",
+        "price",
+        "stock",
+        "images",
+        "rating",
+        "ratingCount",
+        "category"
+      ]
+    },
+    "Order": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Order",
+      "type": "object",
+      "description": "Represents a customer order.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the order."
+        },
+        "businessId": {
+          "type": "string",
+          "description": "The ID of the business this order belongs to."
+        },
+        "customerName": {
+          "type": "string",
+          "description": "Name of the customer who placed the order."
+        },
+        "customerEmail": {
+          "type": "string",
+          "description": "Email of the customer.",
+          "format": "email"
+        },
+        "customerPhone": {
+          "type": "string",
+          "description": "Phone number of the customer."
+        },
+        "customerAddress": {
+          "type": "string",
+          "description": "Shipping address for the order."
+        },
+        "productName": {
+          "type": "string",
+          "description": "Name of the product ordered."
+        },
+        "productId": {
+          "type": "string",
+          "description": "ID of the product ordered."
+        },
+        "quantity": {
+          "type": "number",
+          "description": "Quantity of the product ordered."
+        },
+        "unitPrice": {
+          "type": "number",
+          "description": "Price of a single unit of the product."
+        },
+        "subtotal": {
+          "type": "number",
+          "description": "Total price for the ordered quantity (quantity * unitPrice)."
+        },
+        "paymentMethod": {
+          "type": "string",
+          "description": "Payment method chosen by the customer."
+        },
+        "orderDate": {
+          "type": "string",
+          "description": "Date and time when the order was placed.",
+          "format": "date-time"
+        },
+        "orderStatus": {
+          "type": "string",
+          "description": "Current status of the order.",
+          "enum": ["Pendiente", "En proceso", "Enviado", "Entregado", "Cancelado"]
+        }
+      },
+      "required": [
+        "id",
+        "businessId",
+        "customerName",
+        "customerEmail",
+        "customerPhone",
+        "productName",
+        "productId",
+        "quantity",
+        "unitPrice",
+        "subtotal",
+        "paymentMethod",
+        "orderDate",
+        "orderStatus"
+      ]
+    },
+    "ContactForm": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "ContactForm",
+      "type": "object",
+      "description": "Represents a contact form created by a business on the Negocio V03 platform.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the contact form entity."
+        },
+        "businessId": {
+          "type": "string",
+          "description": "Reference to Business. (Relationship: Business 1:N ContactForm)"
+        },
+        "fields": {
+          "type": "string",
+          "description": "The configuration of the contact form fields (e.g., JSON)."
+        },
+        "email": {
+          "type": "string",
+          "description": "Email address where the form submissions will be sent to.",
+          "format": "email"
+        }
+      },
+      "required": [
+        "id",
+        "businessId",
+        "fields",
+        "email"
+      ]
+    },
+    "ContactSubmission": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "ContactSubmission",
+      "type": "object",
+      "description": "Represents a submission received through a contact form on the Negocio V03 platform.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the contact submission entity."
+        },
+        "businessId": {
+          "type": "string",
+          "description": "Reference to Business. (Relationship: Business 1:N ContactSubmission)"
+        },
+        "formId": {
+          "type": "string",
+          "description": "Reference to ContactForm. (Relationship: ContactForm 1:N ContactSubmission)"
+        },
+        "sender": {
+          "type": "string",
+          "description": "The name of the sender of the submission."
+        },
+        "email": {
+          "type": "string",
+          "description": "The email address of the sender.",
+          "format": "email"
+        },
+        "message": {
+          "type": "string",
+          "description": "The message content of the submission."
+        },
+        "date": {
+          "type": "string",
+          "description": "The date and time when the submission was received.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "businessId",
+        "formId",
+        "sender",
+        "email",
+        "message",
+        "date"
+      ]
+    },
+    "Integration": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Integration",
+      "type": "object",
+      "description": "Represents an integration with a third-party service in the Negocio V03 platform.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the integration entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "The name of the integration (e.g., Cloudinary, Google Analytics)."
+        },
+        "fields": {
+          "type": "string",
+          "description": "The configuration fields for the integration (e.g., API key, secret)."
+        },
+        "status": {
+          "type": "string",
+          "description": "The status of the integration (e.g., active, inactive)."
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "fields",
+        "status"
+      ]
+    },
+    "PaymentSetting": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "PaymentSetting",
+      "type": "object",
+      "description": "Represents the payment settings for a user on the Negocio V03 platform.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the payment setting entity."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to User. (Relationship: User 1:1 PaymentSetting)"
+        },
+        "nequiNumber": {
+          "type": "string",
+          "description": "The Nequi number for payment."
+        },
+        "nequiQR": {
+          "type": "string",
+          "description": "The Nequi QR code for payment (URL)."
+        },
+        "bancolombiaAccount": {
+          "type": "string",
+          "description": "The Bancolombia account number for payment."
+        },
+        "bancolombiaQR": {
+          "type": "string",
+          "description": "The Bancolombia QR code for payment (URL)."
+        }
+      },
+      "required": [
+        "id",
+        "userId"
+      ]
+    },
+     "ChatbotConfig": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "ChatbotConfig",
+      "type": "object",
+      "description": "Stores the configuration for the WhatsApp Chatbot.",
+      "properties": {
+        "id": { "type": "string" },
+        "businessId": { "type": "string" },
+        "whatsApp": {
+          "type": "object",
+          "properties": {
+            "connected": { "type": "boolean" },
+            "number": { "type": "string" },
+            "token": { "type": "string" }
+          }
+        },
+        "business": {
+          "type": "object",
+          "properties": {
+            "name": { "type": "string" },
+            "type": { "type": "string", "enum": ["Restaurante", "Panadería", "Heladería", "Cafetería", "Otro"] },
+            "description": { "type": "string" },
+            "logoUrl": { "type": "string", "format": "uri" }
+          }
+        },
+        "communication": {
+          "type": "object",
+          "properties": {
+            "tone": { "type": "string", "enum": ["Profesional y formal", "Amigable y cercano", "Casual y divertido"] },
+            "greeting": { "type": "string" }
+          }
+        },
+        "schedule": {
+          "type": "object",
+          "properties": {
+            "is247": { "type": "boolean" },
+            "startTime": { "type": "string", "format": "time" },
+            "endTime": { "type": "string", "format": "time" },
+            "offHoursMessage": { "type": "string" }
+          }
+        }
+      },
+      "required": ["id", "businessId"]
+    },
+    "KnowledgeDocument": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "KnowledgeDocument",
+      "type": "object",
+      "description": "Represents a document uploaded to the Chatbot's knowledge base.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the document."
+        },
+        "fileName": {
+          "type": "string",
+          "description": "The original name of the uploaded file."
+        },
+        "fileUrl": {
+          "type": "string",
+          "description": "The URL where the document is stored.",
+          "format": "uri"
+        },
+        "fileType": {
+          "type": "string",
+          "description": "The MIME type of the file (e.g., 'application/pdf')."
+        },
+        "status": {
+          "type": "string",
+          "description": "The processing status of the document.",
+          "enum": ["training", "ready", "error"]
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "The date and time the document was uploaded.",
+          "format": "date-time"
+        }
+      },
+      "required": ["id", "fileName", "fileUrl", "fileType", "status", "createdAt"]
+    },
+    "ChatConversation": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "ChatConversation",
+      "description": "Represents a single chat session between a user and the chatbot.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "businessId": { "type": "string" },
+        "userIdentifier": { "type": "string", "description": "Identifier for the end-user (e.g., WhatsApp number)." },
+        "startTime": { "type": "string", "format": "date-time" },
+        "endTime": { "type": "string", "format": "date-time" },
+        "status": { "type": "string", "enum": ["active", "resolved", "abandoned", "escalated"] },
+        "satisfactionRating": { "type": "number", "minimum": 1, "maximum": 5 },
+        "summary": { "type": "string", "description": "An AI-generated summary of the conversation." }
+      },
+      "required": ["id", "businessId", "userIdentifier", "startTime", "status"]
+    },
+    "ChatMessage": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "ChatMessage",
+      "description": "Represents a single message within a chat conversation.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "conversationId": { "type": "string" },
+        "sender": { "type": "string", "enum": ["user", "bot"] },
+        "content": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "intentDetected": { "type": "string", "description": "The intent recognized by the AI (e.g., 'check_order_status', 'product_inquiry')." }
+      },
+      "required": ["id", "conversationId", "sender", "content", "timestamp"]
+    },
+    "SuggestionRule": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "SuggestionRule",
+      "description": "Represents an intelligent suggestion rule for products/services.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "businessId": { "type": "string" },
+        "triggerItem": { "type": "string", "description": "ID of the product that triggers the rule." },
+        "conditions": {
+          "type": "object",
+          "properties": {
+            "timeRange": {
+              "type": "object",
+              "properties": { "start": { "type": "string", "format": "time" }, "end": { "type": "string", "format": "time" } }
+            },
+            "daysOfWeek": { "type": "array", "items": { "type": "string" } },
+            "minMargin": { "type": "number" },
+            "category": { "type": "string" },
+            "minPrice": { "type": "number" },
+            "maxPrice": { "type": "number" },
+            "stock": { "type": "number" }
+          }
+        },
+        "suggestedItem": { "type": "string", "description": "ID of the product to suggest." },
+        "suggestionType": { "type": "string", "enum": ["cross-sell", "upsell", "bundle"] },
+        "active": { "type": "boolean" },
+        "priority": { "type": "number" },
+        "metrics": {
+          "type": "object",
+          "properties": {
+            "timesShown": { "type": "number" },
+            "timesAccepted": { "type": "number" },
+            "revenueGenerated": { "type": "number" },
+            "conversionRate": { "type": "number" }
+          }
+        },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "businessId", "triggerItem", "suggestedItem", "suggestionType", "active"]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/users/{userId}",
+        "definition": {
+          "entityName": "User",
+          "schema": {
+            "$ref": "#/backend/entities/User"
+          },
+          "description": "Stores user profiles. Includes standard user information like name, email, role, and status.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier for the user."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/systemServices/{serviceId}",
+        "definition": {
+          "entityName": "SystemService",
+          "schema": {
+            "$ref": "#/backend/entities/SystemService"
+          },
+          "description": "Stores system service configurations. Allows admins to manage service status and limits.",
+          "params": [
+            {
+              "name": "serviceId",
+              "description": "The unique identifier for the system service."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/modules/{moduleId}",
+        "definition": {
+          "entityName": "Module",
+          "schema": {
+            "$ref": "#/backend/entities/Module"
+          },
+          "description": "Stores platform modules. Allows super admins to manage module status.",
+          "params": [
+            {
+              "name": "moduleId",
+              "description": "The unique identifier for the module."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/globalConfig/system",
+        "definition": {
+          "entityName": "GlobalConfig",
+          "schema": {
+            "$ref": "#/backend/entities/GlobalConfig"
+          },
+          "description": "Stores global configuration settings for the platform, such as maintenance mode, logo URL, and theme settings."
+        }
+      },
+      {
+        "path": "/businesses/{businessId}",
+        "definition": {
+          "entityName": "Business",
+          "schema": {
+            "$ref": "#/backend/entities/Business"
+          },
+          "description": "Stores business profiles. Contains business details like name, logo URL, and description.",
+          "params": [
+            {
+              "name": "businessId",
+              "description": "The unique identifier for the business."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/businesses/{businessId}/landingPages/{pageId}",
+        "definition": {
+          "entityName": "LandingPage",
+          "schema": {
+            "$ref": "#/backend/entities/LandingPage"
+          },
+          "description": "Stores landing pages created by businesses. Includes denormalized 'businessId' for authorization independence.",
+          "params": [
+            {
+              "name": "businessId",
+              "description": "The unique identifier for the business."
+            },
+            {
+              "name": "pageId",
+              "description": "The unique identifier for the landing page."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/businesses/{businessId}/products/{productId}",
+        "definition": {
+          "entityName": "Product",
+          "schema": {
+            "$ref": "#/backend/entities/Product"
+          },
+          "description": "Stores product information within a business's subcollection. Includes denormalized 'businessId' for authorization independence.",
+          "params": [
+            {
+              "name": "businessId",
+              "description": "The unique identifier for the business."
+            },
+            {
+              "name": "productId",
+              "description": "The unique identifier for the product."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/businesses/{businessId}/orders/{orderId}",
+        "definition": {
+          "entityName": "Order",
+          "schema": {
+            "$ref": "#/backend/entities/Order"
+          },
+          "description": "Stores customer orders for a specific business.",
+          "params": [
+            {
+              "name": "businessId",
+              "description": "The unique identifier for the business."
+            },
+            {
+              "name": "orderId",
+              "description": "The unique identifier for the order."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/businesses/{businessId}/contactForms/{formId}",
+        "definition": {
+          "entityName": "ContactForm",
+          "schema": {
+            "$ref": "#/backend/entities/ContactForm"
+          },
+          "description": "Stores contact form configurations for each business. Includes denormalized 'businessId' for authorization independence.",
+          "params": [
+            {
+              "name": "businessId",
+              "description": "The unique identifier for the business."
+            },
+            {
+              "name": "formId",
+              "description": "The unique identifier for the contact form."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/businesses/{businessId}/contactSubmissions/{submissionId}",
+        "definition": {
+          "entityName": "ContactSubmission",
+          "schema": {
+            "$ref": "#/backend/entities/ContactSubmission"
+          },
+          "description": "Stores contact form submissions. Includes denormalized 'businessId' for authorization independence.",
+          "params": [
+            {
+              "name": "businessId",
+              "description": "The unique identifier for the business."
+            },
+            {
+              "name": "submissionId",
+              "description": "The unique identifier for the contact submission."
+            }
+          ]
+        }
+      },
+       {
+        "path": "/businesses/{businessId}/chatbotConfig/main",
+        "definition": {
+          "entityName": "ChatbotConfig",
+          "schema": { "$ref": "#/backend/entities/ChatbotConfig" },
+          "description": "Stores the chatbot configuration for a specific business. A single document 'main' holds all settings.",
+          "params": [
+            { "name": "businessId", "description": "The unique identifier for the business." }
+          ]
+        }
+      },
+      {
+        "path": "/businesses/{businessId}/chatbotConfig/main/knowledgeBase/{documentId}",
+        "definition": {
+          "entityName": "KnowledgeDocument",
+          "schema": { "$ref": "#/backend/entities/KnowledgeDocument" },
+          "description": "Stores documents for the chatbot's knowledge base.",
+          "params": [
+            { "name": "businessId", "description": "The unique identifier for the business." },
+            { "name": "documentId", "description": "The unique identifier for the knowledge document." }
+          ]
+        }
+      },
+      {
+        "path": "/businesses/{businessId}/chatConversations/{conversationId}",
+        "definition": {
+          "entityName": "ChatConversation",
+          "schema": { "$ref": "#/backend/entities/ChatConversation" },
+          "description": "Stores individual chat sessions for analytics.",
+          "params": [
+            { "name": "businessId", "description": "The unique identifier for the business." },
+            { "name": "conversationId", "description": "The unique identifier for the chat conversation." }
+          ]
+        }
+      },
+      {
+        "path": "/businesses/{businessId}/chatConversations/{conversationId}/messages/{messageId}",
+        "definition": {
+          "entityName": "ChatMessage",
+          "schema": { "$ref": "#/backend/entities/ChatMessage" },
+          "description": "Stores messages within a specific chat conversation.",
+          "params": [
+            { "name": "businessId", "description": "The unique identifier for the business." },
+            { "name": "conversationId", "description": "The unique identifier for the chat conversation." },
+            { "name": "messageId", "description": "The unique identifier for the message." }
+          ]
+        }
+      },
+      {
+        "path": "/integrations/{integrationId}",
+        "definition": {
+          "entityName": "Integration",
+          "schema": {
+            "$ref": "#/backend/entities/Integration"
+          },
+          "description": "Stores integration configurations. Includes details like name, fields, and status.",
+          "params": [
+            {
+              "name": "integrationId",
+              "description": "The unique identifier for the integration."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/paymentSettings/{userId}",
+        "definition": {
+          "entityName": "PaymentSetting",
+          "schema": {
+            "$ref": "#/backend/entities/PaymentSetting"
+          },
+          "description": "Stores payment settings for each user.  Path-based ownership with the User. Relationship: User 1:1 PaymentSetting",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier for the user."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/businesses/{businessId}/suggestionRules/{ruleId}",
+        "definition": {
+          "entityName": "SuggestionRule",
+          "schema": {
+            "$ref": "#/backend/entities/SuggestionRule"
+          },
+          "description": "Stores intelligent suggestion rules for a business.",
+          "params": [
+            {
+              "name": "businessId",
+              "description": "The unique identifier for the business."
+            },
+            {
+              "name": "ruleId",
+              "description": "The unique identifier for the suggestion rule."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "The Firestore structure is designed to ensure Authorization Independence and support the application's QAPs (Queries are not Filters). Authorization Independence is achieved by avoiding `get()` calls in security rules through denormalization.  Specifically, the `LandingPage`, `Product`, `ContactForm`, `ContactSubmission` and `ChatbotConfig` subcollections under `/businesses/{businessId}` include the `businessId` field, which duplicates the parent document's ID, but allows security rules to validate access without requiring a `get()` call to the parent `business` document.\n\nStructural Segregation is applied by separating user-specific data (`/users/{userId}`) from business-related data (`/businesses/{businessId}/...`).  Each collection has a homogeneous security posture. Path-based ownership (`/users/{userId}`) is used for private user data like payment settings.\n\nThe membership model is implicitly supported through the businessId on resources linked to each business.\n\nGlobal roles are managed using content over existence, within the User document under role (e.g., `/users/{uid}` has `role: 'super_admin'`).\n\nQAPs (Rules are not Filters) are supported through structural segregation. Listing operations are secured based on the path and, where applicable, the denormalized `businessId` field in subcollections, allowing secure querying without filtering on insecure data.\n\nExplicit state modeling is used through the `status` field in entities like `User` and `SystemService`."
+  }
+}
+
+    
+
+    

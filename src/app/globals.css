@@ -1,0 +1,194 @@
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 96.1%;
+    --foreground: 0 0% 12.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 12.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 12.9%;
+    --primary: 120 39.4% 49.6%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 0 0% 96.1%;
+    --secondary-foreground: 0 0% 9%;
+    --muted: 0 0% 96.1%;
+    --muted-foreground: 0 0% 38%;
+    --accent: 36 100% 49.8%;
+    --accent-foreground: 0 0% 12.9%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 89.8%;
+    --input: 0 0% 89.8%;
+    --ring: 120 39.4% 49.6%;
+    --chart-1: 120 39% 50%;
+    --chart-2: 36 100% 50%;
+    --chart-3: 197 37% 24%;
+    --chart-4: 43 74% 66%;
+    --chart-5: 27 87% 67%;
+    --radius: 0.5rem;
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 0 0% 26.1%;
+    --sidebar-primary: 120 39.4% 49.6%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 0 0% 96.1%;
+    --sidebar-accent-foreground: 0 0% 9%;
+    --sidebar-border: 0 0% 89.8%;
+    --sidebar-ring: 120 39.4% 49.6%;
+  }
+  .dark {
+    --background: 0 0% 12.9%;
+    --foreground: 0 0% 98%;
+    --card: 0 0% 3.9%;
+    --card-foreground: 0 0% 98%;
+    --popover: 0 0% 3.9%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 120 39.4% 49.6%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 0 0% 14.9%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 0 0% 14.9%;
+    --muted-foreground: 0 0% 63.9%;
+    --accent: 36 100% 49.8%;
+    --accent-foreground: 0 0% 12.9%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 14.9%;
+    --input: 0 0% 14.9%;
+    --ring: 120 39.4% 49.6%;
+    --chart-1: 120 70% 50%;
+    --chart-2: 36 60% 45%;
+    --chart-3: 30 80% 55%;
+    --chart-4: 280 65% 60%;
+    --chart-5: 340 75% 55%;
+    --sidebar-background: 0 0% 3.9%;
+    --sidebar-foreground: 0 0% 95.9%;
+    --sidebar-primary: 120 39.4% 49.6%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 0 0% 15.9%;
+    --sidebar-accent-foreground: 0 0% 95.9%;
+    --sidebar-border: 0 0% 15.9%;
+    --sidebar-ring: 120 39.4% 49.6%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+
+/* Estilos personalizados para el contenedor del editor */
+.rich-editor-wrapper {
+  background: white;
+  border-radius: 0.5rem; /* Ajustar según tu diseño */
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  padding: 1rem;
+}
+
+.rich-editor-wrapper .quill {
+  font-family: inherit; /* Hereda la fuente de tu aplicación */
+}
+
+/* Estilos para la barra de herramientas */
+.rich-editor-wrapper .ql-toolbar {
+  border: 1px solid #e5e7eb; /* Gris claro */
+  border-radius: 0.5rem 0.5rem 0 0;
+  background: #f9fafb; /* Un fondo ligeramente gris */
+}
+
+/* Estilos para el contenedor del contenido */
+.rich-editor-wrapper .ql-container {
+  border: 1px solid #e5e7eb;
+  border-top: none;
+  border-radius: 0 0 0.5rem 0.5rem;
+  min-height: 200px;
+  font-size: 1rem; /* o 16px */
+}
+
+.rich-editor-wrapper .ql-editor {
+  min-height: 200px;
+}
+
+/* Placeholder */
+.rich-editor-wrapper .ql-editor.ql-blank::before {
+  color: #9ca3af; /* Color de placeholder */
+  font-style: normal;
+}
+
+/* Forzar estilos de alineación de Quill */
+.ql-align-justify {
+  text-align: justify;
+}
+.ql-align-center {
+  text-align: center;
+}
+.ql-align-right {
+  text-align: right;
+}
+
+/* Fix overlay gris en hero */
+section#hero {
+  background-color: #FFFFFF !important;
+}
+
+section#hero > div.absolute.inset-0.z-\[1\] {
+  display: none !important;
+}
+
+/* Estilos para las fuentes de Quill en la barra de herramientas */
+.ql-font-arial { font-family: 'Arial', sans-serif; }
+.ql-font-comic-sans { font-family: 'Comic Sans MS', cursive; }
+.ql-font-courier-new { font-family: 'Courier New', monospace; }
+.ql-font-georgia { font-family: 'Georgia', serif; }
+.ql-font-helvetica { font-family: 'Helvetica', sans-serif; }
+.ql-font-lucida { font-family: 'Lucida Grande', sans-serif; }
+
+.ql-picker.ql-size .ql-picker-label::before,
+.ql-picker.ql-size .ql-picker-item::before {
+  content: attr(data-value) !important;
+}
+.ql-picker.ql-size .ql-picker-item[data-value]::before {
+  content: attr(data-value) !important;
+}
+.ql-picker.ql-size .ql-picker-label:not([data-value])::before {
+  content: 'Normal' !important;
+}
+.ql-picker.ql-font .ql-picker-label::before,
+.ql-picker.ql-font .ql-picker-item::before {
+  content: attr(data-value) !important;
+}
+ .ql-picker.ql-font .ql-picker-label[data-value="sans-serif"]::before {
+    content: "Sans Serif" !important;
+}
+.ql-picker.ql-font .ql-picker-label[data-value="serif"]::before {
+    content: "Serif" !important;
+}
+.ql-picker.ql-font .ql-picker-label[data-value="monospace"]::before {
+    content: "Monospace" !important;
+}
+ .ql-picker.ql-font .ql-picker-label[data-value="arial"]::before {
+    content: "Arial" !important;
+}
+.ql-picker.ql-font .ql-picker-label[data-value="comic-sans"]::before {
+    content: "Comic Sans" !important;
+}
+.ql-picker.ql-font .ql-picker-label[data-value="courier-new"]::before {
+    content: "Courier New" !important;
+}
+.ql-picker.ql-font .ql-picker-label[data-value="georgia"]::before {
+    content: "Georgia" !important;
+}
+.ql-picker.ql-font .ql-picker-label[data-value="helvetica"]::before {
+    content: "Helvetica" !important;
+}
+.ql-picker.ql-font .ql-picker-label[data-value="lucida"]::before {
+    content: "Lucida" !important;
+}

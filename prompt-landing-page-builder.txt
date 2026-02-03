@@ -1,0 +1,233 @@
+
+# PROMPT PARA IA: Constructor de Landing Page Visual con React y Firebase
+
+## ROL Y OBJETIVO
+
+Actúa como un **desarrollador senior Full Stack** especializado en **React (Next.js), TypeScript, Firebase y Shadcn UI**.
+
+Tu objetivo es implementar un **Constructor de Landing Page Visual** completo dentro de un panel de control existente. El constructor debe permitir a los usuarios editar varias secciones de su página y ver una vista previa en tiempo real.
+
+---
+
+## 1. STACK TECNOLÓGICO Y REQUISITOS
+
+*   **Framework**: Next.js 14+ con App Router.
+*   **Lenguaje**: TypeScript (con `strict: true`).
+*   **Base de Datos**: Firebase Firestore para la persistencia de datos.
+*   **UI**: Componentes de **Shadcn UI** (`Tabs`, `Card`, `Input`, `Label`, `Button`, `Accordion`, `Switch`, `Slider`, `Textarea`, etc.).
+*   **Iconos**: `lucide-react`.
+*   **Estilos**: Tailwind CSS.
+
+---
+
+## 2. ESTRUCTURA DE ARCHIVOS PROPUESTA
+
+Organiza el código de la siguiente manera:
+
+*   `app/dashboard/landing-page/page.tsx` (Componente principal que une el editor y la vista previa).
+*   `components/landing-page/EditorLandingForm.tsx` (El panel de edición con todas las pestañas).
+*   `components/landing-page/EditorLandingPreview.tsx` (El componente que muestra la vista previa en tiempo real).
+*   `components/landing-page/LandingPageContent.tsx` (Componente que renderiza la página pública final a partir de los datos).
+*   `models/landing-page.ts` (Interfaces de TypeScript que definen la estructura de datos).
+
+---
+
+## 3. MODELO DE DATOS (DATA STRUCTURE)
+
+Define la estructura de datos completa en `models/landing-page.ts`. Este es el objeto principal que se guardará en Firestore.
+
+```typescript
+// src/models/landing-page.ts
+
+export type LandingPageData = {
+  hero: HeroSection;
+  navigation: NavigationSection;
+  sections: ContentSection[];
+  testimonials: TestimonialSection[];
+  seo: SEOSection;
+  form: FormSection;
+  header: LandingHeaderConfigData;
+  footer: FooterSection;
+};
+
+export type HeroSection = {
+  title: string;
+  subtitle: string;
+  additionalContent: string; // HTML
+  imageUrl: string | null;
+  ctaButtonText: string;
+  ctaButtonUrl: string;
+  backgroundColor: string;
+  textColor: string;
+  buttonColor: string;
+};
+
+export type NavigationSection = {
+  enabled: boolean;
+  logoUrl: string;
+  logoAlt: string;
+  logoWidth: number;
+  logoAlignment: 'left' | 'center' | 'right';
+  businessName: string;
+  links: NavLink[];
+  backgroundColor: string;
+  textColor: string;
+  hoverColor: string;
+  fontSize: number;
+  spacing: number;
+  useShadow: boolean;
+};
+
+export type NavLink = {
+  id: string;
+  text: string;
+  url:string;
+  openInNewTab: boolean;
+  enabled: boolean;
+};
+
+export type ContentSection = {
+  id: string;
+  title: string;
+  subtitle: string;
+  content: string; // HTML
+  subsections: SubSection[];
+  backgroundColor: string;
+  textColor: string;
+};
+
+export type SubSection = {
+  id: string;
+  title: string;
+  description: string; // HTML
+  imageUrl: string | null;
+  mediaType: 'image' | 'video' | null;
+};
+
+export type TestimonialSection = {
+    id: string;
+    authorName: string;
+    authorRole: string;
+    text: string; // HTML
+    avatarUrl: string;
+    rating: number; // 1-5
+};
+
+export type SEOSection = {
+  title: string;
+  description: string;
+  keywords: string[];
+};
+
+export type FormField = {
+  id: string;
+  label: string;
+  type: 'text' | 'email' | 'textarea' | 'tel' | 'number';
+  placeholder: string;
+  required: boolean;
+};
+
+export type FormSection = {
+  fields: FormField[];
+  destinationEmail: string;
+};
+
+export type LandingHeaderConfigData = {
+    banner: {
+        mediaUrl: string | null;
+        mediaType: 'image' | 'video' | null;
+    };
+    businessInfo: {
+        name: string;
+        address: string;
+        phone: string;
+        email?: string;
+    };
+    socialLinks: {
+        tiktok: string;
+        instagram: string;
+        facebook: string;
+        whatsapp: string;
+        twitter: string;
+    };
+    carouselItems: CarouselItem[];
+};
+
+export type CarouselItem = {
+    id: string;
+    mediaUrl: string | null;
+    mediaType: 'image' | 'video' | null;
+    slogan: string;
+};
+
+// Define también los tipos para el Footer (FooterSection, FooterLink, etc.)
+// ...
+```
+
+---
+
+## 4. FUNCIONALIDAD DETALLADA
+
+### 4.1. Componente Principal (`page.tsx`)
+
+*   **Layout**: Debe tener un layout de dos columnas:
+    *   Columna 1 (más ancha): `EditorLandingForm`.
+    *   Columna 2 (más estrecha): `EditorLandingPreview`.
+*   **State Management**:
+    *   Usa el hook `useState<LandingPageData>()` para mantener el estado completo de la landing page.
+    *   Inicializa el estado con un objeto `initialLandingData`.
+*   **Firebase**:
+    *   Usa el hook `useDoc` para obtener los datos guardados desde Firestore en la ruta `businesses/{userId}/landingPages/main`.
+    *   Usa `useEffect` para actualizar el estado local cuando los datos de Firebase se cargan.
+    *   Implementa una función `handleSave` que use `setDocumentNonBlocking` para persistir el estado actual en Firestore.
+*   **Header**: Debe tener un título y un botón "Guardar" que llame a `handleSave`.
+
+### 4.2. Editor de Contenido (`EditorLandingForm.tsx`)
+
+*   **Estructura**: Usa el componente `Tabs` de Shadcn UI para organizar las diferentes secciones de edición: `Principal`, `Navegación`, `Secciones`, `Testimonios`, `SEO`, `Formulario`, etc.
+*   **Props**: Recibe `data: LandingPageData` y `setData: (updater: (prevData) => LandingPageData) => void`.
+*   **Pestaña "Principal (Hero)"**:
+    *   Inputs para `title`, `subtitle`, `imageUrl`, `ctaButtonText`, `ctaButtonUrl`.
+    *   Un `RichTextEditor` para `additionalContent`.
+    *   Selectores de color (`<input type="color">`) para `backgroundColor`, `textColor`, y `buttonColor`.
+*   **Pestaña "Navegación"**:
+    *   Usa un `Accordion` para separar la configuración de la Barra Superior (Header) y el Pie de Página (Footer).
+    *   **Header**: Inputs para `logoUrl`, `logoWidth` (Slider), `logoAlignment` (botones), `backgroundColor`, `textColor`, etc.
+    *   **Enlaces**: Implementa una UI para añadir, editar y eliminar (`NavLink`) dinámicamente. Cada enlace debe tener campos para texto, URL y un switch para `enabled`.
+*   **Pestaña "Secciones de Contenido"**:
+    *   Permite añadir (`addContentSection`) y eliminar (`removeContentSection`) secciones dinámicamente.
+    *   Cada sección debe estar dentro de un `AccordionItem` y contener:
+        *   Inputs para `title`, `subtitle`, `backgroundColor`, `textColor`.
+        *   Un `RichTextEditor` para `content`.
+        *   Una sub-sección para gestionar `SubSection` (tarjetas/columnas), permitiendo añadir, editar y eliminar cada una con su título, descripción e imagen.
+*   **Pestaña "Testimonios"**:
+    *   Similar a "Secciones", permite añadir/eliminar testimonios.
+    *   Cada testimonio debe tener campos para `authorName`, `authorRole`, `avatarUrl` (con subida de imagen), `text` (RichTextEditor) y un sistema de calificación por estrellas (1-5).
+*   **Pestaña "SEO"**:
+    *   Inputs para `title` y `description`.
+    *   Una UI para añadir y eliminar `keywords` (palabras clave) en forma de `Badge`.
+
+### 4.3. Vista Previa (`EditorLandingPreview.tsx`)
+
+*   **Props**: Recibe `data: LandingPageData`.
+*   **Estructura**: Debe simular un navegador.
+    *   Una barra superior falsa con círculos de colores (rojo, amarillo, verde).
+    *   Un área de contenido principal que renderiza el componente `LandingPageContent`.
+*   **Funcionalidad**: Pasa el objeto `data` directamente al componente `LandingPageContent`. Debe actualizarse visualmente en tiempo real cada vez que el estado `data` cambie en el componente padre.
+
+### 4.4. Renderizado Público (`LandingPageContent.tsx`)
+
+*   **Props**: Recibe `data: LandingPageData`.
+*   **Responsabilidad**: Es un componente puramente presentacional. Toma el objeto `data` y lo renderiza como una página HTML estática y estilizada con Tailwind CSS.
+*   Usa `dangerouslySetInnerHTML` para renderizar el contenido HTML proveniente de los `RichTextEditor`.
+
+---
+
+## 5. REQUISITOS ADICIONALES
+
+*   **Subida de Medios**: Para cada campo de imagen (`imageUrl`, `logoUrl`, `avatarUrl`), implementa un componente `MediaUploader`. Este debe permitir al usuario subir un archivo, llamar a una Server Action/Genkit Flow (`uploadMedia`) para subirlo a un servicio como Cloudinary, y actualizar el estado con la URL devuelta.
+*   **Rich Text Editor**: Crea un componente `RichTextEditor` que encapsule `react-quill`. Debe manejar la carga de la librería de forma dinámica (`dynamic import`) para evitar errores de SSR en Next.js.
+*   **Inmutabilidad**: Asegúrate de que todas las actualizaciones de estado se hagan de forma inmutable (usando `...spread` operator o funciones de actualización en `setData`) para que React detecte los cambios correctamente.
+*   **IDs Únicos**: Usa una librería como `uuid` para generar IDs únicos al crear nuevas secciones, enlaces o testimonios.
+
+Genera el código completo para cada archivo, siguiendo las mejores prácticas de React y TypeScript.
