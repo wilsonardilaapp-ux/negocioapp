@@ -1,12 +1,11 @@
+'use client';
 
-"use client";
-
-import { useMemo } from "react";
-import { useRouter } from "next/navigation";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-import { Button } from "@/components/ui/button";
+import { useMemo } from 'react';
+import { useRouter } from 'next/navigation';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { Button } from '@/components/ui/button';
 import {
   Card,
   CardContent,
@@ -14,8 +13,8 @@ import {
   CardFooter,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+} from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import {
   Form,
   FormControl,
@@ -23,14 +22,14 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from "@/components/ui/form";
-import { useToast } from "@/hooks/use-toast";
-import { useAuth, useUser, useFirestore, useDoc, useMemoFirebase, initiateEmailSignIn } from "@/firebase";
+} from '@/components/ui/form';
+import { useToast } from '@/hooks/use-toast';
+import { useAuth, useUser, useFirestore, useDoc, useMemoFirebase, initiateEmailSignIn } from '@/firebase';
 import { doc } from 'firebase/firestore';
-import type { GlobalConfig } from "@/models/global-config";
-import { useEffect } from "react";
-import Link from "next/link";
-import { Loader2 } from "lucide-react";
+import type { GlobalConfig } from '@/models/global-config';
+import { useEffect } from 'react';
+import Link from 'next/link';
+import { Loader2 } from 'lucide-react';
 
 const SUPER_ADMIN_UID = "qy2fh98JgYhZnWz682JuPX4A7fU2";
 
@@ -80,6 +79,9 @@ export default function LoginPage() {
       });
       // The FirebaseProvider's onAuthStateChanged will handle the redirection.
     } catch (error: any) {
+      // Log the specific Firebase error code to the developer console for debugging
+      console.error("Login Error Code:", error.code);
+      
       toast({
         variant: "destructive",
         title: "Error de Autenticación",
