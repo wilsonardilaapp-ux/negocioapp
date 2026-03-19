@@ -344,10 +344,17 @@ export default function RegisterPage() {
       });
       
     } catch (error: any) {
+      let description = "No se pudo completar el registro. Inténtalo de nuevo.";
+      if (error.code === 'auth/email-already-in-use') {
+        description = "Este correo electrónico ya está registrado. Por favor, intenta con otro o inicia sesión.";
+      } else if (error.message) {
+        description = error.message;
+      }
+      
       toast({
         variant: "destructive",
         title: "Error al Registrarse",
-        description: error.message || "No se pudo completar el registro. Inténtalo de nuevo.",
+        description: description,
       });
     }
   }
