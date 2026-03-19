@@ -13,21 +13,22 @@ interface RichTextEditorProps {
 const MAX_FILE_SIZE_MB = 1;
 const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 
+// Moved outside the component to prevent re-creation on every render
+const sizeWhitelist = [
+    '8px', '9px', '10px', '11px', '12px', '14px', '16px', '18px', 
+    '20px', '24px', '28px', '32px', '36px', '48px', '60px', '72px'
+];
+
+const fontWhitelist = [
+    'sans-serif', 'serif', 'monospace', 'arial', 'comic-sans', 
+    'courier-new', 'georgia', 'helvetica', 'lucida'
+];
+
 const RichTextEditor: React.FC<RichTextEditorProps> = ({ value, onChange, placeholder }) => {
   const editorRef = useRef<HTMLDivElement>(null);
   const quillInstance = useRef<any>(null);
   const [isLoaded, setIsLoaded] = useState(false);
   const { toast } = useToast();
-
-  const sizeWhitelist = [
-    '8px', '9px', '10px', '11px', '12px', '14px', '16px', '18px', 
-    '20px', '24px', '28px', '32px', '36px', '48px', '60px', '72px'
-  ];
-
-  const fontWhitelist = [
-    'sans-serif', 'serif', 'monospace', 'arial', 'comic-sans', 
-    'courier-new', 'georgia', 'helvetica', 'lucida'
-  ];
 
   useEffect(() => {
     const loadQuill = async () => {
@@ -117,7 +118,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({ value, onChange, placeh
     if (typeof window !== 'undefined') {
       loadQuill();
     }
-  }, [placeholder, onChange, toast, fontWhitelist, sizeWhitelist]);
+  }, [placeholder, onChange, toast]);
 
   useEffect(() => {
     // This effect ensures that if the 'value' prop changes from the parent,
