@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useRouter } from "next/navigation";
@@ -343,13 +344,13 @@ export default function RegisterPage() {
       
     } catch (error: any) {
       let description = "No se pudo completar el registro. Inténtalo de nuevo.";
-      // Catch specific Firebase Auth error for existing email
+      // Catch specific Firebase Auth error for existing email and provide a user-friendly message.
       if (error.code === 'auth/email-already-in-use') {
-        // Log for developer clarity
-        console.log("Registration failed: Email already in use.", values.email);
+        // Log a more informative message for developers, not an aggressive "error".
+        console.log("Info: Registration attempt with an existing email.", values.email);
         description = "Este correo electrónico ya está registrado. Por favor, intenta con otro o inicia sesión.";
       } else {
-        // Log other unexpected errors
+        // Log other unexpected errors as actual errors.
         console.error("An unexpected error occurred during registration:", error);
         if (error.message) {
           description = error.message;
