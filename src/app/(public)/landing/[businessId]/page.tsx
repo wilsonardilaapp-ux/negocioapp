@@ -1,62 +1,83 @@
+'use client';
 
-import { notFound } from "next/navigation";
-import Link from "next/link";
-import { Button } from "@/components/ui/button";
+import React, { useMemo } from 'react';
+import { useFirestore, useMemoFirebase, useDoc } from '@/firebase';
+import { doc } from 'firebase/firestore';
+import { useParams } from 'next/navigation';
+import { Loader2, Frown } from 'lucide-react';
+import type { LandingPageData } from '@/models/landing-page';
+import LandingPageContent from '@/components/landing-page/landing-page-content';
+import { ChatbotWidget } from '@/components/chatbot/chatbot-widget';
 
-// --- TIPO DE PROPS PARA NEXT.JS 15 ---
-// En Next.js 15, params es una Promesa.
-type Props = {
-  params: Promise<{ businessId: string }>;
-};
+export default function BusinessLandingPage() {
+    const firestore = useFirestore();
+    const params = useParams();
+    const businessId = params.businessId as string;
 
-// --- METADATA ---
-export async function generateMetadata({ params }: Props) {
-  const { businessId } = await params;
-  return {
-    title: `Landing Page - ${businessId}`,
-    description: `Bienvenido a la página del negocio ${businessId}`,
-  };
-}
+    const landingPageDocRef = useMemoFirebase(() => {
+        if (!firestore || !businessId) return null;
+        return doc(firestore, 'businesses', businessId, 'landingPages', 'main');
+    }, [firestore, businessId]);
 
-// --- COMPONENTE PRINCIPAL ---
-export default async function BusinessLandingPage({ params }: Props) {
-  // 1. Esperamos la promesa de params (Requisito de Next.js 15)
-  const { businessId } = await params;
+    const { data: landingData, isLoading, error } = useDoc<LandingPageData>(landingPageDocRef);
 
-  // Aquí iría la lógica para buscar los datos del negocio en Firebase
-  // const businessData = await getBusinessFromFirebase(businessId);
-  
-  if (!businessId) {
-    notFound();
-  }
+    const finalData = useMemo(() => {
+      if (!landingData) return null;
+      // This logic is from the main page.tsx to handle possibly empty image URLs
+      const cleanImageUrl =
+        landingData.hero?.imageUrl &&
+        typeof landingData.hero.imageUrl === 'string' &&
+        landingData.hero.imageUrl.trim().length > 0 &&
+        landingData.hero.imageUrl.startsWith('http')
+          ? landingData.hero.imageUrl
+          : null;
 
-  return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 p-4">
-      <div className="max-w-2xl w-full bg-white p-8 rounded-xl shadow-lg text-center space-y-6">
-        
-        <h1 className="text-4xl font-bold text-gray-900">
-          Bienvenido
-        </h1>
-        
-        <p className="text-lg text-gray-600">
-          Estás viendo la Landing Page del negocio con ID:
-        </p>
-        
-        <code className="block bg-gray-100 p-3 rounded text-emerald-600 font-mono text-xl">
-          {businessId}
-        </code>
+      return {
+        ...landingData,
+        hero: {
+          ...landingData.hero,
+          imageUrl: cleanImageUrl,
+        },
+      };
+    }, [landingData]);
 
-        <p className="text-sm text-gray-400">
-          (Esta página está lista para conectar con la base de datos)
-        </p>
+    if (isLoading) {
+        return (
+            <div className="flex h-screen w-full items-center justify-center bg-background">
+                <Loader2 className="h-12 w-12 animate-spin text-primary" />
+            </div>
+        );
+    }
 
-        <div className="pt-4">
-          <Link href="/">
-            <Button variant="outline">Volver al Inicio</Button>
-          </Link>
+    if (error) {
+        return (
+            <div className="flex h-screen w-full flex-col items-center justify-center bg-background text-center px-4">
+                <Frown className="h-16 w-16 text-destructive mb-4" />
+                <h1 className="text-2xl font-bold text-destructive">Error al Cargar la Página</h1>
+                <p className="text-muted-foreground mt-2 max-w-md">
+                   No se pudo cargar la página. Verifica que el enlace sea correcto y que las reglas de seguridad de Firestore permitan el acceso público a 'businesses/{'{businessId}'}/landingPages/main'.
+                </p>
+                <pre className="mt-4 p-4 bg-muted rounded-md text-left text-xs overflow-auto">{error.message}</pre>
+            </div>
+        );
+    }
+    
+    if (!finalData) {
+        return (
+            <div className="flex h-screen w-full flex-col items-center justify-center bg-background text-center px-4">
+                <Frown className="h-16 w-16 text-muted-foreground mb-4" />
+                <h1 className="text-2xl font-bold">Página no Encontrada</h1>
+                <p className="text-muted-foreground mt-2 max-w-md">
+                    La configuración de la landing page para este negocio no existe. El administrador debe crearla desde el panel de control.
+                </p>
+            </div>
+        );
+    }
+
+    return (
+        <div>
+            <LandingPageContent data={finalData} businessId={businessId} />
+            <ChatbotWidget businessId={businessId} />
         </div>
-
-      </div>
-    </div>
-  );
+    );
 }
