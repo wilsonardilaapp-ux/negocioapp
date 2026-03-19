@@ -145,15 +145,13 @@ export default function LoginPage() {
             <Button className="w-full" type="submit" disabled={form.formState.isSubmitting}>
               {form.formState.isSubmitting ? "Accediendo..." : "Acceder"}
             </Button>
-            {config?.allowUserRegistration && (
-              <div className="text-sm text-muted-foreground">
-                ¿No tienes una cuenta?{" "}
-                <Link href="/register" className="underline text-primary hover:text-primary/80">
-                  Regístrate aquí
-                </Link>
-                .
-              </div>
-            )}
+            <div className="text-sm text-muted-foreground">
+              ¿No tienes una cuenta?{" "}
+              <Link href="/register" className="underline text-primary hover:text-primary/80">
+                Regístrate aquí
+              </Link>
+              .
+            </div>
           </CardFooter>
         </form>
       </Form>
