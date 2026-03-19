@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useRouter } from "next/navigation";
@@ -24,6 +23,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
+import { ToastAction } from "@/components/ui/toast";
 import { useAuth, useUser, useFirestore, initiateEmailSignUp } from "@/firebase";
 import { useEffect } from "react";
 import { doc, setDoc, writeBatch, getDoc } from 'firebase/firestore';
@@ -343,25 +343,26 @@ export default function RegisterPage() {
       });
       
     } catch (error: any) {
-      let description = "No se pudo completar el registro. Inténtalo de nuevo.";
-      // Catch specific Firebase Auth error for existing email and provide a user-friendly message.
       if (error.code === 'auth/email-already-in-use') {
-        // Log a more informative message for developers, not an aggressive "error".
         console.log("Info: Registration attempt with an existing email.", values.email);
-        description = "Este correo electrónico ya está registrado. Por favor, intenta con otro o inicia sesión.";
+        toast({
+          variant: "destructive",
+          title: "Error al Registrarse",
+          description: "Este correo electrónico ya está registrado.",
+          action: (
+            <ToastAction asChild altText="Iniciar Sesión">
+              <Link href="/login">Iniciar Sesión</Link>
+            </ToastAction>
+          ),
+        });
       } else {
-        // Log other unexpected errors as actual errors.
         console.error("An unexpected error occurred during registration:", error);
-        if (error.message) {
-          description = error.message;
-        }
+        toast({
+          variant: "destructive",
+          title: "Error al Registrarse",
+          description: error.message || "No se pudo completar el registro. Inténtalo de nuevo.",
+        });
       }
-      
-      toast({
-        variant: "destructive",
-        title: "Error al Registrarse",
-        description: description,
-      });
     }
   }
 
