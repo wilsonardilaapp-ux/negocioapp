@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -29,7 +29,7 @@ import { doc } from 'firebase/firestore';
 import type { GlobalConfig } from '@/models/global-config';
 import { useEffect } from 'react';
 import Link from 'next/link';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Eye, EyeOff } from 'lucide-react';
 
 const SUPER_ADMIN_UID = "qy2fh98JgYhZnWz682JuPX4A7fU2";
 
@@ -53,6 +53,7 @@ export default function LoginPage() {
   const auth = useAuth();
   const firestore = useFirestore();
   const { user, isUserLoading } = useUser();
+  const [showPassword, setShowPassword] = useState(false);
 
   const configDocRef = useMemoFirebase(() => {
     if (!firestore) return null;
@@ -80,7 +81,7 @@ export default function LoginPage() {
       // The FirebaseProvider's onAuthStateChanged will handle the redirection.
     } catch (error: any) {
       // Log the specific Firebase error code to the developer console for debugging
-      console.error("Login Error Code:", error.code);
+      console.error("Login Error:", error.code, error.message);
       
       toast({
         variant: "destructive",
@@ -135,9 +136,31 @@ export default function LoginPage() {
                             ¿Olvidaste tu contraseña?
                         </Link>
                     </div>
-                  <FormControl>
-                    <Input type="password" placeholder="Tu contraseña" {...field} />
-                  </FormControl>
+                  <div className="relative">
+                    <FormControl>
+                      <Input
+                        type={showPassword ? 'text' : 'password'}
+                        placeholder="Tu contraseña"
+                        {...field}
+                      />
+                    </FormControl>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-1 top-1/2 -translate-y-1/2 h-auto p-1 text-muted-foreground"
+                      onClick={() => setShowPassword((prev) => !prev)}
+                    >
+                      {showPassword ? (
+                        <EyeOff className="h-4 w-4" />
+                      ) : (
+                        <Eye className="h-4 w-4" />
+                      )}
+                      <span className="sr-only">
+                        {showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                      </span>
+                    </Button>
+                  </div>
                   <FormMessage />
                 </FormItem>
               )}

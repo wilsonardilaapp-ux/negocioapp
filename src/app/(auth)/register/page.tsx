@@ -25,7 +25,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { ToastAction } from "@/components/ui/toast";
 import { useAuth, useUser, useFirestore, initiateEmailSignUp } from "@/firebase";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { doc, setDoc, writeBatch, getDoc } from 'firebase/firestore';
 import type { Business } from '@/models/business';
 import type { User as AppUser } from "@/models/user";
@@ -37,6 +37,7 @@ import type { Module } from "@/models/module";
 import type { SystemService } from "@/models/system-service";
 import type { KnowledgeDocument } from "@/models/chatbot-config";
 import { isFirstUser } from '@/actions/user';
+import { Eye, EyeOff } from 'lucide-react';
 
 const registerSchema = z.object({
   name: z.string().min(1, { message: "Por favor, introduce tu nombre." }),
@@ -199,6 +200,7 @@ export default function RegisterPage() {
   const auth = useAuth();
   const firestore = useFirestore();
   const { user, isUserLoading } = useUser();
+  const [showPassword, setShowPassword] = useState(false);
 
   const form = useForm<z.infer<typeof registerSchema>>({
     resolver: zodResolver(registerSchema),
@@ -347,8 +349,8 @@ export default function RegisterPage() {
         console.log("Info: Registration attempt with an existing email.", values.email);
         toast({
           variant: "destructive",
-          title: "Error al Registrarse",
-          description: "Este correo electrónico ya está registrado.",
+          title: "Este correo electrónico ya está registrado.",
+          description: "Por favor, intenta con otro correo o inicia sesión.",
           action: (
             <ToastAction asChild altText="Iniciar Sesión">
               <Link href="/login">Iniciar Sesión</Link>
@@ -419,9 +421,31 @@ export default function RegisterPage() {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Contraseña</FormLabel>
-                  <FormControl>
-                    <Input type="password" placeholder="Mínimo 6 caracteres" {...field} />
-                  </FormControl>
+                  <div className="relative">
+                    <FormControl>
+                      <Input
+                        type={showPassword ? 'text' : 'password'}
+                        placeholder="Mínimo 6 caracteres"
+                        {...field}
+                      />
+                    </FormControl>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-1 top-1/2 -translate-y-1/2 h-auto p-1 text-muted-foreground"
+                      onClick={() => setShowPassword((prev) => !prev)}
+                    >
+                      {showPassword ? (
+                        <EyeOff className="h-4 w-4" />
+                      ) : (
+                        <Eye className="h-4 w-4" />
+                      )}
+                      <span className="sr-only">
+                        {showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                      </span>
+                    </Button>
+                  </div>
                   <FormMessage />
                 </FormItem>
               )}
