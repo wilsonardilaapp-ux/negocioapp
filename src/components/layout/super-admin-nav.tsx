@@ -1,3 +1,4 @@
+
 "use client";
 
 import Link from "next/link";
@@ -15,7 +16,7 @@ import {
   CreditCard,
   TrendingUp,
   Package,
-  UserCircle, // Import new icon
+  UserCircle,
 } from "lucide-react";
 
 import { SidebarMenu, SidebarMenuItem, SidebarMenuButton } from "@/components/ui/sidebar";
@@ -33,7 +34,7 @@ const navItems = [
   { href: "/superadmin/monitoreo", icon: Activity, label: "Monitoreo" },
   { href: "/superadmin/configuracion", icon: Settings, label: "Configuración" },
   { href: "/superadmin/analytics", icon: BarChart, label: "Métricas" },
-  { href: "/superadmin/perfil", icon: UserCircle, label: "Perfil" }, // Add new item
+  { href: "/superadmin/perfil", icon: UserCircle, label: "Perfil" },
 ];
 
 export function SuperAdminNav() {
