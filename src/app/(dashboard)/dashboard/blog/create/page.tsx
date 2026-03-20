@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useTransition, useEffect } from 'react';
@@ -12,12 +11,12 @@ import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
-import { Save, Loader2, ArrowLeft, Bot } from 'lucide-react';
+import { Save, Loader2, ArrowLeft, Bot, Lock } from 'lucide-react';
 import RichTextEditor from '@/components/editor/RichTextEditor';
-import { useDoc, useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
-import { doc, collection, query, where } from 'firebase/firestore';
-import type { Module } from '@/models/module';
+import { useCollection, useMemoFirebase, useUser } from '@/firebase';
+import { collection, query, where } from 'firebase/firestore';
 import type { BlogPost } from '@/models/blog-post';
+import { useSubscription } from '@/hooks/useSubscription';
 
 export default function CreatePostPage() {
     const router = useRouter();
@@ -26,27 +25,62 @@ export default function CreatePostPage() {
     const [isPending, startTransition] = useTransition();
     const [content, setContent] = useState('');
     
-    const firestore = useFirestore();
+    const { plan, isFree, canAddBlogPosts, limits, isLoading: isSubscriptionLoading } = useSubscription();
 
-    const blogModuleQuery = useMemoFirebase(() => !firestore ? null : doc(firestore, 'modules', 'blog'), [firestore]);
-    
-    // Query for posts created by the current user.
-    // NOTE: This assumes a `businessId` field on blog posts. If not present, this needs adjustment.
-    // For now, we will query all posts and show the global limit.
-    const postsQuery = useMemoFirebase(() => !firestore ? null : collection(firestore, 'blog_posts'), [firestore]);
+    const postsQuery = useMemoFirebase(() => 
+        !user ? null : query(collection(user.firestore, 'blog_posts'), where('businessId', '==', user.uid)), 
+    [user]);
 
-    const { data: blogModule, isLoading: isModuleLoading } = useDoc<Module>(blogModuleQuery);
     const { data: posts, isLoading: arePostsLoading } = useCollection<BlogPost>(postsQuery);
 
-    const postLimit = blogModule?.limit ?? 50; 
-    const postCount = posts?.length ?? 0;
+    const totalPosts = posts?.length ?? 0;
+    const isLoading = isSubscriptionLoading || arePostsLoading;
+
+    useEffect(() => {
+        if (!isLoading && isFree && !canAddBlogPosts(totalPosts)) {
+            // User is at their limit, but might have navigated here directly.
+            // The UI will show the lock screen, but this could be a good place
+            // for a toast or a redirect if preferred.
+        }
+    }, [isLoading, isFree, canAddBlogPosts, totalPosts, router]);
+    
+    if (isLoading) {
+        return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin" /> Cargando...</div>
+    }
+    
+    if (isFree && !canAddBlogPosts(totalPosts)) {
+        return (
+             <Card className="text-center">
+                <CardHeader>
+                    <Lock className="mx-auto h-12 w-12 text-destructive" />
+                    <CardTitle className="mt-4 text-2xl font-bold">Límite de Posts Alcanzado</CardTitle>
+                    <CardDescription>
+                        Has utilizado {totalPosts} de {limits.blogPosts} posts disponibles en tu plan {plan.toUpperCase()}.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <p className="mb-6">Para crear más artículos, por favor, actualiza tu plan.</p>
+                    <div className="flex justify-center gap-4">
+                         <Button asChild variant="secondary">
+                            <Link href="/dashboard/blog">
+                                <ArrowLeft className="mr-2 h-4 w-4" />
+                                Volver al Blog
+                            </Link>
+                        </Button>
+                        <Button asChild>
+                            <Link href="/dashboard/subscription">Actualizar a PRO →</Link>
+                        </Button>
+                    </div>
+                </CardContent>
+            </Card>
+        );
+    }
 
     const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault();
         const formData = new FormData(event.currentTarget);
         formData.set('content', content);
         
-        // Add businessId to the form data
         if(user) {
             formData.set('businessId', user.uid);
         }
@@ -61,8 +95,6 @@ export default function CreatePostPage() {
             }
         });
     };
-
-    const isLoading = isModuleLoading || arePostsLoading;
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-6">
@@ -123,10 +155,12 @@ export default function CreatePostPage() {
                             <p className="text-sm text-muted-foreground mb-2">Cargando límite...</p>
                         ) : (
                             <p className="text-sm text-muted-foreground mb-2">
-                               Has creado {postCount} de {postLimit === -1 ? '∞' : postLimit} posts permitidos.
+                               {isFree 
+                                    ? `Has creado ${totalPosts} de ${limits.blogPosts} posts permitidos.`
+                                    : 'Tu plan incluye posts ilimitados ∞'}
                             </p>
                         )}
-                        <Progress value={isLoading || postLimit === -1 ? 0 : (postCount / postLimit) * 100} />
+                        <Progress value={isFree ? (totalPosts / limits.blogPosts) * 100 : 100} />
                     </CardContent>
                 </Card>
 
