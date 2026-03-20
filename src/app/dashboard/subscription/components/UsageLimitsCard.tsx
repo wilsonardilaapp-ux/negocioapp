@@ -1,7 +1,6 @@
 "use client";
 
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
@@ -24,10 +23,10 @@ interface UsageLimitsCardProps {
 export default function UsageLimitsCard({ usage, currentPlan }: UsageLimitsCardProps) {
   
   const getProgressColorClass = (percentage: number) => {
-    if (percentage >= 100) return 'bg-red-500';
+    if (percentage >= 100) return 'bg-destructive';
     if (percentage > 85) return 'bg-orange-500';
     if (percentage > 60) return 'bg-yellow-500';
-    return 'bg-green-500';
+    return 'bg-primary';
   };
 
   return (
@@ -51,17 +50,21 @@ export default function UsageLimitsCard({ usage, currentPlan }: UsageLimitsCardP
             </div>
             {!metric.isUnlimited ? (
               <>
-                <Progress 
-                    value={metric.percentage} 
-                    className="h-2"
-                    indicatorClassName={getProgressColorClass(metric.percentage)}
-                />
+                <div className="relative h-2 w-full overflow-hidden rounded-full bg-secondary">
+                  <div
+                    className={cn(
+                      "h-full w-full flex-1 transition-all",
+                      getProgressColorClass(metric.percentage)
+                    )}
+                    style={{ transform: `translateX(-${100 - (metric.percentage || 0)}%)` }}
+                  />
+                </div>
                 {metric.isAtLimit && (
                     <div className="text-center mt-2">
                         <p className="text-xs text-red-500 font-bold">Límite alcanzado</p>
                         {currentPlan === 'free' && (
                              <Button asChild variant="link" size="sm" className="p-0 h-auto">
-                                <Link href="/pricing">Actualizar plan →</Link>
+                                <Link href="/dashboard/subscription">Actualizar plan →</Link>
                             </Button>
                         )}
                     </div>
