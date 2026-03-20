@@ -13,7 +13,8 @@ import {
   BarChart,
   FileText,
   CreditCard,
-  TrendingUp, // Importar nuevo icono
+  TrendingUp,
+  Package, // Importar nuevo icono
 } from "lucide-react";
 
 import { SidebarMenu, SidebarMenuItem, SidebarMenuButton } from "@/components/ui/sidebar";
@@ -22,7 +23,8 @@ const navItems = [
   { href: "/superadmin", icon: LayoutDashboard, label: "Dashboard" },
   { href: "/superadmin/usuarios", icon: Users, label: "Usuarios" },
   { href: "/superadmin/subscriptions", icon: CreditCard, label: "Suscripciones" },
-  { href: "/superadmin/revenue", icon: TrendingUp, label: "Ingresos" }, // Nuevo enlace
+  { href: "/superadmin/revenue", icon: TrendingUp, label: "Ingresos" },
+  { href: "/superadmin/plans", icon: Package, label: "Planes" }, // Nuevo enlace
   { href: "/superadmin/blog", icon: FileText, label: "Blog" },
   { href: "/superadmin/servicios", icon: Server, label: "Servicios" },
   { href: "/superadmin/modulos", icon: Box, label: "Módulos" },
