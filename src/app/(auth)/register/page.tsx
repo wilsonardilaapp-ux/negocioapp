@@ -26,7 +26,7 @@ import { useToast } from "@/hooks/use-toast";
 import { ToastAction } from "@/components/ui/toast";
 import { useAuth, useUser, useFirestore, initiateEmailSignUp } from "@/firebase";
 import { useEffect, useState } from "react";
-import { doc, setDoc, writeBatch, getDoc } from 'firebase/firestore';
+import { doc, setDoc, writeBatch, getDoc, Timestamp } from 'firebase/firestore';
 import type { Business } from '@/models/business';
 import type { User as AppUser } from "@/models/user";
 import Link from "next/link";
@@ -38,6 +38,7 @@ import type { SystemService } from "@/models/system-service";
 import type { KnowledgeDocument } from "@/models/chatbot-config";
 import { isFirstUser } from '@/actions/user';
 import { Eye, EyeOff } from 'lucide-react';
+import type { Subscription } from "@/models/subscription";
 
 const registerSchema = z.object({
   name: z.string().min(1, { message: "Por favor, introduce tu nombre." }),
@@ -336,6 +337,20 @@ export default function RegisterPage() {
         fileUrl: "https://res.cloudinary.com/dazt6g3o1/image/upload/v1717349882/w5j8ot00m5fg0f0r0t8z.jpg"
       };
       batch.set(coffeeOfferRef, coffeeOfferData);
+
+      // 8. Crear documento de Suscripción por defecto
+      const subscriptionDocRef = doc(firestore, 'businesses', newUser.uid, 'subscription', 'current');
+      const now = Timestamp.now();
+      const freeSubscription: Subscription = {
+        plan: 'free',
+        status: 'active',
+        stripeCustomerId: null,
+        stripeSubscriptionId: null,
+        currentPeriodEnd: null,
+        createdAt: now,
+        updatedAt: now,
+      };
+      batch.set(subscriptionDocRef, freeSubscription);
 
       await batch.commit();
       
