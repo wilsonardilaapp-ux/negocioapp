@@ -14,7 +14,8 @@ import {
   FileText,
   CreditCard,
   TrendingUp,
-  Package, // Importar nuevo icono
+  Package,
+  UserCircle, // Import new icon
 } from "lucide-react";
 
 import { SidebarMenu, SidebarMenuItem, SidebarMenuButton } from "@/components/ui/sidebar";
@@ -24,7 +25,7 @@ const navItems = [
   { href: "/superadmin/usuarios", icon: Users, label: "Usuarios" },
   { href: "/superadmin/subscriptions", icon: CreditCard, label: "Suscripciones" },
   { href: "/superadmin/revenue", icon: TrendingUp, label: "Ingresos" },
-  { href: "/superadmin/plans", icon: Package, label: "Planes" }, // Nuevo enlace
+  { href: "/superadmin/plans", icon: Package, label: "Planes" },
   { href: "/superadmin/blog", icon: FileText, label: "Blog" },
   { href: "/superadmin/servicios", icon: Server, label: "Servicios" },
   { href: "/superadmin/modulos", icon: Box, label: "Módulos" },
@@ -32,6 +33,7 @@ const navItems = [
   { href: "/superadmin/monitoreo", icon: Activity, label: "Monitoreo" },
   { href: "/superadmin/configuracion", icon: Settings, label: "Configuración" },
   { href: "/superadmin/analytics", icon: BarChart, label: "Métricas" },
+  { href: "/superadmin/perfil", icon: UserCircle, label: "Perfil" }, // Add new item
 ];
 
 export function SuperAdminNav() {
