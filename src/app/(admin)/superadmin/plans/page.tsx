@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PlusCircle, Package, Loader2 } from 'lucide-react';
-import { useCollection, useFirestore, setDocumentNonBlocking } from '@/firebase';
+import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { collection, doc, writeBatch } from 'firebase/firestore';
 import type { SubscriptionPlan } from '@/models/subscription-plan';
 import { DefaultSubscriptionPlans } from '@/models/subscription-plan';
@@ -19,7 +19,10 @@ export default function PlansPage() {
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [editingPlan, setEditingPlan] = useState<SubscriptionPlan | null>(null);
 
-    const plansQuery = collection(firestore, 'plans');
+    const plansQuery = useMemoFirebase(() => {
+        if (!firestore) return null;
+        return collection(firestore, 'plans');
+    }, [firestore]);
     const { data: plans, isLoading } = useCollection<SubscriptionPlan>(plansQuery);
 
     const handleOpenDialog = (plan: SubscriptionPlan | null) => {
