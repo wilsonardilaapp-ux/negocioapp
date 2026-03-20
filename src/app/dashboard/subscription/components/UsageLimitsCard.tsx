@@ -24,10 +24,10 @@ interface UsageLimitsCardProps {
 export default function UsageLimitsCard({ usage, currentPlan }: UsageLimitsCardProps) {
   
   const getProgressColorClass = (percentage: number) => {
-    if (percentage >= 100) return '[&>div]:!bg-red-500';
-    if (percentage > 85) return '[&>div]:!bg-orange-500';
-    if (percentage > 60) return '[&>div]:!bg-yellow-500';
-    return '[&>div]:!bg-green-500';
+    if (percentage >= 100) return '[&>div]:bg-red-500';
+    if (percentage > 85) return '[&>div]:bg-orange-500';
+    if (percentage > 60) return '[&>div]:bg-yellow-500';
+    return '[&>div]:bg-green-500';
   };
 
   return (
