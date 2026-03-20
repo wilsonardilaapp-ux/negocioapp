@@ -29,6 +29,7 @@ const allNavItems = [
   { href: "/dashboard/mensajes", icon: MessageSquare, label: "Mensajes" },
   { href: "/dashboard/pedidos", icon: ShoppingBag, label: "Pedidos" },
   { href: "/dashboard/pagos", icon: CreditCard, label: "Pagos" },
+  { href: "/dashboard/subscription", icon: CreditCard, label: "Suscripción" },
   { href: "/dashboard/chatbot", icon: MessageCircle, label: "Asistente IA", moduleId: 'chatbot-integrado-con-whatsapp-para-soporte-y-ventas'},
   { href: "/dashboard/suggestions", icon: Lightbulb, label: "Sugerencias", moduleId: 'motor-de-sugerencias-inteligentes' },
   { href: "/dashboard/analytics", icon: BarChart, label: "Métricas", moduleId: 'google-analytics' },
@@ -91,5 +92,3 @@ export function ClientNav() {
     </SidebarMenu>
   );
 }
-
-    
