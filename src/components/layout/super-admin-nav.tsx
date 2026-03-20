@@ -1,4 +1,3 @@
-
 "use client";
 
 import Link from "next/link";
@@ -13,7 +12,8 @@ import {
   Settings,
   BarChart,
   FileText,
-  CreditCard, // Importar el nuevo icono
+  CreditCard,
+  TrendingUp, // Importar nuevo icono
 } from "lucide-react";
 
 import { SidebarMenu, SidebarMenuItem, SidebarMenuButton } from "@/components/ui/sidebar";
@@ -21,7 +21,8 @@ import { SidebarMenu, SidebarMenuItem, SidebarMenuButton } from "@/components/ui
 const navItems = [
   { href: "/superadmin", icon: LayoutDashboard, label: "Dashboard" },
   { href: "/superadmin/usuarios", icon: Users, label: "Usuarios" },
-  { href: "/superadmin/subscriptions", icon: CreditCard, label: "Suscripciones" }, // Nuevo enlace
+  { href: "/superadmin/subscriptions", icon: CreditCard, label: "Suscripciones" },
+  { href: "/superadmin/revenue", icon: TrendingUp, label: "Ingresos" }, // Nuevo enlace
   { href: "/superadmin/blog", icon: FileText, label: "Blog" },
   { href: "/superadmin/servicios", icon: Server, label: "Servicios" },
   { href: "/superadmin/modulos", icon: Box, label: "Módulos" },
