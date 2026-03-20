@@ -50,6 +50,7 @@ export default function UsageLimitsCard({ usage, currentPlan }: UsageLimitsCardP
             </div>
             {!metric.isUnlimited ? (
               <>
+                {/* Manual implementation of the progress bar to fix the rendering error */}
                 <div className="relative h-2 w-full overflow-hidden rounded-full bg-secondary">
                   <div
                     className={cn(
