@@ -10,6 +10,12 @@ service cloud.firestore {
       allow write: if request.auth != null;
     }
 
+    // Regla para Planes de Suscripción
+    match /plans/{planId} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+
     // 2. CONFIGURACIÓN GLOBAL (Para que no falle el inicio)
     match /globalConfig/{document=**} {
       allow read: if true;
