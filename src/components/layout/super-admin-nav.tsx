@@ -1,4 +1,3 @@
-
 "use client";
 
 import Link from "next/link";
@@ -27,6 +26,7 @@ const navItems = [
   { href: "/superadmin/subscriptions", icon: CreditCard, label: "Suscripciones" },
   { href: "/superadmin/revenue", icon: TrendingUp, label: "Ingresos" },
   { href: "/superadmin/plans", icon: Package, label: "Planes" },
+  { href: "/superadmin/payment-methods", icon: CreditCard, label: "Pasarelas de Pago" },
   { href: "/superadmin/blog", icon: FileText, label: "Blog" },
   { href: "/superadmin/servicios", icon: Server, label: "Servicios" },
   { href: "/superadmin/modulos", icon: Box, label: "Módulos" },
