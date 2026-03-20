@@ -12,7 +12,8 @@ import {
   Plug,
   Settings,
   BarChart,
-  FileText, // Importar el nuevo icono
+  FileText,
+  CreditCard, // Importar el nuevo icono
 } from "lucide-react";
 
 import { SidebarMenu, SidebarMenuItem, SidebarMenuButton } from "@/components/ui/sidebar";
@@ -20,7 +21,8 @@ import { SidebarMenu, SidebarMenuItem, SidebarMenuButton } from "@/components/ui
 const navItems = [
   { href: "/superadmin", icon: LayoutDashboard, label: "Dashboard" },
   { href: "/superadmin/usuarios", icon: Users, label: "Usuarios" },
-  { href: "/superadmin/blog", icon: FileText, label: "Blog" }, // Nuevo enlace
+  { href: "/superadmin/subscriptions", icon: CreditCard, label: "Suscripciones" }, // Nuevo enlace
+  { href: "/superadmin/blog", icon: FileText, label: "Blog" },
   { href: "/superadmin/servicios", icon: Server, label: "Servicios" },
   { href: "/superadmin/modulos", icon: Box, label: "Módulos" },
   { href: "/superadmin/integraciones", icon: Plug, label: "Integraciones" },
