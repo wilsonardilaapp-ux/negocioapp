@@ -13,12 +13,6 @@ service cloud.firestore {
       );
     }
 
-    function isOwner(businessId) {
-      // For collection list operations. ONLY allows the owner.
-      // This is because rules for `list` cannot use `get()` or `exists()`.
-      return request.auth != null && request.auth.uid == businessId;
-    }
-
     // Publicly readable collections
     match /blog_posts/{postId} {
       allow read: if true;
@@ -62,27 +56,27 @@ service cloud.firestore {
 
       // Private subcollections with split rules for list (owner-only) vs get/write (member).
       match /products/{productId} {
-        allow list: if isOwner(businessId);
+        allow list: if request.auth != null && request.auth.uid == businessId;
         allow get, write: if isBusinessMember(businessId);
       }
       match /orders/{orderId} {
-        allow list: if isOwner(businessId);
+        allow list: if request.auth != null && request.auth.uid == businessId;
         allow get, write: if isBusinessMember(businessId);
       }
       match /contactForms/{formId} {
-        allow list: if isOwner(businessId);
+        allow list: if request.auth != null && request.auth.uid == businessId;
         allow get, write: if isBusinessMember(businessId);
       }
       match /contactSubmissions/{submissionId} {
-        allow list: if isOwner(businessId);
+        allow list: if request.auth != null && request.auth.uid == businessId;
         allow get, write: if isBusinessMember(businessId);
       }
       match /suggestionRules/{ruleId} {
-        allow list: if isOwner(businessId);
+        allow list: if request.auth != null && request.auth.uid == businessId;
         allow get, write: if isBusinessMember(businessId);
       }
       match /printers/{printerId} {
-        allow list: if isOwner(businessId);
+        allow list: if request.auth != null && request.auth.uid == businessId;
         allow get, write: if isBusinessMember(businessId);
       }
       match /invoiceSettings/{docId} {
@@ -96,12 +90,12 @@ service cloud.firestore {
       match /chatbotConfig/main {
         allow read, write: if isBusinessMember(businessId);
         match /knowledgeBase/{documentId} {
-            allow list: if isOwner(businessId);
+            allow list: if request.auth != null && request.auth.uid == businessId;
             allow get, write: if isBusinessMember(businessId);
         }
       }
       match /chatConversations/{conversationId} {
-          allow list: if isOwner(businessId);
+          allow list: if request.auth != null && request.auth.uid == businessId;
           allow get, write: if isBusinessMember(businessId);
           match /messages/{messageId} {
               allow read, write: if isBusinessMember(businessId);
