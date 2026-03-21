@@ -1,10 +1,11 @@
+
 import { z } from 'zod';
 
 // For QR-based payments like Nequi, Bancolombia, Daviplata
 export const QRConfigSchema = z.object({
   enabled: z.boolean(),
   accountNumber: z.string().optional(),
-  accountHolder: z.string().optional(),
+  holderName: z.string().optional(),
   qrImageUrl: z.string().nullable().optional(),
   instructions: z.string().optional(),
 });

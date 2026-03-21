@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useMemo } from 'react';
@@ -17,9 +18,9 @@ import { collection, doc, writeBatch } from 'firebase/firestore';
 import type { SubscriptionPlan } from '@/models/subscription-plan';
 
 const initialConfig: GlobalPaymentConfig = {
-    nequi: { enabled: false, accountNumber: '', accountHolder: '', instructions: '', qrImageUrl: null },
-    bancolombia: { enabled: false, accountNumber: '', accountHolder: '', instructions: '', qrImageUrl: null },
-    daviplata: { enabled: false, accountNumber: '', accountHolder: '', instructions: '', qrImageUrl: null },
+    nequi: { enabled: false, accountNumber: '', holderName: '', instructions: '', qrImageUrl: null },
+    bancolombia: { enabled: false, accountNumber: '', holderName: '', instructions: '', qrImageUrl: null },
+    daviplata: { enabled: false, accountNumber: '', holderName: '', instructions: '', qrImageUrl: null },
     breB: { enabled: false, holderName: '', keyType: 'Celular', keyValue: '', instructions: '', qrImageUrl: null, commerceCode: '' },
     stripe: { enabled: false, mode: 'sandbox', secretKey: '', instructions: '' },
     paypal: { enabled: false, mode: 'sandbox', clientId: '', clientSecret: '', instructions: '' },
