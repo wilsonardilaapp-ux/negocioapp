@@ -157,7 +157,7 @@ export default function PaymentMethodsPage() {
                             <Switch id="nequi-enabled" checked={config.nequi.enabled} onCheckedChange={checked => handleConfigChange('nequi', {...config.nequi, enabled: checked})} />
                             <Label htmlFor="nequi-enabled">Habilitar Nequi</Label>
                         </div>
-                        {config.nequi.enabled && <QRForm methodName="Nequi" data={config.nequi} setData={(data) => handleConfigChange('nequi', data)} accountLabel="Número de Teléfono" />}
+                        {config.nequi.enabled && <QRForm methodName="Nequi" data={{...config.nequi, accountNumber: config.nequi.accountNumber ?? '', holderName: config.nequi.holderName ?? '', qrImageUrl: config.nequi.qrImageUrl ?? null, instructions: config.nequi.instructions ?? ''}} setData={(data) => handleConfigChange('nequi', data)} accountLabel="Número de Teléfono" />}
                     </PaymentMethodCard>
                     
                     <PaymentMethodCard title="Bancolombia" icon={Building}>
@@ -165,7 +165,7 @@ export default function PaymentMethodsPage() {
                             <Switch id="bancolombia-enabled" checked={config.bancolombia.enabled} onCheckedChange={checked => handleConfigChange('bancolombia', {...config.bancolombia, enabled: checked})} />
                             <Label htmlFor="bancolombia-enabled">Habilitar Bancolombia</Label>
                         </div>
-                        {config.bancolombia.enabled && <QRForm methodName="Bancolombia" data={config.bancolombia} setData={(data) => handleConfigChange('bancolombia', data)} accountLabel="Número de Cuenta" />}
+                        {config.bancolombia.enabled && <QRForm methodName="Bancolombia" data={{...config.bancolombia, accountNumber: config.bancolombia.accountNumber ?? '', holderName: config.bancolombia.holderName ?? '', qrImageUrl: config.bancolombia.qrImageUrl ?? null, instructions: config.bancolombia.instructions ?? ''}} setData={(data) => handleConfigChange('bancolombia', data)} accountLabel="Número de Cuenta" />}
                     </PaymentMethodCard>
 
                     <PaymentMethodCard title="Daviplata" icon={Smartphone}>
@@ -173,7 +173,7 @@ export default function PaymentMethodsPage() {
                             <Switch id="daviplata-enabled" checked={config.daviplata.enabled} onCheckedChange={checked => handleConfigChange('daviplata', {...config.daviplata, enabled: checked})} />
                             <Label htmlFor="daviplata-enabled">Habilitar Daviplata</Label>
                         </div>
-                        {config.daviplata.enabled && <QRForm methodName="Daviplata" data={config.daviplata} setData={(data) => handleConfigChange('daviplata', data)} accountLabel="Número de Teléfono" />}
+                        {config.daviplata.enabled && <QRForm methodName="Daviplata" data={{...config.daviplata, accountNumber: config.daviplata.accountNumber ?? '', holderName: config.daviplata.holderName ?? '', qrImageUrl: config.daviplata.qrImageUrl ?? null, instructions: config.daviplata.instructions ?? ''}} setData={(data) => handleConfigChange('daviplata', data)} accountLabel="Número de Teléfono" />}
                     </PaymentMethodCard>
 
                     <PaymentMethodCard title="BRE-B" icon={Building2}>
