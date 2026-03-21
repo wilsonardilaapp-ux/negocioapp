@@ -1,4 +1,5 @@
 
+
 "use client"
 
 import { useState } from "react";
@@ -6,6 +7,7 @@ import { ColumnDef } from "@tanstack/react-table"
 import { MoreHorizontal, Eye, Trash2, Edit, Mail, Phone } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -51,9 +53,14 @@ const getStatusVariant = (status: OrderStatus) => {
 type ColumnsProps = {
   handleDeleteOrder: (id: string) => Promise<void>;
   handleUpdateStatus: (id: string, status: OrderStatus) => Promise<void>;
+  selectedOrders: string[];
+  onSelectAll: (isChecked: boolean) => void;
+  onSelectRow: (orderId: string) => void;
+  isAllSelected: boolean;
+  isSomeSelected: boolean;
 };
 
-export const columns = ({ handleDeleteOrder, handleUpdateStatus }: ColumnsProps): ColumnDef<Order>[] => {
+export const columns = ({ handleDeleteOrder, handleUpdateStatus, selectedOrders, onSelectAll, onSelectRow, isAllSelected, isSomeSelected }: ColumnsProps): ColumnDef<Order>[] => {
 
   const ViewOrderDialog = ({ order }: { order: Order }) => {
     const [isOpen, setIsOpen] = useState(false);
@@ -218,6 +225,25 @@ export const columns = ({ handleDeleteOrder, handleUpdateStatus }: ColumnsProps)
 
   return [
     {
+      id: "select",
+      header: ({ table }) => (
+        <Checkbox
+          checked={isAllSelected}
+          onCheckedChange={(value) => onSelectAll(!!value)}
+          aria-label="Select all"
+        />
+      ),
+      cell: ({ row }) => (
+        <Checkbox
+          checked={selectedOrders.includes(row.original.id)}
+          onCheckedChange={() => onSelectRow(row.original.id)}
+          aria-label="Select row"
+        />
+      ),
+      enableSorting: false,
+      enableHiding: false,
+    },
+    {
       accessorKey: "customerName",
       header: "Cliente",
     },
@@ -274,5 +300,3 @@ export const columns = ({ handleDeleteOrder, handleUpdateStatus }: ColumnsProps)
     },
   ];
 }
-
-    

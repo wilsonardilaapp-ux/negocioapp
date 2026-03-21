@@ -1,4 +1,5 @@
 
+
 "use client"
 
 import {
@@ -17,17 +18,20 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Loader2 } from "lucide-react"
+import { cn } from "@/lib/utils"
 
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[]
   data: TData[]
   isLoading?: boolean
+  selectedOrderIds?: string[]
 }
 
-export function DataTable<TData, TValue>({
+export function DataTable<TData extends {id: string}, TValue>({
   columns,
   data,
   isLoading,
+  selectedOrderIds = [],
 }: DataTableProps<TData, TValue>) {
   const table = useReactTable({
     data,
@@ -71,6 +75,9 @@ export function DataTable<TData, TValue>({
               <TableRow
                 key={row.id}
                 data-state={row.getIsSelected() && "selected"}
+                className={cn(
+                    selectedOrderIds.includes(row.original.id) && "bg-orange-50"
+                )}
               >
                 {row.getVisibleCells().map((cell) => (
                   <TableCell key={cell.id}>
@@ -91,5 +98,3 @@ export function DataTable<TData, TValue>({
     </div>
   )
 }
-
-    
