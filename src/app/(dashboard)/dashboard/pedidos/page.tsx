@@ -74,12 +74,12 @@ export default function PedidosPage() {
   };
 
   const handleDownloadPDF = () => {
-    if (!orders) return;
+    if (!filteredOrders) return;
     const doc = new jsPDF();
 
     doc.autoTable({
       head: [['Cliente', 'Producto', 'Cantidad', 'Total', 'Estado', 'Fecha']],
-      body: orders.map((order) => [
+      body: filteredOrders.map((order) => [
         order.customerName,
         order.productName,
         order.quantity,
