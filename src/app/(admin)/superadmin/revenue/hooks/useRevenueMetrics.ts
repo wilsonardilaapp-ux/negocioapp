@@ -86,7 +86,7 @@ export function useRevenueMetrics() {
             const totalActiveClientsLastMonth = activeSubsLastMonth.length;
             const clientsGrowth = totalActiveClientsLastMonth > 0 ? ((totalActiveClients - totalActiveClientsLastMonth) / totalActiveClientsLastMonth) * 100 : totalActiveClients > 0 ? 100 : 0;
 
-            const newClientsThisMonth = clients.filter(c => c.subscription?.createdAt.toDate() >= startOfThisMonth).length;
+            const newClientsThisMonth = clients.filter(c => c.subscription && c.subscription.createdAt.toDate() >= startOfThisMonth).length;
             const cancelationsThisMonth = clients.filter(c => {
                 const sub = c.subscription;
                 return sub?.status === 'canceled' && sub.updatedAt.toDate() >= startOfThisMonth;
