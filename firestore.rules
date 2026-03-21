@@ -5,8 +5,8 @@ service cloud.firestore {
   match /databases/{database}/documents {
   
     function isBusinessMember(businessId) {
-      // For single doc reads/writes. Allows the owner OR a staff member
-      // whose user doc points to this businessId.
+      // Allows access if the user is the business owner OR a staff member
+      // whose user document points to this businessId.
       return request.auth != null && (
         request.auth.uid == businessId ||
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.businessId == businessId
@@ -54,30 +54,24 @@ service cloud.firestore {
         allow write: if isBusinessMember(businessId);
       }
 
-      // Private subcollections with split rules for list (owner-only) vs get/write (member).
+      // Private subcollections with unified member access
       match /products/{productId} {
-        allow list: if request.auth != null && request.auth.uid == businessId;
-        allow get, write: if isBusinessMember(businessId);
+        allow read, write: if isBusinessMember(businessId);
       }
       match /orders/{orderId} {
-        allow list: if request.auth != null && request.auth.uid == businessId;
-        allow get, write: if isBusinessMember(businessId);
+        allow read, write: if isBusinessMember(businessId);
       }
       match /contactForms/{formId} {
-        allow list: if request.auth != null && request.auth.uid == businessId;
-        allow get, write: if isBusinessMember(businessId);
+        allow read, write: if isBusinessMember(businessId);
       }
       match /contactSubmissions/{submissionId} {
-        allow list: if request.auth != null && request.auth.uid == businessId;
-        allow get, write: if isBusinessMember(businessId);
+        allow read, write: if isBusinessMember(businessId);
       }
       match /suggestionRules/{ruleId} {
-        allow list: if request.auth != null && request.auth.uid == businessId;
-        allow get, write: if isBusinessMember(businessId);
+        allow read, write: if isBusinessMember(businessId);
       }
       match /printers/{printerId} {
-        allow list: if request.auth != null && request.auth.uid == businessId;
-        allow get, write: if isBusinessMember(businessId);
+        allow read, write: if isBusinessMember(businessId);
       }
       match /invoiceSettings/{docId} {
          allow read, write: if isBusinessMember(businessId);
@@ -90,13 +84,11 @@ service cloud.firestore {
       match /chatbotConfig/main {
         allow read, write: if isBusinessMember(businessId);
         match /knowledgeBase/{documentId} {
-            allow list: if request.auth != null && request.auth.uid == businessId;
-            allow get, write: if isBusinessMember(businessId);
+            allow read, write: if isBusinessMember(businessId);
         }
       }
       match /chatConversations/{conversationId} {
-          allow list: if request.auth != null && request.auth.uid == businessId;
-          allow get, write: if isBusinessMember(businessId);
+          allow read, write: if isBusinessMember(businessId);
           match /messages/{messageId} {
               allow read, write: if isBusinessMember(businessId);
           }
