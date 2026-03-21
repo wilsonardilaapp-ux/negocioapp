@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -20,7 +21,7 @@ const initialConfig: GlobalPaymentConfig = {
     nequi: { enabled: false, accountNumber: '', accountHolder: '', instructions: '', qrImageUrl: null },
     bancolombia: { enabled: false, accountNumber: '', accountHolder: '', instructions: '', qrImageUrl: null },
     daviplata: { enabled: false, accountNumber: '', accountHolder: '', instructions: '', qrImageUrl: null },
-    breB: { enabled: false, holderName: '', keyType: 'Celular', keyValue: '', instructions: '', qrImageUrl: null },
+    breB: { enabled: false, holderName: '', keyType: 'Celular', keyValue: '', instructions: '', qrImageUrl: null, commerceCode: '' },
     stripe: { enabled: false, mode: 'sandbox', secretKey: '', instructions: '' },
     paypal: { enabled: false, mode: 'sandbox', clientId: '', clientSecret: '', instructions: '' },
     mercadoPago: { enabled: false, mode: 'sandbox', publicKey: '', accessToken: '', instructions: '' },
@@ -49,16 +50,14 @@ export default function PaymentMethodsPage() {
     const firestore = useFirestore();
 
     const plansQuery = useMemoFirebase(() => !firestore ? null : collection(firestore, 'plans'), [firestore]);
-    const { data: plans } = useCollection<SubscriptionPlan>(plansQuery);
+    const { data: plans, isLoading: plansLoading } = useCollection<SubscriptionPlan>(plansQuery);
 
     useEffect(() => {
-        // Here you would fetch initial config and plans from Firestore
-        // For now, we use the initial state and mock plan data.
         if (plans) {
             const initialLinks = plans.map(p => ({
                 planId: p.id,
                 planName: p.name,
-                hotmartUrl: (p as any).hotmartUrl || '', // Assuming hotmartUrl is a field on the plan
+                hotmartUrl: (p as any).hotmartUrl || '',
             }));
             setHotmartLinks(initialLinks);
         }
@@ -83,7 +82,6 @@ export default function PaymentMethodsPage() {
         setTimeout(() => {
             console.log("Saving config:", config);
             console.log("Saving Hotmart links:", hotmartLinks);
-            // Here you would call a service to update Firestore documents
             toast({ title: 'Configuración Guardada', description: 'Las pasarelas de pago han sido actualizadas.' });
             setIsSaving(false);
             setHasChanges(false);
@@ -133,7 +131,7 @@ export default function PaymentMethodsPage() {
                         </div>
                         {config.breB.enabled && <BreBForm data={config.breB} setData={(data) => handleConfigChange('breB', data)} />}
                     </PaymentMethodCard>
-
+                    
                     <PaymentMethodCard title="Stripe" icon={CreditCard}>
                         <div className="flex items-center space-x-2">
                             <Switch id="stripe-enabled" checked={config.stripe.enabled} onCheckedChange={checked => handleConfigChange('stripe', {...config.stripe, enabled: checked})} />
@@ -166,12 +164,18 @@ export default function PaymentMethodsPage() {
                             <CardDescription>Configura los links de checkout para cada plan.</CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-4">
-                            {hotmartLinks.map(plan => (
-                                <div key={plan.planId}>
-                                    <Label htmlFor={`hotmart-${plan.planId}`}>{plan.planName}</Label>
-                                    <Input id={`hotmart-${plan.planId}`} placeholder="https://pay.hotmart.com/..." value={plan.hotmartUrl} onChange={e => handleHotmartLinkChange(plan.planId, e.target.value)} />
-                                </div>
-                            ))}
+                            {plansLoading ? (
+                                <p className="text-sm text-muted-foreground">Cargando planes...</p>
+                            ) : plans && plans.length > 0 ? (
+                                hotmartLinks.map(plan => (
+                                    <div key={plan.planId}>
+                                        <Label htmlFor={`hotmart-${plan.planId}`}>{plan.planName}</Label>
+                                        <Input id={`hotmart-${plan.planId}`} placeholder="https://pay.hotmart.com/..." value={plan.hotmartUrl} onChange={e => handleHotmartLinkChange(plan.planId, e.target.value)} />
+                                    </div>
+                                ))
+                            ) : (
+                                <p className="text-sm text-muted-foreground">No hay planes de suscripción configurados. Ve a la sección "Planes" para crearlos.</p>
+                            )}
                         </CardContent>
                     </Card>
                 </div>
