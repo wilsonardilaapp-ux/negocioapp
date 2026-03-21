@@ -21,7 +21,7 @@ const printerSchema = z.object({
   connection: z.enum(['usb', 'network', 'bluetooth', 'wifi']),
   ipAddress: z.string().optional(),
   port: z.preprocess(val => Number(val) || undefined, z.number().optional()),
-  paperWidth: z.preprocess(val => Number(val), z.enum([58, 80])),
+  paperWidth: z.preprocess(Number, z.union([z.literal(58), z.literal(80)])),
   isDefault: z.boolean(),
 });
 
