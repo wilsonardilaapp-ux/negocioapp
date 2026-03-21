@@ -9,6 +9,10 @@ export type LandingPageData = {
   form: FormSection;
   header: LandingHeaderConfigData; // New section
   footer: FooterSection;
+  chatbot?: {
+    greeting: string;
+    avatarUrl: string;
+  };
 };
 
 export type HeroSection = {

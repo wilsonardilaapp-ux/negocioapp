@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -10,6 +11,7 @@ import LandingPageContent from '@/components/landing-page/landing-page-content';
 import type { GlobalConfig } from '@/models/global-config';
 import type { Business } from '@/models/business';
 import { ChatbotWidget } from '@/components/chatbot/chatbot-widget';
+import type { Module } from '@/models/module';
 
 
 export default function RootPage() {
@@ -27,8 +29,14 @@ export default function RootPage() {
         if (!firestore || !mainBusinessId) return null;
         return doc(firestore, 'businesses', mainBusinessId, 'landingPages', 'main');
     }, [firestore, mainBusinessId]);
+    
+    const chatbotModuleRef = useMemoFirebase(() => {
+        if (!firestore) return null;
+        return doc(firestore, 'modules', 'chatbot-integrado-con-whatsapp-para-soporte-y-ventas');
+    }, [firestore]);
 
     const { data: landingData, isLoading: isLandingLoading, error } = useDoc<LandingPageData>(landingPageDocRef);
+    const { data: chatbotModule, isLoading: isModuleLoading } = useDoc<Module>(chatbotModuleRef);
 
     const finalData = useMemo(() => {
       if (!landingData) return null;
@@ -50,7 +58,9 @@ export default function RootPage() {
       };
     }, [landingData]);
     
-    if (isConfigLoading || (mainBusinessId && isLandingLoading)) {
+    const isLoading = isConfigLoading || (mainBusinessId && isLandingLoading) || isModuleLoading;
+
+    if (isLoading) {
         return (
             <div className="flex h-screen w-full items-center justify-center bg-background">
                 <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -97,11 +107,19 @@ export default function RootPage() {
             </div>
         );
     }
+    
+    const isChatbotEnabled = chatbotModule?.status === 'active';
 
     return (
         <div>
             <LandingPageContent data={finalData} businessId={mainBusinessId} />
-            <ChatbotWidget businessId={mainBusinessId} />
+            <ChatbotWidget 
+                enabled={isChatbotEnabled}
+                businessId={mainBusinessId}
+                businessName={finalData.header.businessInfo.name || 'Asistente'}
+                avatarUrl={finalData.chatbot?.avatarUrl || ''}
+                greeting={finalData.chatbot?.greeting || '¡Hola! ¿En qué puedo ayudarte?'}
+            />
         </div>
     );
 }

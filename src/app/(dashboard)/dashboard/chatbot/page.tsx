@@ -497,16 +497,29 @@ export default function ChatbotPage() {
     }, [config, isLoading, reset, user]);
     
    const handleSave = async () => {
-        if (!configDocRef) return;
+        if (!configDocRef || !user || !firestore) return;
         const currentData = getValues();
         
         setIsSaving(true);
         try {
-            await setDoc(configDocRef, {
+            // Write private config
+            setDocumentNonBlocking(configDocRef, {
                 ...currentData,
                 id: 'main',
                 businessId: user!.uid
             });
+
+            // Denormalize public config to landing page document
+            const landingPageDocRef = doc(firestore, 'businesses', user.uid, 'landingPages', 'main');
+            const publicChatbotData = {
+                chatbot: {
+                    greeting: currentData.communication?.greeting || '',
+                    avatarUrl: currentData.business?.avatarUrl || ''
+                }
+            };
+            setDocumentNonBlocking(landingPageDocRef, publicChatbotData, { merge: true });
+            
+            await new Promise(resolve => setTimeout(resolve, 500));
             
             toast({
                 title: "Configuración Guardada",

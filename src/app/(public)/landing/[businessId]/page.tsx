@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useMemo } from 'react';
@@ -8,6 +9,7 @@ import { Loader2, Frown } from 'lucide-react';
 import type { LandingPageData } from '@/models/landing-page';
 import LandingPageContent from '@/components/landing-page/landing-page-content';
 import { ChatbotWidget } from '@/components/chatbot/chatbot-widget';
+import type { Module } from '@/models/module';
 
 export default function BusinessLandingPage() {
     const firestore = useFirestore();
@@ -19,11 +21,18 @@ export default function BusinessLandingPage() {
         return doc(firestore, 'businesses', businessId, 'landingPages', 'main');
     }, [firestore, businessId]);
 
-    const { data: landingData, isLoading, error } = useDoc<LandingPageData>(landingPageDocRef);
+    const chatbotModuleRef = useMemoFirebase(() => {
+        if (!firestore) return null;
+        return doc(firestore, 'modules', 'chatbot-integrado-con-whatsapp-para-soporte-y-ventas');
+    }, [firestore]);
+
+    const { data: landingData, isLoading: isLandingLoading, error } = useDoc<LandingPageData>(landingPageDocRef);
+    const { data: chatbotModule, isLoading: isModuleLoading } = useDoc<Module>(chatbotModuleRef);
+
+    const isLoading = isLandingLoading || isModuleLoading;
 
     const finalData = useMemo(() => {
       if (!landingData) return null;
-      // This logic is from the main page.tsx to handle possibly empty image URLs
       const cleanImageUrl =
         landingData.hero?.imageUrl &&
         typeof landingData.hero.imageUrl === 'string' &&
@@ -40,6 +49,9 @@ export default function BusinessLandingPage() {
         },
       };
     }, [landingData]);
+    
+    const isChatbotEnabled = chatbotModule?.status === 'active';
+
 
     if (isLoading) {
         return (
@@ -77,7 +89,13 @@ export default function BusinessLandingPage() {
     return (
         <div>
             <LandingPageContent data={finalData} businessId={businessId} />
-            <ChatbotWidget businessId={businessId} />
+            <ChatbotWidget 
+                enabled={isChatbotEnabled}
+                businessId={businessId}
+                businessName={finalData.header.businessInfo.name || 'Asistente'}
+                avatarUrl={finalData.chatbot?.avatarUrl || ''}
+                greeting={finalData.chatbot?.greeting || '¡Hola! ¿En qué puedo ayudarte?'}
+            />
         </div>
     );
 }
