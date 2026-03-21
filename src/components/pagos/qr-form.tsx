@@ -15,21 +15,22 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Loader2, UploadCloud, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import type { QRFormData } from "@/models/payment-settings";
+import type { QRConfig } from "@/models/global-payment-config";
+import { Textarea } from "@/components/ui/textarea";
 
 interface QRFormProps {
   methodName: string;
-  data: QRFormData;
-  setData: (data: QRFormData) => void;
+  data: QRConfig;
+  setData: (data: QRConfig) => void;
   accountLabel: string;
 }
 
-export function QRForm({ methodName, data, setData, accountLabel }: QRFormProps) {
+export default function QRForm({ methodName, data, setData, accountLabel }: QRFormProps) {
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
-  const handleInputChange = (field: keyof QRFormData, value: string) => {
+  const handleInputChange = (field: keyof QRConfig, value: string) => {
     setData({ ...data, [field]: value });
   };
   
@@ -40,8 +41,6 @@ export function QRForm({ methodName, data, setData, accountLabel }: QRFormProps)
     setIsUploading(true);
 
     // Simulate an upload process
-    // In a real app, you would upload to a service like Cloudinary or Firebase Storage
-    // and get a URL back.
     setTimeout(() => {
         const reader = new FileReader();
         reader.onload = (e) => {
@@ -62,30 +61,23 @@ export function QRForm({ methodName, data, setData, accountLabel }: QRFormProps)
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Configuración de {methodName}</CardTitle>
-        <CardDescription>
-          Completa los datos para recibir pagos a través de {methodName}.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-6">
+      <div className="space-y-6 pt-4 border-t">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-2">
-            <Label htmlFor="holderName">Nombre del Titular</Label>
+            <Label htmlFor={`holderName-${methodName}`}>Nombre del Titular</Label>
             <Input
-              id="holderName"
+              id={`holderName-${methodName}`}
               placeholder="Ej. Juan Pérez"
-              value={data.holderName}
-              onChange={(e) => handleInputChange("holderName", e.target.value)}
+              value={data.accountHolder}
+              onChange={(e) => handleInputChange("accountHolder", e.target.value)}
               disabled={!data.enabled}
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="accountNumber">{accountLabel}</Label>
+            <Label htmlFor={`accountNumber-${methodName}`}>{accountLabel}</Label>
             <Input
-              id="accountNumber"
-              placeholder="Ej. 3001234567"
+              id={`accountNumber-${methodName}`}
+              placeholder="Ej. 3001234567 o 123-456-789"
               value={data.accountNumber}
               onChange={(e) => handleInputChange("accountNumber", e.target.value)}
               disabled={!data.enabled}
@@ -117,7 +109,7 @@ export function QRForm({ methodName, data, setData, accountLabel }: QRFormProps)
             ) : (
               <div
                 className="aspect-square w-full max-w-xs mx-auto border-2 border-dashed rounded-lg flex flex-col items-center justify-center text-center p-6 cursor-pointer hover:border-primary hover:bg-accent"
-                onClick={() => fileInputRef.current?.click()}
+                onClick={() => data.enabled && fileInputRef.current?.click()}
               >
                 {isUploading ? (
                   <>
@@ -145,7 +137,17 @@ export function QRForm({ methodName, data, setData, accountLabel }: QRFormProps)
             />
           </div>
         </div>
-      </CardContent>
-    </Card>
+
+        <div className="space-y-2">
+            <Label htmlFor={`instructions-${methodName}`}>Instrucciones para el Cliente</Label>
+            <Textarea
+              id={`instructions-${methodName}`}
+              placeholder="Ej: Realiza el pago y envía el comprobante a nuestro WhatsApp."
+              value={data.instructions || ''}
+              onChange={(e) => handleInputChange("instructions", e.target.value)}
+              disabled={!data.enabled}
+            />
+        </div>
+      </div>
   );
 }

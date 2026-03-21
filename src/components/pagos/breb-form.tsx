@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -16,7 +15,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Loader2, UploadCloud, X, CheckCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import type { BreBFormData, BreBKeyType } from "@/models/payment-settings";
+import type { BreBConfig, BreBKeyType } from "@/models/global-payment-config";
 import {
   Select,
   SelectContent,
@@ -25,10 +24,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
 
 interface BreBFormProps {
-  data: BreBFormData;
-  setData: (data: BreBFormData) => void;
+  data: BreBConfig;
+  setData: (data: BreBConfig) => void;
 }
 
 export default function BreBForm({ data, setData }: BreBFormProps) {
@@ -36,7 +36,7 @@ export default function BreBForm({ data, setData }: BreBFormProps) {
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
-  const handleInputChange = (field: keyof BreBFormData, value: string | BreBKeyType) => {
+  const handleInputChange = (field: keyof BreBConfig, value: string | BreBKeyType) => {
     setData({ ...data, [field]: value });
   };
   
@@ -190,9 +190,16 @@ export default function BreBForm({ data, setData }: BreBFormProps) {
             />
           </div>
         </div>
-        
-        {/* El botón de guardar es global, no se necesita aquí */}
-
+        <div className="space-y-2">
+            <Label htmlFor={`instructions-breb`}>Instrucciones para el Cliente</Label>
+            <Textarea
+              id={`instructions-breb`}
+              placeholder="Ej: Realiza el pago y envía el comprobante a nuestro WhatsApp."
+              value={data.instructions || ''}
+              onChange={(e) => handleInputChange("instructions", e.target.value)}
+              disabled={!data.enabled}
+            />
+        </div>
       </CardContent>
     </Card>
   );
