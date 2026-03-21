@@ -1,132 +1,111 @@
 
 rules_version = '2';
+
 service cloud.firestore {
-    match /databases/{database}/documents {
-
-          // 1. REGLA MAESTRA PARA BLOG (Soluciona tu error)
-              // Permite leer y escribir SI estás logueado.
-                  match /blog_posts/{postId} {
-                          allow read: if true;
-                                allow write: if request.auth != null;
-                  }
-
-                      // Regla para Planes de Suscripción
-                          match /plans/{planId} {
-                                  allow read: if true;
-                                        allow write: if request.auth != null;
-                          }
-
-                              // 2. CONFIGURACIÓN GLOBAL (Para que no falle el inicio)
-                                  match /globalConfig/{document=**} {
-                                          allow read: if true;
-                                                allow write: if request.auth != null;
-                                  }
-                                      
-                                          // Regla para la configuración de apariencia del blog
-                                              match /settings/{document=**} {
-                                                      allow read: if true;
-                                                            allow write: if request.auth != null;
-                                              }
-                                                  
-                                                      // Permite al usuario leer su propia configuración de pago
-                                                          match /paymentSettings/{userId} {
-                                                                  allow read, write: if request.auth != null && request.auth.uid == userId;
-                                                          }
-
-                                                              // 3. OTRAS REGLAS
-                                                                  match /users/{userId} { 
-                                                                          allow read, write: if request.auth != null; 
-                                                                  }
-                                                                      
-                                                                          // Reglas para la colección de Negocios (Businesses)
-                                                                              match /businesses/{businessId} {
-                                                                                      // El documento principal del negocio es público para lectura (get), pero solo el dueño lo puede modificar
-                                                                                            allow get: if true;
-                                                                                                  allow create, update, delete: if request.auth != null && request.auth.uid == businessId;
-
-                                                                                                        // Subcolecciones públicas (para catálogo, landing page, etc.)
-                                                                                                              match /publicData/{docId=**} {
-                                                                                                                        allow read: if true;
-                                                                                                                                allow write: if request.auth != null && request.auth.uid == businessId;
-                                                                                                              }
-                                                                                                                    match /landingPages/{pageId=**} {
-                                                                                                                              allow read: if true;
-                                                                                                                                      allow write: if request.auth != null && request.auth.uid == businessId;
-                                                                                                                    }
-
-                                                                                                                          // Subcolecciones privadas (solo el dueño del negocio puede acceder)
-                                                                                                                                match /products/{productId=**} {
-                                                                                                                                          allow read, write: if request.auth.uid == businessId;
-                                                                                                                                }
-                                                                                                                                      match /orders/{orderId=**} {
-                                                                                                                                                allow read, write: if request.auth.uid == businessId;
-                                                                                                                                      }
-                                                                                                                                            match /contactForms/{formId=**} {
-                                                                                                                                                      allow read, write: if request.auth.uid == businessId;
-                                                                                                                                            }
-                                                                                                                                                  match /contactSubmissions/{submissionId=**} {
-                                                                                                                                                            allow read, write: if request.auth.uid == businessId;
-                                                                                                                                                  }
-                                                                                                                                                         match /chatbotConfig/{path=**} {
-                                                                                                                                                                  allow read, write: if request.auth.uid == businessId;
-                                                                                                                                                         }
-                                                                                                                                                               match /chatConversations/{path=**} {
-                                                                                                                                                                        allow read, write: if request.auth.uid == businessId;
-                                                                                                                                                               }
-                                                                                                                                                                     match /suggestionRules/{ruleId=**} {
-                                                                                                                                                                              allow read, write: if request.auth.uid == businessId;
-                                                                                                                                                                     }
-                                                                                                                                                                           match /printers/{printerId=**} {
-                                                                                                                                                                                    allow read, write: if request.auth.uid == businessId;
-                                                                                                                                                                           }
-                                                                                                                                                                                 match /invoiceSettings/{docId=**} {
-                                                                                                                                                                                          allow read, write: if request.auth.uid == businessId;
-                                                                                                                                                                                 }
-                                                                                                                                                                                       match /subscription/{docId=**} {
-                                                                                                                                                                                                allow read, write: if request.auth.uid == businessId;
-                                                                                                                                                                                       }
-                                                                              }
-                                                                                  
-                                                                                      match /modules/{moduleId} {
-                                                                                              allow read: if true;
-                                                                                                    allow write: if request.auth != null;
-                                                                                      }
-
-                                                                                          match /systemServices/{serviceId} { 
-                                                                                                  allow read, write: if request.auth != null; 
-                                                                                          }
-                                                                                              match /integrations/{integrationId} { 
-                                                                                                      allow get, list, write: if request.auth != null; 
-                                                                                              }
-                                                                                                  
-                                                                                                      match /{document=**} { 
-                                                                                                              allow read, write: if false; 
-                                                                                                      }
+  match /databases/{database}/documents {
+  
+    // Helper function to check if a user is an owner or a member of a business
+    function isBusinessMember(businessId) {
+      return request.auth != null && (
+        request.auth.uid == businessId ||
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.businessId == businessId
+      );
     }
+
+    // Publicly readable collections
+    match /blog_posts/{postId} {
+      allow read: if true;
+      allow write: if request.auth != null; // Simplistic write rule, consider refining
+    }
+    match /plans/{planId} {
+      allow read: if true;
+      allow write: if request.auth != null; // Assumes only authenticated users can modify
+    }
+    match /globalConfig/{document=**} {
+      allow read: if true;
+      allow write: if request.auth != null; // Assumes only authenticated users can modify
+    }
+    match /settings/{document=**} {
+      allow read: if true;
+      allow write: if request.auth != null; // Assumes only authenticated users can modify
+    }
+
+    // User-specific data
+    match /users/{userId} { 
+      allow read, write: if request.auth != null && request.auth.uid == userId; 
+    }
+    match /paymentSettings/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Business-related data
+    match /businesses/{businessId} {
+      // Public can read the main business document
+      allow get: if true;
+      
+      // Only members of the business can write to it
+      allow create, update, delete: if isBusinessMember(businessId);
+
+      // Publicly readable subcollections
+      match /publicData/{docId=**} {
+        allow read: if true;
+        allow write: if isBusinessMember(businessId);
+      }
+      match /landingPages/{pageId=**} {
+        allow read: if true;
+        allow write: if isBusinessMember(businessId);
+      }
+
+      // Private subcollections accessible only by business members
+      match /products/{productId=**} {
+        allow read, write: if isBusinessMember(businessId);
+      }
+      match /orders/{orderId=**} {
+        allow read, write: if isBusinessMember(businessId);
+      }
+      match /contactForms/{formId=**} {
+        allow read, write: if isBusinessMember(businessId);
+      }
+      match /contactSubmissions/{submissionId=**} {
+        allow read, write: if isBusinessMember(businessId);
+      }
+      match /chatbotConfig/{path=**} {
+        allow read, write: if isBusinessMember(businessId);
+      }
+      match /chatConversations/{path=**} {
+        allow read, write: if isBusinessMember(businessId);
+      }
+      match /suggestionRules/{ruleId=**} {
+        allow read, write: if isBusinessMember(businessId);
+      }
+      match /printers/{printerId=**} {
+        allow read, write: if isBusinessMember(businessId);
+      }
+      match /invoiceSettings/{docId=**} {
+        allow read, write: if isBusinessMember(businessId);
+      }
+      match /subscription/{docId=**} {
+        allow read, write: if isBusinessMember(businessId);
+      }
+    }
+    
+    // System-level collections (potentially admin-only)
+    match /modules/{moduleId} {
+      allow read: if true; // Modules are public to read
+      allow write: if request.auth != null; // Simplified admin write rule
+    }
+    match /systemServices/{serviceId} { 
+      allow read, write: if request.auth != null; // Simplified admin write rule
+    }
+    match /integrations/{integrationId} { 
+      allow get, list, write: if request.auth != null; // Simplified admin write rule
+    }
+    
+    // Default deny all other paths
+    match /{document=**} { 
+      allow read, write: if false; 
+    }
+  }
 }
 
-                                                                                                      }
-                                                                                              }
-                                                                                          }
-                                                                                      }
-                                                                                                                                                                                       }
-                                                                                                                                                                                 }
-                                                                                                                                                                           }
-                                                                                                                                                                     }
-                                                                                                                                                               }
-                                                                                                                                                         }
-                                                                                                                                                  }
-                                                                                                                                            }
-                                                                                                                                      }
-                                                                                                                                }
-                                                                                                                    }
-                                                                                                              }
-                                                                              }
-                                                                  }
-                                                          }
-                                              }
-                                  }
-                          }
-                  }
-    }
-}
+    
