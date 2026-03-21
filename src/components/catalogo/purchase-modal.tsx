@@ -276,7 +276,7 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, b
                           <PaymentTabContent
                               methodName="Nequi"
                               accountNumber={paymentSettings.nequi.accountNumber}
-                              qrImageUrl={paymentSettings.nequi.qrImageUrl}
+                              qrImageUrl={paymentSettings.nequi.qrImageUrl ?? null}
                               onCopy={copyToClipboard}
                           />
                       </TabsContent>
@@ -286,7 +286,7 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, b
                           <PaymentTabContent
                               methodName="Bancolombia"
                               accountNumber={paymentSettings.bancolombia.accountNumber}
-                              qrImageUrl={paymentSettings.bancolombia.qrImageUrl}
+                              qrImageUrl={paymentSettings.bancolombia.qrImageUrl ?? null}
                               onCopy={copyToClipboard}
                           />
                       </TabsContent>
@@ -296,7 +296,7 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, b
                           <PaymentTabContent
                               methodName="Daviplata"
                               accountNumber={paymentSettings.daviplata.accountNumber}
-                              qrImageUrl={paymentSettings.daviplata.qrImageUrl}
+                              qrImageUrl={paymentSettings.daviplata.qrImageUrl ?? null}
                               onCopy={copyToClipboard}
                           />
                       </TabsContent>
@@ -382,3 +382,5 @@ const BreBPaymentTabContent = ({ data, onCopy }: { data: PaymentSettings['breB']
         </div>
     </div>
 );
+
+    
