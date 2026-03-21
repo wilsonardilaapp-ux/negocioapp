@@ -685,6 +685,24 @@
         "updatedAt": { "type": "string", "format": "date-time" }
       },
       "required": ["id", "businessId", "triggerItem", "suggestedItem", "suggestionType", "active"]
+    },
+    "Printer": {
+      "title": "Printer",
+      "description": "Represents a configured printer for a business.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "type": { "type": "string", "enum": ["thermal", "inkjet", "laser"] },
+        "connection": { "type": "string", "enum": ["usb", "network", "bluetooth", "wifi"] },
+        "ipAddress": { "type": "string" },
+        "port": { "type": "number" },
+        "paperWidth": { "type": "number", "enum": [58, 80] },
+        "isDefault": { "type": "boolean" },
+        "status": { "type": "string", "enum": ["online", "offline", "error"] },
+        "lastUsed": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "name", "type", "connection", "paperWidth", "isDefault", "status"]
     }
   },
   "auth": {
@@ -967,12 +985,28 @@
             }
           ]
         }
+      },
+      {
+        "path": "/businesses/{businessId}/printers/{printerId}",
+        "definition": {
+          "entityName": "Printer",
+          "schema": {
+            "$ref": "#/backend/entities/Printer"
+          },
+          "description": "Stores printer configurations for a specific business.",
+          "params": [
+            {
+              "name": "businessId",
+              "description": "The unique identifier for the business."
+            },
+            {
+              "name": "printerId",
+              "description": "The unique identifier for the printer."
+            }
+          ]
+        }
       }
     ],
     "reasoning": "The Firestore structure is designed to ensure Authorization Independence and support the application's QAPs (Queries are not Filters). Authorization Independence is achieved by avoiding `get()` calls in security rules through denormalization.  Specifically, the `LandingPage`, `Product`, `ContactForm`, `ContactSubmission` and `ChatbotConfig` subcollections under `/businesses/{businessId}` include the `businessId` field, which duplicates the parent document's ID, but allows security rules to validate access without requiring a `get()` call to the parent `business` document.\n\nStructural Segregation is applied by separating user-specific data (`/users/{userId}`) from business-related data (`/businesses/{businessId}/...`).  Each collection has a homogeneous security posture. Path-based ownership (`/users/{userId}`) is used for private user data like payment settings.\n\nThe membership model is implicitly supported through the businessId on resources linked to each business.\n\nGlobal roles are managed using content over existence, within the User document under role (e.g., `/users/{uid}` has `role: 'super_admin'`).\n\nQAPs (Rules are not Filters) are supported through structural segregation. Listing operations are secured based on the path and, where applicable, the denormalized `businessId` field in subcollections, allowing secure querying without filtering on insecure data.\n\nExplicit state modeling is used through the `status` field in entities like `User` and `SystemService`."
   }
 }
-
-    
-
-    

@@ -17,6 +17,7 @@ import {
   BarChart,
   Lightbulb,
   UserCircle,
+  Printer,
 } from "lucide-react";
 import { MessageCircle as MessageCircleIcon } from "@/components/icons";
 
@@ -31,6 +32,7 @@ const allNavItems = [
   { href: "/dashboard/pedidos", icon: ShoppingBag, label: "Pedidos" },
   { href: "/dashboard/pagos", icon: CreditCard, label: "Pagos" },
   { href: "/dashboard/configuracion/factura", icon: FileText, label: "Editor Factura" },
+  { href: "/dashboard/configuracion/impresoras", icon: Printer, label: "Impresoras" },
   { href: "/dashboard/subscription", icon: CreditCard, label: "Suscripción" },
   { href: "/dashboard/perfil", icon: UserCircle, label: "Perfil" },
   { href: "/dashboard/chatbot", icon: MessageCircleIcon, label: "Asistente IA", moduleId: 'chatbot-integrado-con-whatsapp-para-soporte-y-ventas'},
