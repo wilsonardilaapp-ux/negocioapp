@@ -1,7 +1,6 @@
-
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,8 +12,8 @@ import type { GlobalPaymentConfig, HotmartPlanLink } from '@/models/global-payme
 import QRForm from '@/components/pagos/qr-form';
 import BreBForm from '@/components/pagos/breb-form';
 import ApiGatewayForm from '@/components/pagos/api-gateway-form';
-import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection } from 'firebase/firestore';
+import { useCollection, useFirestore, useMemoFirebase, setDocumentNonBlocking, useDoc } from '@/firebase';
+import { collection, doc, writeBatch } from 'firebase/firestore';
 import type { SubscriptionPlan } from '@/models/subscription-plan';
 
 const initialConfig: GlobalPaymentConfig = {
@@ -49,8 +48,27 @@ export default function PaymentMethodsPage() {
     const { toast } = useToast();
     const firestore = useFirestore();
 
+    const paymentConfigDocRef = useMemoFirebase(() => !firestore ? null : doc(firestore, 'globalConfig', 'payment_methods'), [firestore]);
+    const { data: savedConfig, isLoading: isConfigLoading } = useDoc<GlobalPaymentConfig>(paymentConfigDocRef);
+
     const plansQuery = useMemoFirebase(() => !firestore ? null : collection(firestore, 'plans'), [firestore]);
     const { data: plans, isLoading: plansLoading } = useCollection<SubscriptionPlan>(plansQuery);
+
+    useEffect(() => {
+        if (savedConfig) {
+            // Deep merge to ensure all keys from initialConfig are present, even if not in DB
+            const mergedConfig: GlobalPaymentConfig = {
+                nequi: { ...initialConfig.nequi, ...savedConfig.nequi },
+                bancolombia: { ...initialConfig.bancolombia, ...savedConfig.bancolombia },
+                daviplata: { ...initialConfig.daviplata, ...savedConfig.daviplata },
+                breB: { ...initialConfig.breB, ...savedConfig.breB },
+                stripe: { ...initialConfig.stripe, ...savedConfig.stripe },
+                paypal: { ...initialConfig.paypal, ...savedConfig.paypal },
+                mercadoPago: { ...initialConfig.mercadoPago, ...savedConfig.mercadoPago },
+            };
+            setConfig(mergedConfig);
+        }
+    }, [savedConfig]);
 
     useEffect(() => {
         if (plans) {
@@ -76,17 +94,50 @@ export default function PaymentMethodsPage() {
         setHasChanges(true);
     };
 
-    const handleSave = () => {
+    const handleSave = async () => {
+        if (!firestore) {
+            toast({ variant: "destructive", title: "Error", description: "No se pudo conectar a la base de datos." });
+            return;
+        }
         setIsSaving(true);
-        // Simulate saving to Firestore
-        setTimeout(() => {
-            console.log("Saving config:", config);
-            console.log("Saving Hotmart links:", hotmartLinks);
+        
+        try {
+            // 1. Save general payment config
+            if (paymentConfigDocRef) {
+                setDocumentNonBlocking(paymentConfigDocRef, config);
+            }
+
+            // 2. Save Hotmart links in a batch
+            const batch = writeBatch(firestore);
+            hotmartLinks.forEach(link => {
+                if (link.hotmartUrl !== (plans?.find(p => p.id === link.planId) as any)?.hotmartUrl) {
+                    const planRef = doc(firestore, 'plans', link.planId);
+                    batch.update(planRef, { hotmartUrl: link.hotmartUrl });
+                }
+            });
+            await batch.commit();
+
             toast({ title: 'Configuración Guardada', description: 'Las pasarelas de pago han sido actualizadas.' });
-            setIsSaving(false);
             setHasChanges(false);
-        }, 1500);
+
+        } catch (error) {
+            console.error("Error saving payment settings:", error);
+            toast({ variant: "destructive", title: "Error al guardar", description: "No se pudieron guardar los cambios. Inténtalo de nuevo." });
+        } finally {
+            setIsSaving(false);
+        }
     };
+    
+    const isLoading = isConfigLoading || plansLoading;
+
+    if (isLoading) {
+        return (
+            <div className="flex items-center justify-center h-64">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                <p className="ml-2">Cargando configuraciones...</p>
+            </div>
+        );
+    }
     
     return (
         <div className="space-y-6">
