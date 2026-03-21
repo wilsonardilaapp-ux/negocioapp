@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect } from "react";
@@ -224,7 +223,13 @@ export default function PagosPage() {
                 <QRForm
                     methodName="Nequi"
                     data={settings.nequi}
-                    setData={(formData) => setSettings(prev => ({...prev, nequi: formData}))}
+                    setData={(formData) => setSettings(prev => ({...prev, nequi: {
+                        ...formData,
+                        accountNumber: formData.accountNumber ?? '',
+                        holderName: formData.holderName ?? '',
+                        instructions: formData.instructions ?? '',
+                        qrImageUrl: formData.qrImageUrl ?? null,
+                    }}))}
                     accountLabel="Número de Teléfono"
                 />
             )}
@@ -232,7 +237,13 @@ export default function PagosPage() {
                 <QRForm
                     methodName="Bancolombia"
                     data={settings.bancolombia}
-                    setData={(formData) => setSettings(prev => ({...prev, bancolombia: formData}))}
+                    setData={(formData) => setSettings(prev => ({...prev, bancolombia: {
+                        ...formData,
+                        accountNumber: formData.accountNumber ?? '',
+                        holderName: formData.holderName ?? '',
+                        instructions: formData.instructions ?? '',
+                        qrImageUrl: formData.qrImageUrl ?? null,
+                    }}))}
                     accountLabel="Número de Cuenta"
                 />
             )}
@@ -240,14 +251,31 @@ export default function PagosPage() {
                 <QRForm
                     methodName="Daviplata"
                     data={settings.daviplata}
-                    setData={(formData) => setSettings(prev => ({...prev, daviplata: formData}))}
+                    setData={(formData) => setSettings(prev => ({...prev, daviplata: {
+                        ...formData,
+                        accountNumber: formData.accountNumber ?? '',
+                        holderName: formData.holderName ?? '',
+                        instructions: formData.instructions ?? '',
+                        qrImageUrl: formData.qrImageUrl ?? null,
+                    }}))}
                     accountLabel="Número de Teléfono"
                 />
             )}
             {selectedMethod === 'breB' && (
                 <BreBForm
                     data={settings.breB}
-                    setData={(formData) => setSettings(prev => ({...prev, breB: formData}))}
+                    setData={(formData) => setSettings(prev => ({
+                        ...prev,
+                        breB: {
+                            ...formData,
+                            holderName: formData.holderName ?? '',
+                            keyValue: formData.keyValue ?? '',
+                            commerceCode: formData.commerceCode ?? '',
+                            qrImageUrl: formData.qrImageUrl ?? null,
+                            instructions: formData.instructions ?? '',
+                            keyType: formData.keyType ?? 'Celular',
+                        }
+                    }))}
                 />
             )}
             {selectedMethod === 'pagoContraEntrega' && (
