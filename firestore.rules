@@ -4,46 +4,50 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
   
-    // Helper function to check if a user is an owner or a member of a business
     function isBusinessMember(businessId) {
+      // For single doc reads/writes. Allows the owner OR a staff member
+      // whose user doc points to this businessId.
       return request.auth != null && (
         request.auth.uid == businessId ||
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.businessId == businessId
       );
     }
 
+    function isOwner(businessId) {
+      // For collection list operations. ONLY allows the owner.
+      // This is because rules for `list` cannot use `get()` or `exists()`.
+      return request.auth != null && request.auth.uid == businessId;
+    }
+
     // Publicly readable collections
     match /blog_posts/{postId} {
       allow read: if true;
-      allow write: if request.auth != null; // Simplistic write rule, consider refining
+      allow write: if request.auth != null;
     }
     match /plans/{planId} {
       allow read: if true;
-      allow write: if request.auth != null; // Assumes only authenticated users can modify
+      allow write: if request.auth != null;
     }
     match /globalConfig/{document=**} {
       allow read: if true;
-      allow write: if request.auth != null; // Assumes only authenticated users can modify
+      allow write: if request.auth != null;
     }
     match /settings/{document=**} {
       allow read: if true;
-      allow write: if request.auth != null; // Assumes only authenticated users can modify
+      allow write: if request.auth != null;
     }
 
     // User-specific data
     match /users/{userId} { 
-      allow read, write: if request.auth != null && request.auth.uid == userId; 
+      allow read, write: if request.auth.uid == userId; 
     }
     match /paymentSettings/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read, write: if request.auth.uid == userId;
     }
 
     // Business-related data
     match /businesses/{businessId} {
-      // Public can read the main business document
-      allow get: if true;
-      
-      // Only members of the business can write to it
+      allow get: if true; // Business profile can be public
       allow create, update, delete: if isBusinessMember(businessId);
 
       // Publicly readable subcollections
@@ -51,61 +55,75 @@ service cloud.firestore {
         allow read: if true;
         allow write: if isBusinessMember(businessId);
       }
-      match /landingPages/{pageId=**} {
+      match /landingPages/{pageId} {
         allow read: if true;
         allow write: if isBusinessMember(businessId);
       }
 
-      // Private subcollections accessible only by business members
-      match /products/{productId=**} {
+      // Private subcollections with split rules for list (owner-only) vs get/write (member).
+      match /products/{productId} {
+        allow list: if isOwner(businessId);
+        allow get, write: if isBusinessMember(businessId);
+      }
+      match /orders/{orderId} {
+        allow list: if isOwner(businessId);
+        allow get, write: if isBusinessMember(businessId);
+      }
+      match /contactForms/{formId} {
+        allow list: if isOwner(businessId);
+        allow get, write: if isBusinessMember(businessId);
+      }
+      match /contactSubmissions/{submissionId} {
+        allow list: if isOwner(businessId);
+        allow get, write: if isBusinessMember(businessId);
+      }
+      match /suggestionRules/{ruleId} {
+        allow list: if isOwner(businessId);
+        allow get, write: if isBusinessMember(businessId);
+      }
+      match /printers/{printerId} {
+        allow list: if isOwner(businessId);
+        allow get, write: if isBusinessMember(businessId);
+      }
+      match /invoiceSettings/{docId} {
+         allow read, write: if isBusinessMember(businessId);
+      }
+      match /subscription/{docId} {
         allow read, write: if isBusinessMember(businessId);
       }
-      match /orders/{orderId=**} {
+
+      // Chatbot specific rules
+      match /chatbotConfig/main {
         allow read, write: if isBusinessMember(businessId);
+        match /knowledgeBase/{documentId} {
+            allow list: if isOwner(businessId);
+            allow get, write: if isBusinessMember(businessId);
+        }
       }
-      match /contactForms/{formId=**} {
-        allow read, write: if isBusinessMember(businessId);
-      }
-      match /contactSubmissions/{submissionId=**} {
-        allow read, write: if isBusinessMember(businessId);
-      }
-      match /chatbotConfig/{path=**} {
-        allow read, write: if isBusinessMember(businessId);
-      }
-      match /chatConversations/{path=**} {
-        allow read, write: if isBusinessMember(businessId);
-      }
-      match /suggestionRules/{ruleId=**} {
-        allow read, write: if isBusinessMember(businessId);
-      }
-      match /printers/{printerId=**} {
-        allow read, write: if isBusinessMember(businessId);
-      }
-      match /invoiceSettings/{docId=**} {
-        allow read, write: if isBusinessMember(businessId);
-      }
-      match /subscription/{docId=**} {
-        allow read, write: if isBusinessMember(businessId);
+      match /chatConversations/{conversationId} {
+          allow list: if isOwner(businessId);
+          allow get, write: if isBusinessMember(businessId);
+          match /messages/{messageId} {
+              allow read, write: if isBusinessMember(businessId);
+          }
       }
     }
     
     // System-level collections (potentially admin-only)
     match /modules/{moduleId} {
-      allow read: if true; // Modules are public to read
-      allow write: if request.auth != null; // Simplified admin write rule
+      allow read: if true;
+      allow write: if request.auth != null;
     }
     match /systemServices/{serviceId} { 
-      allow read, write: if request.auth != null; // Simplified admin write rule
+      allow read, write: if request.auth != null;
     }
     match /integrations/{integrationId} { 
-      allow get, list, write: if request.auth != null; // Simplified admin write rule
+      allow get, list, write: if request.auth != null;
     }
     
-    // Default deny all other paths
+    // Default deny all other paths. This is a security best practice.
     match /{document=**} { 
       allow read, write: if false; 
     }
   }
 }
-
-    
