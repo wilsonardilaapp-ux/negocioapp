@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useTransition, useEffect } from 'react';
@@ -13,7 +14,7 @@ import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { Save, Loader2, ArrowLeft, Bot, Lock } from 'lucide-react';
 import RichTextEditor from '@/components/editor/RichTextEditor';
-import { useCollection, useMemoFirebase, useUser } from '@/firebase';
+import { useCollection, useMemoFirebase, useUser, useFirestore } from '@/firebase';
 import { collection, query, where } from 'firebase/firestore';
 import type { BlogPost } from '@/models/blog-post';
 import { useSubscription } from '@/hooks/useSubscription';
@@ -22,14 +23,15 @@ export default function CreatePostPage() {
     const router = useRouter();
     const { toast } = useToast();
     const { user } = useUser();
+    const firestore = useFirestore();
     const [isPending, startTransition] = useTransition();
     const [content, setContent] = useState('');
     
     const { plan, isFree, canAddBlogPosts, limits, isLoading: isSubscriptionLoading } = useSubscription();
 
     const postsQuery = useMemoFirebase(() => 
-        !user ? null : query(collection(user.firestore, 'blog_posts'), where('businessId', '==', user.uid)), 
-    [user]);
+        !user || !firestore ? null : query(collection(firestore, 'blog_posts'), where('businessId', '==', user.uid)), 
+    [user, firestore]);
 
     const { data: posts, isLoading: arePostsLoading } = useCollection<BlogPost>(postsQuery);
 
