@@ -12,6 +12,8 @@ export default function EmpaquePage() {
     const { user } = useUser();
     const firestore = useFirestore();
 
+    // Se utiliza useMemoFirebase para asegurar que la consulta solo se cree cuando
+    // tanto 'firestore' como 'user' no sean nulos, evitando errores de permisos.
     const ordersQuery = useMemoFirebase(() => {
         if (!firestore || !user) return null;
         return query(
