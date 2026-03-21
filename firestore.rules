@@ -40,9 +40,9 @@ service cloud.firestore {
     
     // Reglas para la colección de Negocios (Businesses)
     match /businesses/{businessId} {
-      // El documento principal del negocio es público para lectura, pero solo el dueño lo puede modificar
+      // El documento principal del negocio es público para lectura (get), pero solo el dueño lo puede modificar
       allow get: if true;
-      allow list, create, update, delete: if request.auth != null && request.auth.uid == businessId;
+      allow create, update, delete: if request.auth != null && request.auth.uid == businessId;
 
       // Subcolecciones públicas (para catálogo, landing page, etc.)
       match /publicData/{docId=**} {
