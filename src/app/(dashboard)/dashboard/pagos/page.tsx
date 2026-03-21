@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import { useState, useEffect } from "react";
 import { useUser, useFirestore, useDoc, useMemoFirebase, setDocumentNonBlocking } from "@/firebase";
@@ -222,7 +222,13 @@ export default function PagosPage() {
             {selectedMethod === 'nequi' && (
                 <QRForm
                     methodName="Nequi"
-                    data={settings.nequi}
+                    data={{
+                        ...settings.nequi,
+                        accountNumber: settings.nequi.accountNumber ?? '',
+                        holderName: settings.nequi.holderName ?? '',
+                        qrImageUrl: settings.nequi.qrImageUrl ?? null,
+                        instructions: settings.nequi.instructions ?? '',
+                    }}
                     setData={(formData) => setSettings(prev => ({...prev, nequi: {
                         ...formData,
                         accountNumber: formData.accountNumber ?? '',
@@ -236,7 +242,13 @@ export default function PagosPage() {
             {selectedMethod === 'bancolombia' && (
                 <QRForm
                     methodName="Bancolombia"
-                    data={settings.bancolombia}
+                    data={{
+                        ...settings.bancolombia,
+                        accountNumber: settings.bancolombia.accountNumber ?? '',
+                        holderName: settings.bancolombia.holderName ?? '',
+                        qrImageUrl: settings.bancolombia.qrImageUrl ?? null,
+                        instructions: settings.bancolombia.instructions ?? '',
+                    }}
                     setData={(formData) => setSettings(prev => ({...prev, bancolombia: {
                         ...formData,
                         accountNumber: formData.accountNumber ?? '',
@@ -250,7 +262,13 @@ export default function PagosPage() {
             {selectedMethod === 'daviplata' && (
                 <QRForm
                     methodName="Daviplata"
-                    data={settings.daviplata}
+                    data={{
+                        ...settings.daviplata,
+                        accountNumber: settings.daviplata.accountNumber ?? '',
+                        holderName: settings.daviplata.holderName ?? '',
+                        qrImageUrl: settings.daviplata.qrImageUrl ?? null,
+                        instructions: settings.daviplata.instructions ?? '',
+                    }}
                     setData={(formData) => setSettings(prev => ({...prev, daviplata: {
                         ...formData,
                         accountNumber: formData.accountNumber ?? '',
