@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect } from "react";
@@ -8,6 +7,7 @@ import type { User } from "@/models/user";
 import type { Subscription } from "@/models/subscription";
 
 export interface ClientWithSubscription extends User {
+  userId: string;
   subscription: Subscription | null;
 }
 
