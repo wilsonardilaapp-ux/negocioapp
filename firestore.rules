@@ -30,22 +30,77 @@ service cloud.firestore {
     
     // Permite al usuario leer su propia configuración de pago
     match /paymentSettings/{userId} {
-      allow read: if true;
-      allow write: if request.auth != null && request.auth.uid == userId;
+      allow read, write: if request.auth != null && request.auth.uid == userId;
     }
 
     // 3. OTRAS REGLAS
-    match /users/{userId} { allow read, write: if request.auth != null; }
-    match /businesses/{userId} { allow read, write: if true; match /{d=**} { allow read, write: if true; } }
+    match /users/{userId} { 
+      allow read, write: if request.auth != null; 
+    }
+    
+    // Reglas para la colección de Negocios (Businesses)
+    match /businesses/{businessId} {
+      // El documento principal del negocio es público para lectura, pero solo el dueño lo puede modificar
+      allow get: if true;
+      allow list, create, update, delete: if request.auth != null && request.auth.uid == businessId;
+
+      // Subcolecciones públicas (para catálogo, landing page, etc.)
+      match /publicData/{docId=**} {
+        allow read: if true;
+        allow write: if request.auth != null && request.auth.uid == businessId;
+      }
+      match /landingPages/{pageId=**} {
+        allow read: if true;
+        allow write: if request.auth != null && request.auth.uid == businessId;
+      }
+
+      // Subcolecciones privadas (solo el dueño del negocio puede acceder)
+      match /products/{productId=**} {
+        allow read, write: if request.auth.uid == businessId;
+      }
+      match /orders/{orderId=**} {
+        allow read, write: if request.auth.uid == businessId;
+      }
+      match /contactForms/{formId=**} {
+        allow read, write: if request.auth.uid == businessId;
+      }
+      match /contactSubmissions/{submissionId=**} {
+        allow read, write: if request.auth.uid == businessId;
+      }
+       match /chatbotConfig/{path=**} {
+        allow read, write: if request.auth.uid == businessId;
+      }
+      match /chatConversations/{path=**} {
+        allow read, write: if request.auth.uid == businessId;
+      }
+      match /suggestionRules/{ruleId=**} {
+        allow read, write: if request.auth.uid == businessId;
+      }
+      match /printers/{printerId=**} {
+        allow read, write: if request.auth.uid == businessId;
+      }
+      match /invoiceSettings/{docId=**} {
+        allow read, write: if request.auth.uid == businessId;
+      }
+      match /subscription/{docId=**} {
+        allow read, write: if request.auth.uid == businessId;
+      }
+    }
     
     match /modules/{moduleId} {
       allow read: if true;
       allow write: if request.auth != null;
     }
 
-    match /systemServices/{serviceId} { allow read, write: if request.auth != null; }
-    match /integrations/{integrationId} { allow get, list, write: if request.auth != null; }
+    match /systemServices/{serviceId} { 
+      allow read, write: if request.auth != null; 
+    }
+    match /integrations/{integrationId} { 
+      allow get, list, write: if request.auth != null; 
+    }
     
-    match /{document=**} { allow read, write: if false; }
+    match /{document=**} { 
+      allow read, write: if false; 
+    }
   }
 }

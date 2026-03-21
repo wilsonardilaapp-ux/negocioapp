@@ -1,5 +1,3 @@
-
-
 "use client";
 
 import Link from "next/link";
@@ -18,6 +16,7 @@ import {
   Lightbulb,
   UserCircle,
   Printer,
+  Package,
 } from "lucide-react";
 import { MessageCircle as MessageCircleIcon } from "@/components/icons";
 
@@ -30,6 +29,7 @@ const allNavItems = [
   { href: "/dashboard/blog", icon: FileText, label: "Blog", moduleId: 'blog' },
   { href: "/dashboard/mensajes", icon: MessageSquare, label: "Mensajes" },
   { href: "/dashboard/pedidos", icon: ShoppingBag, label: "Pedidos" },
+  { href: "/dashboard/empaque", icon: Package, label: "Empaque" },
   { href: "/dashboard/pagos", icon: CreditCard, label: "Pagos" },
   { href: "/dashboard/configuracion/factura", icon: FileText, label: "Editor Factura" },
   { href: "/dashboard/configuracion/impresoras", icon: Printer, label: "Impresoras" },
