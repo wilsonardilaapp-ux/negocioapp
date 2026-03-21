@@ -3,7 +3,6 @@ import { NextResponse } from 'next/server';
 import { stripe, getPlanFromPriceId } from '@/lib/stripe';
 import { getAdminFirestore } from '@/firebase/server-init';
 import { Timestamp } from 'firebase-admin/firestore';
-import type { Subscription } from '@/models/subscription';
 
 export async function POST(req: Request) {
   const body = await req.text();
@@ -38,7 +37,7 @@ export async function POST(req: Request) {
           throw new Error(`Plan no encontrado para priceId: ${subscription.items.data[0].price.id}`);
         }
 
-        const subscriptionData: Partial<Subscription> = {
+        const subscriptionData = {
           plan: plan,
           status: 'active',
           stripeSubscriptionId,
@@ -70,7 +69,7 @@ export async function POST(req: Request) {
         
         const businessDoc = businessQuery.docs[0];
 
-        const subscriptionData: Partial<Subscription> = {
+        const subscriptionData = {
           plan,
           status: subscription.status as any,
           currentPeriodEnd: Timestamp.fromMillis(subscription.current_period_end * 1000),
@@ -94,7 +93,7 @@ export async function POST(req: Request) {
         const businessDoc = businessQuery.docs[0];
 
         // Degradar a plan 'free'
-        const subscriptionData: Partial<Subscription> = {
+        const subscriptionData = {
             plan: 'free',
             status: 'canceled',
             stripeSubscriptionId: null, // Limpiar
