@@ -1,7 +1,7 @@
 
 export type QRFormData = {
   enabled: boolean;
-  qrImageUrl: string | null;
+  qrImageUrl?: string | null;
   accountNumber: string;
   holderName: string;
   instructions?: string;
@@ -15,7 +15,7 @@ export type BreBFormData = {
     keyType: BreBKeyType;
     keyValue: string;
     commerceCode?: string;
-    qrImageUrl: string | null;
+    qrImageUrl?: string | null;
     instructions?: string;
 };
 
