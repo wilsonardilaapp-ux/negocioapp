@@ -21,7 +21,7 @@ const printerSchema = z.object({
   connection: z.enum(['usb', 'network', 'bluetooth', 'wifi']),
   ipAddress: z.string().optional(),
   port: z.preprocess(val => Number(val) || undefined, z.number().optional()),
-  paperWidth: z.preprocess(Number, z.union([z.literal(58), z.literal(80)])),
+  paperWidth: z.preprocess(val => Number(val), z.union([z.literal(58), z.literal(80)])),
   isDefault: z.boolean(),
 });
 
@@ -58,17 +58,20 @@ export default function PrinterForm({ existingPrinter, onClose }: PrinterFormPro
         const printerId = existingPrinter?.id || doc(collection(firestore, `businesses/${user.uid}/printers`)).id;
         const printerDocRef = doc(firestore, `businesses/${user.uid}/printers`, printerId);
         
-        const printerToSave: Omit<Printer, 'id'> = {
+        const printerToSave: Partial<Printer> = {
             name: data.name,
             type: data.type,
             connection: data.connection,
-            ipAddress: data.connection === 'network' ? data.ipAddress : undefined,
-            port: data.connection === 'network' ? data.port : undefined,
             paperWidth: data.paperWidth,
             isDefault: data.isDefault,
             status: 'offline', // Default status
             lastUsed: existingPrinter?.lastUsed,
         };
+
+        if (data.connection === 'network') {
+            printerToSave.ipAddress = data.ipAddress || '';
+            printerToSave.port = data.port || 9100;
+        }
 
         setDocumentNonBlocking(printerDocRef, printerToSave, { merge: true });
 
