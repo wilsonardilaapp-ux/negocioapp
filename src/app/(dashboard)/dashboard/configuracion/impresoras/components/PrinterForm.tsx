@@ -55,7 +55,7 @@ export default function PrinterForm({ existingPrinter, onClose }: PrinterFormPro
     const onSubmit = (data: PrinterFormData) => {
         if (!user || !firestore) return;
         
-        const printerId = existingPrinter?.id || doc(collection(firestore, 'printers')).id;
+        const printerId = existingPrinter?.id || doc(collection(firestore, `businesses/${user.uid}/printers`)).id;
         const printerDocRef = doc(firestore, `businesses/${user.uid}/printers`, printerId);
         
         const printerToSave: Omit<Printer, 'id'> = {
