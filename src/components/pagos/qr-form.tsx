@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -15,13 +16,13 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Loader2, UploadCloud, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import type { QRConfig } from "@/models/global-payment-config";
+import type { QRFormData } from "@/models/payment-settings";
 import { Textarea } from "@/components/ui/textarea";
 
 interface QRFormProps {
   methodName: string;
-  data: QRConfig;
-  setData: (data: QRConfig) => void;
+  data: QRFormData;
+  setData: (data: QRFormData) => void;
   accountLabel: string;
 }
 
@@ -30,7 +31,7 @@ export default function QRForm({ methodName, data, setData, accountLabel }: QRFo
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
-  const handleInputChange = (field: keyof QRConfig, value: string) => {
+  const handleInputChange = (field: keyof QRFormData, value: string) => {
     setData({ ...data, [field]: value });
   };
   
@@ -68,8 +69,8 @@ export default function QRForm({ methodName, data, setData, accountLabel }: QRFo
             <Input
               id={`holderName-${methodName}`}
               placeholder="Ej. Juan Pérez"
-              value={data.accountHolder}
-              onChange={(e) => handleInputChange("accountHolder", e.target.value)}
+              value={data.holderName}
+              onChange={(e) => handleInputChange("holderName", e.target.value)}
               disabled={!data.enabled}
             />
           </div>

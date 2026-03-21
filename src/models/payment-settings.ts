@@ -4,6 +4,7 @@ export type QRFormData = {
   qrImageUrl: string | null;
   accountNumber: string;
   holderName: string;
+  instructions?: string;
 };
 
 export type BreBKeyType = "Celular" | "Correo" | "Documento" | "Alfanumerico";
@@ -15,6 +16,7 @@ export type BreBFormData = {
     keyValue: string;
     commerceCode?: string;
     qrImageUrl: string | null;
+    instructions?: string;
 };
 
 export type CashOnDeliveryData = {

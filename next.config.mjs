@@ -1,8 +1,15 @@
-// next.config.mjs
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  experimental: {
-    serverComponentsExternalPackages: ["@opentelemetry/instrumentation"],
+  webpack: (config, { isServer }) => {
+    if (!isServer) {
+      // Exclude server-only packages from the client-side bundle
+      config.externals.push(
+        '@opentelemetry/instrumentation', 
+        'firebase-admin',
+        'require-in-the-middle'
+      );
+    }
+    return config;
   },
 };
 
