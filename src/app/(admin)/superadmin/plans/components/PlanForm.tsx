@@ -12,6 +12,7 @@ import { useUser, useFirestore, setDocumentNonBlocking } from '@/firebase';
 import { doc } from 'firebase/firestore';
 import { SubscriptionPlanSchema, type SubscriptionPlan } from '@/models/subscription-plan';
 import { Trash2, PlusCircle, Loader2 } from 'lucide-react';
+import { useEffect } from 'react';
 
 interface PlanFormProps {
     existingPlan?: SubscriptionPlan | null;
@@ -23,28 +24,43 @@ export default function PlanForm({ existingPlan, onClose }: PlanFormProps) {
     const firestore = useFirestore();
     const { toast } = useToast();
     
-    const { register, handleSubmit, control, formState: { errors, isSubmitting } } = useForm<SubscriptionPlan>({
+    const { register, handleSubmit, control, reset, formState: { errors, isSubmitting } } = useForm<SubscriptionPlan>({
         resolver: zodResolver(SubscriptionPlanSchema),
-        defaultValues: existingPlan || {
-            id: '',
-            name: '',
-            description: '',
-            price: 0,
-            stripePriceId: '',
-            isMostPopular: false,
-            features: [],
-            limits: {
-                products: 0,
-                blogPosts: 0,
-                landingPages: 0,
-            }
-        },
     });
 
     const { fields, append, remove } = useFieldArray({
         control,
         name: "features",
     });
+
+    useEffect(() => {
+        if (existingPlan) {
+            // Handle legacy string[] format for features
+            const featuresAsObjects = ((existingPlan.features || []) as any[]).map(f => 
+                typeof f === 'string' ? { value: f } : f
+            );
+
+            reset({
+                ...existingPlan,
+                features: featuresAsObjects,
+            });
+        } else {
+            reset({
+                id: '',
+                name: '',
+                description: '',
+                price: 0,
+                stripePriceId: '',
+                isMostPopular: false,
+                features: [{ value: '' }],
+                limits: {
+                    products: 0,
+                    blogPosts: 0,
+                    landingPages: 0,
+                }
+            });
+        }
+    }, [existingPlan, reset]);
 
     const onSubmit = (data: SubscriptionPlan) => {
         if (!user || !firestore) return;
@@ -120,14 +136,15 @@ export default function PlanForm({ existingPlan, onClose }: PlanFormProps) {
                 <div className="space-y-2">
                     {fields.map((item, index) => (
                         <div key={item.id} className="flex items-center gap-2">
-                            <Input {...register(`features.${index}` as const)} placeholder={`Característica ${index + 1}`} />
+                            <Input {...register(`features.${index}.value` as const)} placeholder={`Característica ${index + 1}`} />
                             <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)}>
                                 <Trash2 className="h-4 w-4 text-destructive" />
                             </Button>
                         </div>
                     ))}
+                    {errors.features && <p className="text-sm text-destructive mt-1">Todas las características deben tener contenido.</p>}
                 </div>
-                 <Button type="button" variant="outline" size="sm" onClick={() => append("")}>
+                 <Button type="button" variant="outline" size="sm" onClick={() => append({ value: '' })}>
                     <PlusCircle className="mr-2 h-4 w-4" />
                     Añadir Característica
                 </Button>

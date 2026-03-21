@@ -14,7 +14,7 @@ export const SubscriptionPlanSchema = z.object({
   price: z.number().min(0, { message: "El precio debe ser 0 o mayor." }).describe("Precio mensual en USD (ej. 29)."),
   stripePriceId: z.string().min(1, { message: "El ID de precio de Stripe es requerido." }).regex(/^price_/, { message: "Debe ser un ID de precio de Stripe válido (ej. price_...)." }).describe("El ID del precio correspondiente en Stripe."),
   isMostPopular: z.boolean().optional().describe("Marcar para destacar el plan."),
-  features: z.array(z.string()).describe("Lista de características clave para la página de precios."),
+  features: z.array(z.object({ value: z.string().min(1, 'La característica no puede estar vacía.') })).describe("Lista de características clave para la página de precios."),
   limits: PlanLimitsSchema,
 });
 
@@ -29,10 +29,10 @@ export const DefaultSubscriptionPlans: SubscriptionPlan[] = [
     stripePriceId: 'price_free_placeholder',
     isMostPopular: false,
     features: [
-      '10 productos en catálogo',
-      '5 posts de blog',
-      '1 Landing Page',
-      'Soporte base',
+      { value: '10 productos en catálogo' },
+      { value: '5 posts de blog' },
+      { value: '1 Landing Page' },
+      { value: 'Soporte base' },
     ],
     limits: {
       products: 10,
@@ -48,11 +48,11 @@ export const DefaultSubscriptionPlans: SubscriptionPlan[] = [
     stripePriceId: 'price_pro_placeholder',
     isMostPopular: true,
     features: [
-      'Productos ilimitados',
-      'Posts de blog ilimitados',
-      'Landing Pages ilimitadas',
-      'Soporte prioritario',
-      'Módulo de Sugerencias IA'
+      { value: 'Productos ilimitados' },
+      { value: 'Posts de blog ilimitados' },
+      { value: 'Landing Pages ilimitadas' },
+      { value: 'Soporte prioritario' },
+      { value: 'Módulo de Sugerencias IA' },
     ],
     limits: {
       products: -1,
@@ -68,11 +68,11 @@ export const DefaultSubscriptionPlans: SubscriptionPlan[] = [
     stripePriceId: 'price_enterprise_placeholder',
     isMostPopular: false,
     features: [
-      'Todo lo del plan PRO',
-      'Acceso a la API',
-      'Soporte dedicado 24/7',
-      'Onboarding personalizado',
-      'Multi-usuario (próximamente)',
+      { value: 'Todo lo del plan PRO' },
+      { value: 'Acceso a la API' },
+      { value: 'Soporte dedicado 24/7' },
+      { value: 'Onboarding personalizado' },
+      { value: 'Multi-usuario (próximamente)' },
     ],
     limits: {
       products: -1,

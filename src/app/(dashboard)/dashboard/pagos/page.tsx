@@ -18,7 +18,7 @@ import { Switch } from "@/components/ui/switch";
 import { Save, HandCoins, Building } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { PaymentSettings, BreBKeyType } from "@/models/payment-settings";
-import { QRForm } from "@/components/pagos/qr-form";
+import QRForm from "@/components/pagos/qr-form";
 import BreBForm from "@/components/pagos/breb-form";
 import Image from "next/image";
 
