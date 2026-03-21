@@ -139,7 +139,7 @@ export default function PaymentMethodsPage() {
                             <Switch id="stripe-enabled" checked={config.stripe.enabled} onCheckedChange={checked => handleConfigChange('stripe', {...config.stripe, enabled: checked})} />
                             <Label htmlFor="stripe-enabled">Habilitar Stripe</Label>
                         </div>
-                        {config.stripe.enabled && <ApiGatewayForm data={config.stripe} setData={(data) => handleConfigChange('stripe', data)} fields={['publicKey', 'secretKey']} />}
+                        {config.stripe.enabled && <ApiGatewayForm data={config.stripe} setData={(data) => handleConfigChange('stripe', data)} fields={['secretKey']} />}
                     </PaymentMethodCard>
 
                     <PaymentMethodCard title="PayPal" icon={DollarSign}>
