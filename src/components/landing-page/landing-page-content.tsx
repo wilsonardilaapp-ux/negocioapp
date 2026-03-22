@@ -1,8 +1,7 @@
-
 'use client';
 
 import React, { useMemo } from 'react';
-import type { LandingPageData } from '@/models/landing-page';
+import type { LandingPageData, NavLink } from '@/models/landing-page';
 import { Button } from '@/components/ui/button';
 import { MessageCircle, Phone, Mail, Clock, MapPin, Youtube, Linkedin, ArrowUp, Star } from 'lucide-react';
 import { PublicContactForm } from './public-contact-form';
@@ -18,6 +17,19 @@ interface LandingPageContentProps {
   businessId?: string;
   logoUrl?: string;
 }
+
+const getLinkUrl = (link: NavLink, currentBusinessId: string | undefined): string => {
+  if (link.url && link.url !== '#') {
+    return link.url;
+  }
+  const text = link.text.toLowerCase();
+  if (text.includes('blog')) return '/blog';
+  if (text.includes('catálogo')) return currentBusinessId ? `/catalog/${currentBusinessId}` : '#';
+  if (text.includes('contacto')) return '/contact';
+  if (text.includes('inicio')) return currentBusinessId ? `/landing/${currentBusinessId}` : '/';
+  return '#';
+};
+
 
 export default function LandingPageContent({ data, businessId, logoUrl }: LandingPageContentProps) {
   const { hero, navigation, sections, testimonials, form, footer, header } = data;
@@ -145,7 +157,7 @@ export default function LandingPageContent({ data, businessId, logoUrl }: Landin
             </div>
             <div className="hidden md:flex items-center gap-6">
               {navigation.links.filter(l => l.enabled).map(link => (
-                <a key={link.id} href={link.url} className="hover:opacity-70 transition-opacity" style={{ fontSize: `${navigation.fontSize}px` }}>
+                <a key={link.id} href={getLinkUrl(link, businessId)} className="hover:opacity-70 transition-opacity" style={{ fontSize: `${navigation.fontSize}px` }}>
                   {link.text}
                 </a>
               ))}

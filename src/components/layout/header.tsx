@@ -4,7 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/icons";
-import type { LandingPageData } from "@/models/landing-page";
+import type { LandingPageData, NavLink } from "@/models/landing-page";
 import { useDoc, useFirestore, useMemoFirebase } from "@/firebase";
 import { doc, getDoc } from 'firebase/firestore';
 
@@ -18,6 +18,18 @@ async function getMainBusinessId(firestore: any): Promise<string | null> {
         return null;
     }
 }
+
+const getLinkUrl = (link: NavLink, currentBusinessId: string | null | undefined): string => {
+    if (link.url && link.url !== '#') {
+        return link.url;
+    }
+    const text = link.text.toLowerCase();
+    if (text.includes('blog')) return '/blog';
+    if (text.includes('catálogo')) return currentBusinessId ? `/catalog/${currentBusinessId}` : '#';
+    if (text.includes('contacto')) return '/contact';
+    if (text.includes('inicio')) return currentBusinessId ? `/landing/${currentBusinessId}` : '/';
+    return '#';
+};
 
 export default function Header() {
   const firestore = useFirestore();
@@ -66,7 +78,7 @@ export default function Header() {
            {navigation?.links.filter(l => l.enabled).map(link => (
                 <Link 
                     key={link.id} 
-                    href={link.url} 
+                    href={getLinkUrl(link, businessId)} 
                     className="text-sm font-medium hover:text-primary transition-colors"
                     style={{
                         fontSize: `${navigation.fontSize}px`,

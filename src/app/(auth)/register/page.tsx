@@ -31,7 +31,7 @@ import type { Business } from '@/models/business';
 import type { User as AppUser } from "@/models/user";
 import Link from "next/link";
 import { v4 as uuidv4 } from "uuid";
-import type { LandingPageData } from "@/models/landing-page";
+import type { LandingPageData, NavLink } from "@/models/landing-page";
 import type { PaymentSettings } from "@/models/payment-settings";
 import type { Module } from "@/models/module";
 import type { SystemService } from "@/models/system-service";
@@ -265,9 +265,22 @@ export default function RegisterPage() {
 
       // 3. Crear documento de Landing Page por defecto
       const landingPageDocRef = doc(firestore, 'businesses', newUser.uid, 'landingPages', 'main');
+      
+      const dynamicLinks: NavLink[] = [
+        { id: uuidv4(), text: 'Inicio', url: `/landing/${newUser.uid}`, openInNewTab: false, enabled: true },
+        { id: uuidv4(), text: 'Servicios', url: `#servicios`, openInNewTab: false, enabled: true },
+        { id: uuidv4(), text: 'Contacto', url: '/contact', openInNewTab: false, enabled: true },
+        { id: uuidv4(), text: 'Catálogo', url: `/catalog/${newUser.uid}`, openInNewTab: false, enabled: true },
+        { id: uuidv4(), text: 'Blog', url: '/blog', openInNewTab: false, enabled: true },
+      ];
+
       batch.set(landingPageDocRef, {
         ...initialLandingPageData,
-        navigation: { ...initialLandingPageData.navigation, businessName: businessData.name },
+        navigation: { 
+          ...initialLandingPageData.navigation, 
+          businessName: businessData.name,
+          links: dynamicLinks
+        },
         header: { ...initialLandingPageData.header, businessInfo: { ...initialLandingPageData.header.businessInfo, name: businessData.name, email: newUser.email || 'info@tunegocio.com' }},
         form: { ...initialLandingPageData.form, destinationEmail: newUser.email || '' },
         footer: { ...initialLandingPageData.footer, contactInfo: { ...initialLandingPageData.footer.contactInfo, email: newUser.email || 'info@tunegocio.com' }, copyright: { ...initialLandingPageData.footer.copyright, companyName: businessData.name }},
