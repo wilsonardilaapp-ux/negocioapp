@@ -1,4 +1,3 @@
-
 "use client";
 
 import Link from "next/link";
@@ -17,7 +16,6 @@ import {
   TrendingUp,
   Package,
   UserCircle,
-  HardDrive,
 } from "lucide-react";
 
 import { SidebarMenu, SidebarMenuItem, SidebarMenuButton } from "@/components/ui/sidebar";
@@ -33,7 +31,6 @@ const navItems = [
   { href: "/superadmin/servicios", icon: Server, label: "Servicios" },
   { href: "/superadmin/modulos", icon: Box, label: "Módulos" },
   { href: "/superadmin/integraciones", icon: Plug, label: "Integraciones" },
-  { href: "/superadmin/backups", icon: HardDrive, label: "Backups" },
   { href: "/superadmin/monitoreo", icon: Activity, label: "Monitoreo" },
   { href: "/superadmin/configuracion", icon: Settings, label: "Configuración" },
   { href: "/superadmin/analytics", icon: BarChart, label: "Métricas" },
