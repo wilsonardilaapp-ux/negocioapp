@@ -1,3 +1,4 @@
+
 'use server';
 
 import { revalidatePath } from 'next/cache';
@@ -59,12 +60,8 @@ export async function createPost(formData: FormData) {
         slug: slugify(rawData.title),
         createdAt: now,
         updatedAt: now,
+        ...(rawData.businessId && { businessId: rawData.businessId }),
     };
-    
-    if (rawData.businessId) {
-        (newPostData as any).businessId = rawData.businessId;
-    }
-
 
     try {
         await postsCollection.add(newPostData);
@@ -88,6 +85,12 @@ export async function updatePost(formData: FormData) {
     }
 
     const postRef = firestore.collection('blog_posts').doc(postId);
+    
+    const postSnap = await postRef.get();
+    if (!postSnap.exists) {
+        return { success: false, error: 'Post no encontrado.' };
+    }
+    const existingPostData = postSnap.data();
 
     const rawData = {
         title: formData.get('title') as string,
@@ -121,8 +124,9 @@ export async function updatePost(formData: FormData) {
         return { success: false, error: `Error al actualizar en Firestore: ${error.message}` };
     }
     
-    const revalidationPath = '/dashboard/blog';
+    const revalidationPath = existingPostData?.businessId ? '/dashboard/blog' : '/superadmin/blog';
     revalidatePath(revalidationPath);
+    revalidatePath('/blog');
     revalidatePath(`/blog/${updatedData.slug}`);
 
     return { success: true, message: 'Post actualizado con éxito.' };
