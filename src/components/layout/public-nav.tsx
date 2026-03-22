@@ -1,9 +1,22 @@
+
 'use client';
 
 import React from 'react';
-import type { NavigationSection } from '@/models/landing-page';
+import type { NavigationSection, NavLink } from '@/models/landing-page';
 
-const PublicNav = ({ navigation }: { navigation: NavigationSection | undefined }) => {
+const getLinkUrl = (link: NavLink, currentBusinessId: string | undefined): string => {
+  if (link.url && link.url !== '#') {
+    return link.url;
+  }
+  const text = link.text.toLowerCase();
+  if (text.includes('blog')) return '/blog';
+  if (text.includes('catálogo')) return currentBusinessId ? `/catalog/${currentBusinessId}` : '#';
+  if (text.includes('contacto')) return '/contact';
+  if (text.includes('inicio')) return currentBusinessId ? `/landing/${currentBusinessId}` : '/';
+  return '#';
+};
+
+const PublicNav = ({ navigation, businessId }: { navigation: NavigationSection | undefined, businessId: string | undefined }) => {
     if (!navigation || !navigation.enabled) {
         return null;
     }
@@ -30,7 +43,7 @@ const PublicNav = ({ navigation }: { navigation: NavigationSection | undefined }
                 </div>
                 <div className="hidden md:flex items-center gap-6">
                     {navigation.links.filter(l => l.enabled).map(link => (
-                        <a key={link.id} href={link.url} className="hover:opacity-70 transition-opacity" style={{ fontSize: `${navigation.fontSize}px` }}>
+                        <a key={link.id} href={getLinkUrl(link, businessId)} className="hover:opacity-70 transition-opacity" style={{ fontSize: `${navigation.fontSize}px` }}>
                             {link.text}
                         </a>
                     ))}

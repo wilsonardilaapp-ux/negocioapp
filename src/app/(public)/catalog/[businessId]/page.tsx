@@ -604,7 +604,7 @@ export default function CatalogPage() {
     
     return (
         <div id="catalog-page-root" ref={pageRef} className="bg-muted/40">
-            <PublicNav navigation={landingPageData?.navigation} />
+            <PublicNav navigation={landingPageData?.navigation} businessId={businessId} />
             {headerConfig ? (
                 <CatalogHeader config={headerConfig} />
             ) : (
