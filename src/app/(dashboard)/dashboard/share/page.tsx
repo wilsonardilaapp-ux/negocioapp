@@ -18,7 +18,10 @@ import {
   Check,
   Eye,
   Settings,
-  Palette
+  Palette,
+  Image as ImageIcon,
+  Pencil,
+  Trash2,
 } from 'lucide-react';
 import { useUser, useFirestore, useDoc, useMemoFirebase, setDocumentNonBlocking } from '@/firebase';
 import { doc } from 'firebase/firestore';
@@ -30,9 +33,16 @@ import { toPng, toSvg } from 'html-to-image';
 import { WhatsAppIcon } from '@/components/icons';
 import { Slider } from '@/components/ui/slider';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
+import { Textarea } from '@/components/ui/textarea';
+import { uploadMedia } from '@/ai/flows/upload-media-flow';
+import NextImage from 'next/image';
 
 const defaultShareConfig: Omit<MenuShare, 'id' | 'businessId' | 'createdAt' | 'updatedAt'> = {
   slug: '',
+  useCustomSlug: false,
+  socialPreviewImageUrl: null,
+  socialShareMessage: '¡Hola! Te invito a ver nuestro menú digital ✨',
   qrConfig: {
     size: 256,
     backgroundColor: "#ffffff",
@@ -40,6 +50,9 @@ const defaultShareConfig: Omit<MenuShare, 'id' | 'businessId' | 'createdAt' | 'u
     errorCorrectionLevel: 'L',
     style: 'squares',
     logoSize: 0.2,
+    frameEnabled: false,
+    frameText: 'Escanea',
+    frameColor: '#000000',
   },
   totalViews: 0,
   totalScans: 0,
@@ -78,12 +91,12 @@ const QRCodeCustomizer = ({ config, setConfig }: { config: QRConfig, setConfig: 
                     </Select>
                 </div>
                  <div>
-                    <Label>Tamaño del logo ({Math.round(config.logoSize * 100)}%)</Label>
+                    <Label>Tamaño del logo ({Math.round((config.logoSize || 0.2) * 100)}%)</Label>
                     <Slider
                         min={0.1}
                         max={0.3}
                         step={0.05}
-                        defaultValue={[config.logoSize]}
+                        defaultValue={[config.logoSize || 0.2]}
                         onValueChange={(v) => setConfig({...config, logoSize: v[0]})}
                     />
                 </div>
@@ -93,6 +106,60 @@ const QRCodeCustomizer = ({ config, setConfig }: { config: QRConfig, setConfig: 
                 </div>
             </CardContent>
         </Card>
+    );
+};
+
+const SocialPreviewImageUploader = ({ imageUrl, onUpload, onRemove }: {
+    imageUrl: string | null | undefined;
+    onUpload: (file: File) => void;
+    onRemove: () => void;
+}) => {
+    const { toast } = useToast();
+    const [isUploading, setIsUploading] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        if (file.size > 5 * 1024 * 1024) { // 5MB limit
+            toast({
+                variant: "destructive",
+                title: "Archivo muy grande",
+                description: "El tamaño máximo es de 5MB.",
+            });
+            return;
+        }
+
+        setIsUploading(true);
+        await onUpload(file);
+        setIsUploading(false);
+    };
+
+    return (
+        <div className="space-y-2">
+            <Label>Imagen de vista previa (1200x630 recomendado)</Label>
+            <div className="relative w-full border-2 border-dashed rounded-lg flex items-center justify-center text-center p-4 group aspect-[1200/630]">
+                {isUploading ? (
+                     <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                ) : imageUrl ? (
+                    <>
+                        <NextImage src={imageUrl} alt="Vista previa" layout="fill" className="object-contain rounded-md" />
+                        <div className="absolute top-2 right-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Button variant="outline" size="icon" onClick={() => fileInputRef.current?.click()}><Pencil className="h-4 w-4" /></Button>
+                            <Button variant="destructive" size="icon" onClick={onRemove}><Trash2 className="h-4 w-4" /></Button>
+                        </div>
+                    </>
+                ) : (
+                    <div className="cursor-pointer" onClick={() => fileInputRef.current?.click()}>
+                        <ImageIcon className="h-10 w-10 mx-auto text-muted-foreground" />
+                        <p className="mt-2 text-sm font-semibold">Click para subir imagen</p>
+                        <p className="text-xs text-muted-foreground">PNG, JPG (máx. 5MB)</p>
+                    </div>
+                )}
+            </div>
+            <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept="image/png,image/jpeg" />
+        </div>
     );
 };
 
@@ -115,7 +182,8 @@ export default function SharePage() {
   
   useEffect(() => {
     if (savedShareConfig) {
-      setShareConfig(savedShareConfig);
+        const mergedConfig = { ...defaultShareConfig, ...savedShareConfig };
+        setShareConfig(mergedConfig);
     } else if (user && !isLoading) {
       // Create a default config if one doesn't exist
       const newConfig: MenuShare = {
@@ -145,7 +213,6 @@ export default function SharePage() {
     if (!shareConfig) return;
     const updatedConfig = { ...shareConfig, qrConfig: newQRConfig, updatedAt: new Date().toISOString() };
     setShareConfig(updatedConfig);
-    // Debounce this in a real app
     if(shareConfigRef) {
         setDocumentNonBlocking(shareConfigRef, { qrConfig: newQRConfig, updatedAt: new Date().toISOString() }, { merge: true });
     }
@@ -153,7 +220,8 @@ export default function SharePage() {
 
   const getCatalogUrl = () => {
     if (typeof window !== 'undefined' && shareConfig?.slug) {
-      return `${window.location.origin}/catalog/${shareConfig.slug}`;
+      const slug = shareConfig.useCustomSlug ? shareConfig.slug : user?.uid;
+      return `${window.location.origin}/catalog/${slug}`;
     }
     return '';
   };
@@ -185,6 +253,26 @@ export default function SharePage() {
         toast({variant: 'destructive', title: 'Error al descargar', description: 'No se pudo generar el archivo.'});
     }
   };
+
+    const handleSocialImageUpload = async (file: File) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onloadend = async () => {
+            const mediaDataUri = reader.result as string;
+            try {
+                const result = await uploadMedia({ mediaDataUri });
+                handleConfigSave({ socialPreviewImageUrl: result.secure_url });
+            } catch (error: any) {
+                toast({ variant: 'destructive', title: "Error al subir", description: error.message });
+            }
+        };
+    };
+    
+    const handleShareSocialWhatsApp = () => {
+        const text = encodeURIComponent(shareConfig?.socialShareMessage || `¡Mira nuestro menú digital! ${menuUrl}`);
+        const whatsappUrl = `https://wa.me/?text=${text}`;
+        window.open(whatsappUrl, '_blank');
+    };
   
   const handleShare = (platform: 'facebook' | 'twitter' | 'whatsapp') => {
     let url = '';
@@ -217,6 +305,71 @@ export default function SharePage() {
           <CardDescription>Facilita a tus clientes el acceso a tu catálogo de productos.</CardDescription>
         </CardHeader>
       </Card>
+
+      <Card>
+        <CardHeader>
+            <CardTitle className="flex items-center gap-2"><Link2 className="h-5 w-5" /> URL Personalizada</CardTitle>
+            <CardDescription>Crea un enlace corto y memorable para tu menú.</CardDescription>
+        </CardHeader>
+        <CardContent>
+            <div className="flex items-center justify-between rounded-lg border p-4">
+                <div>
+                    <Label htmlFor="custom-slug-switch">Usar alias personalizado</Label>
+                    <p className="text-sm text-muted-foreground">Activa para crear una URL corta para tu menú</p>
+                </div>
+                <Switch
+                    id="custom-slug-switch"
+                    checked={shareConfig.useCustomSlug}
+                    onCheckedChange={(checked) => {
+                        const newSlug = checked ? (shareConfig.slug === user?.uid ? '' : shareConfig.slug) : user?.uid;
+                        handleConfigSave({ useCustomSlug: checked, slug: newSlug || user?.uid });
+                    }}
+                />
+            </div>
+            {shareConfig.useCustomSlug && (
+                <div className="mt-4">
+                    <Label htmlFor="slug-input">Tu alias</Label>
+                    <div className="flex items-center">
+                        <span className="p-2 bg-muted border border-r-0 rounded-l-md text-sm text-muted-foreground">{window.location.origin.replace(/https?:\/\//, '')}/catalog/</span>
+                        <Input
+                            id="slug-input"
+                            className="rounded-l-none"
+                            value={shareConfig.slug === user?.uid ? '' : shareConfig.slug}
+                            placeholder="tu-negocio"
+                            onChange={(e) => handleConfigSave({ slug: e.target.value })}
+                        />
+                    </div>
+                </div>
+            )}
+        </CardContent>
+      </Card>
+      
+      <Card>
+        <CardHeader>
+            <CardTitle className="flex items-center gap-2"><Share2 className="h-5 w-5" /> Vista Previa Social</CardTitle>
+            <CardDescription>Personaliza cómo se ve tu menú al compartirlo en redes sociales.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+            <SocialPreviewImageUploader
+                imageUrl={shareConfig.socialPreviewImageUrl}
+                onUpload={handleSocialImageUpload}
+                onRemove={() => handleConfigSave({ socialPreviewImageUrl: null })}
+            />
+            <div>
+                <Label htmlFor="social-message">Mensaje personalizado</Label>
+                <Textarea
+                    id="social-message"
+                    placeholder="¡Hola! Te invito a ver nuestro menú digital ✨"
+                    value={shareConfig.socialShareMessage}
+                    onChange={(e) => handleConfigSave({ socialShareMessage: e.target.value })}
+                />
+                <p className="text-xs text-muted-foreground mt-1">Este mensaje se incluirá al compartir por WhatsApp.</p>
+            </div>
+            <Button className="w-full bg-green-500 hover:bg-green-600" onClick={handleShareSocialWhatsApp}>
+                <WhatsAppIcon className="h-5 w-5 mr-2" /> Compartir en WhatsApp
+            </Button>
+        </CardContent>
+      </Card>
       
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
@@ -236,15 +389,14 @@ export default function SharePage() {
                               bgColor={qrConfig.backgroundColor}
                               fgColor={qrConfig.foregroundColor}
                               level={qrConfig.errorCorrectionLevel}
-                              // The react-qr-code library has built-in support for an image overlay
                               qrStyle={qrConfig.style}
-                              eyeRadius={qrConfig.style === 'rounded' ? 10 : 0}
+                              eyeRadius={qrConfig.style === 'dots' ? 5 : 0}
                               imageSettings={qrConfig.logoUrl ? {
                                 src: qrConfig.logoUrl,
                                 x: undefined,
                                 y: undefined,
-                                height: 256 * qrConfig.logoSize,
-                                width: 256 * qrConfig.logoSize,
+                                height: 256 * (qrConfig.logoSize || 0.2),
+                                width: 256 * (qrConfig.logoSize || 0.2),
                                 excavate: true,
                               } : undefined}
                             />

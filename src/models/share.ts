@@ -7,6 +7,9 @@ export interface QRConfig {
   logoSize: number;
   errorCorrectionLevel: 'L' | 'M' | 'Q' | 'H';
   style: 'squares' | 'dots';
+  frameEnabled?: boolean;
+  frameText?: string;
+  frameColor?: string;
 }
 
 export interface MenuShare {
@@ -20,5 +23,10 @@ export interface MenuShare {
   lastViewedAt?: string; // ISO string
   isActive: boolean;
   createdAt: string; // ISO string
-  updatedAt: string; // ISO string
+  updatedAt: string; // ISO string;
+
+  // New fields for UI
+  useCustomSlug?: boolean;
+  socialPreviewImageUrl?: string | null;
+  socialShareMessage?: string;
 }
