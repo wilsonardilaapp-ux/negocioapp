@@ -1,8 +1,23 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useMemo } from 'react';
+import dynamic from 'next/dynamic';
 import { uploadMedia } from '@/ai/flows/upload-media-flow';
 import { useToast } from '@/hooks/use-toast';
+
+// Dynamically import ReactQuill to prevent SSR issues
+const ReactQuill = dynamic(
+  async () => {
+    const { default: RQ } = await import('react-quill');
+    // We need to forward the ref to the underlying Quill instance
+    // eslint-disable-next-line react/display-name
+    return ({ forwardedRef, ...props }: any) => <RQ ref={forwardedRef} {...props} />;
+  },
+  {
+    ssr: false,
+    loading: () => <div className="h-[200px] w-full animate-pulse rounded-md bg-muted" />,
+  }
+);
 
 interface RichTextEditorProps {
   value: string;
@@ -10,171 +25,90 @@ interface RichTextEditorProps {
   placeholder?: string;
 }
 
-const MAX_FILE_SIZE_MB = 1;
-const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
-
-// Moved outside the component to prevent re-creation on every render
-const sizeWhitelist = [
-    '8px', '9px', '10px', '11px', '12px', '14px', '16px', '18px', 
-    '20px', '24px', '28px', '32px', '36px', '48px', '60px', '72px'
-];
-
-const fontWhitelist = [
-    'sans-serif', 'serif', 'monospace', 'arial', 'comic-sans', 
-    'courier-new', 'georgia', 'helvetica', 'lucida'
-];
-
 const RichTextEditor: React.FC<RichTextEditorProps> = ({ value, onChange, placeholder }) => {
-  const editorRef = useRef<HTMLDivElement>(null);
-  const quillInstance = useRef<any>(null);
-  const [isLoaded, setIsLoaded] = useState(false);
   const { toast } = useToast();
+  const quillRef = React.useRef<any>(null);
 
-  useEffect(() => {
-    const loadQuill = async () => {
-      const Quill = (await import('quill')).default;
+  const imageHandler = () => {
+    const input = document.createElement('input');
+    input.setAttribute('type', 'file');
+    input.setAttribute('accept', 'image/*');
+    input.click();
 
-      if (editorRef.current && !quillInstance.current) {
-        const toolbarOptions = [
-          [{ 'header': [1, 2, 3, 4, 5, 6, false] }],
-          [{ 'font': fontWhitelist }],
-          [{ 'size': sizeWhitelist }],
-          ['bold', 'italic', 'underline', 'strike'],
-          [{ 'color': [] }, { 'background': [] }],
-          [{ 'script': 'sub' }, { 'script': 'super' }],
-          [{ 'list': 'ordered' }, { 'list': 'bullet' }],
-          [{ 'indent': '-1' }, { 'indent': '+1' }, { 'align': [] }],
-          ['blockquote', 'code-block'],
-          ['link', 'image', 'video'],
-          ['clean']
-        ];
+    input.onchange = async () => {
+      if (!input.files) return;
+      const file = input.files[0];
+      const MAX_FILE_SIZE_MB = 1;
+      const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 
-        const imageHandler = () => {
-          const input = document.createElement('input');
-          input.setAttribute('type', 'file');
-          input.setAttribute('accept', 'image/*');
-          input.click();
-
-          input.onchange = async () => {
-              if (input.files) {
-                  const file = input.files[0];
-                  if (file.size > MAX_FILE_SIZE_BYTES) {
-                      toast({
-                          variant: 'destructive',
-                          title: "Archivo muy pesado",
-                          description: `El archivo es muy pesado. Máximo ${MAX_FILE_SIZE_MB}MB.`,
-                      });
-                      input.value = "";
-                      return;
-                  }
-                  const reader = new FileReader();
-                  reader.readAsDataURL(file);
-                  const range = quillInstance.current.getSelection(true);
-                  reader.onloadend = async () => {
-                      const mediaDataUri = reader.result as string;
-                      try {
-                          quillInstance.current.insertEmbed(range.index, 'image', `data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7`);
-                          quillInstance.current.setSelection(range.index + 1);
-
-                          const result = await uploadMedia({ mediaDataUri });
-                          
-                          quillInstance.current.deleteText(range.index, 1);
-                          quillInstance.current.insertEmbed(range.index, 'image', result.secure_url);
-                          quillInstance.current.setSelection(range.index + 1);
-                      } catch (error) {
-                          console.error('Image upload failed', error);
-                          if (range) {
-                              quillInstance.current.deleteText(range.index, 1);
-                          }
-                      }
-                  }
-              }
-          };
-        };
-
-        quillInstance.current = new Quill(editorRef.current, {
-          theme: 'snow',
-          placeholder: placeholder || 'Escribe aquí...',
-          modules: {
-            toolbar: toolbarOptions
-          }
+      if (file.size > MAX_FILE_SIZE_BYTES) {
+        toast({
+          variant: 'destructive',
+          title: 'Archivo muy pesado',
+          description: `El archivo es muy pesado. Máximo ${MAX_FILE_SIZE_MB}MB.`,
         });
-
-        quillInstance.current.getModule('toolbar').addHandler('image', imageHandler);
-
-        quillInstance.current.on('text-change', () => {
-          const html = quillInstance.current.root.innerHTML;
-          if (html !== '<p><br></p>') {
-            onChange(html);
-          } else {
-            onChange('');
-          }
-        });
-        
-        setIsLoaded(true);
+        return;
       }
+
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+
+      reader.onloadend = async () => {
+        const mediaDataUri = reader.result as string;
+        const quill = quillRef.current?.getEditor();
+        if (!quill) return;
+
+        const range = quill.getSelection(true);
+        // Show a temporary loader/placeholder in the editor
+        quill.insertEmbed(range.index, 'image', `data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7`);
+        quill.setSelection(range.index + 1);
+
+        try {
+          const result = await uploadMedia({ mediaDataUri });
+          // Remove the loader and insert the actual image URL
+          quill.deleteText(range.index, 1);
+          quill.insertEmbed(range.index, 'image', result.secure_url);
+          quill.setSelection(range.index + 1);
+        } catch (error) {
+          console.error('Image upload failed', error);
+          quill.deleteText(range.index, 1); // Remove loader on failure
+          toast({
+            variant: 'destructive',
+            title: 'Error al subir imagen',
+            description: 'No se pudo cargar la imagen. Inténtalo de nuevo.',
+          });
+        }
+      };
     };
+  };
 
-    if (typeof window !== 'undefined') {
-      loadQuill();
-    }
-  }, [placeholder, onChange, toast]);
-
-  useEffect(() => {
-    // This effect ensures that if the 'value' prop changes from the parent,
-    // and the editor is loaded, the content is updated.
-    if (isLoaded && quillInstance.current && value !== quillInstance.current.root.innerHTML) {
-        quillInstance.current.root.innerHTML = value || '<p><br></p>';
-    }
-  }, [value, isLoaded]); // Depends on both value and isLoaded
+  const modules = useMemo(() => ({
+    toolbar: {
+      container: [
+        [{ header: [1, 2, 3, 4, 5, 6, false] }],
+        [{ font: [] }],
+        [{ size: [] }],
+        ['bold', 'italic', 'underline', 'strike', 'blockquote'],
+        [{ list: 'ordered' }, { list: 'bullet' }, { indent: '-1' }, { indent: '+1' }],
+        ['link', 'image', 'video'],
+        ['clean'],
+      ],
+      handlers: {
+        image: imageHandler,
+      },
+    },
+  }), []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="rich-editor-wrapper">
-      {/* CSS Inyectado para mostrar las etiquetas de tamaño y fuente en el menú */}
-      <style dangerouslySetInnerHTML={{ __html: `
-        .ql-picker.ql-size .ql-picker-label::before,
-        .ql-picker.ql-size .ql-picker-item::before {
-          content: attr(data-value) !important;
-        }
-        .ql-picker.ql-size .ql-picker-item[data-value]::before {
-          content: attr(data-value) !important;
-        }
-        .ql-picker.ql-size .ql-picker-label:not([data-value])::before {
-          content: 'Normal' !important;
-        }
-        .ql-picker.ql-font .ql-picker-label::before,
-        .ql-picker.ql-font .ql-picker-item::before {
-          content: attr(data-value) !important;
-        }
-         .ql-picker.ql-font .ql-picker-label[data-value="sans-serif"]::before {
-            content: "Sans Serif" !important;
-        }
-        .ql-picker.ql-font .ql-picker-label[data-value="serif"]::before {
-            content: "Serif" !important;
-        }
-        .ql-picker.ql-font .ql-picker-label[data-value="monospace"]::before {
-            content: "Monospace" !important;
-        }
-         .ql-picker.ql-font .ql-picker-label[data-value="arial"]::before {
-            content: "Arial" !important;
-        }
-        .ql-picker.ql-font .ql-picker-label[data-value="comic-sans"]::before {
-            content: "Comic Sans" !important;
-        }
-        .ql-picker.ql-font .ql-picker-label[data-value="courier-new"]::before {
-            content: "Courier New" !important;
-        }
-        .ql-picker.ql-font .ql-picker-label[data-value="georgia"]::before {
-            content: "Georgia" !important;
-        }
-        .ql-picker.ql-font .ql-picker-label[data-value="helvetica"]::before {
-            content: "Helvetica" !important;
-        }
-        .ql-picker.ql-font .ql-picker-label[data-value="lucida"]::before {
-            content: "Lucida" !important;
-        }
-      `}} />
-      <div ref={editorRef} />
+      <ReactQuill
+        forwardedRef={quillRef}
+        theme="snow"
+        value={value}
+        onChange={onChange}
+        modules={modules}
+        placeholder={placeholder}
+      />
     </div>
   );
 };
