@@ -25,7 +25,7 @@ import {
 import type { LandingHeaderConfigData } from '@/models/landing-page';
 import { v4 as uuidv4 } from 'uuid';
 import { useDoc, useFirestore, useUser, useMemoFirebase, setDocumentNonBlocking, deleteDocumentNonBlocking, useCollection } from '@/firebase';
-import { doc, collection, writeBatch, query, where } from 'firebase/firestore';
+import { doc, collection, writeBatch, query, where, getDoc } from 'firebase/firestore';
 import type { SystemService } from '@/models/system-service';
 import type { Module } from '@/models/module';
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
@@ -40,6 +40,8 @@ const initialHeaderConfig: LandingHeaderConfigData = {
       address: 'Dirección de ejemplo',
       phone: '3001234567',
       email: 'info@tunegocio.com',
+      deliveryFee: 0,
+      vatRate: 19,
     },
     socialLinks: {
       tiktok: '',
@@ -59,23 +61,50 @@ export default function CatalogoPage() {
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [editingProduct, setEditingProduct] = useState<Product | null>(null);
     const [productToDelete, setProductToDelete] = useState<Product | null>(null);
+    const [catalogModule, setCatalogModule] = useState<Module | null>(null);
+    const [isModuleLoading, setIsModuleLoading] = useState(true);
     
     const { user, isUserLoading } = useUser();
     const firestore = useFirestore();
+
+    // Lógica para verificar el módulo de catálogo con retrocompatibilidad
+    useEffect(() => {
+        if (!firestore) return;
+        
+        const checkModule = async () => {
+            setIsModuleLoading(true);
+            try {
+                const primaryDocRef = doc(firestore, 'modules', 'catalogo');
+                const primarySnap = await getDoc(primaryDocRef);
+
+                if (primarySnap.exists()) {
+                    setCatalogModule({ ...primarySnap.data(), id: primarySnap.id } as Module);
+                } else {
+                    const fallbackDocRef = doc(firestore, 'modules', 'catalogo-de-productos');
+                    const fallbackSnap = await getDoc(fallbackDocRef);
+                    if (fallbackSnap.exists()) {
+                        setCatalogModule({ ...fallbackSnap.data(), id: fallbackSnap.id } as Module);
+                    } else {
+                        setCatalogModule(null);
+                    }
+                }
+            } catch (error) {
+                console.error("Error fetching catalog module:", error);
+                setCatalogModule(null);
+            } finally {
+                setIsModuleLoading(false);
+            }
+        };
+
+        checkModule();
+    }, [firestore]);
 
     const productLimitServiceQuery = useMemoFirebase(() => {
         if (!firestore) return null;
         return doc(firestore, 'systemServices', 'product_limit');
     }, [firestore]);
     
-    const catalogModuleQuery = useMemoFirebase(() => {
-        if (!firestore) return null;
-        return doc(firestore, 'modules', 'catalogo');
-    }, [firestore]);
-
     const { data: productLimitService, isLoading: isServicesLoading } = useDoc<SystemService>(productLimitServiceQuery);
-    const { data: catalogModule, isLoading: isModuleLoading } = useDoc<Module>(catalogModuleQuery);
-
 
     const productsQuery = useMemoFirebase(() => {
         if (!firestore || !user) return null;
