@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
@@ -187,9 +186,9 @@ export default function SharePage() {
     } else if (user && !isLoading) {
       // Create a default config if one doesn't exist
       const newConfig: MenuShare = {
-        ...defaultShareConfig,
         id: 'main',
         businessId: user.uid,
+        ...defaultShareConfig,
         slug: user.uid,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -395,8 +394,6 @@ export default function SharePage() {
                               bgColor={qrConfig.backgroundColor}
                               fgColor={qrConfig.foregroundColor}
                               level={qrConfig.errorCorrectionLevel}
-                              qrStyle={qrConfig.style}
-                              eyeRadius={qrConfig.style === 'dots' ? 5 : 0}
                               imageSettings={qrConfig.logoUrl ? {
                                 src: qrConfig.logoUrl,
                                 x: undefined,
