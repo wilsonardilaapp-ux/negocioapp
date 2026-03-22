@@ -122,8 +122,10 @@ export default function BusinessesPage() {
   const handleSaveManageBusiness = async () => {
     if (!selectedBusiness) return;
 
-    // Update business status
-    await updateDocumentNonBlocking(doc(firestore, `businesses/${selectedBusiness.id}`), { status: selectedBusiness.status });
+    // Update business status only if it's defined
+    if (selectedBusiness.status) {
+      await updateDocumentNonBlocking(doc(firestore, `businesses/${selectedBusiness.id}`), { status: selectedBusiness.status });
+    }
     
     // Deactivate all first
     const currentModules = await getDocs(collection(firestore, `businesses/${selectedBusiness.id}/modules`));
