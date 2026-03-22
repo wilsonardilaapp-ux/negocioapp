@@ -187,10 +187,10 @@ export default function SharePage() {
     } else if (user && !isLoading) {
       // Create a default config if one doesn't exist
       const newConfig: MenuShare = {
+        ...defaultShareConfig,
         id: 'main',
         businessId: user.uid,
         slug: user.uid,
-        ...defaultShareConfig,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
