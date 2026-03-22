@@ -350,11 +350,13 @@ export default function SharePage() {
             <CardDescription>Personaliza cómo se ve tu menú al compartirlo en redes sociales.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-            <SocialPreviewImageUploader
-                imageUrl={shareConfig.socialPreviewImageUrl}
-                onUpload={handleSocialImageUpload}
-                onRemove={() => handleConfigSave({ socialPreviewImageUrl: null })}
-            />
+            <div className="max-w-lg mx-auto">
+              <SocialPreviewImageUploader
+                  imageUrl={shareConfig.socialPreviewImageUrl}
+                  onUpload={handleSocialImageUpload}
+                  onRemove={() => handleConfigSave({ socialPreviewImageUrl: null })}
+              />
+            </div>
             <div>
                 <Label htmlFor="social-message">Mensaje personalizado</Label>
                 <Textarea
