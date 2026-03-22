@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useRouter } from "next/navigation";
@@ -249,6 +250,9 @@ export default function RegisterPage() {
       const businessData: Business = {
         id: newUser.uid,
         name: `${values.name}'s Business`,
+        ownerName: values.name,
+        ownerEmail: values.email,
+        status: 'active',
         logoURL: 'https://seeklogo.com/images/E/eco-friendly-logo-7087A22106-seeklogo.com.png',
         description: 'Bienvenido a mi negocio en Negocio V03.',
       };
@@ -496,3 +500,5 @@ export default function RegisterPage() {
     </Card>
   );
 }
+
+    
