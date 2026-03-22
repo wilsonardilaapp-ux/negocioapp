@@ -89,20 +89,6 @@ const QRCodeCustomizer = ({ config, setConfig }: { config: QRConfig, setConfig: 
                         </SelectContent>
                     </Select>
                 </div>
-                 <div>
-                    <Label>Tamaño del logo ({Math.round((config.logoSize || 0.2) * 100)}%)</Label>
-                    <Slider
-                        min={0.1}
-                        max={0.3}
-                        step={0.05}
-                        defaultValue={[config.logoSize || 0.2]}
-                        onValueChange={(v) => setConfig({...config, logoSize: v[0]})}
-                    />
-                </div>
-                <div>
-                    <Label htmlFor="logo-url">URL del Logo (opcional)</Label>
-                    <Input id="logo-url" placeholder="https://..." value={config.logoUrl || ''} onChange={e => setConfig({...config, logoUrl: e.target.value})} />
-                </div>
             </CardContent>
         </Card>
     );
@@ -181,7 +167,14 @@ export default function SharePage() {
   
   useEffect(() => {
     if (savedShareConfig) {
-        const mergedConfig = { ...defaultShareConfig, ...savedShareConfig };
+        const mergedConfig = {
+            ...defaultShareConfig,
+            ...savedShareConfig,
+            qrConfig: {
+                ...defaultShareConfig.qrConfig,
+                ...(savedShareConfig.qrConfig || {}),
+            },
+        };
         setShareConfig(mergedConfig);
     } else if (user && !isLoading) {
       // Create a default config if one doesn't exist
@@ -394,14 +387,6 @@ export default function SharePage() {
                               bgColor={qrConfig.backgroundColor}
                               fgColor={qrConfig.foregroundColor}
                               level={qrConfig.errorCorrectionLevel}
-                              imageSettings={qrConfig.logoUrl ? {
-                                src: qrConfig.logoUrl,
-                                x: undefined,
-                                y: undefined,
-                                height: 256 * (qrConfig.logoSize || 0.2),
-                                width: 256 * (qrConfig.logoSize || 0.2),
-                                excavate: true,
-                              } : undefined}
                             />
                           </div>
                            <div className="flex gap-2 mt-4">
