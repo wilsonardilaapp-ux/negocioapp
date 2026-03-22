@@ -17,6 +17,7 @@ import {
   UserCircle,
   Printer,
   Package,
+  Share2,
 } from "lucide-react";
 import { MessageCircle as MessageCircleIcon } from "@/components/icons";
 
@@ -26,6 +27,7 @@ const allNavItems = [
   { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
   { href: "/dashboard/landing-page", icon: FileText, label: "Landing Page" },
   { href: "/dashboard/catalogo", icon: ShoppingCart, label: "Catálogo", moduleId: 'catalogo' },
+  { href: "/dashboard/share", icon: Share2, label: "Compartir Menú" },
   { href: "/dashboard/blog", icon: FileText, label: "Blog", moduleId: 'blog' },
   { href: "/dashboard/mensajes", icon: MessageSquare, label: "Mensajes" },
   { href: "/dashboard/pedidos", icon: ShoppingBag, label: "Pedidos" },

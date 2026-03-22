@@ -5,8 +5,8 @@ service cloud.firestore {
   match /databases/{database}/documents {
   
     function isBusinessMember(businessId) {
-      // Allows access if the user is the business owner OR a staff member
-      // whose user document points to this businessId.
+      // For single doc reads/writes. Allows the owner OR a staff member
+      // whose user doc points to this businessId.
       return request.auth != null && (
         request.auth.uid == businessId ||
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.businessId == businessId
@@ -77,6 +77,9 @@ service cloud.firestore {
          allow read, write: if isBusinessMember(businessId);
       }
       match /subscription/{docId} {
+        allow read, write: if isBusinessMember(businessId);
+      }
+      match /shareConfig/main {
         allow read, write: if isBusinessMember(businessId);
       }
 
