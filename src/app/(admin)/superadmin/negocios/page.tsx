@@ -39,7 +39,10 @@ const iconMap: { [key: string]: React.ReactNode } = {
   default: <Puzzle className="w-4 h-4" />,
 };
 
-const StatusBadge = ({ status }: { status: EntityStatus }) => {
+const StatusBadge = ({ status }: { status: EntityStatus | undefined }) => {
+  if (!status) {
+    return <Badge className="bg-gray-100 text-gray-800">Indefinido</Badge>;
+  }
   const statusConfig = {
     active: 'bg-green-100 text-green-800',
     inactive: 'bg-gray-100 text-gray-800',
@@ -78,7 +81,7 @@ export default function BusinessesPage() {
     return (businesses || []).filter(business => {
       const searchMatch = searchBusiness === '' ||
         business.name.toLowerCase().includes(searchBusiness.toLowerCase()) ||
-        business.ownerName.toLowerCase().includes(searchBusiness.toLowerCase());
+        (business.ownerName && business.ownerName.toLowerCase().includes(searchBusiness.toLowerCase()));
       const planMatch = filterPlan === 'all' || business.planName === plans?.find(p => p.id === filterPlan)?.name;
       const statusMatch = filterStatus === 'all' || business.status === filterStatus;
       return searchMatch && planMatch && statusMatch;
@@ -95,6 +98,8 @@ export default function BusinessesPage() {
     const newBusiness: Omit<Business, 'id'> = {
       ...businessForm,
       planName: selectedPlan?.name,
+      logoURL: 'https://seeklogo.com/images/E/eco-friendly-logo-7087A22106-seeklogo.com.png', // Default logo
+      description: 'Descripción por defecto', // Default description
     };
     await setDocumentNonBlocking(newBusinessRef, newBusiness);
     setBusinessForm(initialFormState);
