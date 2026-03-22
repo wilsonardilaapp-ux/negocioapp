@@ -33,10 +33,7 @@ service cloud.firestore {
 
     // User-specific data
     match /users/{userId} { 
-      // A regular user can read and update their own profile.
       allow get, update: if request.auth.uid == userId;
-      
-      // A super_admin can read (get, list) and write (create, update, delete) any user document.
       allow read, write: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'super_admin';
     }
     match /paymentSettings/{userId} {
@@ -45,9 +42,9 @@ service cloud.firestore {
 
     // Business-related data
     match /businesses/{businessId} {
-      allow get: if true; // Business profile can be public
-      // Only a business member can modify the business document
-      allow write: if isBusinessMember(businessId);
+      allow get: if true;
+      allow list, write: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'super_admin';
+      allow create, update, delete: if isBusinessMember(businessId);
 
       // Publicly readable subcollections
       match /publicData/{docId=**} {
@@ -59,7 +56,7 @@ service cloud.firestore {
         allow write: if isBusinessMember(businessId);
       }
 
-      // Private subcollections can be read/written by members
+      // Private subcollections
       match /products/{productId} {
         allow read, write: if isBusinessMember(businessId);
       }
@@ -107,18 +104,24 @@ service cloud.firestore {
               allow read, write: if isBusinessMember(businessId);
           }
       }
+      match /services/{serviceId} {
+        allow read, write: if isBusinessMember(businessId) || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'super_admin';
+      }
+      match /modules/{moduleId} {
+        allow read, write: if isBusinessMember(businessId) || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'super_admin';
+      }
     }
     
     // System-level collections (potentially admin-only)
     match /modules/{moduleId} {
       allow read: if true;
-      allow write: if request.auth != null;
+      allow write: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'super_admin';
     }
     match /systemServices/{serviceId} { 
-      allow read, write: if request.auth != null;
+      allow read, write: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'super_admin';
     }
     match /integrations/{integrationId} { 
-      allow get, list, write: if request.auth != null;
+      allow read, write: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'super_admin';
     }
     
     // Default deny all other paths. This is a security best practice.

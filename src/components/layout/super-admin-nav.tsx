@@ -16,6 +16,7 @@ import {
   TrendingUp,
   Package,
   UserCircle,
+  Building,
 } from "lucide-react";
 
 import { SidebarMenu, SidebarMenuItem, SidebarMenuButton } from "@/components/ui/sidebar";
@@ -23,6 +24,7 @@ import { SidebarMenu, SidebarMenuItem, SidebarMenuButton } from "@/components/ui
 const navItems = [
   { href: "/superadmin", icon: LayoutDashboard, label: "Dashboard" },
   { href: "/superadmin/usuarios", icon: Users, label: "Usuarios" },
+  { href: "/superadmin/negocios", icon: Building, label: "Negocios" },
   { href: "/superadmin/subscriptions", icon: CreditCard, label: "Suscripciones" },
   { href: "/superadmin/revenue", icon: TrendingUp, label: "Ingresos" },
   { href: "/superadmin/plans", icon: Package, label: "Planes" },

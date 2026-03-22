@@ -1,7 +1,11 @@
 
+export type EntityStatus = 'active' | 'inactive' | 'suspended' | 'pending_payment';
+
 export type Business = {
     id: string;
     name: string;
+    ownerName: string;
+    ownerEmail: string;
     contactEmail?: string;
     phone?: string;
     logoURL: string;
@@ -13,4 +17,6 @@ export type Business = {
     vatRate?: number;
     deliveryFee?: number;
     packagingFee?: number;
+    planName?: string;
+    status: EntityStatus;
 };
