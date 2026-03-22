@@ -1,5 +1,6 @@
 'use client';
 
+import { useMemo } from 'react';
 import {
   Card,
   CardContent,
@@ -11,7 +12,7 @@ import { Button } from '@/components/ui/button';
 import { PlusCircle, Frown } from 'lucide-react';
 import Link from 'next/link';
 import { useCollection, useFirestore, useMemoFirebase, useUser, useDoc } from '@/firebase';
-import { collection, query, where, doc, orderBy } from 'firebase/firestore';
+import { collection, query, where, doc, type Timestamp } from 'firebase/firestore';
 import type { BlogPost } from '@/models/blog-post';
 import { PostsTable } from '@/components/blog/posts-table';
 import type { Module } from '@/models/module';
@@ -28,15 +29,27 @@ export default function BlogPage() {
   
   const { data: blogModule, isLoading: isModuleLoading } = useDoc<Module>(blogModuleQuery);
 
-  // This query is now just for fetching the posts, not for limit logic
+  // This query now fetches posts without ordering to avoid composite index issues.
+  // Sorting will be handled on the client-side.
   const postsQuery = useMemoFirebase(() => 
     !firestore || !user
       ? null 
-      : query(collection(firestore, 'blog_posts'), where('businessId', '==', user.uid), orderBy('createdAt', 'desc')),
+      : query(collection(firestore, 'blog_posts'), where('businessId', '==', user.uid)),
     [firestore, user]
   );
   
-  const { data: posts, isLoading: arePostsLoading } = useCollection<BlogPost>(postsQuery);
+  const { data: unsortedPosts, isLoading: arePostsLoading } = useCollection<BlogPost>(postsQuery);
+
+  const posts = useMemo(() => {
+    if (!unsortedPosts) return [];
+    return [...unsortedPosts].sort((a, b) => {
+        // Handle both string and Timestamp formats for date
+        const dateA = a.createdAt ? (typeof a.createdAt === 'string' ? new Date(a.createdAt) : (a.createdAt as Timestamp).toDate()) : new Date(0);
+        const dateB = b.createdAt ? (typeof b.createdAt === 'string' ? new Date(b.createdAt) : (b.createdAt as Timestamp).toDate()) : new Date(0);
+        return dateB.getTime() - dateA.getTime(); // Descending order
+    });
+  }, [unsortedPosts]);
+
   const { plan, isFree, canAddBlogPosts, limits, isLoading: isSubscriptionLoading } = useSubscription();
   
   const totalPosts = posts?.length ?? 0;
