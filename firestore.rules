@@ -33,7 +33,11 @@ service cloud.firestore {
 
     // User-specific data
     match /users/{userId} { 
-      allow read, write: if request.auth.uid == userId; 
+      // A regular user can read and update their own profile.
+      allow get, update: if request.auth.uid == userId;
+      
+      // A super_admin can read (get, list) and write (create, update, delete) any user document.
+      allow read, write: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'super_admin';
     }
     match /paymentSettings/{userId} {
       allow read, write: if request.auth.uid == userId;
@@ -42,7 +46,8 @@ service cloud.firestore {
     // Business-related data
     match /businesses/{businessId} {
       allow get: if true; // Business profile can be public
-      allow create, update, delete: if isBusinessMember(businessId);
+      // Only a business member can modify the business document
+      allow write: if isBusinessMember(businessId);
 
       // Publicly readable subcollections
       match /publicData/{docId=**} {
@@ -54,7 +59,7 @@ service cloud.firestore {
         allow write: if isBusinessMember(businessId);
       }
 
-      // Private subcollections with unified member access
+      // Private subcollections can be read/written by members
       match /products/{productId} {
         allow read, write: if isBusinessMember(businessId);
       }
