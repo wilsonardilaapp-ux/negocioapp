@@ -15,8 +15,20 @@ service cloud.firestore {
 
     // Publicly readable collections
     match /blog_posts/{postId} {
-      allow read: if true;
-      allow write: if request.auth != null;
+      // Allow public read for get, and allow anyone to query the collection
+      allow get, list: if true;
+      
+      // Allow create for authenticated users, ensuring they set the correct businessId
+      // or are a superadmin creating a global post.
+      allow create: if request.auth != null && 
+                    (request.resource.data.businessId == request.auth.uid || 
+                     (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'super_admin' && !('businessId' in request.resource.data)));
+
+      // Allow update/delete only for the owner or a superadmin
+      allow update, delete: if request.auth != null && (
+        get(/databases/$(database)/documents/blog_posts/$(postId)).data.businessId == request.auth.uid ||
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'super_admin'
+      );
     }
     match /plans/{planId} {
       allow read: if true;
