@@ -65,7 +65,7 @@ export default function PrinterForm({ existingPrinter, onClose }: PrinterFormPro
             paperWidth: data.paperWidth,
             isDefault: data.isDefault,
             status: 'offline', // Default status
-            lastUsed: existingPrinter?.lastUsed ?? null,
+            lastUsed: existingPrinter?.lastUsed,
         };
 
         if (data.connection === 'network') {
