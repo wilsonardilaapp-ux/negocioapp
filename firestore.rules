@@ -82,6 +82,12 @@ service cloud.firestore {
       match /shareConfig/main {
         allow read, write: if isBusinessMember(businessId);
       }
+      match /backups/{backupId} {
+        allow read, write: if isBusinessMember(businessId);
+      }
+      match /backupSchedules/{scheduleId} {
+        allow read, write: if isBusinessMember(businessId);
+      }
 
       // Chatbot specific rules
       match /chatbotConfig/main {

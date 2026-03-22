@@ -740,6 +740,41 @@
         "updatedAt": { "type": "string", "format": "date-time" }
       },
       "required": ["id", "businessId", "slug", "qrConfig", "isActive"]
+    },
+    "Backup": {
+      "title": "Backup",
+      "description": "Represents a single backup instance of business data.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "businessId": { "type": "string" },
+        "name": { "type": "string" },
+        "type": { "type": "string", "enum": ["FULL", "INCREMENTAL", "DIFFERENTIAL", "SELECTIVE"] },
+        "status": { "type": "string", "enum": ["PENDING", "RUNNING", "COMPLETED", "FAILED", "CANCELLED"] },
+        "storageType": { "type": "string", "enum": ["LOCAL", "S3", "GCS", "AZURE", "FTP", "DROPBOX", "GDRIVE"] },
+        "sizeBytes": { "type": "number" },
+        "filePath": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "completedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "businessId", "name", "type", "status", "storageType", "createdAt"]
+    },
+    "BackupSchedule": {
+      "title": "BackupSchedule",
+      "description": "Defines a schedule for automatic backups.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "businessId": { "type": "string" },
+        "name": { "type": "string" },
+        "enabled": { "type": "boolean" },
+        "frequency": { "type": "string", "enum": ["DAILY", "WEEKLY", "MONTHLY"] },
+        "backupType": { "type": "string", "enum": ["FULL", "INCREMENTAL"] },
+        "storageType": { "type": "string" },
+        "retentionDays": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "businessId", "name", "enabled", "frequency", "backupType", "storageType", "retentionDays"]
     }
   },
   "auth": {
@@ -1051,6 +1086,30 @@
               "name": "printerId",
               "description": "The unique identifier for the printer."
             }
+          ]
+        }
+      },
+      {
+        "path": "/businesses/{businessId}/backups/{backupId}",
+        "definition": {
+          "entityName": "Backup",
+          "schema": { "$ref": "#/backend/entities/Backup" },
+          "description": "Stores individual backup records for a business.",
+          "params": [
+            { "name": "businessId", "description": "The unique identifier for the business." },
+            { "name": "backupId", "description": "The unique identifier for the backup record." }
+          ]
+        }
+      },
+      {
+        "path": "/businesses/{businessId}/backupSchedules/{scheduleId}",
+        "definition": {
+          "entityName": "BackupSchedule",
+          "schema": { "$ref": "#/backend/entities/BackupSchedule" },
+          "description": "Stores backup schedules for a business.",
+          "params": [
+            { "name": "businessId", "description": "The unique identifier for the business." },
+            { "name": "scheduleId", "description": "The unique identifier for the backup schedule." }
           ]
         }
       }
