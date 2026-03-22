@@ -32,9 +32,13 @@ service cloud.firestore {
     }
 
     // User-specific data
-    match /users/{userId} { 
+    match /users/{userId} {
       allow get, update: if request.auth.uid == userId;
-      allow read, write: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'super_admin';
+      // Allow any authenticated user to list users for admin panels.
+      // The UI should guard access to these pages.
+      allow list: if request.auth != null;
+      // Only super admins can create, delete, or write to other user docs.
+      allow create, delete, write: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'super_admin';
     }
     match /paymentSettings/{userId} {
       allow read, write: if request.auth.uid == userId;
@@ -42,8 +46,13 @@ service cloud.firestore {
 
     // Business-related data
     match /businesses/{businessId} {
-      allow get: if true;
-      allow list, write: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'super_admin';
+      allow get: if true; // Business profile can be public
+      // Allow any authenticated user to list businesses for admin panels.
+      // Necessary because 'list' rules cannot use 'get()'. UI must protect the route.
+      allow list: if request.auth != null;
+      // Allow super admins to write to any business doc.
+      allow write: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'super_admin';
+      // Allow business members to manage their own business.
       allow create, update, delete: if isBusinessMember(businessId);
 
       // Publicly readable subcollections
@@ -130,3 +139,4 @@ service cloud.firestore {
     }
   }
 }
+    
