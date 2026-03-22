@@ -333,11 +333,15 @@ export default function SharePage() {
                         <span className="p-2 bg-muted border border-r-0 rounded-l-md text-sm text-muted-foreground">{window.location.origin.replace(/https?:\/\//, '')}/catalog/</span>
                         <Input
                             id="slug-input"
-                            className="rounded-l-none"
+                            className="rounded-l-none rounded-r-none"
                             value={shareConfig.slug === user?.uid ? '' : shareConfig.slug}
                             placeholder="tu-negocio"
                             onChange={(e) => handleConfigSave({ slug: e.target.value })}
                         />
+                         <Button variant="outline" size="icon" className="rounded-l-none border-l-0" onClick={handleCopyLink}>
+                            {copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
+                            <span className="sr-only">Copiar URL</span>
+                        </Button>
                     </div>
                 </div>
             )}
