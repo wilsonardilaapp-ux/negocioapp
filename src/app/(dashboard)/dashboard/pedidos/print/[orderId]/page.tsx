@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useMemo } from 'react';
@@ -9,6 +8,7 @@ import { Loader2 } from 'lucide-react';
 
 import type { Order } from '@/models/order';
 import type { InvoiceSettings } from '@/models/invoice-settings';
+import { initialInvoiceSettings } from '@/models/invoice-settings';
 import type { Business } from '@/models/business';
 import { InvoiceTemplate, type OrderType } from '@/components/invoice/InvoiceTemplate';
 
@@ -33,8 +33,10 @@ const PrintInvoicePage = () => {
     );
 
     const { data: order, isLoading: isOrderLoading } = useDoc<Order>(orderDocRef);
-    const { data: settings, isLoading: isSettingsLoading } = useDoc<InvoiceSettings>(settingsDocRef);
+    const { data: savedSettings, isLoading: isSettingsLoading } = useDoc<InvoiceSettings>(settingsDocRef);
     const { data: business, isLoading: isBusinessLoading } = useDoc<Business>(businessDocRef);
+
+    const settings = savedSettings ?? initialInvoiceSettings;
 
     // Trigger print when data is loaded
     useEffect(() => {
@@ -92,7 +94,7 @@ const PrintInvoicePage = () => {
         );
     }
     
-    if (!order || !settings || !adaptedOrder) {
+    if (!order || !adaptedOrder) {
         return (
             <div className="flex h-screen w-full items-center justify-center bg-white">
                 <p className="text-lg text-destructive">Error: No se pudo cargar la información de la factura.</p>
