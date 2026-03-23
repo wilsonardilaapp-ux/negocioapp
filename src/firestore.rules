@@ -13,9 +13,7 @@ service cloud.firestore {
       let userDocPath = /databases/$(database)/documents/users/$(request.auth.uid);
       
       return request.auth != null && (
-        // Is the user the direct owner of the business?
         request.auth.uid == businessId ||
-        // Or is the user a staff member whose document exists and points to this business?
         (exists(userDocPath) && get(userDocPath).data.businessId == businessId)
       );
     }
@@ -147,4 +145,3 @@ service cloud.firestore {
     }
   }
 }
-    
