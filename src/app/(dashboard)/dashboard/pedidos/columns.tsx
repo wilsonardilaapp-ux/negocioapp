@@ -1,10 +1,9 @@
 
-
 "use client"
 
 import { useState } from "react";
 import { ColumnDef } from "@tanstack/react-table"
-import { MoreHorizontal, Eye, Trash2, Edit, Mail, Phone } from "lucide-react"
+import { MoreHorizontal, Eye, Trash2, Edit, Mail, Phone, Printer, FileDown } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -17,6 +16,7 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuSubContent,
   DropdownMenuPortal,
+  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu"
 import {
   AlertDialog,
@@ -292,6 +292,16 @@ export const columns = ({ handleDeleteOrder, handleUpdateStatus, selectedOrders,
             <DropdownMenuContent align="end">
                 <ViewOrderDialog order={order} />
                 <UpdateStatusSubMenu orderId={order.id} />
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => alert(`Imprimir factura para pedido: ${order.id}`)}>
+                  <Printer className="mr-2 h-4 w-4" />
+                  Imprimir Factura
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => alert(`Descargar PDF para pedido: ${order.id}`)}>
+                  <FileDown className="mr-2 h-4 w-4" />
+                  Descargar PDF
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
                 <DeleteOrderItem orderId={order.id} />
             </DropdownMenuContent>
           </DropdownMenu>
