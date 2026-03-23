@@ -119,22 +119,22 @@ export default function CatalogoPage() {
     const { data: headerConfig, isLoading: isConfigLoading } = useDoc<LandingHeaderConfigData>(headerConfigDocRef);
 
     const mergedConfig = useMemo(() => {
-        const savedConf = headerConfig || {};
+        const savedConf = headerConfig; // This will be LandingHeaderConfigData | null
     
-        // Ensure carouselItems is always an array, providing a default if it's missing or not an array.
-        const carouselItems = (Array.isArray(savedConf.carouselItems) && savedConf.carouselItems.length > 0)
+        // Safely access carouselItems. Use optional chaining.
+        const carouselItems = (savedConf?.carouselItems && Array.isArray(savedConf.carouselItems) && savedConf.carouselItems.length > 0)
             ? savedConf.carouselItems
             : initialHeaderConfig.carouselItems;
     
         // Ensure each item has a unique ID.
-        const carouselWithIds = carouselItems.map(item => item && item.id ? item : { ...item, id: uuidv4() });
+        const carouselWithIds = carouselItems.map(item => (item && item.id ? item : { ...item, id: uuidv4() }));
     
         return {
             ...initialHeaderConfig,
             ...savedConf,
-            banner: { ...initialHeaderConfig.banner, ...(savedConf.banner || {}) },
-            businessInfo: { ...initialHeaderConfig.businessInfo, ...(savedConf.businessInfo || {}) },
-            socialLinks: { ...initialHeaderConfig.socialLinks, ...(savedConf.socialLinks || {}) },
+            banner: { ...initialHeaderConfig.banner, ...(savedConf?.banner || {}) },
+            businessInfo: { ...initialHeaderConfig.businessInfo, ...(savedConf?.businessInfo || {}) },
+            socialLinks: { ...initialHeaderConfig.socialLinks, ...(savedConf?.socialLinks || {}) },
             carouselItems: carouselWithIds,
         };
     }, [headerConfig]);
