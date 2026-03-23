@@ -99,8 +99,9 @@ service cloud.firestore {
       match /subscription/{docId} {
         allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
       }
-      match /shareConfig/main {
-        allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
+      match /shareConfig/{docId} {
+        allow read: if true;
+        allow write: if isBusinessMember(businessId) || isSuperAdmin();
       }
       match /backups/{backupId} {
         allow read, write: if isBusinessMember(businessId) || isSuperAdmin();

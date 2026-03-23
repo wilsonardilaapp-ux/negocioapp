@@ -3,7 +3,7 @@
 
 import { useMemo, useState, useEffect, useRef } from 'react';
 import { useDoc, useFirestore, useMemoFirebase } from '@/firebase';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, collectionGroup, query, where, getDocs, limit } from 'firebase/firestore';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,12 +11,12 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Badge } from '@/components/ui/badge';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
 import Autoplay from "embla-carousel-autoplay";
-import { Star, Loader2, PackageSearch, Mail, Printer, FileDown, Settings } from 'lucide-react';
+import { Star, Loader2, PackageSearch, Mail, Printer, FileDown, Settings, Frown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Product } from '@/models/product';
 import type { Module } from '@/models/module';
 import type { LandingHeaderConfigData, LandingPageData } from '@/models/landing-page';
-import { TikTokIcon, WhatsAppIcon, XIcon, FacebookIcon, InstagramIcon } from '@/components/icons';
+import { TikTokIcon, WhatsAppIcon, XIcon, FacebookIcon, InstagramIcon, YoutubeIcon } from '@/components/icons';
 import { useParams, useSearchParams } from 'next/navigation';
 import { rateProduct } from '@/ai/flows/rate-product-flow';
 import { useToast } from '@/hooks/use-toast';
@@ -478,19 +478,68 @@ const ActionButtons = ({ pageRef }: { pageRef: React.RefObject<HTMLDivElement> }
 
 export default function CatalogPage() {
     const firestore = useFirestore();
+    const params = useParams();
+    const searchParams = useSearchParams();
+    const slug = params.businessId as string;
+    const pageRef = useRef<HTMLDivElement>(null);
+    
+    const [resolvedBusinessId, setResolvedBusinessId] = useState<string | null>(null);
+    const [isLoadingBusinessId, setIsLoadingBusinessId] = useState(true);
+    const [resolutionError, setResolutionError] = useState<string | null>(null);
+    
     const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
     const [isPurchaseModalOpen, setIsPurchaseModalOpen] = useState(false);
     const [cart, setCart] = useState<CartItem[]>([]);
     const [catalogModule, setCatalogModule] = useState<Module | null>(null);
     const [isModuleLoading, setIsModuleLoading] = useState(true);
 
-    const params = useParams();
-    const searchParams = useSearchParams();
-    const businessId = params.businessId as string;
-    const pageRef = useRef<HTMLDivElement>(null);
-    
     const showPrintButton = searchParams.get('print') === 'true';
     const showDownloadButton = searchParams.get('download') === 'true';
+    
+    // Effect to resolve slug to businessId
+    useEffect(() => {
+        if (!firestore || !slug) {
+            setIsLoadingBusinessId(false);
+            return;
+        };
+
+        const resolveSlug = async () => {
+            setIsLoadingBusinessId(true);
+            setResolutionError(null);
+            try {
+                // This is a collection group query. It needs a corresponding rule.
+                const shareConfigQuery = query(
+                    collectionGroup(firestore, 'shareConfig'), 
+                    where('slug', '==', slug),
+                    where('useCustomSlug', '==', true),
+                    limit(1)
+                );
+
+                const querySnapshot = await getDocs(shareConfigQuery);
+
+                if (!querySnapshot.empty) {
+                    const docSnap = querySnapshot.docs[0];
+                    const businessId = docSnap.ref.parent.parent?.id;
+                    if (businessId) {
+                        setResolvedBusinessId(businessId);
+                    } else {
+                         throw new Error("ID de negocio no encontrado en la ruta del slug.");
+                    }
+                } else {
+                    // If no custom slug is found, assume the slug IS the businessId
+                    setResolvedBusinessId(slug);
+                }
+            } catch (e: any) {
+                console.error("Error resolviendo el slug del catálogo:", e);
+                setResolutionError("No se pudo encontrar el negocio para este catálogo.");
+            } finally {
+                setIsLoadingBusinessId(false);
+            }
+        };
+
+        resolveSlug();
+    }, [firestore, slug]);
+
 
     // Lógica para verificar el módulo de catálogo con retrocompatibilidad
     useEffect(() => {
@@ -526,25 +575,25 @@ export default function CatalogPage() {
 
 
     const publicDataRef = useMemoFirebase(() => {
-        if (!firestore || !businessId) return null;
-        return doc(firestore, `businesses/${businessId}/publicData`, 'catalog');
-    }, [firestore, businessId]);
+        if (!firestore || !resolvedBusinessId) return null;
+        return doc(firestore, `businesses/${resolvedBusinessId}/publicData`, 'catalog');
+    }, [firestore, resolvedBusinessId]);
 
     const paymentSettingsRef = useMemoFirebase(() => {
-        if (!firestore || !businessId) return null;
-        return doc(firestore, 'paymentSettings', businessId);
-    }, [firestore, businessId]);
+        if (!firestore || !resolvedBusinessId) return null;
+        return doc(firestore, 'paymentSettings', resolvedBusinessId);
+    }, [firestore, resolvedBusinessId]);
 
     const landingPageDocRef = useMemoFirebase(() => {
-        if (!firestore || !businessId) return null;
-        return doc(firestore, `businesses/${businessId}/landingPages`, 'main');
-    }, [firestore, businessId]);
+        if (!firestore || !resolvedBusinessId) return null;
+        return doc(firestore, `businesses/${resolvedBusinessId}/landingPages`, 'main');
+    }, [firestore, resolvedBusinessId]);
 
     const { data: publicData, isLoading: isPublicDataLoading } = useDoc<{ products: Product[], headerConfig: LandingHeaderConfigData }>(publicDataRef);
     const { data: paymentSettings, isLoading: isPaymentSettingsLoading } = useDoc<PaymentSettings>(paymentSettingsRef);
     const { data: landingPageData, isLoading: isLandingDataLoading } = useDoc<LandingPageData>(landingPageDocRef);
     
-    const isLoading = isPublicDataLoading || isModuleLoading || isPaymentSettingsLoading || isLandingDataLoading;
+    const isLoading = isPublicDataLoading || isModuleLoading || isPaymentSettingsLoading || isLandingDataLoading || isLoadingBusinessId;
 
     useEffect(() => {
         if (showPrintButton) {
@@ -575,6 +624,16 @@ export default function CatalogPage() {
             </div>
         );
     }
+
+    if (resolutionError) {
+        return (
+           <div className="flex flex-col h-screen w-full items-center justify-center bg-background text-center p-4">
+               <PackageSearch className="h-16 w-16 text-muted-foreground mb-4" />
+               <h1 className="text-2xl font-bold">Catálogo no encontrado</h1>
+               <p className="text-muted-foreground mt-2 max-w-md">{resolutionError}</p>
+           </div>
+       );
+   }
     
     if (!catalogModule) {
         return (
@@ -604,7 +663,7 @@ export default function CatalogPage() {
     
     return (
         <div id="catalog-page-root" ref={pageRef} className="bg-muted/40">
-            <PublicNav navigation={landingPageData?.navigation} businessId={businessId} />
+            <PublicNav navigation={landingPageData?.navigation} businessId={resolvedBusinessId ?? undefined} />
             {headerConfig ? (
                 <CatalogHeader config={headerConfig} />
             ) : (
@@ -640,20 +699,20 @@ export default function CatalogPage() {
                 isOpen={!!selectedProduct} 
                 onOpenChange={handleModalChange} 
                 businessPhone={headerConfig?.businessInfo.phone || ''}
-                businessId={businessId}
+                businessId={resolvedBusinessId}
                 paymentSettings={paymentSettings ?? null}
                 onAddToCart={handleAddToCart}
             />
 
             {(showPrintButton || showDownloadButton) && <ActionButtons pageRef={pageRef} />}
             
-            {businessId && (
+            {resolvedBusinessId && (
                  <PurchaseModal
                     isOpen={isPurchaseModalOpen}
                     onOpenChange={setIsPurchaseModalOpen}
                     cartItems={cart}
                     onRemoveItem={handleRemoveFromCart}
-                    businessId={businessId}
+                    businessId={resolvedBusinessId}
                     businessPhone={headerConfig?.businessInfo.phone || ''}
                     paymentSettings={paymentSettings}
                 />
