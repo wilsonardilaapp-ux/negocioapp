@@ -1,5 +1,6 @@
-/** @type {import('next').NextConfig} */
-const nextConfig = {
+import type { NextConfig } from 'next';
+
+const nextConfig: NextConfig = {
     images: {
         remotePatterns: [
             {
@@ -28,15 +29,6 @@ const nextConfig = {
             }
         ],
     },
-    experimental: {
-        serverComponentsExternalPackages: [
-            '@genkit-ai/core',
-            '@opentelemetry/instrumentation',
-            '@opentelemetry/sdk-node',
-            'require-in-the-middle',
-            'firebase-admin',
-        ],
-    },
 };
 
-module.exports = nextConfig;
+export default nextConfig;
