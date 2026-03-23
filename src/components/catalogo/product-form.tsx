@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -117,7 +116,7 @@ export default function ProductForm({ product, onSave, onCancel }: ProductFormPr
         if (item.type === 'video') {
             return <video src={item.url} className="rounded-md object-cover w-full h-full" autoPlay loop muted />;
         }
-        return <Image src={item.url} alt={alt} layout="fill" className="rounded-md object-cover" />;
+        return <Image src={item.url} alt={alt} fill sizes="10rem" className="rounded-md object-cover" />;
     };
 
     return (

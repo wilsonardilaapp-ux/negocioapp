@@ -1,5 +1,4 @@
-
-"use client";
+'use client';
 
 import { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
@@ -119,18 +118,39 @@ export default function CatalogoPage() {
     
     const { data: headerConfig, isLoading: isConfigLoading } = useDoc<LandingHeaderConfigData>(headerConfigDocRef);
 
+    const mergedConfig = useMemo(() => {
+        const savedConf = headerConfig || {};
+        const businessInfo = { ...initialHeaderConfig.businessInfo, ...savedConf.businessInfo };
+        const socialLinks = { ...initialHeaderConfig.socialLinks, ...savedConf.socialLinks };
+        const banner = { ...initialHeaderConfig.banner, ...savedConf.banner };
+        const carouselItems = (savedConf.carouselItems && savedConf.carouselItems.length > 0)
+            ? savedConf.carouselItems
+            : initialHeaderConfig.carouselItems;
+
+        // Ensure carousel items have IDs
+        const carouselWithIds = carouselItems.map(item => item.id ? item : { ...item, id: uuidv4() });
+
+        return {
+            ...initialHeaderConfig,
+            ...savedConf,
+            banner,
+            businessInfo,
+            socialLinks,
+            carouselItems: carouselWithIds
+        };
+    }, [headerConfig]);
+
+
     const productLimit = productLimitService?.limit ?? 10;
     const isProductLimitServiceActive = productLimitService?.status === 'active';
 
     const canCreateProduct = useMemo(() => {
         const productCount = products?.length ?? 0;
         
-        // Si el servicio de límite no está activo, no hay límite.
         if (!isProductLimitServiceActive) {
             return { allowed: true, reason: '' };
         }
 
-        // Si el servicio está activo, comprobar el límite.
         if (productCount >= productLimit) {
             return { allowed: false, reason: `Has alcanzado el límite de ${productLimit} productos.` };
         }
@@ -138,16 +158,10 @@ export default function CatalogoPage() {
         return { allowed: true, reason: '' };
     }, [isProductLimitServiceActive, productLimit, products]);
     
-    const updatePublicCatalog = (updatedProducts: Product[], currentConfig: LandingHeaderConfigData | null) => {
+    const updatePublicCatalog = (productsToSave: Product[], configToSave: LandingHeaderConfigData) => {
         if (!firestore || !user) return;
-    
         const publicCatalogRef = doc(firestore, 'businesses', user.uid, 'publicData', 'catalog');
-        const productsToSave = updatedProducts ?? products;
-        const configToSave = currentConfig ?? headerConfig ?? initialHeaderConfig;
-        
-        if (productsToSave) {
-            setDocumentNonBlocking(publicCatalogRef, { products: productsToSave, headerConfig: configToSave }, { merge: true });
-        }
+        setDocumentNonBlocking(publicCatalogRef, { products: productsToSave, headerConfig: configToSave }, { merge: true });
     };
     
     
@@ -179,7 +193,8 @@ export default function CatalogoPage() {
         } else {
             updatedProductList = [...currentProducts, { ...dataToSave, id: updatedProductId }];
         }
-        updatePublicCatalog(updatedProductList, headerConfig);
+        
+        updatePublicCatalog(updatedProductList, mergedConfig);
 
         setIsFormOpen(false);
         setEditingProduct(null);
@@ -203,7 +218,7 @@ export default function CatalogoPage() {
         await deleteDocumentNonBlocking(productDocRef);
 
         const updatedProductList = (products || []).filter(p => p.id !== productToDelete.id);
-        updatePublicCatalog(updatedProductList, headerConfig);
+        updatePublicCatalog(updatedProductList, mergedConfig);
         
         setProductToDelete(null);
     };
@@ -220,6 +235,36 @@ export default function CatalogoPage() {
     
     const isLoading = isUserLoading || isConfigLoading || isProductsLoading || isServicesLoading || isModuleLoading;
 
+    const AddProductButtonAndTrigger = () => {
+        const button = (
+            <Button disabled={!canCreateProduct.allowed}>
+                <PlusCircle className="mr-2 h-4 w-4" />
+                Añadir Producto
+            </Button>
+        );
+    
+        if (canCreateProduct.allowed) {
+            return (
+                <DialogTrigger asChild onClick={openNewProductForm}>
+                    {button}
+                </DialogTrigger>
+            );
+        }
+    
+        return (
+            <TooltipProvider>
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        <div>{button}</div>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                        <p>{canCreateProduct.reason}</p>
+                    </TooltipContent>
+                </Tooltip>
+            </TooltipProvider>
+        );
+    };
+    
     if (isLoading) {
         return <div>Cargando tu catálogo...</div>
     }
@@ -241,35 +286,9 @@ export default function CatalogoPage() {
         );
     }
 
-    const AddProductButton = () => {
-        const button = (
-             <Button onClick={openNewProductForm} disabled={!canCreateProduct.allowed}>
-                <PlusCircle className="mr-2 h-4 w-4" />
-                Añadir Producto
-            </Button>
-        );
-
-        if (canCreateProduct.allowed) {
-            return button;
-        }
-
-        return (
-            <TooltipProvider>
-                <Tooltip>
-                    <TooltipTrigger asChild>
-                        <div>{button}</div>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                        <p>{canCreateProduct.reason}</p>
-                    </TooltipContent>
-                </Tooltip>
-            </TooltipProvider>
-        );
-    }
-
     return (
         <div className="flex flex-col gap-6">
-            <CatalogHeaderForm data={headerConfig ?? initialHeaderConfig} setData={handleSaveHeader} />
+            <CatalogHeaderForm data={mergedConfig} setData={handleSaveHeader} />
             
             <CatalogQRGenerator />
 
@@ -291,9 +310,7 @@ export default function CatalogoPage() {
                             Descargar PDF
                         </Button>
                         <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-                            <DialogTrigger asChild>
-                                <AddProductButton />
-                            </DialogTrigger>
+                           <AddProductButtonAndTrigger />
                             <DialogContent className="max-w-4xl">
                                 <DialogHeader>
                                     <DialogTitle>{editingProduct ? 'Editar Producto' : 'Añadir Nuevo Producto'}</DialogTitle>
@@ -314,7 +331,7 @@ export default function CatalogoPage() {
                     <div className="flex items-center gap-2 rounded-lg border bg-secondary/50 p-3 text-sm">
                         <Info className="h-5 w-5 text-muted-foreground" />
                         <p className="text-muted-foreground">
-                            Límite de productos: <span className="font-bold">{products?.length ?? 0} / {productLimit}</span>.
+                            Límite de productos: <span className="font-bold">{products?.length ?? 0} / {productLimit === -1 ? '∞' : productLimit}</span>.
                             Estado del servicio de límite: <span className={`font-bold ${isProductLimitServiceActive ? 'text-green-600' : 'text-red-600'}`}>{isProductLimitServiceActive ? 'Activado' : 'Desactivado'}</span>.
                         </p>
                     </div>

@@ -62,7 +62,8 @@ function CarouselItemCard({ item, index, onUpload, onRemove, onSloganChange }: {
                   <Image 
                     src={item.mediaUrl} 
                     alt={`Carrusel ${index + 1}`} 
-                    layout="fill" 
+                    fill 
+                    sizes="(max-width: 768px) 100vw, 33vw"
                     className="object-cover rounded-md" 
                   />
                 )}
@@ -155,7 +156,7 @@ const MediaUploader = ({
           </div>
         ) : mediaUrl ? (
           <>
-            {mediaType === 'image' && <Image src={mediaUrl} alt="Banner" layout="fill" className="object-cover rounded-md" />}
+            {mediaType === 'image' && <Image src={mediaUrl} alt="Banner" fill sizes="100vw" className="object-cover rounded-md" />}
             {mediaType === 'video' && <video src={mediaUrl} controls className="w-full h-full rounded-md" />}
             <div className="absolute top-2 right-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
               <Button variant="outline" size="icon" onClick={() => fileInputRef.current?.click()}><Pencil className="h-4 w-4" /></Button>

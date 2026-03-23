@@ -68,7 +68,7 @@ const ProductSuggestionCard = ({ product, highlight = false }: { product: Produc
         <Card className={`w-48 overflow-hidden transition-all ${highlight ? 'border-primary border-2 shadow-lg' : ''}`}>
             <CardContent className="p-2 text-center">
                  <div className="relative aspect-square w-full mb-2 rounded-md overflow-hidden">
-                    <Image src={product.images[0] || 'https://picsum.photos/seed/placeholder/200/200'} alt={product.name} layout="fill" className="object-cover" />
+                    <Image src={product.images[0] || 'https://picsum.photos/seed/placeholder/200/200'} alt={product.name} fill sizes="12rem" className="object-cover" />
                 </div>
                 <h4 className="text-sm font-semibold truncate">{product.name}</h4>
                 <p className={`font-bold ${highlight ? 'text-primary' : 'text-muted-foreground'}`}>{formatCurrency(product.price)}</p>

@@ -146,7 +146,8 @@ export default function BreBForm({ data, setData }: BreBFormProps) {
                 <Image
                   src={data.qrImageUrl}
                   alt="Código QR de Bre-B"
-                  layout="fill"
+                  fill
+                  sizes="12rem"
                   className="rounded-md object-contain"
                 />
                  <Button

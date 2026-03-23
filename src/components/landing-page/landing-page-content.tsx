@@ -235,7 +235,7 @@ export default function LandingPageContent({ data, businessId, logoUrl }: Landin
                             <div key={sub.id} className="text-center">
                                 {sub.imageUrl && (
                                     <div className="relative aspect-video w-full mb-4 rounded-lg overflow-hidden">
-                                        <Image src={sub.imageUrl} alt={sub.title} layout="fill" className="object-cover"/>
+                                        <Image src={sub.imageUrl} alt={sub.title} fill sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw" className="object-cover"/>
                                     </div>
                                 )}
                                 <h3 className="text-xl font-semibold mb-2">{sub.title}</h3>
@@ -301,7 +301,7 @@ export default function LandingPageContent({ data, businessId, logoUrl }: Landin
             <div className="md:col-span-1 space-y-4">
               {footer.logo.url && (
                 <div className="relative h-16 w-40">
-                  <Image src={footer.logo.url} alt="Logo" layout="fill" className="object-contain" />
+                  <Image src={footer.logo.url} alt="Logo" fill sizes="10rem" className="object-contain" />
                 </div>
               )}
               <p className="text-sm">{footer.logo.slogan}</p>

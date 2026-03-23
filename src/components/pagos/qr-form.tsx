@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -94,7 +93,8 @@ export default function QRForm({ methodName, data, setData, accountLabel }: QRFo
                 <Image
                   src={data.qrImageUrl}
                   alt={`Código QR de ${methodName}`}
-                  layout="fill"
+                  fill
+                  sizes="12rem"
                   className="rounded-md object-contain"
                 />
                  <Button

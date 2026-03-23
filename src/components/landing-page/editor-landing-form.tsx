@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useRef, useEffect } from "react";
@@ -83,10 +82,10 @@ const MediaUploader = ({
             <>
               {mediaUrl && isIcon ? (
                 <div className="relative w-24 h-24 mx-auto">
-                  <Image src={mediaUrl} alt="Icono" layout="fill" className="object-contain rounded-md" />
+                  <Image src={mediaUrl} alt="Icono" fill sizes="6rem" className="object-contain rounded-md" />
                 </div>
               ) : mediaType === 'image' ? (
-                <Image src={mediaUrl} alt="Subido" layout="fill" className="object-cover rounded-md" />
+                <Image src={mediaUrl} alt="Subido" fill sizes="10rem" className="object-cover rounded-md" />
               ) : (
                 <video src={mediaUrl} controls className="w-full h-full rounded-md" />
               )}
