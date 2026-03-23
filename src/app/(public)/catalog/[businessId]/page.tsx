@@ -507,19 +507,19 @@ export default function CatalogPage() {
             setIsLoadingBusinessId(true);
             setResolutionError(null);
             try {
-                // This is a collection group query. It needs a corresponding rule.
+                // This query is less strict to avoid index errors.
                 const shareConfigQuery = query(
                     collectionGroup(firestore, 'shareConfig'), 
-                    where('slug', '==', slug),
-                    where('useCustomSlug', '==', true),
-                    limit(1)
+                    where('slug', '==', slug)
                 );
 
                 const querySnapshot = await getDocs(shareConfigQuery);
+                
+                // We must filter on the client side now.
+                const customSlugDoc = querySnapshot.docs.find(doc => doc.data().useCustomSlug === true);
 
-                if (!querySnapshot.empty) {
-                    const docSnap = querySnapshot.docs[0];
-                    const businessId = docSnap.ref.parent.parent?.id;
+                if (customSlugDoc) {
+                    const businessId = customSlugDoc.ref.parent.parent?.id;
                     if (businessId) {
                         setResolvedBusinessId(businessId);
                     } else {
