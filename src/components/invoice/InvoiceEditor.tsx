@@ -92,11 +92,31 @@ export const InvoiceEditor: React.FC<InvoiceEditorProps> = ({ settings, setSetti
         'paymentMethod', 'estimatedDelivery', 'items', 'total', 'subtotalFees', 'qrText', 'socialMedia', 'footer'
     ];
     
-    const zoneLabels: Record<keyof InvoiceSettings['bold']['zones'], string> = {
-        businessName: 'Nombre Negocio', address: 'Dirección', nit: 'NIT', invoiceNumber: 'N° Factura', dateTime: 'Fecha/Hora',
-        clientName: 'Nombre Cliente', clientPhone: 'Tel. Cliente', clientAddress: 'Dir. Cliente', paymentMethod: 'Método Pago',
-        estimatedDelivery: 'Tiempo Entrega', items: 'Ítems', total: 'Total', subtotalFees: 'Subtotal/Tasas',
-        qrText: 'Texto QR', socialMedia: 'Redes Sociales', footer: 'Pie de Factura'
+    const zoneLabels: Record<string, string> = {
+        showInvoiceNumber: 'N° Factura',
+        showDateTime: 'Fecha y Hora',
+        showClientAddress: 'Dirección Cliente',
+        showClientPhone: 'Teléfono Cliente',
+        showPaymentMethod: 'Método de Pago',
+        showDeliveryFee: 'Costo Domicilio',
+        showPackaging: 'Costo Empaque',
+        showEstimatedDelivery: 'Tiempo de Entrega',
+        businessName: 'Nombre Negocio', 
+        address: 'Dirección', 
+        nit: 'NIT', 
+        invoiceNumber: 'N° Factura', 
+        dateTime: 'Fecha/Hora',
+        clientName: 'Nombre Cliente', 
+        clientPhone: 'Tel. Cliente', 
+        clientAddress: 'Dir. Cliente', 
+        paymentMethod: 'Método Pago',
+        estimatedDelivery: 'Tiempo Entrega', 
+        items: 'Ítems', 
+        total: 'Total', 
+        subtotalFees: 'Subtotal/Tasas',
+        qrText: 'Texto QR', 
+        socialMedia: 'Redes Sociales', 
+        footer: 'Pie de Factura'
     };
 
     return (
@@ -109,10 +129,10 @@ export const InvoiceEditor: React.FC<InvoiceEditorProps> = ({ settings, setSetti
             <AccordionItem value="item-1">
                 <AccordionTrigger className="text-foreground">1. Encabezado</AccordionTrigger>
                 <AccordionContent className="space-y-4 p-2">
-                    <div className="space-y-1"><Label className="text-foreground">Nombre del Negocio</Label><Input className="placeholder:text-muted-foreground" value={settings.header.businessName} onChange={(e) => handleUpdate('header', 'businessName', e.target.value)} /></div>
-                    <div className="space-y-1"><Label className="text-foreground">Dirección</Label><Input className="placeholder:text-muted-foreground" value={settings.header.address} onChange={(e) => handleUpdate('header', 'address', e.target.value)} /></div>
-                    <div className="space-y-1"><Label className="text-foreground">Teléfono</Label><Input className="placeholder:text-muted-foreground" value={settings.header.phone} onChange={(e) => handleUpdate('header', 'phone', e.target.value)} /></div>
-                    <div className="space-y-1"><Label className="text-foreground">NIT/RUT</Label><Input className="placeholder:text-muted-foreground" value={settings.header.nit} onChange={(e) => handleUpdate('header', 'nit', e.target.value)} /></div>
+                    <div className="space-y-1"><Label className="text-foreground">Nombre del Negocio</Label><Input className="placeholder:text-muted-foreground text-foreground" value={settings.header.businessName} onChange={(e) => handleUpdate('header', 'businessName', e.target.value)} /></div>
+                    <div className="space-y-1"><Label className="text-foreground">Dirección</Label><Input className="placeholder:text-muted-foreground text-foreground" value={settings.header.address} onChange={(e) => handleUpdate('header', 'address', e.target.value)} /></div>
+                    <div className="space-y-1"><Label className="text-foreground">Teléfono</Label><Input className="placeholder:text-muted-foreground text-foreground" value={settings.header.phone} onChange={(e) => handleUpdate('header', 'phone', e.target.value)} /></div>
+                    <div className="space-y-1"><Label className="text-foreground">NIT/RUT</Label><Input className="placeholder:text-muted-foreground text-foreground" value={settings.header.nit} onChange={(e) => handleUpdate('header', 'nit', e.target.value)} /></div>
                 </AccordionContent>
             </AccordionItem>
 
@@ -138,8 +158,8 @@ export const InvoiceEditor: React.FC<InvoiceEditorProps> = ({ settings, setSetti
                 <AccordionContent className="space-y-4 p-2">
                      <div className="flex items-center space-x-2"><Switch id="qr-show" checked={settings.qr.show} onCheckedChange={(val) => handleUpdate('qr', 'show', val)} /><Label className="text-foreground" htmlFor="qr-show">Mostrar QR</Label></div>
                      <Label className="text-foreground">Enlazar a</Label><Select onValueChange={(val) => handleUpdate('qr', 'linkType', val)} value={settings.qr.linkType}><SelectTrigger><SelectValue placeholder="Enlazar a..." /></SelectTrigger><SelectContent><SelectItem value="menu">Menú Digital</SelectItem><SelectItem value="review">Reseña Google</SelectItem><SelectItem value="whatsapp">WhatsApp</SelectItem><SelectItem value="instagram">Instagram</SelectItem><SelectItem value="custom">Link Personalizado</SelectItem></SelectContent></Select>
-                    <div className="space-y-1"><Label className="text-foreground">URL del QR</Label><Input className="placeholder:text-muted-foreground" value={settings.qr.url} onChange={(e) => handleUpdate('qr', 'url', e.target.value)} /></div>
-                    <div className="space-y-1"><Label className="text-foreground">Texto bajo el QR</Label><Input className="placeholder:text-muted-foreground" value={settings.qr.labelText} onChange={(e) => handleUpdate('qr', 'labelText', e.target.value)} /></div>
+                    <div className="space-y-1"><Label className="text-foreground">URL del QR</Label><Input className="placeholder:text-muted-foreground text-foreground" value={settings.qr.url} onChange={(e) => handleUpdate('qr', 'url', e.target.value)} /></div>
+                    <div className="space-y-1"><Label className="text-foreground">Texto bajo el QR</Label><Input className="placeholder:text-muted-foreground text-foreground" value={settings.qr.labelText} onChange={(e) => handleUpdate('qr', 'labelText', e.target.value)} /></div>
                 </AccordionContent>
             </AccordionItem>
 
@@ -147,9 +167,9 @@ export const InvoiceEditor: React.FC<InvoiceEditorProps> = ({ settings, setSetti
                 <AccordionTrigger className="text-foreground">4. Redes Sociales</AccordionTrigger>
                 <AccordionContent className="space-y-4 p-2">
                      <div className="flex items-center space-x-2"><Switch id="social-show" checked={settings.socialMedia.show} onCheckedChange={(val) => handleUpdate('socialMedia', 'show', val)} /><Label className="text-foreground" htmlFor="social-show">Mostrar Redes</Label></div>
-                    <div className="space-y-1"><Label className="text-foreground">Instagram (usuario)</Label><Input className="placeholder:text-muted-foreground" value={settings.socialMedia.instagram} onChange={(e) => handleUpdate('socialMedia', 'instagram', e.target.value)} /></div>
-                    <div className="space-y-1"><Label className="text-foreground">Facebook (usuario)</Label><Input className="placeholder:text-muted-foreground" value={settings.socialMedia.facebook} onChange={(e) => handleUpdate('socialMedia', 'facebook', e.target.value)} /></div>
-                    <div className="space-y-1"><Label className="text-foreground">WhatsApp (número)</Label><Input className="placeholder:text-muted-foreground" value={settings.socialMedia.whatsapp} onChange={(e) => handleUpdate('socialMedia', 'whatsapp', e.target.value)} /></div>
+                    <div className="space-y-1"><Label className="text-foreground">Instagram (usuario)</Label><Input className="placeholder:text-muted-foreground text-foreground" value={settings.socialMedia.instagram} onChange={(e) => handleUpdate('socialMedia', 'instagram', e.target.value)} /></div>
+                    <div className="space-y-1"><Label className="text-foreground">Facebook (usuario)</Label><Input className="placeholder:text-muted-foreground text-foreground" value={settings.socialMedia.facebook} onChange={(e) => handleUpdate('socialMedia', 'facebook', e.target.value)} /></div>
+                    <div className="space-y-1"><Label className="text-foreground">WhatsApp (número)</Label><Input className="placeholder:text-muted-foreground text-foreground" value={settings.socialMedia.whatsapp} onChange={(e) => handleUpdate('socialMedia', 'whatsapp', e.target.value)} /></div>
                 </AccordionContent>
             </AccordionItem>
             
@@ -196,14 +216,14 @@ export const InvoiceEditor: React.FC<InvoiceEditorProps> = ({ settings, setSetti
                 <AccordionTrigger className="text-foreground">8. Promoción</AccordionTrigger>
                  <AccordionContent className="space-y-4 p-2">
                      <div className="flex items-center space-x-2"><Switch id="promo-show" checked={settings.promo.show} onCheckedChange={(val) => handleUpdate('promo', 'show', val)} /><Label className="text-foreground" htmlFor="promo-show">Mostrar Promoción</Label></div>
-                     <Label className="text-foreground">Texto de la promoción</Label><Textarea className="placeholder:text-muted-foreground" value={settings.promo.text} onChange={(e) => handleUpdate('promo', 'text', e.target.value)} />
+                     <Label className="text-foreground">Texto de la promoción</Label><Textarea className="placeholder:text-muted-foreground text-foreground" value={settings.promo.text} onChange={(e) => handleUpdate('promo', 'text', e.target.value)} />
                 </AccordionContent>
             </AccordionItem>
 
             <AccordionItem value="item-9">
                 <AccordionTrigger className="text-foreground">9. Pie de Factura</AccordionTrigger>
                 <AccordionContent className="space-y-4 p-2">
-                    <Label className="text-foreground">Mensaje de agradecimiento</Label><Textarea className="placeholder:text-muted-foreground" value={settings.footer.message} onChange={(e) => handleUpdate('footer', 'message', e.target.value)} />
+                    <Label className="text-foreground">Mensaje de agradecimiento</Label><Textarea className="placeholder:text-muted-foreground text-foreground" value={settings.footer.message} onChange={(e) => handleUpdate('footer', 'message', e.target.value)} />
                     <div className="flex items-center space-x-2"><Switch id="footer-repeat" checked={settings.footer.repeatBusinessName} onCheckedChange={(val) => handleUpdate('footer', 'repeatBusinessName', val)} /><Label className="text-foreground" htmlFor="footer-repeat">Repetir nombre del negocio</Label></div>
                 </AccordionContent>
             </AccordionItem>
