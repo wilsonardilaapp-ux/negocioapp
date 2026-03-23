@@ -120,23 +120,22 @@ export default function CatalogoPage() {
 
     const mergedConfig = useMemo(() => {
         const savedConf = headerConfig || {};
-        const businessInfo = { ...initialHeaderConfig.businessInfo, ...savedConf.businessInfo };
-        const socialLinks = { ...initialHeaderConfig.socialLinks, ...savedConf.socialLinks };
-        const banner = { ...initialHeaderConfig.banner, ...savedConf.banner };
-        const carouselItems = (savedConf.carouselItems && savedConf.carouselItems.length > 0)
+    
+        // Ensure carouselItems is always an array, providing a default if it's missing or not an array.
+        const carouselItems = (Array.isArray(savedConf.carouselItems) && savedConf.carouselItems.length > 0)
             ? savedConf.carouselItems
             : initialHeaderConfig.carouselItems;
-
-        // Ensure carousel items have IDs
-        const carouselWithIds = carouselItems.map(item => item.id ? item : { ...item, id: uuidv4() });
-
+    
+        // Ensure each item has a unique ID.
+        const carouselWithIds = carouselItems.map(item => item && item.id ? item : { ...item, id: uuidv4() });
+    
         return {
             ...initialHeaderConfig,
             ...savedConf,
-            banner,
-            businessInfo,
-            socialLinks,
-            carouselItems: carouselWithIds
+            banner: { ...initialHeaderConfig.banner, ...(savedConf.banner || {}) },
+            businessInfo: { ...initialHeaderConfig.businessInfo, ...(savedConf.businessInfo || {}) },
+            socialLinks: { ...initialHeaderConfig.socialLinks, ...(savedConf.socialLinks || {}) },
+            carouselItems: carouselWithIds,
         };
     }, [headerConfig]);
 
@@ -255,32 +254,13 @@ export default function CatalogoPage() {
             </Card>
         );
     }
-
-    const AddProductButton = () => {
-        const button = (
-             <Button onClick={openNewProductForm} disabled={!canCreateProduct.allowed}>
-                <PlusCircle className="mr-2 h-4 w-4" />
-                Añadir Producto
-            </Button>
-        );
-
-        if (canCreateProduct.allowed) {
-            return button;
-        }
-
-        return (
-            <TooltipProvider>
-                <Tooltip>
-                    <TooltipTrigger asChild>
-                        <div>{button}</div>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                        <p>{canCreateProduct.reason}</p>
-                    </TooltipContent>
-                </Tooltip>
-            </TooltipProvider>
-        );
-    }
+    
+    const addProductButton = (
+        <Button onClick={canCreateProduct.allowed ? openNewProductForm : undefined} disabled={!canCreateProduct.allowed} aria-disabled={!canCreateProduct.allowed}>
+            <PlusCircle className="mr-2 h-4 w-4" />
+            Añadir Producto
+        </Button>
+    );
 
     return (
         <div className="flex flex-col gap-6">
@@ -307,7 +287,21 @@ export default function CatalogoPage() {
                         </Button>
                         <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
                             <DialogTrigger asChild>
-                                <AddProductButton />
+                                {canCreateProduct.allowed ? (
+                                    addProductButton
+                                ) : (
+                                    <TooltipProvider>
+                                        <Tooltip>
+                                            <TooltipTrigger asChild>
+                                                {/* The div is necessary for Tooltip to work on a disabled button */}
+                                                <div>{addProductButton}</div>
+                                            </TooltipTrigger>
+                                            <TooltipContent>
+                                                <p>{canCreateProduct.reason}</p>
+                                            </TooltipContent>
+                                        </Tooltip>
+                                    </TooltipProvider>
+                                )}
                             </DialogTrigger>
                             <DialogContent className="max-w-4xl">
                                 <DialogHeader>
@@ -386,5 +380,3 @@ export default function CatalogoPage() {
         </div>
     );
 }
-
-    
