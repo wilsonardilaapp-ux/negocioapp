@@ -104,6 +104,18 @@ const PrintInvoicePage = () => {
 
     return (
         <div className="bg-white">
+            <style type="text/css" media="print">
+            {`
+                @page {
+                    size: auto;
+                    margin: 0mm;
+                }
+                body {
+                    margin: 0;
+                    padding: 0;
+                }
+            `}
+            </style>
             <InvoiceTemplate config={settings} order={adaptedOrder} />
         </div>
     );
