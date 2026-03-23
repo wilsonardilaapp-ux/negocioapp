@@ -125,12 +125,10 @@ export default function CatalogoPage() {
     const canCreateProduct = useMemo(() => {
         const productCount = products?.length ?? 0;
         
-        // Si el servicio de límite no está activo, no hay límite.
         if (!isProductLimitServiceActive) {
             return { allowed: true, reason: '' };
         }
 
-        // Si el servicio está activo, comprobar el límite.
         if (productCount >= productLimit) {
             return { allowed: false, reason: `Has alcanzado el límite de ${productLimit} productos.` };
         }
