@@ -1,5 +1,4 @@
-
-"use client";
+'use client';
 
 import { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
@@ -119,6 +118,23 @@ export default function CatalogoPage() {
     
     const { data: headerConfig, isLoading: isConfigLoading } = useDoc<LandingHeaderConfigData>(headerConfigDocRef);
 
+    const mergedConfig = useMemo(() => {
+        if (isConfigLoading) {
+          return initialHeaderConfig;
+        }
+        return {
+            ...initialHeaderConfig,
+            ...(headerConfig || {}),
+            banner: { ...initialHeaderConfig.banner, ...(headerConfig?.banner || {}) },
+            businessInfo: { ...initialHeaderConfig.businessInfo, ...(headerConfig?.businessInfo || {}) },
+            socialLinks: { ...initialHeaderConfig.socialLinks, ...(headerConfig?.socialLinks || {}) },
+            carouselItems: headerConfig?.carouselItems && headerConfig.carouselItems.length > 0 
+                ? headerConfig.carouselItems 
+                : initialHeaderConfig.carouselItems,
+        };
+    }, [headerConfig, isConfigLoading]);
+
+
     const productLimit = productLimitService?.limit ?? 10;
     const isProductLimitServiceActive = productLimitService?.status === 'active';
 
@@ -136,16 +152,14 @@ export default function CatalogoPage() {
         return { allowed: true, reason: '' };
     }, [isProductLimitServiceActive, productLimit, products]);
     
-    const updatePublicCatalog = (updatedProducts: Product[], currentConfig: LandingHeaderConfigData | null) => {
+    const updatePublicCatalog = (updatedProducts: Product[] | null, currentConfig: LandingHeaderConfigData | null) => {
         if (!firestore || !user) return;
     
         const publicCatalogRef = doc(firestore, 'businesses', user.uid, 'publicData', 'catalog');
-        const productsToSave = updatedProducts ?? products;
-        const configToSave = currentConfig ?? headerConfig ?? initialHeaderConfig;
+        const productsToSave = updatedProducts ?? products ?? [];
+        const configToSave = currentConfig ?? mergedConfig;
         
-        if (productsToSave) {
-            setDocumentNonBlocking(publicCatalogRef, { products: productsToSave, headerConfig: configToSave }, { merge: true });
-        }
+        setDocumentNonBlocking(publicCatalogRef, { products: productsToSave, headerConfig: configToSave }, { merge: true });
     };
     
     
@@ -267,7 +281,7 @@ export default function CatalogoPage() {
 
     return (
         <div className="flex flex-col gap-6">
-            <CatalogHeaderForm data={headerConfig ?? initialHeaderConfig} setData={handleSaveHeader} />
+            <CatalogHeaderForm data={mergedConfig} setData={handleSaveHeader} />
             
             <CatalogQRGenerator />
 
@@ -312,7 +326,7 @@ export default function CatalogoPage() {
                     <div className="flex items-center gap-2 rounded-lg border bg-secondary/50 p-3 text-sm">
                         <Info className="h-5 w-5 text-muted-foreground" />
                         <p className="text-muted-foreground">
-                            Límite de productos: <span className="font-bold">{products?.length ?? 0} / {productLimit}</span>.
+                            Límite de productos: <span className="font-bold">{products?.length ?? 0} / {productLimit === -1 ? '∞' : productLimit}</span>.
                             Estado del servicio de límite: <span className={`font-bold ${isProductLimitServiceActive ? 'text-green-600' : 'text-red-600'}`}>{isProductLimitServiceActive ? 'Activado' : 'Desactivado'}</span>.
                         </p>
                     </div>
