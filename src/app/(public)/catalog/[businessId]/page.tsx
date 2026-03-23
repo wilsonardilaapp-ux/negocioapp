@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useMemo, useState, useEffect, useRef } from 'react';
@@ -531,7 +530,11 @@ export default function CatalogPage() {
                 }
             } catch (e: any) {
                 console.error("Error resolviendo el slug del catálogo:", e);
-                setResolutionError("No se pudo encontrar el negocio para este catálogo.");
+                if (e.message && e.message.includes("requires a COLLECTION_GROUP_ASC index")) {
+                    setResolutionError("Se requiere un índice de base de datos. Por favor, revisa la consola del navegador (F12) para encontrar un enlace que te permitirá crear el índice necesario en Firestore. El error es: 'The query requires a COLLECTION_GROUP_ASC index'.");
+                } else {
+                    setResolutionError("No se pudo encontrar el negocio para este catálogo. Error: " + e.message);
+                }
             } finally {
                 setIsLoadingBusinessId(false);
             }
@@ -728,3 +731,5 @@ export default function CatalogPage() {
         </div>
     );
 }
+
+    
