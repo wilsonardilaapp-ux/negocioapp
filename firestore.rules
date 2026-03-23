@@ -20,6 +20,12 @@ service cloud.firestore {
         (exists(userDocPath) && get(userDocPath).data.businessId == businessId)
       );
     }
+    
+    // NEW: Allow public read access to the 'shareConfig' collection group.
+    // This is necessary for resolving custom catalog slugs.
+    match /{path=**}/shareConfig/{docId} {
+      allow read: if true;
+    }
 
     // Publicly readable collections
     match /blog_posts/{postId} {
@@ -100,6 +106,7 @@ service cloud.firestore {
         allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
       }
       match /shareConfig/{docId} {
+        // This rule remains for direct access and write control
         allow read: if true;
         allow write: if isBusinessMember(businessId) || isSuperAdmin();
       }
