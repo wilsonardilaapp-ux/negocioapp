@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useRef, useState, useEffect } from 'react';
@@ -104,7 +105,7 @@ export default function CatalogHeaderForm({ data, setData }: CatalogHeaderFormPr
             </div>
           ) : mediaUrl ? (
             <>
-              {mediaType === 'image' && <Image src={mediaUrl} alt="Banner" layout="fill" className={isAvatar ? 'object-cover rounded-full' : 'object-cover rounded-md'} />}
+              {mediaType === 'image' && <Image src={mediaUrl} alt="Banner" layout="fill" sizes="100%" className={isAvatar ? 'object-cover rounded-full' : 'object-cover rounded-md'} />}
               {mediaType === 'video' && <video src={mediaUrl} controls className="w-full h-full rounded-md" />}
               { onRemove && (
                  <div className={`absolute top-2 right-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity ${isAvatar ? 'justify-center items-center inset-0 bg-black/30 rounded-full' : ''}`}>
@@ -169,6 +170,8 @@ export default function CatalogHeaderForm({ data, setData }: CatalogHeaderFormPr
     whatsapp: <WhatsAppIcon />,
     twitter: <XIcon />,
   };
+  
+  const safeCarouselItems = Array.isArray(localData.carouselItems) ? localData.carouselItems : [];
 
   return (
     <Card>
@@ -251,7 +254,7 @@ export default function CatalogHeaderForm({ data, setData }: CatalogHeaderFormPr
             <Label className="text-lg font-semibold">Carrusel Promocional</Label>
             <p className="text-sm text-muted-foreground">Sube aquí las imágenes o videos que se mostrarán en el carrusel principal de tu landing page (máximo 3).</p>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {localData.carouselItems.map((item, index) => {
+                {(safeCarouselItems || []).map((item, index) => {
                     const replaceInputRef = useRef<HTMLInputElement>(null);
                     return (
                         <Card key={item.id} className="flex flex-col">
@@ -283,3 +286,5 @@ export default function CatalogHeaderForm({ data, setData }: CatalogHeaderFormPr
     </Card>
   );
 }
+
+    

@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -120,32 +121,23 @@ export default function CatalogoPage() {
 
     const mergedConfig = useMemo(() => {
         const savedConf = headerConfig || {};
-        
-        // Deep merge for nested objects
-        const deepMerge = (target: any, source: any) => {
-            const output = { ...target };
-            if (target && typeof target === 'object' && source && typeof source === 'object') {
-                Object.keys(source).forEach(key => {
-                    if (source[key] && typeof source[key] === 'object' && key in target && typeof target[key] === 'object') {
-                        output[key] = deepMerge(target[key], source[key]);
-                    } else {
-                        output[key] = source[key];
-                    }
-                });
-            }
-            return output;
-        };
-
-        const carouselItems = (savedConf.carouselItems && savedConf.carouselItems.length > 0)
+    
+        // Ensure carouselItems is always an array, providing a default if it's missing or not an array.
+        const carouselItems = (Array.isArray(savedConf.carouselItems) && savedConf.carouselItems.length > 0)
             ? savedConf.carouselItems
             : initialHeaderConfig.carouselItems;
-        const carouselWithIds = carouselItems.map(item => item.id ? item : { ...item, id: uuidv4() });
-
-        return deepMerge(initialHeaderConfig, {
+    
+        // Ensure each item has a unique ID.
+        const carouselWithIds = carouselItems.map(item => item && item.id ? item : { ...item, id: uuidv4() });
+    
+        return {
+            ...initialHeaderConfig,
             ...savedConf,
+            banner: { ...initialHeaderConfig.banner, ...(savedConf.banner || {}) },
+            businessInfo: { ...initialHeaderConfig.businessInfo, ...(savedConf.businessInfo || {}) },
+            socialLinks: { ...initialHeaderConfig.socialLinks, ...(savedConf.socialLinks || {}) },
             carouselItems: carouselWithIds,
-        });
-
+        };
     }, [headerConfig]);
 
 
@@ -389,3 +381,5 @@ export default function CatalogoPage() {
         </div>
     );
 }
+
+    
