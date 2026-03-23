@@ -2,6 +2,7 @@
 "use client"
 
 import { useState } from "react";
+import Link from 'next/link';
 import { ColumnDef } from "@tanstack/react-table"
 import { MoreHorizontal, Eye, Trash2, Edit, Mail, Phone, Printer, FileDown } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -293,11 +294,13 @@ export const columns = ({ handleDeleteOrder, handleUpdateStatus, selectedOrders,
                 <ViewOrderDialog order={order} />
                 <UpdateStatusSubMenu orderId={order.id} />
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => alert(`Imprimir factura para pedido: ${order.id}`)}>
-                  <Printer className="mr-2 h-4 w-4" />
-                  Imprimir Factura
+                <DropdownMenuItem asChild>
+                  <Link href={`/dashboard/pedidos/print/${order.id}`} target="_blank" rel="noopener noreferrer">
+                    <Printer className="mr-2 h-4 w-4" />
+                    Imprimir Factura
+                  </Link>
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => alert(`Descargar PDF para pedido: ${order.id}`)}>
+                <DropdownMenuItem onClick={() => alert(`Funcionalidad para descargar PDF no implementada.`)}>
                   <FileDown className="mr-2 h-4 w-4" />
                   Descargar PDF
                 </DropdownMenuItem>
