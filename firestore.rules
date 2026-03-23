@@ -4,53 +4,50 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
   
+    function isSuperAdmin() {
+      // Efficiently check if the user exists and has the 'super_admin' role.
+      let userDocPath = /databases/$(database)/documents/users/$(request.auth.uid);
+      return request.auth != null && exists(userDocPath) && get(userDocPath).data.role == 'super_admin';
+    }
+  
     function isBusinessMember(businessId) {
-      // For single doc reads/writes. Allows the owner OR a staff member
-      // whose user doc points to this businessId.
+      // A more robust check for business membership.
+      // First, check for direct ownership which is most common and doesn't require a 'get'.
+      // Then, check for staff membership safely using 'exists'.
+      let userDocPath = /databases/$(database)/documents/users/$(request.auth.uid);
       return request.auth != null && (
         request.auth.uid == businessId ||
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.businessId == businessId
+        (exists(userDocPath) && get(userDocPath).data.businessId == businessId)
       );
     }
 
     // Publicly readable collections
     match /blog_posts/{postId} {
-      // Allow public read for get, and allow anyone to query the collection
       allow get, list: if true;
-      
-      // Allow create for authenticated users, ensuring they set the correct businessId
-      // or are a superadmin creating a global post.
       allow create: if request.auth != null && 
-                    (request.resource.data.businessId == request.auth.uid || 
-                     (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'super_admin' && !('businessId' in request.resource.data)));
-
-      // Allow update/delete only for the owner or a superadmin
+                    (request.resource.data.businessId == request.auth.uid || isSuperAdmin());
       allow update, delete: if request.auth != null && (
-        get(/databases/$(database)/documents/blog_posts/$(postId)).data.businessId == request.auth.uid ||
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'super_admin'
+        resource.data.businessId == request.auth.uid || isSuperAdmin()
       );
     }
     match /plans/{planId} {
       allow read: if true;
-      allow write: if request.auth != null;
+      allow write: if isSuperAdmin();
     }
     match /globalConfig/{document=**} {
       allow read: if true;
-      allow write: if request.auth != null;
+      allow write: if isSuperAdmin();
     }
     match /settings/{document=**} {
       allow read: if true;
-      allow write: if request.auth != null;
+      allow write: if isSuperAdmin();
     }
 
     // User-specific data
     match /users/{userId} {
       allow get, update: if request.auth.uid == userId;
-      // Allow any authenticated user to list users for admin panels.
-      // The UI should guard access to these pages.
       allow list: if request.auth != null;
-      // Only super admins can create, delete, or write to other user docs.
-      allow create, delete, write: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'super_admin';
+      allow create, delete, write: if isSuperAdmin();
     }
     match /paymentSettings/{userId} {
       allow read, write: if request.auth.uid == userId;
@@ -58,96 +55,93 @@ service cloud.firestore {
 
     // Business-related data
     match /businesses/{businessId} {
-      allow get: if true; // Business profile can be public
-      // Allow any authenticated user to list businesses for admin panels.
-      // Necessary because 'list' rules cannot use 'get()'. UI must protect the route.
+      allow get: if true;
       allow list: if request.auth != null;
-      // Allow super admins to write to any business doc.
-      allow write: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'super_admin';
-      // Allow business members to manage their own business.
+      allow write: if isSuperAdmin();
       allow create, update, delete: if isBusinessMember(businessId);
 
       // Publicly readable subcollections
       match /publicData/{docId=**} {
         allow read: if true;
-        allow write: if isBusinessMember(businessId);
+        allow write: if isBusinessMember(businessId) || isSuperAdmin();
       }
       match /landingPages/{pageId} {
         allow read: if true;
-        allow write: if isBusinessMember(businessId);
+        allow write: if isBusinessMember(businessId) || isSuperAdmin();
       }
        match /landingConfig/{docId=**} {
-        allow read, write: if isBusinessMember(businessId);
+        allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
       }
 
 
       // Private subcollections
       match /products/{productId} {
-        allow read, write: if isBusinessMember(businessId);
+        allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
       }
       match /orders/{orderId} {
-        allow read, write: if isBusinessMember(businessId);
+        allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
       }
       match /contactForms/{formId} {
-        allow read, write: if isBusinessMember(businessId);
+        allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
       }
       match /contactSubmissions/{submissionId} {
-        allow read, write: if isBusinessMember(businessId);
+        allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
       }
       match /suggestionRules/{ruleId} {
-        allow read, write: if isBusinessMember(businessId);
+        allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
       }
       match /printers/{printerId} {
-        allow read, write: if isBusinessMember(businessId);
+        allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
       }
       match /invoiceSettings/{docId} {
-         allow read, write: if isBusinessMember(businessId);
+         allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
       }
       match /subscription/{docId} {
-        allow read, write: if isBusinessMember(businessId);
+        allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
       }
       match /shareConfig/main {
-        allow read, write: if isBusinessMember(businessId);
+        allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
       }
       match /backups/{backupId} {
-        allow read, write: if isBusinessMember(businessId);
+        allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
       }
       match /backupSchedules/{scheduleId} {
-        allow read, write: if isBusinessMember(businessId);
+        allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
       }
 
       // Chatbot specific rules
       match /chatbotConfig/main {
-        allow read, write: if isBusinessMember(businessId);
+        allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
         match /knowledgeBase/{documentId} {
-            allow read, write: if isBusinessMember(businessId);
+            allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
         }
       }
       match /chatConversations/{conversationId} {
-          allow read, write: if isBusinessMember(businessId);
+          allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
           match /messages/{messageId} {
-              allow read, write: if isBusinessMember(businessId);
+              allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
           }
       }
       match /services/{serviceId} {
-        allow read, write: if isBusinessMember(businessId) || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'super_admin';
+        allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
       }
       match /modules/{moduleId} {
-        allow read, write: if isBusinessMember(businessId) || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'super_admin';
+        allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
       }
     }
     
-    // System-level collections (potentially admin-only)
+    // System-level collections
     match /modules/{moduleId} {
       allow read: if true;
-      allow write: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'super_admin';
+      allow write: if isSuperAdmin();
     }
     match /systemServices/{serviceId} { 
+      // Any authenticated user can read system services (e.g., to check limits).
       allow read: if request.auth != null;
-      allow write: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'super_admin';
+      allow write: if isSuperAdmin();
     }
     match /integrations/{integrationId} { 
-      allow read, write: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'super_admin';
+      allow read, write: if isSuperAdmin();
     }
     
     // Default deny all other paths. This is a security best practice.
@@ -156,4 +150,3 @@ service cloud.firestore {
     }
   }
 }
-    
