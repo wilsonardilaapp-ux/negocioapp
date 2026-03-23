@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -120,10 +119,10 @@ export default function CatalogoPage() {
     const { data: headerConfig, isLoading: isConfigLoading } = useDoc<LandingHeaderConfigData>(headerConfigDocRef);
 
     const mergedConfig = useMemo(() => {
-        const savedConf = headerConfig || {};
+        const savedConf = headerConfig;
     
         // Ensure carouselItems is always an array, providing a default if it's missing or not an array.
-        const carouselItems = (Array.isArray(savedConf.carouselItems) && savedConf.carouselItems.length > 0)
+        const carouselItems = (savedConf?.carouselItems && Array.isArray(savedConf.carouselItems) && savedConf.carouselItems.length > 0)
             ? savedConf.carouselItems
             : initialHeaderConfig.carouselItems;
     
@@ -132,10 +131,10 @@ export default function CatalogoPage() {
     
         return {
             ...initialHeaderConfig,
-            ...savedConf,
-            banner: { ...initialHeaderConfig.banner, ...(savedConf.banner || {}) },
-            businessInfo: { ...initialHeaderConfig.businessInfo, ...(savedConf.businessInfo || {}) },
-            socialLinks: { ...initialHeaderConfig.socialLinks, ...(savedConf.socialLinks || {}) },
+            ...(savedConf || {}),
+            banner: { ...initialHeaderConfig.banner, ...(savedConf?.banner || {}) },
+            businessInfo: { ...initialHeaderConfig.businessInfo, ...(savedConf?.businessInfo || {}) },
+            socialLinks: { ...initialHeaderConfig.socialLinks, ...(savedConf?.socialLinks || {}) },
             carouselItems: carouselWithIds,
         };
     }, [headerConfig]);
@@ -381,5 +380,3 @@ export default function CatalogoPage() {
         </div>
     );
 }
-
-    
