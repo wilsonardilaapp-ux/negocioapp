@@ -120,24 +120,32 @@ export default function CatalogoPage() {
 
     const mergedConfig = useMemo(() => {
         const savedConf = headerConfig || {};
-        const businessInfo = { ...initialHeaderConfig.businessInfo, ...savedConf.businessInfo };
-        const socialLinks = { ...initialHeaderConfig.socialLinks, ...savedConf.socialLinks };
-        const banner = { ...initialHeaderConfig.banner, ...savedConf.banner };
+        
+        // Deep merge for nested objects
+        const deepMerge = (target: any, source: any) => {
+            const output = { ...target };
+            if (target && typeof target === 'object' && source && typeof source === 'object') {
+                Object.keys(source).forEach(key => {
+                    if (source[key] && typeof source[key] === 'object' && key in target && typeof target[key] === 'object') {
+                        output[key] = deepMerge(target[key], source[key]);
+                    } else {
+                        output[key] = source[key];
+                    }
+                });
+            }
+            return output;
+        };
+
         const carouselItems = (savedConf.carouselItems && savedConf.carouselItems.length > 0)
             ? savedConf.carouselItems
             : initialHeaderConfig.carouselItems;
-
-        // Ensure carousel items have IDs
         const carouselWithIds = carouselItems.map(item => item.id ? item : { ...item, id: uuidv4() });
 
-        return {
-            ...initialHeaderConfig,
+        return deepMerge(initialHeaderConfig, {
             ...savedConf,
-            banner,
-            businessInfo,
-            socialLinks,
-            carouselItems: carouselWithIds
-        };
+            carouselItems: carouselWithIds,
+        });
+
     }, [headerConfig]);
 
 
@@ -235,36 +243,6 @@ export default function CatalogoPage() {
     
     const isLoading = isUserLoading || isConfigLoading || isProductsLoading || isServicesLoading || isModuleLoading;
 
-    const AddProductButtonAndTrigger = () => {
-        const button = (
-            <Button disabled={!canCreateProduct.allowed}>
-                <PlusCircle className="mr-2 h-4 w-4" />
-                Añadir Producto
-            </Button>
-        );
-    
-        if (canCreateProduct.allowed) {
-            return (
-                <DialogTrigger asChild onClick={openNewProductForm}>
-                    {button}
-                </DialogTrigger>
-            );
-        }
-    
-        return (
-            <TooltipProvider>
-                <Tooltip>
-                    <TooltipTrigger asChild>
-                        <div>{button}</div>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                        <p>{canCreateProduct.reason}</p>
-                    </TooltipContent>
-                </Tooltip>
-            </TooltipProvider>
-        );
-    };
-    
     if (isLoading) {
         return <div>Cargando tu catálogo...</div>
     }
@@ -285,6 +263,13 @@ export default function CatalogoPage() {
             </Card>
         );
     }
+    
+    const addProductButton = (
+        <Button onClick={canCreateProduct.allowed ? openNewProductForm : undefined} disabled={!canCreateProduct.allowed} aria-disabled={!canCreateProduct.allowed}>
+            <PlusCircle className="mr-2 h-4 w-4" />
+            Añadir Producto
+        </Button>
+    );
 
     return (
         <div className="flex flex-col gap-6">
@@ -310,7 +295,23 @@ export default function CatalogoPage() {
                             Descargar PDF
                         </Button>
                         <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-                           <AddProductButtonAndTrigger />
+                            <DialogTrigger asChild>
+                                {canCreateProduct.allowed ? (
+                                    addProductButton
+                                ) : (
+                                    <TooltipProvider>
+                                        <Tooltip>
+                                            <TooltipTrigger asChild>
+                                                {/* The div is necessary for Tooltip to work on a disabled button */}
+                                                <div>{addProductButton}</div>
+                                            </TooltipTrigger>
+                                            <TooltipContent>
+                                                <p>{canCreateProduct.reason}</p>
+                                            </TooltipContent>
+                                        </Tooltip>
+                                    </TooltipProvider>
+                                )}
+                            </DialogTrigger>
                             <DialogContent className="max-w-4xl">
                                 <DialogHeader>
                                     <DialogTitle>{editingProduct ? 'Editar Producto' : 'Añadir Nuevo Producto'}</DialogTitle>

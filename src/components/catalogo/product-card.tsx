@@ -29,7 +29,7 @@ export default function ProductCard({ product, children }: ProductCardProps) {
         }).format(value);
     };
 
-    const mediaUrl = product.images[0] || 'https://picsum.photos/seed/placeholder/600/400';
+    const mediaUrl = product.images?.[0] || 'https://picsum.photos/seed/placeholder/600/400';
     const isMediaVideo = isVideo(mediaUrl);
 
     return (
@@ -49,6 +49,7 @@ export default function ProductCard({ product, children }: ProductCardProps) {
                             src={mediaUrl}
                             alt={product.name}
                             fill
+                            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                             className="object-cover"
                         />
                     )}

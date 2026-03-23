@@ -73,7 +73,7 @@ export default function EditorLandingPreview({ data }: EditorLandingPreviewProps
 
                   {/* Live Preview Content */}
                   <div className="bg-white max-h-[80vh] overflow-y-auto">
-                    <LandingPageContent data={data} logoUrl={data.navigation.logoUrl}/>
+                    <LandingPageContent data={data} businessId={user?.uid} logoUrl={data.navigation.logoUrl}/>
                   </div>
               </div>
           </CardContent>
