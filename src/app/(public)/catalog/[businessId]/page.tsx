@@ -515,8 +515,8 @@ export default function CatalogPage() {
 
                 const querySnapshot = await getDocs(shareConfigQuery);
                 
-                // We must filter on the client side now.
-                const customSlugDoc = querySnapshot.docs.find(doc => doc.data().useCustomSlug === true);
+                // Use non-strict equality to handle both boolean and string "true"
+                const customSlugDoc = querySnapshot.docs.find(doc => doc.data().useCustomSlug == true);
 
                 if (customSlugDoc) {
                     const businessId = customSlugDoc.ref.parent.parent?.id;
