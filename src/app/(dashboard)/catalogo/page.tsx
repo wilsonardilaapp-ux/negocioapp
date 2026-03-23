@@ -119,20 +119,26 @@ export default function CatalogoPage() {
     const { data: headerConfig, isLoading: isConfigLoading } = useDoc<LandingHeaderConfigData>(headerConfigDocRef);
 
     const mergedConfig = useMemo(() => {
-        if (isConfigLoading) {
-          return initialHeaderConfig;
-        }
+        const savedConf = headerConfig || {};
+        const businessInfo = { ...initialHeaderConfig.businessInfo, ...savedConf.businessInfo };
+        const socialLinks = { ...initialHeaderConfig.socialLinks, ...savedConf.socialLinks };
+        const banner = { ...initialHeaderConfig.banner, ...savedConf.banner };
+        const carouselItems = (savedConf.carouselItems && savedConf.carouselItems.length > 0)
+            ? savedConf.carouselItems
+            : initialHeaderConfig.carouselItems;
+
+        // Ensure carousel items have IDs
+        const carouselWithIds = carouselItems.map(item => item.id ? item : { ...item, id: uuidv4() });
+
         return {
             ...initialHeaderConfig,
-            ...(headerConfig || {}),
-            banner: { ...initialHeaderConfig.banner, ...(headerConfig?.banner || {}) },
-            businessInfo: { ...initialHeaderConfig.businessInfo, ...(headerConfig?.businessInfo || {}) },
-            socialLinks: { ...initialHeaderConfig.socialLinks, ...(headerConfig?.socialLinks || {}) },
-            carouselItems: headerConfig?.carouselItems && headerConfig.carouselItems.length > 0 
-                ? headerConfig.carouselItems 
-                : initialHeaderConfig.carouselItems,
+            ...savedConf,
+            banner,
+            businessInfo,
+            socialLinks,
+            carouselItems: carouselWithIds
         };
-    }, [headerConfig, isConfigLoading]);
+    }, [headerConfig]);
 
 
     const productLimit = productLimitService?.limit ?? 10;
@@ -152,13 +158,9 @@ export default function CatalogoPage() {
         return { allowed: true, reason: '' };
     }, [isProductLimitServiceActive, productLimit, products]);
     
-    const updatePublicCatalog = (updatedProducts: Product[] | null, currentConfig: LandingHeaderConfigData | null) => {
+    const updatePublicCatalog = (productsToSave: Product[], configToSave: LandingHeaderConfigData) => {
         if (!firestore || !user) return;
-    
         const publicCatalogRef = doc(firestore, 'businesses', user.uid, 'publicData', 'catalog');
-        const productsToSave = updatedProducts ?? products ?? [];
-        const configToSave = currentConfig ?? mergedConfig;
-        
         setDocumentNonBlocking(publicCatalogRef, { products: productsToSave, headerConfig: configToSave }, { merge: true });
     };
     
@@ -191,7 +193,8 @@ export default function CatalogoPage() {
         } else {
             updatedProductList = [...currentProducts, { ...dataToSave, id: updatedProductId }];
         }
-        updatePublicCatalog(updatedProductList, headerConfig);
+        
+        updatePublicCatalog(updatedProductList, mergedConfig);
 
         setIsFormOpen(false);
         setEditingProduct(null);
@@ -215,7 +218,7 @@ export default function CatalogoPage() {
         await deleteDocumentNonBlocking(productDocRef);
 
         const updatedProductList = (products || []).filter(p => p.id !== productToDelete.id);
-        updatePublicCatalog(updatedProductList, headerConfig);
+        updatePublicCatalog(updatedProductList, mergedConfig);
         
         setProductToDelete(null);
     };
@@ -383,3 +386,5 @@ export default function CatalogoPage() {
         </div>
     );
 }
+
+    
