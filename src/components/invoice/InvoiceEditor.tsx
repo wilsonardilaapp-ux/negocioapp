@@ -1,3 +1,4 @@
+
 'use client';
 import React, { useRef, useState } from 'react';
 import type { InvoiceSettings } from '@/models/invoice-settings';
@@ -33,6 +34,7 @@ export const InvoiceEditor: React.FC<InvoiceEditorProps> = ({ settings, setSetti
     const { toast } = useToast();
     const [isUploading, setIsUploading] = useState(false);
     const logoInputRef = useRef<HTMLInputElement>(null);
+    const qrCodeInputRef = useRef<HTMLInputElement>(null);
 
     const handleUpdate = (section: keyof InvoiceSettings, field: string, value: any) => {
         setSettings((prev) => ({
@@ -79,6 +81,36 @@ export const InvoiceEditor: React.FC<InvoiceEditorProps> = ({ settings, setSetti
                 const result = await uploadMedia({ mediaDataUri });
                 handleUpdate('logo', 'url', result.secure_url);
                 toast({ title: 'Logo subido con éxito' });
+            };
+        } catch (error: any) {
+            toast({ variant: 'destructive', title: 'Error al subir', description: error.message });
+        } finally {
+            setIsUploading(false);
+        }
+    };
+
+    const handleQrImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        if (!['image/png', 'image/jpeg', 'image/svg+xml'].includes(file.type)) {
+            toast({ variant: 'destructive', title: 'Formato inválido', description: 'Solo se permiten archivos PNG, JPG o SVG.' });
+            return;
+        }
+        if (file.size > 2 * 1024 * 1024) { // 2MB
+            toast({ variant: 'destructive', title: 'Archivo muy grande', description: 'El tamaño máximo es de 2MB.' });
+            return;
+        }
+
+        setIsUploading(true);
+        try {
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onloadend = async () => {
+                const mediaDataUri = reader.result as string;
+                const result = await uploadMedia({ mediaDataUri });
+                handleUpdate('qr', 'qrImageUrl', result.secure_url);
+                toast({ title: 'QR subido con éxito' });
             };
         } catch (error: any) {
             toast({ variant: 'destructive', title: 'Error al subir', description: error.message });
@@ -157,8 +189,21 @@ export const InvoiceEditor: React.FC<InvoiceEditorProps> = ({ settings, setSetti
                 <AccordionTrigger className="text-foreground">3. Código QR</AccordionTrigger>
                 <AccordionContent className="space-y-4 p-2">
                      <div className="flex items-center space-x-2"><Switch id="qr-show" checked={settings.qr.show} onCheckedChange={(val) => handleUpdate('qr', 'show', val)} /><Label className="text-foreground" htmlFor="qr-show">Mostrar QR</Label></div>
+
+                     <div className="border p-4 rounded-md space-y-2">
+                        <Label className="text-foreground">Imagen de QR (opcional)</Label>
+                        <p className="text-xs text-muted-foreground">Sube una imagen si quieres usar un QR personalizado en lugar del generado automáticamente.</p>
+                        {settings.qr.qrImageUrl && <img src={settings.qr.qrImageUrl} alt="qr preview" className="mx-auto h-24 w-24 object-contain mb-4 bg-white p-1 rounded-md" />}
+                        <Button variant="outline" className="w-full" onClick={() => qrCodeInputRef.current?.click()} disabled={isUploading}>
+                            {isUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UploadCloud className="mr-2 h-4 w-4" />}
+                            {settings.qr.qrImageUrl ? 'Cambiar Imagen QR' : 'Subir Imagen QR'}
+                        </Button>
+                        <input type="file" ref={qrCodeInputRef} onChange={handleQrImageUpload} className="hidden" accept="image/png, image/jpeg, image/svg+xml" />
+                        {settings.qr.qrImageUrl && <Button variant="ghost" size="sm" className="w-full text-destructive" onClick={() => handleUpdate('qr', 'qrImageUrl', null)}><Trash2 className="mr-2 h-4 w-4" />Quitar Imagen</Button>}
+                    </div>
+
                      <Label className="text-foreground">Enlazar a</Label><Select onValueChange={(val) => handleUpdate('qr', 'linkType', val)} value={settings.qr.linkType}><SelectTrigger><SelectValue placeholder="Enlazar a..." /></SelectTrigger><SelectContent><SelectItem value="menu">Menú Digital</SelectItem><SelectItem value="review">Reseña Google</SelectItem><SelectItem value="whatsapp">WhatsApp</SelectItem><SelectItem value="instagram">Instagram</SelectItem><SelectItem value="custom">Link Personalizado</SelectItem></SelectContent></Select>
-                    <div className="space-y-1"><Label className="text-foreground">URL del QR</Label><Input className="placeholder:text-muted-foreground text-foreground" value={settings.qr.url} onChange={(e) => handleUpdate('qr', 'url', e.target.value)} /></div>
+                    <div className="space-y-1"><Label className="text-foreground">URL del QR (si no subes imagen)</Label><Input className="placeholder:text-muted-foreground text-foreground" value={settings.qr.url} onChange={(e) => handleUpdate('qr', 'url', e.target.value)} /></div>
                     <div className="space-y-1"><Label className="text-foreground">Texto bajo el QR</Label><Input className="placeholder:text-muted-foreground text-foreground" value={settings.qr.labelText} onChange={(e) => handleUpdate('qr', 'labelText', e.target.value)} /></div>
                 </AccordionContent>
             </AccordionItem>

@@ -1,3 +1,4 @@
+
 'use client';
 
 import React from 'react';
@@ -141,7 +142,11 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ config, order,
 
       {config.qr.show && (
         <div className="flex flex-col items-center my-2 space-y-1">
-          <QRCode value={config.qr.url || 'https://www.google.com'} size={100} />
+          {config.qr.qrImageUrl ? (
+             <img src={config.qr.qrImageUrl} alt="QR Code" style={{ width: '100px', height: '100px' }} className="object-contain bg-white rounded-sm p-1" />
+          ) : (
+            <QRCode value={config.qr.url || 'https://www.google.com'} size={100} />
+          )}
           <p className={cn(isBold('qrText') && 'font-bold')}>{config.qr.labelText}</p>
         </div>
       )}

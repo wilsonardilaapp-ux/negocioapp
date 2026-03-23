@@ -1,3 +1,4 @@
+
 import { z } from 'zod';
 
 // Zod schema for validation
@@ -18,6 +19,7 @@ export const InvoiceSettingsSchema = z.object({
     linkType: z.enum(['menu', 'review', 'whatsapp', 'instagram', 'custom']),
     url: z.string(),
     labelText: z.string(),
+    qrImageUrl: z.string().nullable().optional(), // Added for custom QR upload
   }),
   socialMedia: z.object({
     show: z.boolean(),
@@ -93,6 +95,7 @@ export const initialInvoiceSettings: InvoiceSettings = {
     linkType: "menu",
     url: "",
     labelText: "Ver nuestro menú",
+    qrImageUrl: null,
   },
   socialMedia: {
     show: false,
