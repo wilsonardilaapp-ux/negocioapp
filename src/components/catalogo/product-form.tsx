@@ -14,9 +14,10 @@ import { UploadCloud, X, Loader2 } from 'lucide-react';
 import Image from 'next/image';
 import { uploadMedia } from '@/ai/flows/upload-media-flow';
 import { useToast } from '@/hooks/use-toast';
-import { useDoc, useFirestore, useMemoFirebase } from '@/firebase';
+import { useDoc, useFirestore, useMemoFirebase, useUser } from '@/firebase';
 import { doc } from 'firebase/firestore';
 import type { SystemService } from '@/models/system-service';
+import type { Business } from '@/models/business';
 import { cn } from '@/lib/utils';
 
 const productSchema = z.object({
@@ -58,20 +59,28 @@ export default function ProductForm({ product, onSave, onCancel }: ProductFormPr
     const [mediaItems, setMediaItems] = useState<Array<MediaItem | null>>([]);
     const [isUploading, setIsUploading] = useState<number | null>(null);
     const { toast } = useToast();
+    const { user } = useUser();
     const firestore = useFirestore();
+
+    const businessDocRef = useMemoFirebase(() => 
+        user ? doc(firestore, 'businesses', user.uid) : null,
+    [user, firestore]);
+    const { data: business, isLoading: isBusinessLoading } = useDoc<Business>(businessDocRef);
 
     const imageLimitServiceQuery = useMemoFirebase(() => 
         firestore ? doc(firestore, 'systemServices', 'limite-de-imagenes-por-producto') : null,
     [firestore]);
-
-    const { data: imageLimitService } = useDoc<SystemService>(imageLimitServiceQuery);
+    const { data: imageLimitService, isLoading: isServiceLoading } = useDoc<SystemService>(imageLimitServiceQuery);
 
     const imageLimit = useMemo(() => {
+        if (business?.imageLimit && business.imageLimit > 0) {
+            return business.imageLimit;
+        }
         if (imageLimitService?.status === 'active' && imageLimitService.limit > 0) {
             return imageLimitService.limit;
         }
         return 5; // Default limit
-    }, [imageLimitService]);
+    }, [business, imageLimitService]);
 
     const isLimitReached = useMemo(() => mediaItems.filter(item => item).length >= imageLimit, [mediaItems, imageLimit]);
 
@@ -157,6 +166,10 @@ export default function ProductForm({ product, onSave, onCancel }: ProductFormPr
         }
         return <Image src={item.url} alt={alt} fill sizes="10rem" className="rounded-md object-cover" />;
     };
+
+    if (isBusinessLoading || isServiceLoading) {
+        return <div className="flex items-center justify-center h-64"><Loader2 className="h-8 w-8 animate-spin" /></div>;
+    }
 
     return (
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 p-1 max-h-[80vh] overflow-y-auto">

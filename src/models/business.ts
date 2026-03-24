@@ -19,4 +19,6 @@ export type Business = {
     packagingFee?: number;
     planName?: string;
     status: EntityStatus;
+    imageLimit?: number;
 };
+

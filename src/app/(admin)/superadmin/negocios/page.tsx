@@ -107,7 +107,7 @@ export default function BusinessesPage() {
   };
 
   const openManageBusiness = async (business: Business) => {
-    setSelectedBusiness(business);
+    setSelectedBusiness({ ...business, imageLimit: business.imageLimit ?? undefined });
     
     // Load assigned modules and services
     const modulesSnapshot = await getDocs(collection(firestore, `businesses/${business.id}/modules`));
@@ -121,17 +121,24 @@ export default function BusinessesPage() {
   
   const handleSaveManageBusiness = async () => {
     if (!selectedBusiness) return;
-
-    // Update business status only if it's defined
-    if (selectedBusiness.status) {
-      await updateDocumentNonBlocking(doc(firestore, `businesses/${selectedBusiness.id}`), { status: selectedBusiness.status });
-    }
     
-    // Deactivate all first
-    const currentModules = await getDocs(collection(firestore, `businesses/${selectedBusiness.id}/modules`));
-    const currentServices = await getDocs(collection(firestore, `businesses/${selectedBusiness.id}/services`));
+    // Prepare business document update
+    const businessUpdateData: Partial<Business> = {
+      status: selectedBusiness.status,
+      imageLimit: selectedBusiness.imageLimit && Number(selectedBusiness.imageLimit) > 0 
+        ? Number(selectedBusiness.imageLimit) 
+        : null
+    };
+
+    // Update business status and imageLimit
+    await updateDocumentNonBlocking(doc(firestore, `businesses/${selectedBusiness.id}`), businessUpdateData);
+    
+    // Deactivate all first, then activate selected in a batch
     const batch = writeBatch(firestore);
+    const currentModules = await getDocs(collection(firestore, `businesses/${selectedBusiness.id}/modules`));
     currentModules.forEach(doc => batch.update(doc.ref, { status: 'inactive' }));
+    
+    const currentServices = await getDocs(collection(firestore, `businesses/${selectedBusiness.id}/services`));
     currentServices.forEach(doc => batch.update(doc.ref, { status: 'inactive' }));
     
     // Activate selected
@@ -316,6 +323,18 @@ export default function BusinessesPage() {
                 {services?.length === 0 && <p className="text-sm text-gray-500 text-center py-4">No hay servicios disponibles</p>}
               </div>
               <div>
+                <h4 className="font-medium mb-3">Límite de Imágenes por Producto</h4>
+                <Input
+                  type="number"
+                  placeholder="Usar límite global por defecto"
+                  value={selectedBusiness.imageLimit ?? ''}
+                  onChange={e => setSelectedBusiness(prev => prev ? { ...prev, imageLimit: e.target.value === '' ? undefined : Number(e.target.value) } : null)}
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Define un límite específico para este negocio o déjalo vacío para usar el valor global.
+                </p>
+              </div>
+              <div>
                 <h4 className="font-medium mb-3">Cambiar Estado</h4>
                 <Select value={selectedBusiness.status} onValueChange={(v: EntityStatus) => setSelectedBusiness(prev => prev ? { ...prev, status: v } : null)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
@@ -330,3 +349,4 @@ export default function BusinessesPage() {
     </div>
   );
 }
+
