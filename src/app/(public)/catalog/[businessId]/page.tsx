@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useMemo, useState, useEffect, useRef } from 'react';
@@ -716,7 +717,7 @@ export default function CatalogPage() {
                     cartItems={cart}
                     onRemoveItem={handleRemoveFromCart}
                     businessId={resolvedBusinessId}
-                    businessPhone={headerConfig?.businessInfo.phone || ''}
+                    businessInfo={headerConfig?.businessInfo ?? null}
                     paymentSettings={paymentSettings}
                 />
             )}
@@ -731,5 +732,3 @@ export default function CatalogPage() {
         </div>
     );
 }
-
-    

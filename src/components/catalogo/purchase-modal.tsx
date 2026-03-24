@@ -22,6 +22,7 @@ import { collection } from 'firebase/firestore';
 import { cn } from '@/lib/utils';
 import type { CartItem } from '@/app/(public)/catalog/[businessId]/page';
 import { ScrollArea } from '../ui/scroll-area';
+import type { LandingHeaderConfigData } from '@/models/landing-page';
 
 
 const purchaseSchema = z.object({
@@ -38,7 +39,7 @@ interface PurchaseModalProps {
   cartItems: CartItem[];
   onRemoveItem: (productId: string) => void;
   businessId: string;
-  businessPhone: string;
+  businessInfo: LandingHeaderConfigData['businessInfo'] | null;
   paymentSettings: PaymentSettings | null;
 }
 
@@ -59,7 +60,7 @@ const formatCurrency = (value: number) => {
 };
 
 
-export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, businessId, businessPhone, paymentSettings }: PurchaseModalProps) {
+export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, businessId, businessInfo, paymentSettings }: PurchaseModalProps) {
   const { toast } = useToast();
   const firestore = useFirestore();
   
@@ -94,7 +95,11 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, b
   
   const packagingTotal = cartItems.reduce((sum, item) => sum + ((item.packagingCost ?? 0) * item.quantity), 0);
   const subtotalProducts = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-  const total = subtotalProducts + packagingTotal;
+  const deliveryFee = businessInfo?.deliveryFee ?? 0;
+  const subtotalBeforeVat = subtotalProducts + packagingTotal + deliveryFee;
+  const vatRate = businessInfo?.vatRate ?? 0;
+  const vatAmount = subtotalBeforeVat * (vatRate / 100);
+  const total = subtotalBeforeVat + vatAmount;
 
   useEffect(() => {
     // Reset selected tab when modal opens or available methods change
@@ -150,6 +155,7 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, b
     }
 
     // 2. Abrir WhatsApp con el mensaje
+    const businessPhone = businessInfo?.phone || '';
     const paymentMethodText = selectedPaymentMethod === 'pagoContraEntrega' ? 'Pago Contra Entrega' : selectedPaymentMethod.charAt(0).toUpperCase() + selectedPaymentMethod.slice(1);
     
     let messageBody = `¡Hola! 👋 Estoy interesado en realizar un pedido:\n\n`;
@@ -158,9 +164,18 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, b
         messageBody += `*Cantidad:* ${item.quantity}\n`;
         messageBody += `*Subtotal:* ${formatCurrency(item.price * item.quantity)}\n\n`;
     });
+    
     if (packagingTotal > 0) {
-      messageBody += `*Empaque (antes de IVA):* ${formatCurrency(packagingTotal)}\n\n`;
+      messageBody += `*Empaque:* ${formatCurrency(packagingTotal)}\n`;
     }
+    if (deliveryFee > 0) {
+      messageBody += `*Domicilio:* ${formatCurrency(deliveryFee)}\n`;
+    }
+    if (vatRate > 0) {
+        messageBody += `\n*Subtotal (antes de IVA): ${formatCurrency(subtotalBeforeVat)}*\n`;
+        messageBody += `*IVA (${vatRate}%):* ${formatCurrency(vatAmount)}\n`;
+    }
+
     messageBody += `*TOTAL DEL PEDIDO: ${formatCurrency(total)}*\n\n`;
     messageBody += `*Mis Datos:*\n`;
     messageBody += `*Nombre:* ${data.fullName}\n`;
@@ -224,8 +239,24 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, b
                     </div>
                     {packagingTotal > 0 && (
                       <div className="flex justify-between text-sm text-muted-foreground">
-                        <span>Empaque (antes de IVA):</span>
+                        <span>Empaque:</span>
                         <span>{formatCurrency(packagingTotal)}</span>
+                      </div>
+                    )}
+                    {deliveryFee > 0 && (
+                      <div className="flex justify-between text-sm text-muted-foreground">
+                        <span>Domicilio:</span>
+                        <span>{formatCurrency(deliveryFee)}</span>
+                      </div>
+                    )}
+                     <div className="flex justify-between text-sm">
+                      <span>Subtotal:</span>
+                      <span>{formatCurrency(subtotalBeforeVat)}</span>
+                    </div>
+                    {vatRate > 0 && (
+                      <div className="flex justify-between text-sm">
+                          <span>IVA ({vatRate}%):</span>
+                          <span>{formatCurrency(vatAmount)}</span>
                       </div>
                     )}
                     <div className="flex justify-between items-center pt-1 border-t">
