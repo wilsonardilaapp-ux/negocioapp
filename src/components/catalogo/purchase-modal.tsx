@@ -16,13 +16,14 @@ import { ShoppingBag, Building2, HandCoins, Trash2 } from 'lucide-react';
 import Image from 'next/image';
 import { useToast } from '@/hooks/use-toast';
 import type { PaymentSettings } from '@/models/payment-settings';
-import type { Order } from '@/models/order';
+import type { Order, TipoEntrega } from '@/models/order';
 import { useFirestore, addDocumentNonBlocking } from '@/firebase';
 import { collection } from 'firebase/firestore';
 import { cn } from '@/lib/utils';
 import type { CartItem } from '@/app/(public)/catalog/[businessId]/page';
 import { ScrollArea } from '../ui/scroll-area';
 import type { LandingHeaderConfigData } from '@/models/landing-page';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
 
 const purchaseSchema = z.object({
@@ -63,6 +64,7 @@ const formatCurrency = (value: number) => {
 export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, businessId, businessInfo, paymentSettings }: PurchaseModalProps) {
   const { toast } = useToast();
   const firestore = useFirestore();
+  const [tipoEntrega, setTipoEntrega] = useState<TipoEntrega>('domicilio');
   
   const availableMethods = Object.entries(paymentMethodsConfig)
         .map(([key, config]) => {
@@ -93,25 +95,34 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, b
     },
   });
   
-  // Corrected calculation logic and order
   const packagingTotal = cartItems.reduce((sum, item) => sum + ((item.packagingCost ?? 0) * item.quantity), 0);
   const subtotalProducts = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   const subtotalBeforeVat = subtotalProducts + packagingTotal;
   const vatRate = businessInfo?.vatRate ?? 0;
   const vatAmount = subtotalBeforeVat * (vatRate / 100);
   const deliveryFee = businessInfo?.deliveryFee ?? 0;
-  const total = subtotalBeforeVat + vatAmount + deliveryFee;
+  const costoEntrega = tipoEntrega === 'domicilio' ? deliveryFee : 0;
+  const total = subtotalBeforeVat + vatAmount + costoEntrega;
 
   useEffect(() => {
     // Reset selected tab when modal opens or available methods change
     if (isOpen) {
       setSelectedPaymentMethod(defaultTab);
+      // Reset delivery type to default when modal opens
+      setTipoEntrega(deliveryFee > 0 ? 'domicilio' : 'recoger_en_tienda');
     }
-  }, [isOpen, defaultTab]);
+  }, [isOpen, defaultTab, deliveryFee]);
 
   const onSubmit = (data: z.infer<typeof purchaseSchema>) => {
+    if (tipoEntrega === 'domicilio' && !data.address) {
+        toast({
+            variant: "destructive",
+            title: "Dirección requerida",
+            description: "Por favor, introduce una dirección de envío para el domicilio.",
+        });
+        return;
+    }
 
-    // 1. Guardar el pedido en Firestore (si está disponible)
     if (firestore && businessId) {
         cartItems.forEach(item => {
             const paymentMethodLabels: { [key: string]: string } = {
@@ -128,7 +139,7 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, b
                 customerName: data.fullName,
                 customerEmail: data.email,
                 customerPhone: data.whatsapp,
-                customerAddress: data.address || 'No especificada',
+                customerAddress: tipoEntrega === 'domicilio' ? (data.address || 'No especificada') : 'Recoge en tienda',
                 productId: item.id,
                 productName: item.name,
                 quantity: item.quantity,
@@ -138,6 +149,7 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, b
                 orderDate: new Date().toISOString(),
                 orderStatus: 'Pendiente',
                 packagingCost: item.packagingCost,
+                tipoEntrega: tipoEntrega,
             };
     
             const ordersCollection = collection(firestore, 'businesses', businessId, 'orders');
@@ -155,11 +167,11 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, b
         });
     }
 
-    // 2. Abrir WhatsApp con el mensaje
     const businessPhone = businessInfo?.phone || '';
     const paymentMethodText = selectedPaymentMethod === 'pagoContraEntrega' ? 'Pago Contra Entrega' : selectedPaymentMethod.charAt(0).toUpperCase() + selectedPaymentMethod.slice(1);
     
     let messageBody = `¡Hola! 👋 Estoy interesado en realizar un pedido:\n\n`;
+    messageBody += `*TIPO DE ENTREGA: ${tipoEntrega === 'domicilio' ? 'Domicilio' : 'Recoger en Tienda'}*\n\n`;
     cartItems.forEach(item => {
         messageBody += `*Producto:* ${item.name}\n`;
         messageBody += `*Cantidad:* ${item.quantity}\n`;
@@ -176,8 +188,8 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, b
         messageBody += `*IVA (${vatRate}%):* ${formatCurrency(vatAmount)}\n`;
     }
 
-    if (deliveryFee > 0) {
-      messageBody += `*Domicilio:* ${formatCurrency(deliveryFee)}\n`;
+    if (costoEntrega > 0) {
+      messageBody += `*Domicilio:* ${formatCurrency(costoEntrega)}\n`;
     }
 
     messageBody += `*TOTAL DEL PEDIDO: ${formatCurrency(total)}*\n\n`;
@@ -185,7 +197,7 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, b
     messageBody += `*Nombre:* ${data.fullName}\n`;
     messageBody += `*Email:* ${data.email}\n`;
     messageBody += `*WhatsApp:* ${data.whatsapp}\n`;
-    if (data.address) messageBody += `*Dirección:* ${data.address}\n`;
+    if (tipoEntrega === 'domicilio' && data.address) messageBody += `*Dirección:* ${data.address}\n`;
     messageBody += `*Método de pago elegido:* ${paymentMethodText}\n\n`;
     if (data.message) messageBody += `*Mensaje adicional:* ${data.message}\n`;
     messageBody += `¡Quedo atento a la confirmación! 👍`;
@@ -257,15 +269,34 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, b
                           <span>{formatCurrency(vatAmount)}</span>
                       </div>
                     )}
-                    {deliveryFee > 0 && (
-                      <div className="flex justify-between text-sm text-muted-foreground">
-                        <span>Domicilio:</span>
-                        <span>{formatCurrency(deliveryFee)}</span>
-                      </div>
-                    )}
-                    <div className="flex justify-between items-center pt-1 border-t">
-                      <span className="font-semibold">Total:</span>
-                      <span className="text-lg font-bold">{formatCurrency(total)}</span>
+                    <RadioGroup value={tipoEntrega} onValueChange={(v) => setTipoEntrega(v as TipoEntrega)} className="my-3 space-y-2">
+                        <Label htmlFor="recoger_en_tienda" className={cn("flex items-center justify-between gap-4 rounded-lg border bg-background p-3 cursor-pointer", tipoEntrega === 'recoger_en_tienda' && 'border-primary ring-2 ring-primary')}>
+                            <div className="flex items-center gap-3">
+                                <RadioGroupItem value="recoger_en_tienda" id="recoger_en_tienda" />
+                                <div>
+                                    <p className="font-medium text-sm">Recoger en tienda</p>
+                                    <p className="text-xs text-muted-foreground">Sin costo adicional</p>
+                                </div>
+                            </div>
+                            <span className="font-semibold text-sm">$0</span>
+                        </Label>
+                        {deliveryFee > 0 && (
+                           <Label htmlFor="domicilio" className={cn("flex items-center justify-between gap-4 rounded-lg border bg-background p-3 cursor-pointer", tipoEntrega === 'domicilio' && 'border-primary ring-2 ring-primary')}>
+                                <div className="flex items-center gap-3">
+                                    <RadioGroupItem value="domicilio" id="domicilio" />
+                                    <div>
+                                        <p className="font-medium text-sm">Domicilio</p>
+                                        <p className="text-xs text-muted-foreground">Envío a tu dirección</p>
+                                    </div>
+                                </div>
+                                <span className="font-semibold text-sm">{formatCurrency(deliveryFee)}</span>
+                            </Label>
+                        )}
+                    </RadioGroup>
+
+                    <div className="flex justify-between items-center pt-2 border-t">
+                      <span className="font-semibold text-lg">Total:</span>
+                      <span className="text-xl font-bold">{formatCurrency(total)}</span>
                     </div>
                   </div>
                 </Card>
@@ -287,10 +318,12 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, b
                   <Input id="whatsapp" type="tel" {...register('whatsapp')} placeholder="ej. 3001234567" />
                   {errors.whatsapp && <p className="text-sm text-destructive mt-1">{errors.whatsapp.message}</p>}
                 </div>
-                <div>
-                  <Label htmlFor="address">Dirección de envío</Label>
-                  <Input id="address" {...register('address')} placeholder="Tu dirección de envío" />
-                </div>
+                {tipoEntrega === 'domicilio' && (
+                    <div>
+                      <Label htmlFor="address">Dirección de envío</Label>
+                      <Input id="address" {...register('address')} placeholder="Tu dirección de envío" />
+                    </div>
+                )}
                 <div>
                   <Label htmlFor="message">Mensaje Adicional</Label>
                   <Textarea id="message" {...register('message')} placeholder="Instrucciones especiales, etc." />
