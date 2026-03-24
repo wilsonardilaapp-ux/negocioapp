@@ -5,15 +5,9 @@ import dynamic from 'next/dynamic';
 import { uploadMedia } from '@/ai/flows/upload-media-flow';
 import { useToast } from '@/hooks/use-toast';
 
-// Dynamically import ReactQuill to prevent SSR issues, using .then() for robustness
+// Simplified dynamic import for ReactQuill to prevent SSR issues.
 const ReactQuill = dynamic(
-  () =>
-    import('react-quill').then((mod) => {
-      // eslint-disable-next-line react/display-name
-      return ({ forwardedRef, ...props }: any) => (
-        <mod.default ref={forwardedRef} {...props} />
-      );
-    }),
+  () => import('react-quill'),
   {
     ssr: false,
     loading: () => <div className="h-[200px] w-full animate-pulse rounded-md bg-muted" />,
@@ -103,7 +97,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({ value, onChange, placeh
   return (
     <div className="rich-editor-wrapper">
       <ReactQuill
-        forwardedRef={quillRef}
+        ref={quillRef}
         theme="snow"
         value={value}
         onChange={onChange}
