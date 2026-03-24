@@ -5,14 +5,15 @@ import dynamic from 'next/dynamic';
 import { uploadMedia } from '@/ai/flows/upload-media-flow';
 import { useToast } from '@/hooks/use-toast';
 
-// Dynamically import ReactQuill to prevent SSR issues
+// Dynamically import ReactQuill to prevent SSR issues, using .then() for robustness
 const ReactQuill = dynamic(
-  async () => {
-    const { default: RQ } = await import('react-quill');
-    // We need to forward the ref to the underlying Quill instance
-    // eslint-disable-next-line react/display-name
-    return ({ forwardedRef, ...props }: any) => <RQ ref={forwardedRef} {...props} />;
-  },
+  () =>
+    import('react-quill').then((mod) => {
+      // eslint-disable-next-line react/display-name
+      return ({ forwardedRef, ...props }: any) => (
+        <mod.default ref={forwardedRef} {...props} />
+      );
+    }),
   {
     ssr: false,
     loading: () => <div className="h-[200px] w-full animate-pulse rounded-md bg-muted" />,
