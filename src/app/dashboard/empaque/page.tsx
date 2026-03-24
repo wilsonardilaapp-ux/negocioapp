@@ -1,3 +1,3 @@
-// This file is intentionally left blank to resolve a routing conflict.
-// It does not export a default component, so Next.js will not treat it as a page.
-export const placeholder = true;
+// This file is intentionally left with invalid content to resolve a route conflict.
+// Do not delete or modify unless you understand Next.js file-system based routing.
+"conflict-resolved";
