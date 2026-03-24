@@ -5,47 +5,29 @@ import { useState, useEffect, useMemo } from 'react';
 import { useUser, useFirestore, useDoc, useCollection, useMemoFirebase } from '@/firebase';
 import { doc, collection, query, where, type Timestamp } from 'firebase/firestore';
 import { useSubscription } from '@/hooks/useSubscription';
-import type { SubscriptionPlan } from '@/models/subscription-plan';
 import CurrentPlanCard, { type CurrentPlanInfo } from './components/CurrentPlanCard';
 import UsageLimitsCard, { type UsageMetric } from './components/UsageLimitsCard';
 import PlanComparisonTable from './components/PlanComparisonTable';
 import BillingHistoryCard, { type BillingRecord } from './components/BillingHistoryCard';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Loader2, CreditCard } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 
 export default function SubscriptionPage() {
-  const { user } = useUser();
-  const firestore = useFirestore();
+  const { 
+    subscription,
+    allPlans,
+    plan,
+    limits,
+    productsCount,
+    blogPostsCount,
+    landingPagesCount,
+    isLoading,
+    error,
+  } = useSubscription();
 
   const [billingHistory, setBillingHistory] = useState<BillingRecord[]>([]);
   const [isBillingLoading, setIsBillingLoading] = useState(false);
   
-  // --- Firestore Data Hooks ---
-  const { 
-    subscription, 
-    allPlans,
-    plan, 
-    limits, 
-    isSubLoading, 
-    arePlansLoading,
-    error: subError 
-  } = useSubscription();
-
-  const productsRef = useMemoFirebase(() => user ? collection(firestore, `businesses/${user.uid}/products`) : null, [user, firestore]);
-  const blogPostsQuery = useMemoFirebase(() => 
-    user ? query(collection(firestore, 'blog_posts'), where('businessId', '==', user.uid)) : null, 
-    [user, firestore]
-  );
-  const landingPagesRef = useMemoFirebase(() => user ? collection(firestore, `businesses/${user.uid}/landingPages`) : null, [user, firestore]);
-  
-  const { data: products, isLoading: isProductsLoading } = useCollection(productsRef);
-  const { data: blogPosts, isLoading: isBlogPostsLoading } = useCollection(blogPostsQuery);
-  const { data: landingPages, isLoading: isLandingPagesLoading } = useCollection(landingPagesRef);
-  
-  const isLoading = isSubLoading || isProductsLoading || isBlogPostsLoading || isLandingPagesLoading || arePlansLoading || isBillingLoading;
-  const error = subError;
-
   // --- Fetch Billing History ---
   useEffect(() => {
     if (subscription?.stripeCustomerId) {
@@ -61,7 +43,7 @@ export default function SubscriptionPage() {
           const data = await res.json();
           setBillingHistory(data);
         } catch (e: any) {
-          // setError(e.message); // This variable doesn't exist, maybe it should be a state
+           console.error("Billing History Error:", e.message);
         } finally {
           setIsBillingLoading(false);
         }
@@ -93,9 +75,9 @@ export default function SubscriptionPage() {
     };
 
     const usageMetrics: UsageMetric[] = [
-      { label: 'Productos', current: products?.length ?? 0, limit: limits.products },
-      { label: 'Posts de Blog', current: blogPosts?.length ?? 0, limit: limits.blogPosts },
-      { label: 'Landing Pages', current: landingPages?.length ?? 0, limit: limits.landingPages },
+      { label: 'Productos', current: productsCount, limit: limits.products },
+      { label: 'Posts de Blog', current: blogPostsCount, limit: limits.blogPosts },
+      { label: 'Landing Pages', current: landingPagesCount, limit: limits.landingPages },
     ].map(metric => ({
         ...metric,
         isUnlimited: metric.limit === -1,
@@ -104,7 +86,7 @@ export default function SubscriptionPage() {
     }));
     
     return { currentPlanInfo, usageMetrics };
-  }, [subscription, allPlans, products, blogPosts, landingPages, plan, limits]);
+  }, [subscription, allPlans, productsCount, blogPostsCount, landingPagesCount, plan, limits]);
 
   return (
     <div className="flex flex-col gap-6">
@@ -145,3 +127,4 @@ export default function SubscriptionPage() {
     </div>
   );
 }
+
