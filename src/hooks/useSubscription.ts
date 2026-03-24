@@ -20,7 +20,6 @@ export function useSubscription() {
   const { data: subscription, isLoading: isSubLoading, error: subError } = useDoc<Subscription>(subscriptionRef);
   const { data: allPlans, isLoading: arePlansLoading, error: plansError } = useCollection<SubscriptionPlan>(plansRef);
 
-  const isLoading = isSubLoading || arePlansLoading;
   const error = subError || plansError;
 
   const { plan, isActive, limits, isFree, isPro, isEnterprise } = useMemo(() => {
@@ -52,9 +51,11 @@ export function useSubscription() {
 
   return {
     subscription,
+    allPlans,
     plan,
     isActive,
-    isLoading,
+    isSubLoading,
+    arePlansLoading,
     error,
     isFree,
     isPro,

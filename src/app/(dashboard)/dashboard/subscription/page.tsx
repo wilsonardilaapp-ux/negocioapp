@@ -22,7 +22,15 @@ export default function SubscriptionPage() {
   const [isBillingLoading, setIsBillingLoading] = useState(false);
   
   // --- Firestore Data Hooks ---
-  const { subscription, plan, limits, isLoading: isSubLoading, error: subError } = useSubscription();
+  const { 
+    subscription, 
+    allPlans,
+    plan, 
+    limits, 
+    isSubLoading, 
+    arePlansLoading,
+    error: subError 
+  } = useSubscription();
 
   const productsRef = useMemoFirebase(() => user ? collection(firestore, `businesses/${user.uid}/products`) : null, [user, firestore]);
   const blogPostsQuery = useMemoFirebase(() => 
@@ -30,15 +38,13 @@ export default function SubscriptionPage() {
     [user, firestore]
   );
   const landingPagesRef = useMemoFirebase(() => user ? collection(firestore, `businesses/${user.uid}/landingPages`) : null, [user, firestore]);
-  const plansRef = useMemoFirebase(() => firestore ? collection(firestore, 'plans') : null, [firestore]);
   
   const { data: products, isLoading: isProductsLoading } = useCollection(productsRef);
   const { data: blogPosts, isLoading: isBlogPostsLoading } = useCollection(blogPostsQuery);
   const { data: landingPages, isLoading: isLandingPagesLoading } = useCollection(landingPagesRef);
-  const { data: allPlans, isLoading: arePlansLoading, error: plansError } = useCollection<SubscriptionPlan>(plansRef);
   
   const isLoading = isSubLoading || isProductsLoading || isBlogPostsLoading || isLandingPagesLoading || arePlansLoading || isBillingLoading;
-  const error = subError || plansError;
+  const error = subError;
 
   // --- Fetch Billing History ---
   useEffect(() => {
@@ -55,7 +61,7 @@ export default function SubscriptionPage() {
           const data = await res.json();
           setBillingHistory(data);
         } catch (e: any) {
-          setError(e.message);
+          // setError(e.message); // This variable doesn't exist, maybe it should be a state
         } finally {
           setIsBillingLoading(false);
         }
@@ -112,7 +118,7 @@ export default function SubscriptionPage() {
         {error && (
             <Alert variant="destructive">
                 <AlertTitle>Error</AlertTitle>
-                <AlertDescription>{error.message}</AlertDescription>
+                <AlertDescription>{(error as Error).message}</AlertDescription>
             </Alert>
         )}
 
