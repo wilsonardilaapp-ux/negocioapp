@@ -31,7 +31,7 @@ import {
   DialogFooter,
   DialogClose,
 } from "@/components/ui/dialog";
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 const serviceSchema = z.object({
   name: z.string().min(3, { message: "El nombre debe tener al menos 3 caracteres." }),
@@ -49,6 +49,23 @@ export default function ServicesPage() {
   }, [firestore]);
 
   const { data: services, isLoading } = useCollection<SystemService>(servicesQuery);
+
+  useEffect(() => {
+    if (!isLoading && services && firestore) {
+      const imageLimitServiceExists = services.some(s => s.id === 'limite-de-imagenes-por-producto');
+      if (!imageLimitServiceExists) {
+        const newImageLimitService: SystemService = {
+          id: 'limite-de-imagenes-por-producto',
+          name: 'Límite de Imágenes por Producto',
+          limit: 5,
+          status: 'active',
+          lastUpdate: new Date().toISOString(),
+        };
+        const serviceDocRef = doc(firestore, 'systemServices', newImageLimitService.id);
+        setDocumentNonBlocking(serviceDocRef, newImageLimitService);
+      }
+    }
+  }, [services, isLoading, firestore]);
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<z.infer<typeof serviceSchema>>({
     resolver: zodResolver(serviceSchema),
@@ -194,7 +211,8 @@ export default function ServicesPage() {
                         id={`limit-${service.id}`}
                         defaultValue={[service.limit]}
                         max={1000}
-                        step={10}
+                        min={1}
+                        step={1}
                         onValueCommit={(value) => handleLimitChange(service.id, value)}
                         disabled={service.status !== 'active'}
                       />
