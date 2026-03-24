@@ -1,8 +1,9 @@
+
 "use client";
 
 import { useState, useEffect, useMemo } from 'react';
 import { useUser, useFirestore, useDoc, useCollection, useMemoFirebase } from '@/firebase';
-import { doc, collection, type Timestamp } from 'firebase/firestore';
+import { doc, collection, query, where, type Timestamp } from 'firebase/firestore';
 import { useSubscription } from '@/hooks/useSubscription';
 import type { SubscriptionPlan } from '@/models/subscription-plan';
 import CurrentPlanCard, { type CurrentPlanInfo } from './components/CurrentPlanCard';
@@ -24,12 +25,15 @@ export default function SubscriptionPage() {
   const { subscription, plan, limits, isLoading: isSubLoading, error: subError } = useSubscription();
 
   const productsRef = useMemoFirebase(() => user ? collection(firestore, `businesses/${user.uid}/products`) : null, [user, firestore]);
-  const blogPostsRef = useMemoFirebase(() => user ? collection(firestore, `businesses/${user.uid}/blog_posts`) : null, [user, firestore]);
+  const blogPostsQuery = useMemoFirebase(() => 
+    user ? query(collection(firestore, 'blog_posts'), where('businessId', '==', user.uid)) : null, 
+    [user, firestore]
+  );
   const landingPagesRef = useMemoFirebase(() => user ? collection(firestore, `businesses/${user.uid}/landingPages`) : null, [user, firestore]);
   const plansRef = useMemoFirebase(() => firestore ? collection(firestore, 'plans') : null, [firestore]);
   
   const { data: products, isLoading: isProductsLoading } = useCollection(productsRef);
-  const { data: blogPosts, isLoading: isBlogPostsLoading } = useCollection(blogPostsRef);
+  const { data: blogPosts, isLoading: isBlogPostsLoading } = useCollection(blogPostsQuery);
   const { data: landingPages, isLoading: isLandingPagesLoading } = useCollection(landingPagesRef);
   const { data: allPlans, isLoading: arePlansLoading, error: plansError } = useCollection<SubscriptionPlan>(plansRef);
   
