@@ -4,36 +4,84 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Check, X } from "lucide-react";
+import { Check, X, Infinity as InfinityIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Link from 'next/link';
+import type { SubscriptionPlan } from "@/models/subscription-plan";
 
 interface PlanComparisonTableProps {
   currentPlan: 'free' | 'pro' | 'enterprise';
+  allPlans: SubscriptionPlan[];
 }
 
-const features = [
-  { feature: "Precio mensual", free: "$0", pro: "$29", enterprise: "$99" },
-  { feature: "Productos", free: "10", pro: "Ilimitados", enterprise: "Ilimitados" },
-  { feature: "Servicios", free: "3", pro: "Ilimitados", enterprise: "Ilimitados" },
-  { feature: "Posts de Blog", free: "5", pro: "Ilimitados", enterprise: "Ilimitados" },
-  { feature: "Landing Pages", free: "1", pro: "Ilimitadas", enterprise: "Ilimitadas" },
-  { feature: "Soporte", free: "Base", pro: "Prioritario", enterprise: "Dedicado" },
-  { feature: "Multi-usuario", free: <X className="h-5 w-5 text-muted-foreground" />, pro: <X className="h-5 w-5 text-muted-foreground" />, enterprise: <Check className="h-5 w-5 text-green-500" /> },
-  { feature: "API Access", free: <X className="h-5 w-5 text-muted-foreground" />, pro: <X className="h-5 w-5 text-muted-foreground" />, enterprise: <Check className="h-5 w-5 text-green-500" /> },
-  { feature: "Onboarding", free: <X className="h-5 w-5 text-muted-foreground" />, pro: <X className="h-5 w-5 text-muted-foreground" />, enterprise: <Check className="h-5 w-5 text-green-500" /> },
-];
+const formatCurrency = (value: number) => `$${value.toLocaleString('en-US')}`;
 
-export default function PlanComparisonTable({ currentPlan }: PlanComparisonTableProps) {
+export default function PlanComparisonTable({ currentPlan, allPlans }: PlanComparisonTableProps) {
     
-    const getButton = (plan: 'free' | 'pro' | 'enterprise') => {
-        if (plan === currentPlan) {
+    const getLimitText = (limit: number | undefined) => {
+        if (typeof limit === 'undefined') return <div className="flex justify-center"><X className="h-5 w-5 text-muted-foreground" /></div>;
+        if (limit === -1) return <div className="flex justify-center"><InfinityIcon className="h-5 w-5" /></div>;
+        return String(limit);
+    };
+
+    const getFeatureCheck = (plan: SubscriptionPlan | undefined, keyword: string) => {
+        if (!plan || !plan.features) return <div className="flex justify-center"><X className="h-5 w-5 text-muted-foreground" /></div>;
+        const hasFeature = plan.features.some(f => f.value.toLowerCase().includes(keyword));
+        return <div className="flex justify-center">{hasFeature ? <Check className="h-5 w-5 text-green-500" /> : <X className="h-5 w-5 text-muted-foreground" />}</div>;
+    };
+
+    const getPlanProp = <T,>(planId: string, prop: (p: SubscriptionPlan) => T, defaultValue: T): T => {
+        const plan = allPlans.find(p => p.id === planId);
+        return plan ? prop(plan) : defaultValue;
+    };
+
+    const features = [
+        {
+            feature: "Precio mensual",
+            free: formatCurrency(getPlanProp('free', p => p.price, 0)),
+            pro: formatCurrency(getPlanProp('pro', p => p.price, 0)),
+            enterprise: formatCurrency(getPlanProp('enterprise', p => p.price, 0)),
+        },
+        {
+            feature: "Productos",
+            free: getLimitText(getPlanProp('free', p => p.limits.products, 0)),
+            pro: getLimitText(getPlanProp('pro', p => p.limits.products, 0)),
+            enterprise: getLimitText(getPlanProp('enterprise', p => p.limits.products, 0)),
+        },
+        {
+            feature: "Posts de Blog",
+            free: getLimitText(getPlanProp('free', p => p.limits.blogPosts, 0)),
+            pro: getLimitText(getPlanProp('pro', p => p.limits.blogPosts, 0)),
+            enterprise: getLimitText(getPlanProp('enterprise', p => p.limits.blogPosts, 0)),
+        },
+        {
+            feature: "Landing Pages",
+            free: getLimitText(getPlanProp('free', p => p.limits.landingPages, 0)),
+            pro: getLimitText(getPlanProp('pro', p => p.limits.landingPages, 0)),
+            enterprise: getLimitText(getPlanProp('enterprise', p => p.limits.landingPages, 0)),
+        },
+        {
+            feature: "Soporte",
+            free: getFeatureCheck(allPlans.find(p => p.id === 'free'), "base"),
+            pro: getFeatureCheck(allPlans.find(p => p.id === 'pro'), "prioritario"),
+            enterprise: getFeatureCheck(allPlans.find(p => p.id === 'enterprise'), "dedicado"),
+        },
+        {
+            feature: "Acceso API",
+            free: getFeatureCheck(allPlans.find(p => p.id === 'free'), "api"),
+            pro: getFeatureCheck(allPlans.find(p => p.id === 'pro'), "api"),
+            enterprise: getFeatureCheck(allPlans.find(p => p.id === 'enterprise'), "api"),
+        },
+    ];
+
+    const getButton = (planId: 'free' | 'pro' | 'enterprise') => {
+        if (planId === currentPlan) {
             return <Button disabled variant="secondary" className="w-full">Plan Actual</Button>;
         }
         
         const planOrder = { free: 0, pro: 1, enterprise: 2 };
 
-        if (planOrder[plan] > planOrder[currentPlan]) {
+        if (planOrder[planId] > planOrder[currentPlan]) {
              return <Button asChild className="w-full"><Link href="/pricing">Actualizar →</Link></Button>;
         }
 

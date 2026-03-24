@@ -3,7 +3,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useUser, useFirestore, useDoc, useCollection, useMemoFirebase } from '@/firebase';
 import { doc, collection, type Timestamp } from 'firebase/firestore';
-import type { Subscription } from '@/models/subscription';
+import { useSubscription } from '@/hooks/useSubscription';
+import type { SubscriptionPlan } from '@/models/subscription-plan';
 import CurrentPlanCard, { type CurrentPlanInfo } from './components/CurrentPlanCard';
 import UsageLimitsCard, { type UsageMetric } from './components/UsageLimitsCard';
 import PlanComparisonTable from './components/PlanComparisonTable';
@@ -12,32 +13,28 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Loader2, CreditCard } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 
-const PLAN_CONFIG = {
-  free: { name: 'Plan Gratuito', price: 0, limits: { products: 10, services: 3, blogPosts: 5, landingPages: 1 } },
-  pro: { name: 'Plan Profesional', price: 29, limits: { products: -1, services: -1, blogPosts: -1, landingPages: -1 } },
-  enterprise: { name: 'Plan Empresarial', price: 99, limits: { products: -1, services: -1, blogPosts: -1, landingPages: -1 } },
-};
-
 export default function SubscriptionPage() {
   const { user } = useUser();
   const firestore = useFirestore();
 
   const [billingHistory, setBillingHistory] = useState<BillingRecord[]>([]);
   const [isBillingLoading, setIsBillingLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
+  
   // --- Firestore Data Hooks ---
-  const subscriptionRef = useMemoFirebase(() => user ? doc(firestore, `businesses/${user.uid}/subscription`, 'current') : null, [user, firestore]);
+  const { subscription, plan, limits, isLoading: isSubLoading, error: subError } = useSubscription();
+
   const productsRef = useMemoFirebase(() => user ? collection(firestore, `businesses/${user.uid}/products`) : null, [user, firestore]);
   const blogPostsRef = useMemoFirebase(() => user ? collection(firestore, `businesses/${user.uid}/blog_posts`) : null, [user, firestore]);
   const landingPagesRef = useMemoFirebase(() => user ? collection(firestore, `businesses/${user.uid}/landingPages`) : null, [user, firestore]);
+  const plansRef = useMemoFirebase(() => firestore ? collection(firestore, 'plans') : null, [firestore]);
   
-  const { data: subscription, isLoading: isSubLoading } = useDoc<Subscription>(subscriptionRef);
   const { data: products, isLoading: isProductsLoading } = useCollection(productsRef);
   const { data: blogPosts, isLoading: isBlogPostsLoading } = useCollection(blogPostsRef);
   const { data: landingPages, isLoading: isLandingPagesLoading } = useCollection(landingPagesRef);
+  const { data: allPlans, isLoading: arePlansLoading, error: plansError } = useCollection<SubscriptionPlan>(plansRef);
   
-  const isLoading = isSubLoading || isProductsLoading || isBlogPostsLoading || isLandingPagesLoading || isBillingLoading;
+  const isLoading = isSubLoading || isProductsLoading || isBlogPostsLoading || isLandingPagesLoading || arePlansLoading || isBillingLoading;
+  const error = subError || plansError;
 
   // --- Fetch Billing History ---
   useEffect(() => {
@@ -65,47 +62,39 @@ export default function SubscriptionPage() {
 
 
   // --- Memoized Derived State ---
-  const { currentPlan, usageMetrics } = useMemo(() => {
-    const planName = subscription?.plan || 'free';
-    const planDetails = PLAN_CONFIG[planName];
-
-    // Current Plan Info
-    const periodEndDate = subscription?.currentPeriodEnd ? (subscription.currentPeriodEnd as unknown as Timestamp).toDate() : null;
-    const now = new Date();
-    const sevenDaysFromNow = new Date(now.setDate(now.getDate() + 7));
-    const isExpiringSoon = periodEndDate ? periodEndDate < sevenDaysFromNow : false;
+  const { currentPlanInfo, usageMetrics } = useMemo(() => {
+    const planDetails = allPlans?.find(p => p.id === plan);
     
-    const currentPlan: CurrentPlanInfo = {
-      plan: planName,
-      status: subscription?.status || 'active',
+    if (!planDetails || !subscription) {
+        return { currentPlanInfo: null, usageMetrics: [] };
+    }
+
+    const periodEndDate = subscription.currentPeriodEnd ? (subscription.currentPeriodEnd as unknown as Timestamp).toDate() : null;
+    const isExpiringSoon = periodEndDate ? periodEndDate < new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) : false;
+
+    const currentPlanInfo: CurrentPlanInfo = {
+      plan: plan as 'free' | 'pro' | 'enterprise',
+      status: subscription.status,
       currentPeriodEnd: periodEndDate,
       isExpiringSoon,
       price: planDetails.price,
       displayName: planDetails.name,
-      stripeSubscriptionId: subscription?.stripeSubscriptionId || null,
+      stripeSubscriptionId: subscription.stripeSubscriptionId,
     };
-    
-    // Usage Metrics
+
     const usageMetrics: UsageMetric[] = [
-      { label: 'Productos', current: products?.length ?? 0, limit: planDetails.limits.products },
-      { label: 'Posts de Blog', current: blogPosts?.length ?? 0, limit: planDetails.limits.blogPosts },
-      { label: 'Landing Pages', current: landingPages?.length ?? 0, limit: planDetails.limits.landingPages },
-       // Adding a placeholder for services as its collection is not defined in the prompt context
-      { label: 'Servicios', current: 0, limit: planDetails.limits.services },
-    ].map(metric => {
-        const isUnlimited = metric.limit === -1;
-        const percentage = isUnlimited || metric.limit === 0 ? 0 : (metric.current / metric.limit) * 100;
-        return {
-            ...metric,
-            isUnlimited,
-            percentage: Math.min(percentage, 100),
-            isAtLimit: !isUnlimited && metric.current >= metric.limit,
-        };
-    });
-
-    return { currentPlan, usageMetrics };
-
-  }, [subscription, products, blogPosts, landingPages]);
+      { label: 'Productos', current: products?.length ?? 0, limit: limits.products },
+      { label: 'Posts de Blog', current: blogPosts?.length ?? 0, limit: limits.blogPosts },
+      { label: 'Landing Pages', current: landingPages?.length ?? 0, limit: limits.landingPages },
+    ].map(metric => ({
+        ...metric,
+        isUnlimited: metric.limit === -1,
+        percentage: metric.limit > 0 ? (metric.current / metric.limit) * 100 : 0,
+        isAtLimit: metric.limit > 0 && metric.current >= metric.limit,
+    }));
+    
+    return { currentPlanInfo, usageMetrics };
+  }, [subscription, allPlans, products, blogPosts, landingPages, plan, limits]);
 
   return (
     <div className="flex flex-col gap-6">
@@ -119,11 +108,11 @@ export default function SubscriptionPage() {
         {error && (
             <Alert variant="destructive">
                 <AlertTitle>Error</AlertTitle>
-                <AlertDescription>{error}</AlertDescription>
+                <AlertDescription>{error.message}</AlertDescription>
             </Alert>
         )}
 
-        {isLoading ? (
+        {isLoading || !currentPlanInfo ? (
             <div className="flex justify-center items-center h-64">
                 <Loader2 className="h-10 w-10 animate-spin text-primary" />
             </div>
@@ -131,14 +120,14 @@ export default function SubscriptionPage() {
             <>
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
                     <div className="lg:col-span-1">
-                        <CurrentPlanCard planInfo={currentPlan} />
+                        <CurrentPlanCard planInfo={currentPlanInfo} />
                     </div>
                     <div className="lg:col-span-2">
-                        <UsageLimitsCard usage={usageMetrics} currentPlan={currentPlan.plan} />
+                        <UsageLimitsCard usage={usageMetrics} currentPlan={currentPlanInfo.plan} />
                     </div>
                 </div>
 
-                <PlanComparisonTable currentPlan={currentPlan.plan} />
+                <PlanComparisonTable currentPlan={currentPlanInfo.plan} allPlans={allPlans || []} />
 
                 <BillingHistoryCard billingHistory={billingHistory} isLoading={isBillingLoading} />
             </>
