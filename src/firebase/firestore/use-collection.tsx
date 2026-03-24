@@ -9,8 +9,6 @@ import {
   QuerySnapshot,
   CollectionReference,
 } from 'firebase/firestore';
-import { errorEmitter } from '@/firebase/error-emitter';
-import { FirestorePermissionError } from '@/firebase/errors';
 
 /** Utility type to add an 'id' field to a given type T. */
 export type WithId<T> = T & { id: string };
@@ -85,23 +83,9 @@ export function useCollection<T = any>(
         setIsLoading(false);
       },
       (error: FirestoreError) => {
-        if (error.code === 'permission-denied') {
-            const path: string =
-              memoizedTargetRefOrQuery.type === 'collection'
-                ? (memoizedTargetRefOrQuery as CollectionReference).path
-                : (memoizedTargetRefOrQuery as unknown as InternalQuery)._query.path.canonicalString()
-
-            const contextualError = new FirestorePermissionError({
-              operation: 'list',
-              path,
-            });
-
-            setError(contextualError);
-            errorEmitter.emit('permission-error', contextualError);
-        } else {
-            // It's a different kind of error (e.g., missing index), pass it directly.
-            setError(error);
-        }
+        // SIMPLIFIED: Pass up any error from Firestore.
+        // This will catch permission errors, missing indexes, etc.
+        setError(error);
         setData(null);
         setIsLoading(false);
       }
