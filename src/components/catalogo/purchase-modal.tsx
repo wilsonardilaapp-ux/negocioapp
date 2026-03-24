@@ -93,13 +93,14 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, b
     },
   });
   
+  // Corrected calculation logic and order
   const packagingTotal = cartItems.reduce((sum, item) => sum + ((item.packagingCost ?? 0) * item.quantity), 0);
   const subtotalProducts = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-  const deliveryFee = businessInfo?.deliveryFee ?? 0;
-  const subtotalBeforeVat = subtotalProducts + packagingTotal + deliveryFee;
+  const subtotalBeforeVat = subtotalProducts + packagingTotal;
   const vatRate = businessInfo?.vatRate ?? 0;
   const vatAmount = subtotalBeforeVat * (vatRate / 100);
-  const total = subtotalBeforeVat + vatAmount;
+  const deliveryFee = businessInfo?.deliveryFee ?? 0;
+  const total = subtotalBeforeVat + vatAmount + deliveryFee;
 
   useEffect(() => {
     // Reset selected tab when modal opens or available methods change
@@ -168,12 +169,15 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, b
     if (packagingTotal > 0) {
       messageBody += `*Empaque:* ${formatCurrency(packagingTotal)}\n`;
     }
+
+    messageBody += `\n*Subtotal (antes de IVA): ${formatCurrency(subtotalBeforeVat)}*\n`;
+    
+    if (vatRate > 0) {
+        messageBody += `*IVA (${vatRate}%):* ${formatCurrency(vatAmount)}\n`;
+    }
+
     if (deliveryFee > 0) {
       messageBody += `*Domicilio:* ${formatCurrency(deliveryFee)}\n`;
-    }
-    if (vatRate > 0) {
-        messageBody += `\n*Subtotal (antes de IVA): ${formatCurrency(subtotalBeforeVat)}*\n`;
-        messageBody += `*IVA (${vatRate}%):* ${formatCurrency(vatAmount)}\n`;
     }
 
     messageBody += `*TOTAL DEL PEDIDO: ${formatCurrency(total)}*\n\n`;
@@ -243,20 +247,20 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, b
                         <span>{formatCurrency(packagingTotal)}</span>
                       </div>
                     )}
-                    {deliveryFee > 0 && (
-                      <div className="flex justify-between text-sm text-muted-foreground">
-                        <span>Domicilio:</span>
-                        <span>{formatCurrency(deliveryFee)}</span>
-                      </div>
-                    )}
-                     <div className="flex justify-between text-sm">
+                    <div className="flex justify-between text-sm">
                       <span>Subtotal:</span>
                       <span>{formatCurrency(subtotalBeforeVat)}</span>
                     </div>
                     {vatRate > 0 && (
-                      <div className="flex justify-between text-sm">
+                      <div className="flex justify-between text-sm text-muted-foreground">
                           <span>IVA ({vatRate}%):</span>
                           <span>{formatCurrency(vatAmount)}</span>
+                      </div>
+                    )}
+                    {deliveryFee > 0 && (
+                      <div className="flex justify-between text-sm text-muted-foreground">
+                        <span>Domicilio:</span>
+                        <span>{formatCurrency(deliveryFee)}</span>
                       </div>
                     )}
                     <div className="flex justify-between items-center pt-1 border-t">

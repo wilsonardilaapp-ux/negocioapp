@@ -68,7 +68,7 @@ const MediaUploader = ({
                     <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                 ) : mediaUrl ? (
                     <>
-                        <Image src={mediaUrl} alt={label} layout="fill" className="object-contain rounded-md" />
+                        <Image src={mediaUrl} alt={label} layout="fill" sizes="100%" className="object-contain rounded-md" />
                         <div className="absolute top-1 right-1 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                             <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => fileInputRef.current?.click()}><Pencil className="h-4 w-4" /></Button>
                             <Button variant="destructive" size="icon" className="h-7 w-7" onClick={onRemove}><Trash2 className="h-4 w-4" /></Button>
