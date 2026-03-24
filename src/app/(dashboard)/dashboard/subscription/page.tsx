@@ -1,9 +1,7 @@
 
-"use client";
+'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { useUser, useFirestore, useDoc, useCollection, useMemoFirebase } from '@/firebase';
-import { doc, collection, query, where, type Timestamp } from 'firebase/firestore';
 import { useSubscription } from '@/hooks/useSubscription';
 import CurrentPlanCard, { type CurrentPlanInfo } from './components/CurrentPlanCard';
 import UsageLimitsCard, { type UsageMetric } from './components/UsageLimitsCard';
@@ -11,6 +9,14 @@ import PlanComparisonTable from './components/PlanComparisonTable';
 import BillingHistoryCard, { type BillingRecord } from './components/BillingHistoryCard';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Loader2, CreditCard } from "lucide-react";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
+import type { Timestamp } from 'firebase/firestore';
+
 
 export default function SubscriptionPage() {
   const { 
@@ -88,6 +94,14 @@ export default function SubscriptionPage() {
     return { currentPlanInfo, usageMetrics };
   }, [subscription, allPlans, productsCount, blogPostsCount, landingPagesCount, plan, limits]);
 
+  if (isLoading) {
+    return (
+        <div className="flex justify-center items-center h-64">
+            <Loader2 className="h-10 w-10 animate-spin text-primary" />
+        </div>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-6">
         <Card>
@@ -104,9 +118,10 @@ export default function SubscriptionPage() {
             </Alert>
         )}
 
-        {isLoading || !currentPlanInfo ? (
-            <div className="flex justify-center items-center h-64">
+        {!currentPlanInfo ? (
+             <div className="flex justify-center items-center h-64">
                 <Loader2 className="h-10 w-10 animate-spin text-primary" />
+                 <p className="ml-4 text-muted-foreground">Cargando datos de suscripción...</p>
             </div>
         ) : (
             <>
@@ -127,4 +142,3 @@ export default function SubscriptionPage() {
     </div>
   );
 }
-
