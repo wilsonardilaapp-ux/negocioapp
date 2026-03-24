@@ -20,5 +20,7 @@ export type Business = {
     planName?: string;
     status: EntityStatus;
     imageLimit?: number;
+    productLimit?: number;
 };
 
+    

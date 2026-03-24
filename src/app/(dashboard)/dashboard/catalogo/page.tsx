@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -28,6 +29,7 @@ import { doc, collection, writeBatch, query, where, getDoc } from 'firebase/fire
 import type { SystemService } from '@/models/system-service';
 import type { Module } from '@/models/module';
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
+import type { Business } from '@/models/business';
 
 const initialHeaderConfig: LandingHeaderConfigData = {
     banner: {
@@ -105,6 +107,12 @@ export default function CatalogoPage() {
     
     const { data: productLimitService, isLoading: isServicesLoading } = useDoc<SystemService>(productLimitServiceQuery);
 
+    const businessDocRef = useMemoFirebase(() => {
+        if (!firestore || !user) return null;
+        return doc(firestore, 'businesses', user.uid);
+    }, [firestore, user]);
+    const { data: business, isLoading: isBusinessLoading } = useDoc<Business>(businessDocRef);
+
     const productsQuery = useMemoFirebase(() => {
         if (!firestore || !user) return null;
         return collection(firestore, 'businesses', user.uid, 'products');
@@ -139,23 +147,29 @@ export default function CatalogoPage() {
         };
     }, [headerConfig]);
 
-
-    const productLimit = productLimitService?.limit ?? 10;
-    const isProductLimitServiceActive = productLimitService?.status === 'active';
+    const productLimit = useMemo(() => {
+        if (business?.productLimit && business.productLimit !== 0) {
+            return business.productLimit;
+        }
+        if (productLimitService?.status === 'active' && productLimitService.limit > 0) {
+            return productLimitService.limit;
+        }
+        return 10; // Default limit
+    }, [business, productLimitService]);
 
     const canCreateProduct = useMemo(() => {
         const productCount = products?.length ?? 0;
         
-        if (!isProductLimitServiceActive) {
-            return { allowed: true, reason: '' };
+        if (productLimit === -1) {
+             return { allowed: true, reason: '' };
         }
-
+        
         if (productCount >= productLimit) {
             return { allowed: false, reason: `Has alcanzado el límite de ${productLimit} productos.` };
         }
 
         return { allowed: true, reason: '' };
-    }, [isProductLimitServiceActive, productLimit, products]);
+    }, [productLimit, products]);
     
     const updatePublicCatalog = (productsToSave: Product[], configToSave: LandingHeaderConfigData) => {
         if (!firestore || !user) return;
@@ -232,7 +246,7 @@ export default function CatalogoPage() {
         window.open(url, '_blank');
     };
     
-    const isLoading = isUserLoading || isConfigLoading || isProductsLoading || isServicesLoading || isModuleLoading;
+    const isLoading = isUserLoading || isConfigLoading || isProductsLoading || isServicesLoading || isModuleLoading || isBusinessLoading;
 
     if (isLoading) {
         return <div>Cargando tu catálogo...</div>
@@ -324,7 +338,6 @@ export default function CatalogoPage() {
                         <Info className="h-5 w-5 text-muted-foreground" />
                         <p className="text-muted-foreground">
                             Límite de productos: <span className="font-bold">{products?.length ?? 0} / {productLimit === -1 ? '∞' : productLimit}</span>.
-                            Estado del servicio de límite: <span className={`font-bold ${isProductLimitServiceActive ? 'text-green-600' : 'text-red-600'}`}>{isProductLimitServiceActive ? 'Activado' : 'Desactivado'}</span>.
                         </p>
                     </div>
                 </CardContent>
@@ -380,3 +393,5 @@ export default function CatalogoPage() {
         </div>
     );
 }
+
+    

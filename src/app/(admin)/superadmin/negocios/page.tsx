@@ -107,7 +107,11 @@ export default function BusinessesPage() {
   };
 
   const openManageBusiness = async (business: Business) => {
-    setSelectedBusiness({ ...business, imageLimit: business.imageLimit ?? undefined });
+    setSelectedBusiness({ 
+      ...business, 
+      imageLimit: business.imageLimit ?? undefined,
+      productLimit: business.productLimit ?? undefined 
+    });
     
     // Load assigned modules and services
     const modulesSnapshot = await getDocs(collection(firestore, `businesses/${business.id}/modules`));
@@ -127,6 +131,9 @@ export default function BusinessesPage() {
       status: selectedBusiness.status,
       imageLimit: selectedBusiness.imageLimit && Number(selectedBusiness.imageLimit) > 0 
         ? Number(selectedBusiness.imageLimit) 
+        : null,
+      productLimit: selectedBusiness.productLimit && Number(selectedBusiness.productLimit) > 0 
+        ? Number(selectedBusiness.productLimit) 
         : null
     };
 
@@ -335,6 +342,18 @@ export default function BusinessesPage() {
                 </p>
               </div>
               <div>
+                <h4 className="font-medium mb-3">Límite de Productos</h4>
+                <Input
+                  type="number"
+                  placeholder="Usar límite global por defecto"
+                  value={selectedBusiness.productLimit ?? ''}
+                  onChange={e => setSelectedBusiness(prev => prev ? { ...prev, productLimit: e.target.value === '' ? undefined : Number(e.target.value) } : null)}
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Define un límite de productos para este negocio. -1 para ilimitado.
+                </p>
+              </div>
+              <div>
                 <h4 className="font-medium mb-3">Cambiar Estado</h4>
                 <Select value={selectedBusiness.status} onValueChange={(v: EntityStatus) => setSelectedBusiness(prev => prev ? { ...prev, status: v } : null)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
@@ -350,3 +369,4 @@ export default function BusinessesPage() {
   );
 }
 
+    
