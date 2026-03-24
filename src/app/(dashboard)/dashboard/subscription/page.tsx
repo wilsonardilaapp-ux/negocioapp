@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -14,6 +13,7 @@ import {
   CardHeader,
   CardTitle,
   CardDescription,
+  CardContent,
 } from "@/components/ui/card";
 import type { Timestamp } from 'firebase/firestore';
 
@@ -48,8 +48,9 @@ export default function SubscriptionPage() {
           if (!res.ok) throw new Error('Failed to fetch billing history');
           const data = await res.json();
           setBillingHistory(data);
-        } catch (e: any) {
-           console.error("Billing History Error:", e.message);
+        } catch (e: unknown) {
+          const message = e instanceof Error ? e.message : 'Unknown error';
+          console.error("Billing History Error:", message);
         } finally {
           setIsBillingLoading(false);
         }
@@ -63,21 +64,28 @@ export default function SubscriptionPage() {
   const { currentPlanInfo, usageMetrics } = useMemo(() => {
     const planDetails = allPlans?.find(p => p.id === plan);
     
-    if (!planDetails || !subscription) {
-        return { currentPlanInfo: null, usageMetrics: [] };
+    // FIX: Si no hay suscripción pero tampoco está cargando,
+    // construimos un plan free por defecto en lugar de retornar null
+    if (!planDetails) {
+      return { currentPlanInfo: null, usageMetrics: [] };
     }
 
-    const periodEndDate = subscription.currentPeriodEnd ? (subscription.currentPeriodEnd as unknown as Timestamp).toDate() : null;
-    const isExpiringSoon = periodEndDate ? periodEndDate < new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) : false;
+    const periodEndDate = subscription?.currentPeriodEnd 
+      ? (subscription.currentPeriodEnd as unknown as Timestamp).toDate() 
+      : null;
+    const isExpiringSoon = periodEndDate 
+      ? periodEndDate < new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) 
+      : false;
 
     const currentPlanInfo: CurrentPlanInfo = {
       plan: plan as 'free' | 'pro' | 'enterprise',
-      status: subscription.status,
+      // FIX: Si no hay documento de suscripción, el estado es 'active' en plan free
+      status: subscription?.status ?? 'active',
       currentPeriodEnd: periodEndDate,
       isExpiringSoon,
       price: planDetails.price,
       displayName: planDetails.name,
-      stripeSubscriptionId: subscription.stripeSubscriptionId,
+      stripeSubscriptionId: subscription?.stripeSubscriptionId ?? null,
     };
 
     const usageMetrics: UsageMetric[] = [
@@ -94,51 +102,65 @@ export default function SubscriptionPage() {
     return { currentPlanInfo, usageMetrics };
   }, [subscription, allPlans, productsCount, blogPostsCount, landingPagesCount, plan, limits]);
 
+  // --- Render: Loading global ---
   if (isLoading) {
     return (
-        <div className="flex justify-center items-center h-64">
-            <Loader2 className="h-10 w-10 animate-spin text-primary" />
-        </div>
+      <div className="flex justify-center items-center h-64">
+        <Loader2 className="h-10 w-10 animate-spin text-primary" />
+      </div>
     );
   }
 
   return (
     <div className="flex flex-col gap-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>Mi Suscripción</CardTitle>
+          <CardDescription>Gestiona tu plan, revisa tus límites y mira tu historial de pagos.</CardDescription>
+        </CardHeader>
+      </Card>
+      
+      {error && (
+        <Alert variant="destructive">
+          <AlertTitle>Error</AlertTitle>
+          <AlertDescription>{(error as Error).message}</AlertDescription>
+        </Alert>
+      )}
+
+      {/* FIX: Reemplaza spinner infinito por mensaje real cuando no hay datos */}
+      {!currentPlanInfo ? (
         <Card>
-            <CardHeader>
-                <CardTitle>Mi Suscripción</CardTitle>
-                <CardDescription>Gestiona tu plan, revisa tus límites y mira tu historial de pagos.</CardDescription>
-            </CardHeader>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <CreditCard className="h-5 w-5" />
+              Sin suscripción activa
+            </CardTitle>
+            <CardDescription>
+              No se encontró información de suscripción para tu cuenta.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">
+              Si crees que esto es un error, contacta al soporte.
+            </p>
+          </CardContent>
         </Card>
-        
-        {error && (
-            <Alert variant="destructive">
-                <AlertTitle>Error</AlertTitle>
-                <AlertDescription>{(error as Error).message}</AlertDescription>
-            </Alert>
-        )}
-
-        {!currentPlanInfo ? (
-             <div className="flex justify-center items-center h-64">
-                <Loader2 className="h-10 w-10 animate-spin text-primary" />
-                 <p className="ml-4 text-muted-foreground">Cargando datos de suscripción...</p>
+      ) : (
+        <>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+            <div className="lg:col-span-1">
+              <CurrentPlanCard planInfo={currentPlanInfo} />
             </div>
-        ) : (
-            <>
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-                    <div className="lg:col-span-1">
-                        <CurrentPlanCard planInfo={currentPlanInfo} />
-                    </div>
-                    <div className="lg:col-span-2">
-                        <UsageLimitsCard usage={usageMetrics} currentPlan={currentPlanInfo.plan} />
-                    </div>
-                </div>
+            <div className="lg:col-span-2">
+              <UsageLimitsCard usage={usageMetrics} currentPlan={currentPlanInfo.plan} />
+            </div>
+          </div>
 
-                <PlanComparisonTable currentPlan={currentPlanInfo.plan} allPlans={allPlans || []} />
+          <PlanComparisonTable currentPlan={currentPlanInfo.plan} allPlans={allPlans || []} />
 
-                <BillingHistoryCard billingHistory={billingHistory} isLoading={isBillingLoading} />
-            </>
-        )}
+          <BillingHistoryCard billingHistory={billingHistory} isLoading={isBillingLoading} />
+        </>
+      )}
     </div>
   );
 }
