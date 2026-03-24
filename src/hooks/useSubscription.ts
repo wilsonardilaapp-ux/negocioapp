@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useMemo } from 'react';
@@ -30,11 +29,11 @@ export function useSubscription() {
   // Data fetching
   const { data: subscription, isLoading: isSubLoading, error: subError } = useDoc<Subscription>(subscriptionRef);
   const { data: allPlans, isLoading: arePlansLoading, error: plansError } = useCollection<SubscriptionPlan>(plansRef);
-  const { data: products, isLoading: isProductsLoading } = useCollection<Product>(productsRef);
-  const { data: blogPosts, isLoading: isBlogPostsLoading } = useCollection<BlogPost>(blogPostsQuery);
-  const { data: landingPages, isLoading: isLandingPagesLoading } = useCollection<LandingPageData>(landingPagesRef);
+  const { data: products, isLoading: isProductsLoading, error: productsError } = useCollection<Product>(productsRef);
+  const { data: blogPosts, isLoading: isBlogPostsLoading, error: blogPostsError } = useCollection<BlogPost>(blogPostsQuery);
+  const { data: landingPages, isLoading: isLandingPagesLoading, error: landingPagesError } = useCollection<LandingPageData>(landingPagesRef);
   
-  const error = subError || plansError;
+  const error = subError || plansError || productsError || blogPostsError || landingPagesError;
   const isLoading = isSubLoading || arePlansLoading || isProductsLoading || isBlogPostsLoading || isLandingPagesLoading;
 
   const { plan, isActive, limits, isFree, isPro, isEnterprise } = useMemo(() => {
