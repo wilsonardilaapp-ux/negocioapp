@@ -86,7 +86,7 @@ export default function ProductForm({ product, onSave, onCancel }: ProductFormPr
             images: mediaItems.filter(item => item).map(item => item!.url), // Guardamos solo las URLs
             rating: product?.rating || 0,
             ratingCount: product?.ratingCount || 0,
-            packagingCost: data.packagingCost,
+            packagingCost: data.packagingCost ?? 0, // Convert undefined/null to 0
         };
         onSave(productData);
     };
