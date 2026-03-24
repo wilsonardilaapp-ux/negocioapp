@@ -35,7 +35,7 @@ import { useState } from 'react';
 
 const serviceSchema = z.object({
   name: z.string().min(3, { message: "El nombre debe tener al menos 3 caracteres." }),
-  limit: z.number().min(0).max(1000),
+  limit: z.number().min(1).max(1000),
 });
 
 export default function ServicesPage() {
@@ -134,7 +134,7 @@ export default function ServicesPage() {
                   {errors.name && <p className="text-sm text-destructive mt-1">{errors.name.message}</p>}
                 </div>
                 <div>
-                   <Label htmlFor="limit">Límite de Uso (0-1000)</Label>
+                   <Label htmlFor="limit">Límite de Uso (1-1000)</Label>
                    <Input id="limit" type="number" {...register("limit", { valueAsNumber: true })} />
                    {errors.limit && <p className="text-sm text-destructive mt-1">{errors.limit.message}</p>}
                 </div>

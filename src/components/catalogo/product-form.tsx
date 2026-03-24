@@ -1,6 +1,7 @@
+
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -13,6 +14,10 @@ import { UploadCloud, X, Loader2 } from 'lucide-react';
 import Image from 'next/image';
 import { uploadMedia } from '@/ai/flows/upload-media-flow';
 import { useToast } from '@/hooks/use-toast';
+import { useDoc, useFirestore, useMemoFirebase } from '@/firebase';
+import { doc } from 'firebase/firestore';
+import type { SystemService } from '@/models/system-service';
+import { cn } from '@/lib/utils';
 
 const productSchema = z.object({
     name: z.string().min(3, "El nombre es requerido."),
@@ -28,7 +33,7 @@ const productSchema = z.object({
     description: z.string().min(10, "La descripción es muy corta."),
     packagingCost: z.preprocess(
       (val) => val === '' || val === undefined || val === null
-        ? undefined
+        ? 0
         : parseFloat(String(val)),
       z.number().min(0, "El valor debe ser positivo.").optional()
     ),
@@ -53,6 +58,22 @@ export default function ProductForm({ product, onSave, onCancel }: ProductFormPr
     const [mediaItems, setMediaItems] = useState<Array<MediaItem | null>>([]);
     const [isUploading, setIsUploading] = useState<number | null>(null);
     const { toast } = useToast();
+    const firestore = useFirestore();
+
+    const imageLimitServiceQuery = useMemoFirebase(() => 
+        firestore ? doc(firestore, 'systemServices', 'limite-de-imagenes-por-producto') : null,
+    [firestore]);
+
+    const { data: imageLimitService } = useDoc<SystemService>(imageLimitServiceQuery);
+
+    const imageLimit = useMemo(() => {
+        if (imageLimitService?.status === 'active' && imageLimitService.limit > 0) {
+            return imageLimitService.limit;
+        }
+        return 5; // Default limit
+    }, [imageLimitService]);
+
+    const isLimitReached = useMemo(() => mediaItems.filter(item => item).length >= imageLimit, [mediaItems, imageLimit]);
 
     useEffect(() => {
         if (product) {
@@ -86,12 +107,21 @@ export default function ProductForm({ product, onSave, onCancel }: ProductFormPr
             images: mediaItems.filter(item => item).map(item => item!.url), // Guardamos solo las URLs
             rating: product?.rating || 0,
             ratingCount: product?.ratingCount || 0,
-            packagingCost: data.packagingCost ?? 0, // Convert undefined/null to 0
+            packagingCost: data.packagingCost ?? 0,
         };
         onSave(productData);
     };
 
     const handleMediaUpload = async (file: File, index: number) => {
+        if (isLimitReached) {
+            toast({
+                variant: 'destructive',
+                title: 'Límite de imágenes alcanzado',
+                description: `No puedes subir más de ${imageLimit} imágenes.`,
+            });
+            return;
+        }
+
         setIsUploading(index);
         const reader = new FileReader();
         reader.readAsDataURL(file);
@@ -134,11 +164,11 @@ export default function ProductForm({ product, onSave, onCancel }: ProductFormPr
                 
                 {/* Columna Izquierda: Imágenes/Videos */}
                 <div className="space-y-2">
-                    <Label>Imágenes/Videos del Producto (Principal primero, hasta 5)</Label>
+                    <Label>Imágenes/Videos del Producto (Principal primero, hasta {imageLimit})</Label>
                     <div className="flex gap-2">
                         {/* Columna de miniaturas */}
                         <div className="flex flex-col gap-2">
-                            {Array.from({ length: 4 }).map((_, index) => {
+                            {Array.from({ length: Math.max(0, imageLimit - 1) }).map((_, index) => {
                                 const mediaIndex = index + 1;
                                 const currentItem = mediaItems[mediaIndex];
                                 return (
@@ -161,13 +191,14 @@ export default function ProductForm({ product, onSave, onCancel }: ProductFormPr
                                             </Button>
                                         </div>
                                     ) : (
-                                        <label className="flex flex-col items-center justify-center w-full h-full border-2 border-dashed rounded-md cursor-pointer hover:bg-muted p-2">
+                                        <label className={cn("flex flex-col items-center justify-center w-full h-full border-2 border-dashed rounded-md cursor-pointer hover:bg-muted p-2", isLimitReached && "cursor-not-allowed opacity-50")}>
                                             <UploadCloud className="h-5 w-5 text-muted-foreground" />
                                             <Input 
                                                 type="file" 
                                                 className="hidden" 
                                                 onChange={(e) => e.target.files && handleMediaUpload(e.target.files[0], mediaIndex)} 
-                                                accept="image/*,video/*" 
+                                                accept="image/*,video/*"
+                                                disabled={isLimitReached}
                                             />
                                         </label>
                                     )}
@@ -195,7 +226,7 @@ export default function ProductForm({ product, onSave, onCancel }: ProductFormPr
                                     </Button>
                                 </div>
                             ) : (
-                                <label className="flex flex-col items-center justify-center w-full h-full border-2 border-dashed rounded-md cursor-pointer hover:bg-muted p-4">
+                                <label className={cn("flex flex-col items-center justify-center w-full h-full border-2 border-dashed rounded-md cursor-pointer hover:bg-muted p-4", isLimitReached && "cursor-not-allowed opacity-50")}>
                                     <UploadCloud className="h-8 w-8 text-muted-foreground" />
                                     <span className="text-sm text-center font-semibold text-muted-foreground mt-2">Haz clic para subir una imagen o video</span>
                                     <span className="text-xs text-center text-muted-foreground mt-1">1500 × 1500 pixeles</span>
@@ -204,6 +235,7 @@ export default function ProductForm({ product, onSave, onCancel }: ProductFormPr
                                         className="hidden" 
                                         onChange={(e) => e.target.files && handleMediaUpload(e.target.files[0], 0)} 
                                         accept="image/*,video/*"
+                                        disabled={isLimitReached}
                                     />
                                 </label>
                             )}
