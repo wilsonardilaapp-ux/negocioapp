@@ -1,5 +1,5 @@
 
-"use client";
+'use client';
 
 import { useMemo } from 'react';
 import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
@@ -10,23 +10,22 @@ import type { Product } from '@/models/product';
 import type { BlogPost } from '@/models/blog-post';
 import type { LandingPageData } from '@/models/landing-page';
 
-
 export function useSubscription() {
   const { user } = useUser();
   const firestore = useFirestore();
 
   // References
   const subscriptionRef = useMemoFirebase(
-    () => (user ? doc(firestore, `businesses/${user.uid}/subscription`, 'current') : null),
-    [user, firestore]
+    () => (user?.uid ? doc(firestore, `businesses/${user.uid}/subscription`, 'current') : null),
+    [user?.uid, firestore]
   );
   const plansRef = useMemoFirebase(() => firestore ? collection(firestore, 'plans') : null, [firestore]);
-  const productsRef = useMemoFirebase(() => user ? collection(firestore, `businesses/${user.uid}/products`) : null, [user, firestore]);
+  const productsRef = useMemoFirebase(() => user?.uid ? collection(firestore, `businesses/${user.uid}/products`) : null, [user?.uid, firestore]);
   const blogPostsQuery = useMemoFirebase(() => 
-    user ? query(collection(firestore, 'blog_posts'), where('businessId', '==', user.uid)) : null, 
-    [user, firestore]
+    user?.uid ? query(collection(firestore, 'blog_posts'), where('businessId', '==', user.uid)) : null, 
+    [user?.uid, firestore]
   );
-  const landingPagesRef = useMemoFirebase(() => user ? collection(firestore, `businesses/${user.uid}/landingPages`) : null, [user, firestore]);
+  const landingPagesRef = useMemoFirebase(() => user?.uid ? collection(firestore, `businesses/${user.uid}/landingPages`) : null, [user?.uid, firestore]);
 
   // Data fetching
   const { data: subscription, isLoading: isSubLoading, error: subError } = useDoc<Subscription>(subscriptionRef);
