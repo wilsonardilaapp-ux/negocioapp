@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -93,7 +92,9 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, b
     },
   });
   
-  const total = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  const packagingTotal = cartItems.reduce((sum, item) => sum + ((item.packagingCost ?? 0) * item.quantity), 0);
+  const subtotalProducts = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  const total = subtotalProducts + packagingTotal;
 
   useEffect(() => {
     // Reset selected tab when modal opens or available methods change
@@ -130,6 +131,7 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, b
                 paymentMethod: paymentMethodText,
                 orderDate: new Date().toISOString(),
                 orderStatus: 'Pendiente',
+                packagingCost: item.packagingCost,
             };
     
             const ordersCollection = collection(firestore, 'businesses', businessId, 'orders');
@@ -156,6 +158,9 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, b
         messageBody += `*Cantidad:* ${item.quantity}\n`;
         messageBody += `*Subtotal:* ${formatCurrency(item.price * item.quantity)}\n\n`;
     });
+    if (packagingTotal > 0) {
+      messageBody += `*Empaque (antes de IVA):* ${formatCurrency(packagingTotal)}\n\n`;
+    }
     messageBody += `*TOTAL DEL PEDIDO: ${formatCurrency(total)}*\n\n`;
     messageBody += `*Mis Datos:*\n`;
     messageBody += `*Nombre:* ${data.fullName}\n`;
@@ -212,10 +217,22 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, b
                             ))}
                         </ScrollArea>
                     </CardContent>
-                    <div className="p-4 bg-muted border-t flex justify-between items-center">
-                        <span className="font-semibold">Total:</span>
-                        <span className="text-lg font-bold">{formatCurrency(total)}</span>
+                  <div className="p-4 bg-muted border-t space-y-1">
+                    <div className="flex justify-between text-sm text-muted-foreground">
+                      <span>Subtotal productos:</span>
+                      <span>{formatCurrency(subtotalProducts)}</span>
                     </div>
+                    {packagingTotal > 0 && (
+                      <div className="flex justify-between text-sm text-muted-foreground">
+                        <span>Empaque (antes de IVA):</span>
+                        <span>{formatCurrency(packagingTotal)}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between items-center pt-1 border-t">
+                      <span className="font-semibold">Total:</span>
+                      <span className="text-lg font-bold">{formatCurrency(total)}</span>
+                    </div>
+                  </div>
                 </Card>
 
               <h3 className="font-semibold text-lg">1. Completa tus datos</h3>
@@ -382,5 +399,3 @@ const BreBPaymentTabContent = ({ data, onCopy }: { data: PaymentSettings['breB']
         </div>
     </div>
 );
-
-    

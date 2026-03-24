@@ -9,6 +9,5 @@ export type Product = {
     images: string[]; // URLs de las imágenes
     rating: number; // Calificación promedio (ej. 4.5)
     ratingCount: number; // Número de valoraciones
+    packagingCost?: number;
 };
-
-    

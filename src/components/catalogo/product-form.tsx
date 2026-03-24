@@ -26,6 +26,12 @@ const productSchema = z.object({
     ),
     category: z.string().min(1, "La categoría es requerida."),
     description: z.string().min(10, "La descripción es muy corta."),
+    packagingCost: z.preprocess(
+      (val) => val === '' || val === undefined || val === null
+        ? undefined
+        : parseFloat(String(val)),
+      z.number().min(0, "El valor debe ser positivo.").optional()
+    ),
 });
 
 interface ProductFormProps {
@@ -56,6 +62,7 @@ export default function ProductForm({ product, onSave, onCancel }: ProductFormPr
                 stock: product.stock,
                 category: product.category,
                 description: product.description,
+                packagingCost: product.packagingCost ?? undefined,
             });
             // Asumimos que las imágenes viejas son 'image'. Si se necesita soportar videos viejos,
             // se necesitaría un campo 'mediaType' en el modelo Product.
@@ -67,6 +74,7 @@ export default function ProductForm({ product, onSave, onCancel }: ProductFormPr
                 stock: 0,
                 category: '',
                 description: '',
+                packagingCost: undefined,
             });
             setMediaItems([]);
         }
@@ -78,6 +86,7 @@ export default function ProductForm({ product, onSave, onCancel }: ProductFormPr
             images: mediaItems.filter(item => item).map(item => item!.url), // Guardamos solo las URLs
             rating: product?.rating || 0,
             ratingCount: product?.ratingCount || 0,
+            packagingCost: data.packagingCost,
         };
         onSave(productData);
     };
@@ -230,7 +239,7 @@ export default function ProductForm({ product, onSave, onCancel }: ProductFormPr
                     <Input id="name" {...register("name")} placeholder="Ej: Café Orgánico de Altura" />
                     {errors.name && <p className="text-sm text-destructive">{errors.name.message}</p>}
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-3 gap-4">
                     <div>
                         <Label htmlFor="price">Precio</Label>
                         <Input id="price" type="number" step="0.01" {...register("price")} />
@@ -241,6 +250,19 @@ export default function ProductForm({ product, onSave, onCancel }: ProductFormPr
                         <Input id="stock" type="number" {...register("stock")} />
                         {errors.stock && <p className="text-sm text-destructive">{errors.stock.message}</p>}
                     </div>
+                  <div>
+                    <Label htmlFor="packagingCost">Costo de empaque</Label>
+                    <Input
+                      id="packagingCost"
+                      type="number"
+                      step="0.01"
+                      placeholder="0 = sin empaque"
+                      {...register("packagingCost")}
+                    />
+                    {errors.packagingCost && (
+                      <p className="text-sm text-destructive">{errors.packagingCost.message}</p>
+                    )}
+                  </div>
                 </div>
             </div>
 

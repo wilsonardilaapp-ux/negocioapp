@@ -1,5 +1,4 @@
 
-
 export type OrderStatus = "Pendiente" | "En proceso" | "Enviado" | "Entregado" | "Cancelado";
 
 export type Order = {
@@ -19,5 +18,5 @@ export type Order = {
     paymentMethod: string;
     orderDate: string; // ISO 8601 date string
     orderStatus: OrderStatus;
+    packagingCost?: number;
 };
-    
