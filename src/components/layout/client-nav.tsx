@@ -1,4 +1,3 @@
-
 'use client';
 
 import Link from "next/link";
@@ -36,8 +35,8 @@ const allNavItems = [
   { href: "/dashboard/pedidos", icon: ShoppingBag, label: "Pedidos" },
   { href: "/dashboard/empaque", icon: Package, label: "Empaque" },
   { href: "/dashboard/pagos", icon: CreditCard, label: "Pagos" },
-  { href: "/dashboard/contabilidad", icon: Calculator, label: "Contabilidad", moduleId: 'inventario-kardex' },
-  { href: "/dashboard/kardex", icon: Package, label: "Kardex" },
+  { href: "/dashboard/contabilidad", icon: Calculator, label: "Contabilidad", moduleId: 'contabilidad' },
+  { href: "/dashboard/kardex", icon: Package, label: "Kardex", moduleId: 'inventario-kardex' },
   { href: "/dashboard/configuracion/factura", icon: FileText, label: "Editor Factura" },
   { href: "/dashboard/configuracion/impresoras", icon: Printer, label: "Impresoras" },
   { href: "/dashboard/backups", icon: HardDrive, label: "Backups" },
