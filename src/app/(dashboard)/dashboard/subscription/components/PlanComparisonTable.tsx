@@ -28,8 +28,17 @@ export default function PlanComparisonTable({ currentPlan, allPlans }: PlanCompa
     };
 
     const getFeatureCheck = (plan: SubscriptionPlan, keyword: string) => {
-        if (!plan.features) return <div className="flex justify-center"><X className="h-5 w-5 text-muted-foreground" /></div>;
-        const hasFeature = plan.features.some(f => f.value.toLowerCase().includes(keyword));
+        // Handle case where features might not exist or is empty
+        if (!plan.features || plan.features.length === 0) {
+            return <div className="flex justify-center"><X className="h-5 w-5 text-muted-foreground" /></div>;
+        }
+
+        const hasFeature = plan.features.some(f => {
+            // Check if f is a string (legacy format) or an object with a 'value' property
+            const featureText = (typeof f === 'string' ? f : f?.value) || '';
+            return featureText.toLowerCase().includes(keyword);
+        });
+
         return <div className="flex justify-center">{hasFeature ? <Check className="h-5 w-5 text-green-500" /> : <X className="h-5 w-5 text-muted-foreground" />}</div>;
     };
 
