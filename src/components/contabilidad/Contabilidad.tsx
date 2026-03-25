@@ -1,4 +1,3 @@
-
 'use client';
 
 import React from 'react';
@@ -6,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import InventarioKardex from './InventarioKardex';
 import KardexResumen from './secciones/KardexResumen';
+import PlanDeCuentas from './secciones/PlanDeCuentas';
 import { useInventarioKardex } from '@/hooks/useInventarioKardex';
 
 // Placeholder para las secciones existentes
@@ -45,7 +45,7 @@ export default function Contabilidad() {
           </CardDescription>
         </CardHeader>
       </Card>
-      <Tabs defaultValue="resumen" className="w-full">
+      <Tabs defaultValue="cuentas" className="w-full">
         <TabsList className="grid w-full grid-cols-4 md:grid-cols-8">
           {sections.map(section => (
             <TabsTrigger key={section.id} value={section.id}>
@@ -59,6 +59,8 @@ export default function Contabilidad() {
                     <InventarioKardex />
                 ) : section.id === 'resumen' ? (
                     <KardexResumen resumen={kardexData.resumen} movimientos={kardexData.movimientos} />
+                ) : section.id === 'cuentas' ? (
+                    <PlanDeCuentas />
                 ) : (
                     <PlaceholderSection title={section.label} />
                 )}
