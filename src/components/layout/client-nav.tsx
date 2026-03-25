@@ -1,9 +1,10 @@
+
 'use client';
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useUser, useCollection, useFirestore, useMemoFirebase } from "@/firebase";
-import { collection } from "firebase/firestore";
+import { collection, query, where } from "firebase/firestore";
 import type { Module } from "@/models/module";
 import {
   LayoutDashboard,
@@ -36,6 +37,7 @@ const allNavItems = [
   { href: "/dashboard/empaque", icon: Package, label: "Empaque" },
   { href: "/dashboard/pagos", icon: CreditCard, label: "Pagos" },
   { href: "/dashboard/contabilidad", icon: Calculator, label: "Contabilidad", moduleId: 'inventario-kardex' },
+  { href: "/dashboard/kardex", icon: Package, label: "Kardex" },
   { href: "/dashboard/configuracion/factura", icon: FileText, label: "Editor Factura" },
   { href: "/dashboard/configuracion/impresoras", icon: Printer, label: "Impresoras" },
   { href: "/dashboard/backups", icon: HardDrive, label: "Backups" },
@@ -52,7 +54,6 @@ export function ClientNav() {
   const firestore = useFirestore();
   const { user } = useUser();
 
-  // Corrected query to point to the business-specific modules subcollection
   const modulesQuery = useMemoFirebase(() => {
     if (!firestore || !user?.uid) return null;
     return collection(firestore, 'businesses', user.uid, 'modules');
@@ -65,13 +66,10 @@ export function ClientNav() {
   };
   
   const navItems = allNavItems.filter(item => {
-    // If an item doesn't have a moduleId, it's always visible
     if (!item.moduleId) {
       return true;
     }
-    // Find the module in the business-specific list
     const module = modules?.find(m => m.id === item.moduleId);
-    // Show the item only if the module exists and its status is 'active'
     return module?.status === 'active';
   });
 
