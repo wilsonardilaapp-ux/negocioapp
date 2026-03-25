@@ -1,3 +1,4 @@
+
 'use client';
 import { useState, useMemo } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
@@ -16,7 +17,7 @@ import { z } from 'zod';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
-import type { Cuenta } from '@/types/contabilidad.types';
+import type { Cuenta, AsientoContable } from '@/types/contabilidad.types';
 import { useToast } from '@/hooks/use-toast';
 
 const detalleSchema = z.object({
