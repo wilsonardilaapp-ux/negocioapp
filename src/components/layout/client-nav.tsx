@@ -19,7 +19,7 @@ import {
   Package,
   Share2,
   HardDrive,
-  Calculator, // Importado el nuevo ícono
+  Calculator,
 } from "lucide-react";
 import { MessageCircle as MessageCircleIcon } from "@/components/icons";
 
@@ -35,7 +35,7 @@ const allNavItems = [
   { href: "/dashboard/pedidos", icon: ShoppingBag, label: "Pedidos" },
   { href: "/dashboard/empaque", icon: Package, label: "Empaque" },
   { href: "/dashboard/pagos", icon: CreditCard, label: "Pagos" },
-  { href: "/dashboard/contabilidad", icon: Calculator, label: "Contabilidad", moduleId: 'inventario-kardex' }, // Línea añadida
+  { href: "/dashboard/contabilidad", icon: Calculator, label: "Contabilidad", moduleId: 'inventario-kardex' },
   { href: "/dashboard/configuracion/factura", icon: FileText, label: "Editor Factura" },
   { href: "/dashboard/configuracion/impresoras", icon: Printer, label: "Impresoras" },
   { href: "/dashboard/backups", icon: HardDrive, label: "Backups" },
@@ -52,10 +52,11 @@ export function ClientNav() {
   const firestore = useFirestore();
   const { user } = useUser();
 
+  // Corrected query to point to the business-specific modules subcollection
   const modulesQuery = useMemoFirebase(() => {
-    if (!firestore || !user) return null;
-    return collection(firestore, 'modules');
-  }, [firestore, user]);
+    if (!firestore || !user?.uid) return null;
+    return collection(firestore, 'businesses', user.uid, 'modules');
+  }, [firestore, user?.uid]);
   
   const { data: modules, isLoading } = useCollection<Module>(modulesQuery);
 
@@ -64,10 +65,13 @@ export function ClientNav() {
   };
   
   const navItems = allNavItems.filter(item => {
+    // If an item doesn't have a moduleId, it's always visible
     if (!item.moduleId) {
       return true;
     }
+    // Find the module in the business-specific list
     const module = modules?.find(m => m.id === item.moduleId);
+    // Show the item only if the module exists and its status is 'active'
     return module?.status === 'active';
   });
 
