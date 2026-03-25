@@ -1,4 +1,3 @@
-
 'use client';
 import { useState, useMemo } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
@@ -73,6 +72,7 @@ const AsientoForm = ({ cuentas, onSave, onClose }: AsientoFormProps) => {
     const onSubmit = (data: AsientoFormData) => {
         const fullDetails = data.detalles.map(d => ({
             ...d,
+            descripcion: d.descripcion || '',
             id: `det-${Math.random()}`,
             cuentaNombre: cuentas.find(c => c.codigo === d.cuentaCodigo)?.nombre || 'N/A',
         }));
