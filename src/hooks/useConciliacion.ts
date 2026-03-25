@@ -4,8 +4,8 @@ import type { MovimientoLibro, MovimientoExtracto, PartidaConciliada } from '@/t
 import { useAsientosContables } from './useAsientosContables';
 
 const getInitialExtracto = (): MovimientoExtracto[] => [
-    { id: 'ext-001', fecha: '2023-10-01', descripcion: 'Consignación nómina', monto: -1750000, esConciliado: true },
-    { id: 'ext-002', fecha: '2023-10-04', descripcion: 'Pago de cliente Juan Pérez', monto: 450000, esConciliado: true },
+    { id: 'ext-001', fecha: '2023-10-01', descripcion: 'Consignación nómina', monto: -1750000, esConciliado: false },
+    { id: 'ext-002', fecha: '2023-10-04', descripcion: 'Pago de cliente Juan Pérez', monto: 450000, esConciliado: false },
     { id: 'ext-003', fecha: '2023-10-06', descripcion: 'Comisión bancaria', monto: -15000, esConciliado: false },
     { id: 'ext-004', fecha: '2023-10-10', descripcion: 'Intereses sobre saldo', monto: 2500, esConciliado: false },
 ];
@@ -13,9 +13,7 @@ const getInitialExtracto = (): MovimientoExtracto[] => [
 export function useConciliacion() {
     const { asientos } = useAsientosContables();
     const [extracto, setExtracto] = useState<MovimientoExtracto[]>(getInitialExtracto);
-    const [partidasConciliadas, setPartidasConciliadas] = useState<PartidaConciliada[]>([
-        { id: 'pc-001', movimientoLibroId: 'd-002', movimientoExtractoId: 'ext-001', fechaConciliacion: '2023-10-02' }
-    ]);
+    const [partidasConciliadas, setPartidasConciliadas] = useState<PartidaConciliada[]>([]);
 
     const movimientosLibro = useMemo((): MovimientoLibro[] => {
         return asientos
@@ -38,11 +36,24 @@ export function useConciliacion() {
             movimientoExtractoId: extractoId,
             fechaConciliacion: new Date().toISOString(),
         }]);
+
+        // Marcar el movimiento del extracto como conciliado
+        setExtracto(prev => prev.map(mov => 
+            mov.id === extractoId ? { ...mov, esConciliado: true } : mov
+        ));
     }, []);
 
     const desconciliarPartida = useCallback((partidaId: string) => {
+        const partidaAEliminar = partidasConciliadas.find(p => p.id === partidaId);
+        if (!partidaAEliminar) return;
+
+        // Desmarcar el movimiento del extracto
+        setExtracto(prev => prev.map(mov => 
+            mov.id === partidaAEliminar.movimientoExtractoId ? { ...mov, esConciliado: false } : mov
+        ));
+        
         setPartidasConciliadas(prev => prev.filter(p => p.id !== partidaId));
-    }, []);
+    }, [partidasConciliadas]);
     
     return {
         movimientosLibro,
