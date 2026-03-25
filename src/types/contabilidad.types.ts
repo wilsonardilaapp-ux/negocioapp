@@ -61,3 +61,27 @@ export interface ReporteContable {
   datos: any[]; // This will be specific to each report type
   totales: any;
 }
+
+export interface MovimientoLibro {
+  id: string;
+  fecha: string; // ISO
+  descripcion: string;
+  debito: number;
+  credito: number;
+  esConciliado: boolean;
+}
+
+export interface MovimientoExtracto {
+  id: string;
+  fecha: string; // ISO
+  descripcion: string;
+  monto: number; // Positivo para depósitos, negativo para retiros
+  esConciliado: boolean;
+}
+
+export interface PartidaConciliada {
+    id: string;
+    movimientoLibroId: string;
+    movimientoExtractoId: string;
+    fechaConciliacion: string; //ISO
+}
