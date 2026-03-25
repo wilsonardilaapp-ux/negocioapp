@@ -8,6 +8,7 @@ import KardexResumen from './secciones/KardexResumen';
 import PlanDeCuentas from './secciones/PlanDeCuentas';
 import AsientosContables from './secciones/AsientosContables';
 import Impuestos from './secciones/Impuestos';
+import Reportes from './secciones/Reportes';
 import { useInventarioKardex } from '@/hooks/useInventarioKardex';
 
 const PlaceholderSection = ({ title }: { title: string }) => (
@@ -66,6 +67,8 @@ export default function Contabilidad() {
                     <AsientosContables />
                 ) : section.id === 'impuestos' ? (
                     <Impuestos />
+                ) : section.id === 'reportes' ? (
+                    <Reportes />
                 ) : (
                     <PlaceholderSection title={section.label} />
                 )}

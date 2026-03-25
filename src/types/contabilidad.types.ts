@@ -51,3 +51,13 @@ export interface DeclaracionImpuesto {
   valorPagado: number;
   fechaPresentacion: string; // ISO Date
 }
+
+export type TipoReporte = 'balance_general' | 'estado_resultados' | 'libro_diario';
+
+export interface ReporteContable {
+  tipo: TipoReporte;
+  fechaGeneracion: string;
+  rangoFechas: { inicio: string; fin: string };
+  datos: any[]; // This will be specific to each report type
+  totales: any;
+}
