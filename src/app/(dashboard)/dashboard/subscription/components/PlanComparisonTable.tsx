@@ -1,3 +1,4 @@
+
 'use client';
 
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
@@ -9,11 +10,6 @@ import { cn } from "@/lib/utils";
 import Link from 'next/link';
 import type { SubscriptionPlan } from "@/models/subscription-plan";
 import { useMemo } from "react";
-
-interface PlanComparisonTableProps {
-  currentPlan: string;
-  allPlans: SubscriptionPlan[];
-}
 
 const formatCurrency = (value: number) => `$${value.toLocaleString('en-US')}`;
 
@@ -27,23 +23,27 @@ export default function PlanComparisonTable({ currentPlan, allPlans }: PlanCompa
         return String(limit);
     };
 
-    const getFeatureCheck = (plan: SubscriptionPlan, keyword: string) => {
+    const getFeatureCheck = (plan: SubscriptionPlan, keywords: string[]) => {
         if (!plan.features || plan.features.length === 0) {
             return <div className="flex justify-center"><X className="h-5 w-5 text-muted-foreground" /></div>;
         }
-
+    
         const hasFeature = plan.features.some(f => {
             let featureText = '';
-            // Robust check for feature format
+            // Robust check for both object and string array formats
             if (typeof f === 'string') {
                 featureText = f;
             } else if (f && typeof f === 'object' && 'value' in f && typeof f.value === 'string') {
                 featureText = f.value;
             }
             
-            return featureText.toLowerCase().includes(keyword);
+            // Normalize text to handle accents and case
+            const normalizedText = featureText.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    
+            // Check if any of the provided keywords are present in the feature text
+            return keywords.some(kw => normalizedText.includes(kw.toLowerCase()));
         });
-
+    
         return <div className="flex justify-center">{hasFeature ? <Check className="h-5 w-5 text-green-500" /> : <X className="h-5 w-5 text-muted-foreground" />}</div>;
     };
 
@@ -67,11 +67,11 @@ export default function PlanComparisonTable({ currentPlan, allPlans }: PlanCompa
         },
         {
             feature: "Soporte Prioritario",
-            getValue: (plan: SubscriptionPlan) => getFeatureCheck(plan, "prioritario"),
+            getValue: (plan: SubscriptionPlan) => getFeatureCheck(plan, ["prioritario", "dedicado"]),
         },
         {
             feature: "Acceso API",
-            getValue: (plan: SubscriptionPlan) => getFeatureCheck(plan, "api"),
+            getValue: (plan: SubscriptionPlan) => getFeatureCheck(plan, ["api"]),
         },
     ];
 
