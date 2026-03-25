@@ -27,16 +27,16 @@ const getInitialMockData = () => {
 
     const movimientos: MovimientoKardex[] = [
         // Producto 1
-        { id: 'mov-001', fecha: '2023-10-01T10:00:00Z', tipo: 'entrada_compra', productoId: 'prod-001', documento: 'FC-1020', cantidad: 100, costoUnitario: 17500, costoTotal: 1750000, saldoCantidad: 100, saldoCostoTotal: 1750000 },
-        { id: 'mov-002', fecha: '2023-10-05T14:00:00Z', tipo: 'salida_venta', productoId: 'prod-001', documento: 'FV-501', cantidad: 20, costoUnitario: 17500, costoTotal: 350000, saldoCantidad: 80, saldoCostoTotal: 1400000 },
-        { id: 'mov-003', fecha: '2023-10-10T11:00:00Z', tipo: 'entrada_compra', productoId: 'prod-001', documento: 'FC-1055', cantidad: 100, costoUnitario: 18000, costoTotal: 1800000, saldoCantidad: 180, saldoCostoTotal: 3200000 },
-        { id: 'mov-004', fecha: '2023-10-15T09:30:00Z', tipo: 'salida_venta', productoId: 'prod-001', documento: 'FV-520', cantidad: 30, costoUnitario: 17777.78, costoTotal: 533333.34, saldoCantidad: 150, saldoCostoTotal: 2666666.66 },
+        { id: 'mov-001', fecha: '2023-10-01T10:00:00Z', tipo: 'entrada_compra', productoId: 'prod-001', documento: 'FC-1020', cantidad: 100, costoUnitario: 17500, costoTotal: 1750000, saldoCantidad: 100, saldoTotal: 1750000 },
+        { id: 'mov-002', fecha: '2023-10-05T14:00:00Z', tipo: 'salida_venta', productoId: 'prod-001', documento: 'FV-501', cantidad: 20, costoUnitario: 17500, costoTotal: 350000, saldoCantidad: 80, saldoTotal: 1400000 },
+        { id: 'mov-003', fecha: '2023-10-10T11:00:00Z', tipo: 'entrada_compra', productoId: 'prod-001', documento: 'FC-1055', cantidad: 100, costoUnitario: 18000, costoTotal: 1800000, saldoCantidad: 180, saldoTotal: 3200000 },
+        { id: 'mov-004', fecha: '2023-10-15T09:30:00Z', tipo: 'salida_venta', productoId: 'prod-001', documento: 'FV-520', cantidad: 30, costoUnitario: 17777.78, costoTotal: 533333.34, saldoCantidad: 150, saldoTotal: 2666666.66 },
         // Producto 2
-        { id: 'mov-005', fecha: '2023-10-02T09:00:00Z', tipo: 'entrada_compra', productoId: 'prod-002', documento: 'FC-1022', cantidad: 25, costoUnitario: 245000, costoTotal: 6125000, saldoCantidad: 25, saldoCostoTotal: 6125000 },
-        { id: 'mov-006', fecha: '2023-10-08T16:00:00Z', tipo: 'salida_venta', productoId: 'prod-002', documento: 'FV-515', cantidad: 5, costoUnitario: 245000, costoTotal: 1225000, saldoCantidad: 20, saldoCostoTotal: 4900000 },
+        { id: 'mov-005', fecha: '2023-10-02T09:00:00Z', tipo: 'entrada_compra', productoId: 'prod-002', documento: 'FC-1022', cantidad: 25, costoUnitario: 245000, costoTotal: 6125000, saldoCantidad: 25, saldoTotal: 6125000 },
+        { id: 'mov-006', fecha: '2023-10-08T16:00:00Z', tipo: 'salida_venta', productoId: 'prod-002', documento: 'FV-515', cantidad: 5, costoUnitario: 245000, costoTotal: 1225000, saldoCantidad: 20, saldoTotal: 4900000 },
         // Producto 3
-        { id: 'mov-007', fecha: '2023-10-03T13:00:00Z', tipo: 'entrada_compra', productoId: 'prod-003', documento: 'FC-1030', cantidad: 50, costoUnitario: 11500, costoTotal: 575000, saldoCantidad: 50, saldoCostoTotal: 575000 },
-        { id: 'mov-008', fecha: '2023-10-12T10:00:00Z', tipo: 'salida_venta', productoId: 'prod-003', documento: 'FV-518', cantidad: 42, costoUnitario: 11500, costoTotal: 483000, saldoCantidad: 8, saldoCostoTotal: 92000 }
+        { id: 'mov-007', fecha: '2023-10-03T13:00:00Z', tipo: 'entrada_compra', productoId: 'prod-003', documento: 'FC-1030', cantidad: 50, costoUnitario: 11500, costoTotal: 575000, saldoCantidad: 50, saldoTotal: 575000 },
+        { id: 'mov-008', fecha: '2023-10-12T10:00:00Z', tipo: 'salida_venta', productoId: 'prod-003', documento: 'FV-518', cantidad: 42, costoUnitario: 11500, costoTotal: 483000, saldoCantidad: 8, saldoTotal: 92000 }
     ];
 
     return { productos, movimientos };
@@ -63,21 +63,21 @@ export function useInventarioKardex() {
         .pop();
       
       const saldoCantidadAnterior = ultimoMovimiento?.saldoCantidad ?? 0;
-      const saldoCostoTotalAnterior = ultimoMovimiento?.saldoCostoTotal ?? 0;
+      const saldoTotalAnterior = ultimoMovimiento?.saldoTotal ?? 0;
 
       let nuevoSaldoCantidad = saldoCantidadAnterior;
-      let nuevoSaldoCostoTotal = saldoCostoTotalAnterior;
+      let nuevoSaldoTotal = saldoTotalAnterior;
 
       const costoTotalMovimiento = nuevoMovimiento.cantidad * nuevoMovimiento.costoUnitario;
 
       if (nuevoMovimiento.tipo.startsWith('entrada')) {
         nuevoSaldoCantidad += nuevoMovimiento.cantidad;
-        nuevoSaldoCostoTotal += costoTotalMovimiento;
+        nuevoSaldoTotal += costoTotalMovimiento;
       } else {
         nuevoSaldoCantidad -= nuevoMovimiento.cantidad;
         // La valoración de la salida depende del método, aquí simplificamos con el costo del movimiento
         const costoSalida = costoTotalMovimiento; // En un caso real, esto se calcularía
-        nuevoSaldoCostoTotal -= costoSalida;
+        nuevoSaldoTotal -= costoSalida;
       }
 
       const movimientoCompleto: MovimientoKardex = {
@@ -85,7 +85,7 @@ export function useInventarioKardex() {
         ...nuevoMovimiento,
         costoTotal: costoTotalMovimiento,
         saldoCantidad: nuevoSaldoCantidad,
-        saldoCostoTotal: nuevoSaldoCostoTotal,
+        saldoTotal: nuevoSaldoTotal,
       };
 
       // Actualizar el stock del producto
@@ -111,7 +111,7 @@ export function useInventarioKardex() {
 
     const lineas: LineaKardex[] = [];
     let saldoCantidad = 0;
-    let saldoCostoTotal = 0;
+    let saldoTotal = 0;
 
     for (const mov of movimientosProducto) {
         const linea: Partial<LineaKardex> = {
@@ -126,11 +126,11 @@ export function useInventarioKardex() {
                 costoTotal: mov.costoTotal,
             };
             saldoCantidad += mov.cantidad;
-            saldoCostoTotal += mov.costoTotal;
+            saldoTotal += mov.costoTotal;
         } else { // Salida
             let costoUnitarioSalida = mov.costoUnitario;
             if (metodo === 'promedio') {
-                costoUnitarioSalida = saldoCantidad > 0 ? saldoCostoTotal / saldoCantidad : 0;
+                costoUnitarioSalida = saldoCantidad > 0 ? saldoTotal / saldoCantidad : 0;
             }
             const costoTotalSalida = mov.cantidad * costoUnitarioSalida;
 
@@ -140,14 +140,14 @@ export function useInventarioKardex() {
                 costoTotal: costoTotalSalida,
             };
             saldoCantidad -= mov.cantidad;
-            saldoCostoTotal -= costoTotalSalida;
+            saldoTotal -= costoTotalSalida;
         }
 
-        const costoUnitarioSaldo = saldoCantidad > 0 ? saldoCostoTotal / saldoCantidad : 0;
+        const costoUnitarioSaldo = saldoCantidad > 0 ? saldoTotal / saldoCantidad : 0;
         linea.saldo = {
             cantidad: saldoCantidad,
             costoUnitario: costoUnitarioSaldo,
-            costoTotal: saldoCostoTotal,
+            costoTotal: saldoTotal,
         };
 
         lineas.push(linea as LineaKardex);

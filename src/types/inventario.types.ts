@@ -36,8 +36,8 @@ export interface MovimientoKardex {
   costoUnitario: number;
   costoTotal: number;
   saldoCantidad: number;
-  saldoCostoTotal: number;
-  costoPromedio?: number;
+  saldoTotal: number;
+  observaciones?: string;
 }
 
 export interface LineaKardex {
@@ -63,7 +63,7 @@ export interface NuevoMovimientoForm {
   costoUnitario: number;
   documento: string;
   fecha: string;
-  observaciones: string;
+  observaciones?: string;
 }
 
 export interface ConfiguracionKardex {

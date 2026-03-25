@@ -1,3 +1,4 @@
+
 'use client';
 
 import React from 'react';
@@ -57,7 +58,7 @@ export default function Contabilidad() {
                 {section.id === 'inventario_kardex' ? (
                     <InventarioKardex />
                 ) : section.id === 'resumen' ? (
-                    <KardexResumen resumen={kardexData.resumen} />
+                    <KardexResumen resumen={kardexData.resumen} movimientos={kardexData.movimientos} />
                 ) : (
                     <PlaceholderSection title={section.label} />
                 )}
