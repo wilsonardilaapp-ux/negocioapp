@@ -1,5 +1,5 @@
 'use client';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import type { ActivoFijo } from '@/types/contabilidad.types';
 
 const getInitialActivos = (): ActivoFijo[] => {
@@ -37,10 +37,21 @@ export function useActivosFijos() {
   const totalCostoInicial = useMemo(() => activos.reduce((sum, activo) => sum + activo.costoInicial, 0), [activos]);
   const totalDepreciacionAcumulada = useMemo(() => activos.reduce((sum, activo) => sum + activo.depreciacionAcumulada, 0), [activos]);
   
+  const registrarActivo = useCallback((data: Omit<ActivoFijo, 'id' | 'depreciacionAcumulada' | 'valorEnLibros'>) => {
+    const nuevoActivo: ActivoFijo = {
+      ...data,
+      id: `af-${Date.now()}`,
+      depreciacionAcumulada: 0,
+      valorEnLibros: data.costoInicial,
+    };
+    setActivos(prev => [nuevoActivo, ...prev]);
+  }, []);
+
   return {
     activos,
     totalValorEnLibros,
     totalCostoInicial,
     totalDepreciacionAcumulada,
+    registrarActivo,
   };
 }
