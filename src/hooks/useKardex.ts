@@ -1,7 +1,19 @@
+
 'use client';
 
 import { useState, useMemo, useCallback } from 'react';
-import type { ItemInventario, MovimientoKardex, ConfiguracionKardex, ResumenKardex, NuevoMovimientoForm, MetodoValuacion, LineaKardexCalculada, Bodega, EstadoStock } from '@/types/kardex.types';
+import type {
+  ItemInventario,
+  MovimientoKardex,
+  ConfiguracionKardex,
+  ResumenKardex,
+  NuevoMovimientoForm,
+  MetodoValuacion,
+  LineaKardexCalculada,
+  Bodega,
+  EstadoStock,
+  NuevoItemForm,
+} from '@/types/kardex.types';
 
 const getInitialMockData = () => {
     const items: ItemInventario[] = [
@@ -39,6 +51,25 @@ export function useKardex() {
   });
   const [bodegas, setBodegas] = useState<Bodega[]>(() => getInitialMockData().bodegas);
 
+  const registrarOActualizarItem = useCallback((data: NuevoItemForm) => {
+    setItems(prevItems => {
+        const estado = determinarEstadoStock(0, data.stockMinimo, data.stockMaximo);
+
+        if (data.id) { // Actualizar
+            return prevItems.map(item => item.id === data.id ? { ...item, ...data } : item);
+        } else { // Crear
+            const nuevoItem: ItemInventario = {
+                ...data,
+                id: `item-${Date.now()}`,
+                stockActual: 0,
+                estado,
+                activo: true,
+            };
+            return [nuevoItem, ...prevItems];
+        }
+    });
+  }, []);
+
   const registrarMovimiento = useCallback((form: NuevoMovimientoForm) => {
     setMovimientos(prevMovs => {
       const item = items.find(i => i.id === form.itemId);
@@ -70,10 +101,7 @@ export function useKardex() {
       
       setItems(prevItems => prevItems.map(p => {
           if (p.id === form.itemId) {
-              let estado: EstadoStock = 'normal';
-              if(nuevoSaldoCantidad <= 0) estado = 'agotado';
-              else if (nuevoSaldoCantidad <= p.stockMinimo) estado = 'bajo';
-              else if (nuevoSaldoCantidad > p.stockMaximo) estado = 'sobre_stock';
+              const estado = determinarEstadoStock(nuevoSaldoCantidad, p.stockMinimo, p.stockMaximo);
               return { ...p, stockActual: nuevoSaldoCantidad, estado };
           }
           return p;
@@ -146,8 +174,6 @@ export function useKardex() {
         saldoValorTotal -= costoSalidaTotal;
       }
       
-      // Ajustes y otros tipos de movimiento pueden necesitar lógica adicional
-      
       lineas.push({
         movimiento: mov,
         costoUnitarioResultante,
@@ -179,6 +205,13 @@ export function useKardex() {
   const actualizarConfiguracion = (config: ConfiguracionKardex) => {
     setConfiguracion(config);
   };
+  
+  const determinarEstadoStock = (stock: number, min: number, max: number): EstadoStock => {
+      if (stock <= 0) return 'agotado';
+      if (stock <= min) return 'bajo';
+      if (stock > max) return 'sobre_stock';
+      return 'normal';
+  };
 
   return {
     items,
@@ -189,5 +222,6 @@ export function useKardex() {
     registrarMovimiento,
     calcularKardex,
     actualizarConfiguracion,
+    registrarOActualizarItem,
   };
 }

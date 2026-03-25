@@ -38,6 +38,11 @@ export interface ItemInventario {
   activo: boolean;
 }
 
+export interface NuevoItemForm extends Omit<ItemInventario, 'id' | 'stockActual' | 'estado' | 'activo'> {
+  id?: string;
+}
+
+
 export interface MovimientoKardex {
   id: string;
   fecha: string;
