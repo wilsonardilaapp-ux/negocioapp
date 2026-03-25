@@ -6,7 +6,7 @@ import { uploadMedia } from '@/ai/flows/upload-media-flow';
 import { useToast } from '@/hooks/use-toast';
 
 // Simplified dynamic import for ReactQuill to prevent SSR issues.
-const ReactQuill = dynamic(
+const QuillEditor = dynamic(
   () => import('react-quill'),
   {
     ssr: false,
@@ -22,60 +22,6 @@ interface RichTextEditorProps {
 
 const RichTextEditor: React.FC<RichTextEditorProps> = ({ value, onChange, placeholder }) => {
   const { toast } = useToast();
-  const quillRef = React.useRef<any>(null);
-
-  const imageHandler = () => {
-    const input = document.createElement('input');
-    input.setAttribute('type', 'file');
-    input.setAttribute('accept', 'image/*');
-    input.click();
-
-    input.onchange = async () => {
-      if (!input.files) return;
-      const file = input.files[0];
-      const MAX_FILE_SIZE_MB = 1;
-      const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
-
-      if (file.size > MAX_FILE_SIZE_BYTES) {
-        toast({
-          variant: 'destructive',
-          title: 'Archivo muy pesado',
-          description: `El archivo es muy pesado. Máximo ${MAX_FILE_SIZE_MB}MB.`,
-        });
-        return;
-      }
-
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-
-      reader.onloadend = async () => {
-        const mediaDataUri = reader.result as string;
-        const quill = quillRef.current?.getEditor();
-        if (!quill) return;
-
-        const range = quill.getSelection(true);
-        // Show a temporary loader/placeholder in the editor
-        quill.insertEmbed(range.index, 'image', `data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7`);
-        quill.setSelection(range.index + 1);
-
-        try {
-          const result = await uploadMedia({ mediaDataUri });
-          // Remove the loader and insert the actual image URL
-          quill.deleteText(range.index, 1);
-          quill.insertEmbed(range.index, 'image', result.secure_url);
-          quill.setSelection(range.index + 1);
-        } catch (error) {
-          console.error('Image upload failed', error);
-          quill.deleteText(range.index, 1); // Remove loader on failure
-          toast({
-            variant: 'destructive',
-            title: 'Error al subir imagen',
-            description: 'No se pudo cargar la imagen. Inténtalo de nuevo.',
-          });
-        }
-      };
-    };
-  };
 
   const modules = useMemo(() => ({
     toolbar: {
@@ -89,15 +35,66 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({ value, onChange, placeh
         ['clean'],
       ],
       handlers: {
-        image: imageHandler,
+        // Use a standard function to get the correct `this` context from Quill
+        image: function imageHandler() {
+          // @ts-ignore - `this.quill` is the Quill instance bound by the library.
+          const quill = this.quill;
+          if (!quill) return;
+
+          const input = document.createElement('input');
+          input.setAttribute('type', 'file');
+          input.setAttribute('accept', 'image/*');
+          input.click();
+
+          input.onchange = async () => {
+            if (!input.files) return;
+            const file = input.files[0];
+            const MAX_FILE_SIZE_MB = 1;
+            const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
+
+            if (file.size > MAX_FILE_SIZE_BYTES) {
+              toast({
+                variant: 'destructive',
+                title: 'Archivo muy pesado',
+                description: `El archivo es muy pesado. Máximo ${MAX_FILE_SIZE_MB}MB.`,
+              });
+              return;
+            }
+
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+
+            reader.onloadend = async () => {
+              const mediaDataUri = reader.result as string;
+              
+              const range = quill.getSelection(true);
+              quill.insertEmbed(range.index, 'image', `data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7`);
+              quill.setSelection(range.index + 1);
+
+              try {
+                const result = await uploadMedia({ mediaDataUri });
+                quill.deleteText(range.index, 1);
+                quill.insertEmbed(range.index, 'image', result.secure_url);
+                quill.setSelection(range.index + 1);
+              } catch (error: any) {
+                console.error('Image upload failed', error);
+                quill.deleteText(range.index, 1);
+                toast({
+                  variant: 'destructive',
+                  title: 'Error al subir imagen',
+                  description: error.message || 'No se pudo cargar la imagen. Inténtalo de nuevo.',
+                });
+              }
+            };
+          };
+        }
       },
     },
-  }), []); // eslint-disable-line react-hooks/exhaustive-deps
+  }), [toast]);
 
   return (
     <div className="rich-editor-wrapper">
-      <ReactQuill
-        ref={quillRef}
+      <QuillEditor
         theme="snow"
         value={value}
         onChange={onChange}
