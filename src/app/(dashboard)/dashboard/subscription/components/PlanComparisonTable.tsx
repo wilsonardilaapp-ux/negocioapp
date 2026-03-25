@@ -1,4 +1,3 @@
-
 'use client';
 
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
@@ -10,6 +9,11 @@ import { cn } from "@/lib/utils";
 import Link from 'next/link';
 import type { SubscriptionPlan } from "@/models/subscription-plan";
 import { useMemo } from "react";
+
+interface PlanComparisonTableProps {
+  currentPlan: 'free' | 'pro' | 'enterprise' | string;
+  allPlans: SubscriptionPlan[];
+}
 
 const formatCurrency = (value: number) => `$${value.toLocaleString('en-US')}`;
 
@@ -23,57 +27,52 @@ export default function PlanComparisonTable({ currentPlan, allPlans }: PlanCompa
         return String(limit);
     };
 
-    const getFeatureCheck = (plan: SubscriptionPlan, keywords: string[]) => {
-        if (!plan.features || plan.features.length === 0) {
-            return <div className="flex justify-center"><X className="h-5 w-5 text-muted-foreground" /></div>;
-        }
-    
-        const hasFeature = plan.features.some(f => {
-            let featureText = '';
-            // Robust check for both object and string array formats
-            if (typeof f === 'string') {
-                featureText = f;
-            } else if (f && typeof f === 'object' && 'value' in f && typeof f.value === 'string') {
-                featureText = f.value;
+    const featureRows = useMemo(() => {
+        const baseFeatures = [
+            {
+                feature: "Precio mensual",
+                getValue: (plan: SubscriptionPlan) => formatCurrency(plan.price),
+            },
+            {
+                feature: "Productos",
+                getValue: (plan: SubscriptionPlan) => getLimitText(plan.limits.products),
+            },
+            {
+                feature: "Posts de Blog",
+                getValue: (plan: SubscriptionPlan) => getLimitText(plan.limits.blogPosts),
+            },
+            {
+                feature: "Landing Pages",
+                getValue: (plan: SubscriptionPlan) => getLimitText(plan.limits.landingPages),
+            },
+        ];
+
+        const allFeatureStrings = new Set<string>();
+        allPlans.forEach(plan => {
+            if (plan.features) {
+                plan.features.forEach(feature => {
+                    const featureText = (typeof feature === 'string' ? feature : feature?.value) || '';
+                    if (featureText) {
+                        allFeatureStrings.add(featureText);
+                    }
+                });
             }
-            
-            // Normalize text to handle accents and case
-            const normalizedText = featureText.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-    
-            // Check if any of the provided keywords are present in the feature text
-            return keywords.some(kw => normalizedText.includes(kw.toLowerCase()));
         });
-    
-        return <div className="flex justify-center">{hasFeature ? <Check className="h-5 w-5 text-green-500" /> : <X className="h-5 w-5 text-muted-foreground" />}</div>;
-    };
 
+        const dynamicFeatureRows = Array.from(allFeatureStrings).map(featureName => ({
+            feature: featureName,
+            getValue: (plan: SubscriptionPlan) => {
+                const hasFeature = plan.features?.some(f => {
+                    const featureText = (typeof f === 'string' ? f : f?.value) || '';
+                    return featureText === featureName;
+                });
+                return <div className="flex justify-center">{hasFeature ? <Check className="h-5 w-5 text-green-500" /> : <X className="h-5 w-5 text-muted-foreground" />}</div>;
+            }
+        }));
 
-    const featureRows = [
-        {
-            feature: "Precio mensual",
-            getValue: (plan: SubscriptionPlan) => formatCurrency(plan.price),
-        },
-        {
-            feature: "Productos",
-            getValue: (plan: SubscriptionPlan) => getLimitText(plan.limits.products),
-        },
-        {
-            feature: "Posts de Blog",
-            getValue: (plan: SubscriptionPlan) => getLimitText(plan.limits.blogPosts),
-        },
-        {
-            feature: "Landing Pages",
-            getValue: (plan: SubscriptionPlan) => getLimitText(plan.limits.landingPages),
-        },
-        {
-            feature: "Soporte Prioritario",
-            getValue: (plan: SubscriptionPlan) => getFeatureCheck(plan, ["prioritario", "dedicado"]),
-        },
-        {
-            feature: "Acceso API",
-            getValue: (plan: SubscriptionPlan) => getFeatureCheck(plan, ["api"]),
-        },
-    ];
+        return [...baseFeatures, ...dynamicFeatureRows];
+    }, [allPlans]);
+
 
     const getButton = (planId: string) => {
         if (planId === currentPlan) {
