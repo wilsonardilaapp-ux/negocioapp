@@ -85,3 +85,18 @@ export interface PartidaConciliada {
     movimientoExtractoId: string;
     fechaConciliacion: string; //ISO
 }
+
+export interface ActivoFijo {
+  id: string;
+  nombre: string;
+  codigo: string;
+  fechaAdquisicion: string; // ISO
+  costoInicial: number;
+  valorResidual: number;
+  vidaUtil: number; // en años
+  depreciacionAcumulada: number;
+  valorEnLibros: number;
+  cuentaActivo: string; // e.g., 1540
+  cuentaDepreciacion: string; // e.g., 1592
+  cuentaGastoDepreciacion: string; // e.g., 5160
+}

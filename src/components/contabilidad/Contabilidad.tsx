@@ -11,6 +11,7 @@ import Impuestos from './secciones/Impuestos';
 import Reportes from './secciones/Reportes';
 import ConciliacionBancaria from './secciones/ConciliacionBancaria';
 import { useInventarioKardex } from '@/hooks/useInventarioKardex';
+import ActivosFijos from './secciones/ActivosFijos';
 
 const PlaceholderSection = ({ title }: { title: string }) => (
     <Card>
@@ -72,6 +73,8 @@ export default function Contabilidad() {
                     <Reportes />
                 ) : section.id === 'conciliacion' ? (
                     <ConciliacionBancaria />
+                ) : section.id === 'activos_fijos' ? (
+                    <ActivosFijos />
                 ) : (
                     <PlaceholderSection title={section.label} />
                 )}
