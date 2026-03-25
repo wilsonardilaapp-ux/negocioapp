@@ -1,4 +1,3 @@
-
 'use client';
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -22,7 +21,7 @@ export default function InventarioKardex() {
                 <TabsTrigger value="configuracion">Configuración</TabsTrigger>
             </TabsList>
             <TabsContent value="resumen">
-                <KardexResumen resumen={kardexData.resumen} />
+                <KardexResumen resumen={kardexData.resumen} movimientos={kardexData.movimientos} />
             </TabsContent>
             <TabsContent value="kardex">
                 <KardexTabla 
