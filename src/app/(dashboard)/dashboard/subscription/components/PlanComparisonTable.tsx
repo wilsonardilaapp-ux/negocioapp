@@ -21,29 +21,11 @@ export default function PlanComparisonTable({ currentPlan, allPlans }: PlanCompa
     
     const sortedPlans = useMemo(() => [...allPlans].sort((a, b) => a.price - b.price), [allPlans]);
 
-    const getLimitText = (limit: number | undefined) => {
-        if (typeof limit === 'undefined' || limit === 0) return <div className="flex justify-center"><X className="h-5 w-5 text-muted-foreground" /></div>;
-        if (limit === -1) return <div className="flex justify-center"><InfinityIcon className="h-5 w-5" /></div>;
-        return String(limit);
-    };
-
     const featureRows = useMemo(() => {
         const baseFeatures = [
             {
                 feature: "Precio mensual",
                 getValue: (plan: SubscriptionPlan) => formatCurrency(plan.price),
-            },
-            {
-                feature: "Productos",
-                getValue: (plan: SubscriptionPlan) => getLimitText(plan.limits.products),
-            },
-            {
-                feature: "Posts de Blog",
-                getValue: (plan: SubscriptionPlan) => getLimitText(plan.limits.blogPosts),
-            },
-            {
-                feature: "Landing Pages",
-                getValue: (plan: SubscriptionPlan) => getLimitText(plan.limits.landingPages),
             },
         ];
 
@@ -64,6 +46,17 @@ export default function PlanComparisonTable({ currentPlan, allPlans }: PlanCompa
             getValue: (plan: SubscriptionPlan) => {
                 const hasFeature = plan.features?.some(f => {
                     const featureText = (typeof f === 'string' ? f : f?.value) || '';
+                    // Improved check to be more flexible
+                    const normalizedFeatureName = featureName.toLowerCase().replace(/[\d\s]/g, '');
+                    const normalizedFeatureText = featureText.toLowerCase();
+
+                    if (normalizedFeatureName === 'soporteprioritario') {
+                       return normalizedFeatureText.includes('prioritario') || normalizedFeatureText.includes('dedicado');
+                    }
+                    if (normalizedFeatureName === 'accesoapi') {
+                        return normalizedFeatureText.includes('api');
+                    }
+
                     return featureText === featureName;
                 });
                 return <div className="flex justify-center">{hasFeature ? <Check className="h-5 w-5 text-green-500" /> : <X className="h-5 w-5 text-muted-foreground" />}</div>;
