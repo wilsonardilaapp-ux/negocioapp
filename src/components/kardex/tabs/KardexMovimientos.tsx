@@ -1,6 +1,7 @@
-
 'use client';
 import { useForm, Controller } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,14 +17,28 @@ import { useToast } from '@/hooks/use-toast';
 interface KardexMovimientosProps {
     items: ItemInventario[];
     movimientos: MovimientoKardex[];
-    registrarMovimiento: (data: NuevoMovimientoForm) => void;
+    registrarMovimiento: (data: NuevoMovimientoForm) => Promise<void>;
 }
 
 const formatCurrency = (value: number) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(value);
 
+const movimientoSchema = z.object({
+  tipo: z.enum(['entrada_compra', 'entrada_devolucion_cliente', 'salida_venta', 'salida_devolucion_proveedor', 'ajuste_danio', 'ajuste_inventario_fisico', 'transferencia_bodega']),
+  itemId: z.string().min(1, 'Debe seleccionar un ítem'),
+  cantidad: z.preprocess(val => Number(val), z.number().min(0.01, 'La cantidad debe ser mayor a cero')),
+  costoUnitario: z.preprocess(val => Number(val), z.number().min(0, 'El costo no puede ser negativo')),
+  documento: z.string().min(1, 'El documento es requerido'),
+  fecha: z.string().min(1, 'La fecha es requerida'),
+  observaciones: z.string().optional(),
+  bodegaOrigen: z.string().optional(),
+  bodegaDestino: z.string().optional(),
+});
+
+
 export default function KardexMovimientos({ items, movimientos, registrarMovimiento }: KardexMovimientosProps) {
     const { toast } = useToast();
     const { register, handleSubmit, control, reset, formState: { errors, isSubmitting } } = useForm<NuevoMovimientoForm>({
+        resolver: zodResolver(movimientoSchema),
         defaultValues: {
             tipo: 'entrada_compra',
             itemId: '',
@@ -35,9 +50,9 @@ export default function KardexMovimientos({ items, movimientos, registrarMovimie
         }
     });
 
-    const onSubmit = (data: NuevoMovimientoForm) => {
+    const onSubmit = async (data: NuevoMovimientoForm) => {
         try {
-            registrarMovimiento(data);
+            await registrarMovimiento(data);
             toast({ title: 'Movimiento Registrado', description: 'El nuevo movimiento se ha guardado en el kardex.' });
             reset();
         } catch (error: any) {
