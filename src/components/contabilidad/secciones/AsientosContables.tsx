@@ -4,7 +4,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/com
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { PlusCircle, MoreHorizontal, Trash2 } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, Trash2, Loader2 } from 'lucide-react';
 import { useAsientosContables } from '@/hooks/useAsientosContables';
 import { usePlanDeCuentas } from '@/hooks/usePlanDeCuentas';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from "@/components/ui/table";
@@ -16,7 +16,7 @@ import { z } from 'zod';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
-import type { Cuenta, AsientoContable } from '@/types/contabilidad.types';
+import type { Cuenta, AsientoContable, DetalleAsiento } from '@/types/contabilidad.types';
 import { useToast } from '@/hooks/use-toast';
 
 const detalleSchema = z.object({
@@ -76,8 +76,7 @@ const AsientoForm = ({ cuentas, onSave, onClose }: AsientoFormProps) => {
             id: `det-${Math.random()}`,
             cuentaNombre: cuentas.find(c => c.codigo === d.cuentaCodigo)?.nombre || 'N/A',
         }));
-        onSave({ ...data, detalles: fullDetails });
-        toast({ title: "Asiento Guardado", description: "El asiento contable ha sido registrado con éxito."});
+        onSave({ ...data, detalles: fullDetails as DetalleAsiento[] });
     };
     
     const formatCurrency = (value: number) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP' }).format(value);
@@ -154,9 +153,10 @@ const AsientoForm = ({ cuentas, onSave, onClose }: AsientoFormProps) => {
 };
 
 export default function AsientosContables() {
-    const { asientos, registrarAsiento } = useAsientosContables();
+    const { asientos, isLoading, registrarAsiento } = useAsientosContables();
     const { cuentas } = usePlanDeCuentas();
     const [isDialogOpen, setIsDialogOpen] = useState(false);
+    const { toast } = useToast();
     
     const formatCurrency = (value: number) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(value);
 
@@ -177,7 +177,15 @@ export default function AsientosContables() {
                                 <DialogTitle>Crear Nuevo Asiento Contable</DialogTitle>
                                 <DialogDescription>Asegúrate de que la suma de los débitos sea igual a la de los créditos.</DialogDescription>
                             </DialogHeader>
-                            <AsientoForm cuentas={cuentas} onSave={registrarAsiento} onClose={() => setIsDialogOpen(false)} />
+                            <AsientoForm 
+                                cuentas={cuentas} 
+                                onSave={(data) => {
+                                    registrarAsiento(data);
+                                    toast({ title: "Asiento Registrado", description: "Tu asiento contable ha sido guardado." });
+                                    setIsDialogOpen(false);
+                                }} 
+                                onClose={() => setIsDialogOpen(false)} 
+                            />
                         </DialogContent>
                     </Dialog>
                 </div>
@@ -199,27 +207,39 @@ export default function AsientosContables() {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {asientos.map(asiento => (
-                                <TableRow key={asiento.id}>
-                                    <TableCell>{new Date(asiento.fecha).toLocaleDateString()}</TableCell>
-                                    <TableCell className="font-medium">{asiento.concepto}</TableCell>
-                                    <TableCell>{asiento.documentoReferencia}</TableCell>
-                                    <TableCell className="text-right">{formatCurrency(asiento.totalDebitos)}</TableCell>
-                                    <TableCell>
-                                        <Badge variant={asiento.estaCuadrado ? 'default' : 'destructive'}>
-                                            {asiento.estaCuadrado ? 'Cuadrado' : 'Descuadrado'}
-                                        </Badge>
-                                    </TableCell>
-                                    <TableCell className="text-right">
-                                        <DropdownMenu>
-                                            <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
-                                            <DropdownMenuContent>
-                                                <DropdownMenuItem>Ver Detalles</DropdownMenuItem>
-                                            </DropdownMenuContent>
-                                        </DropdownMenu>
+                            {isLoading ? (
+                                <TableRow>
+                                    <TableCell colSpan={6} className="h-24 text-center">
+                                        <Loader2 className="mx-auto h-6 w-6 animate-spin" />
                                     </TableCell>
                                 </TableRow>
-                            ))}
+                            ) : asientos.length > 0 ? (
+                                asientos.map(asiento => (
+                                    <TableRow key={asiento.id}>
+                                        <TableCell>{new Date(asiento.fecha).toLocaleDateString()}</TableCell>
+                                        <TableCell className="font-medium">{asiento.concepto}</TableCell>
+                                        <TableCell>{asiento.documentoReferencia}</TableCell>
+                                        <TableCell className="text-right">{formatCurrency(asiento.totalDebitos)}</TableCell>
+                                        <TableCell>
+                                            <Badge variant={asiento.estaCuadrado ? 'default' : 'destructive'}>
+                                                {asiento.estaCuadrado ? 'Cuadrado' : 'Descuadrado'}
+                                            </Badge>
+                                        </TableCell>
+                                        <TableCell className="text-right">
+                                            <DropdownMenu>
+                                                <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                                                <DropdownMenuContent>
+                                                    <DropdownMenuItem>Ver Detalles</DropdownMenuItem>
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
+                                        </TableCell>
+                                    </TableRow>
+                                ))
+                            ) : (
+                                <TableRow>
+                                    <TableCell colSpan={6} className="h-24 text-center">No hay asientos registrados.</TableCell>
+                                </TableRow>
+                            )}
                         </TableBody>
                     </Table>
                 </div>

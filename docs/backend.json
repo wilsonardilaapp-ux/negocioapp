@@ -775,6 +775,105 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["id", "businessId", "name", "enabled", "frequency", "backupType", "storageType", "retentionDays"]
+    },
+    "AsientoContable": {
+      "title": "AsientoContable",
+      "description": "Represents a complete accounting entry (journal voucher).",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "businessId": { "type": "string" },
+        "fecha": { "type": "string", "format": "date-time" },
+        "concepto": { "type": "string" },
+        "documentoReferencia": { "type": "string" },
+        "totalDebitos": { "type": "number" },
+        "totalCreditos": { "type": "number" },
+        "estaCuadrado": { "type": "boolean" },
+        "detalles": {
+          "type": "array",
+          "items": { "$ref": "#/backend/entities/DetalleAsiento" }
+        }
+      },
+      "required": ["id", "businessId", "fecha", "concepto", "totalDebitos", "totalCreditos", "estaCuadrado", "detalles"]
+    },
+    "DetalleAsiento": {
+      "title": "DetalleAsiento",
+      "description": "Represents a single line item within an accounting entry.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "cuentaCodigo": { "type": "string" },
+        "cuentaNombre": { "type": "string" },
+        "descripcion": { "type": "string" },
+        "debito": { "type": "number" },
+        "credito": { "type": "number" }
+      },
+      "required": ["id", "cuentaCodigo", "cuentaNombre", "debito", "credito"]
+    },
+    "ActivoFijo": {
+      "title": "Activo Fijo",
+      "description": "Represents a fixed asset of the business.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "nombre": { "type": "string" },
+        "codigo": { "type": "string" },
+        "fechaAdquisicion": { "type": "string", "format": "date-time" },
+        "costoInicial": { "type": "number" },
+        "valorResidual": { "type": "number" },
+        "vidaUtil": { "type": "number" },
+        "depreciacionAcumulada": { "type": "number" },
+        "valorEnLibros": { "type": "number" },
+        "cuentaActivo": { "type": "string" },
+        "cuentaDepreciacion": { "type": "string" },
+        "cuentaGastoDepreciacion": { "type": "string" }
+      },
+      "required": ["id", "nombre", "codigo", "fechaAdquisicion", "costoInicial", "valorResidual", "vidaUtil"]
+    },
+    "CuentaContable": {
+      "title": "Cuenta Contable",
+      "description": "Represents an account in the Chart of Accounts (PUC).",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "codigo": { "type": "string" },
+        "nombre": { "type": "string" },
+        "tipo": { "type": "string", "enum": ["Activo", "Pasivo", "Patrimonio", "Ingresos", "Costos", "Gastos"] },
+        "saldo": { "type": "number" },
+        "esCuentaMayor": { "type": "boolean" },
+        "permiteMovimientos": { "type": "boolean" }
+      },
+      "required": ["id", "codigo", "nombre", "tipo", "saldo", "esCuentaMayor", "permiteMovimientos"]
+    },
+    "Impuesto": {
+      "title": "Impuesto",
+      "description": "Defines a tax applicable to the business.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "nombre": { "type": "string" },
+        "tipo": { "type": "string", "enum": ["IVA", "Retefuente", "ICA", "Consumo"] },
+        "tasa": { "type": "number" },
+        "cuentaContableCompras": { "type": "string" },
+        "cuentaContableVentas": { "type": "string" },
+        "activo": { "type": "boolean" }
+      },
+      "required": ["id", "nombre", "tipo", "tasa", "activo"]
+    },
+    "DeclaracionImpuesto": {
+      "title": "Declaracion de Impuesto",
+      "description": "Represents a filed tax declaration.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "periodo": { "type": "string" },
+        "impuestoId": { "type": "string" },
+        "baseGravable": { "type": "number" },
+        "valorCalculado": { "type": "number" },
+        "valorPagado": { "type": "number" },
+        "fechaPresentacion": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "periodo", "impuestoId", "baseGravable", "valorCalculado", "valorPagado", "fechaPresentacion"]
     }
   },
   "auth": {
@@ -1014,6 +1113,66 @@
           "description": "Stores the menu sharing configuration for a specific business.",
           "params": [
             { "name": "businessId", "description": "The unique identifier for the business." }
+          ]
+        }
+      },
+      {
+        "path": "/businesses/{businessId}/asientos/{asientoId}",
+        "definition": {
+          "entityName": "AsientoContable",
+          "schema": { "$ref": "#/backend/entities/AsientoContable" },
+          "description": "Stores accounting entries for a business.",
+          "params": [
+            { "name": "businessId", "description": "The unique identifier for the business." },
+            { "name": "asientoId", "description": "The unique identifier for the accounting entry." }
+          ]
+        }
+      },
+      {
+        "path": "/businesses/{businessId}/cuentas/{cuentaId}",
+        "definition": {
+          "entityName": "CuentaContable",
+          "schema": { "$ref": "#/backend/entities/CuentaContable" },
+          "description": "Stores the chart of accounts for a business.",
+          "params": [
+            { "name": "businessId", "description": "The unique identifier for the business." },
+            { "name": "cuentaId", "description": "The unique identifier for the account." }
+          ]
+        }
+      },
+      {
+        "path": "/businesses/{businessId}/activosFijos/{activoId}",
+        "definition": {
+          "entityName": "ActivoFijo",
+          "schema": { "$ref": "#/backend/entities/ActivoFijo" },
+          "description": "Stores fixed assets for a business.",
+          "params": [
+            { "name": "businessId", "description": "The unique identifier for the business." },
+            { "name": "activoId", "description": "The unique identifier for the fixed asset." }
+          ]
+        }
+      },
+      {
+        "path": "/businesses/{businessId}/impuestos/{impuestoId}",
+        "definition": {
+          "entityName": "Impuesto",
+          "schema": { "$ref": "#/backend/entities/Impuesto" },
+          "description": "Stores tax configurations for a business.",
+          "params": [
+            { "name": "businessId", "description": "The unique identifier for the business." },
+            { "name": "impuestoId", "description": "The unique identifier for the tax." }
+          ]
+        }
+      },
+      {
+        "path": "/businesses/{businessId}/declaracionesImpuestos/{declaracionId}",
+        "definition": {
+          "entityName": "DeclaracionImpuesto",
+          "schema": { "$ref": "#/backend/entities/DeclaracionImpuesto" },
+          "description": "Stores tax declarations for a business.",
+          "params": [
+            { "name": "businessId", "description": "The unique identifier for the business." },
+            { "name": "declaracionId", "description": "The unique identifier for the tax declaration." }
           ]
         }
       },

@@ -79,7 +79,6 @@ service cloud.firestore {
         allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
       }
 
-
       // Private subcollections
       match /products/{productId} {
         allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
@@ -117,6 +116,23 @@ service cloud.firestore {
         allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
       }
 
+      // Contabilidad
+      match /asientos/{asientoId} {
+        allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
+      }
+      match /cuentas/{cuentaId} {
+        allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
+      }
+      match /activosFijos/{activoId} {
+        allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
+      }
+      match /impuestos/{impuestoId} {
+        allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
+      }
+      match /declaracionesImpuestos/{declaracionId} {
+        allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
+      }
+      
       // Chatbot specific rules
       match /chatbotConfig/main {
         allow read, write: if isBusinessMember(businessId) || isSuperAdmin();

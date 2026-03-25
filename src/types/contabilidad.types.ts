@@ -28,6 +28,7 @@ export interface AsientoContable {
   estaCuadrado: boolean;
   documentoReferencia?: string;
   detalles: DetalleAsiento[];
+  businessId?: string;
 }
 
 export type TipoImpuesto = 'IVA' | 'Retefuente' | 'ICA' | 'Consumo';
