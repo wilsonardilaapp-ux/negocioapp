@@ -29,3 +29,25 @@ export interface AsientoContable {
   documentoReferencia?: string;
   detalles: DetalleAsiento[];
 }
+
+export type TipoImpuesto = 'IVA' | 'Retefuente' | 'ICA' | 'Consumo';
+
+export interface Impuesto {
+  id: string;
+  nombre: string;
+  tipo: TipoImpuesto;
+  tasa: number; // Percentage
+  cuentaContableCompras: string; // PUC code
+  cuentaContableVentas: string; // PUC code
+  activo: boolean;
+}
+
+export interface DeclaracionImpuesto {
+  id: string;
+  periodo: string; // e.g., '2023-10'
+  impuestoId: string;
+  baseGravable: number;
+  valorCalculado: number;
+  valorPagado: number;
+  fechaPresentacion: string; // ISO Date
+}

@@ -6,10 +6,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import InventarioKardex from './InventarioKardex';
 import KardexResumen from './secciones/KardexResumen';
 import PlanDeCuentas from './secciones/PlanDeCuentas';
-import AsientosContables from './secciones/AsientosContables'; // Importar el nuevo componente
+import AsientosContables from './secciones/AsientosContables';
+import Impuestos from './secciones/Impuestos';
 import { useInventarioKardex } from '@/hooks/useInventarioKardex';
 
-// Placeholder para las secciones existentes
 const PlaceholderSection = ({ title }: { title: string }) => (
     <Card>
         <CardHeader>
@@ -64,6 +64,8 @@ export default function Contabilidad() {
                     <PlanDeCuentas />
                 ) : section.id === 'asientos' ? (
                     <AsientosContables />
+                ) : section.id === 'impuestos' ? (
+                    <Impuestos />
                 ) : (
                     <PlaceholderSection title={section.label} />
                 )}
