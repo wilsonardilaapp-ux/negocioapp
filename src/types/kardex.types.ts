@@ -52,18 +52,20 @@ export interface MovimientoKardex {
   cantidad: number;
   costoUnitario: number;
   costoTotal: number;
-  saldoCantidad?: number;
-  saldoValorTotal?: number;
+  saldoCantidad?: number; // Opcional, se calculará dinámicamente
+  saldoValorTotal?: number; // Opcional, se calculará dinámicamente
   observaciones: string;
   bodegaOrigen?: string;
   bodegaDestino?: string;
 }
 
 export interface LineaKardexCalculada {
-  movimiento: MovimientoKardex;
-  costoUnitarioResultante: number;
-  saldoCantidad: number;
-  saldoValorTotal: number;
+  fecha: string;
+  concepto: string;
+  documento: string;
+  entrada: { cantidad: number; costoUnitario: number; costoTotal: number } | null;
+  salida: { cantidad: number; costoUnitario: number; costoTotal: number } | null;
+  saldo: { cantidad: number; costoUnitario: number; costoTotal: number };
 }
 
 export interface ResumenKardex {

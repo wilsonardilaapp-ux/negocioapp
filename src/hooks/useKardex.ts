@@ -70,7 +70,7 @@ export function useKardex() {
   const determinarEstadoStock = (stock: number, min: number, max: number): EstadoStock => {
       if (stock <= 0) return 'agotado';
       if (stock <= min) return 'bajo';
-      if (stock > max) return 'sobre_stock';
+      if (max > 0 && stock > max) return 'sobre_stock';
       return 'normal';
   };
 
@@ -113,7 +113,7 @@ export function useKardex() {
       }
     }
     
-    const nuevoMovimientoData: Omit<MovimientoKardex, 'id'> = { ...form, costoTotal, saldoCantidad: 0, saldoValorTotal: 0 };
+    const nuevoMovimientoData: Omit<MovimientoKardex, 'id'> = { ...form, costoTotal, observaciones: form.observaciones || '' };
     const movCollectionRef = collection(firestore, `businesses/${user.uid}/kardexMovimientos`);
     await addDocumentNonBlocking(movCollectionRef, nuevoMovimientoData);
 
@@ -154,57 +154,72 @@ export function useKardex() {
     let capas: { cantidad: number; costoUnitario: number }[] = [];
 
     for (const mov of movimientosProducto) {
-      let costoUnitarioResultante = mov.costoUnitario;
+      let entrada = null;
+      let salida = null;
 
       if (mov.tipo.startsWith('entrada')) {
+        entrada = {
+          cantidad: mov.cantidad,
+          costoUnitario: mov.costoUnitario,
+          costoTotal: mov.costoTotal,
+        };
         saldoCantidad += mov.cantidad;
         saldoValorTotal += mov.costoTotal;
-        costoUnitarioResultante = mov.costoUnitario;
-        
+
         if (metodo === 'peps' || metodo === 'ueps') {
           capas.push({ cantidad: mov.cantidad, costoUnitario: mov.costoUnitario });
         }
-
       } else if (mov.tipo.startsWith('salida')) {
         let costoSalidaTotal = 0;
-        let cantidadSalida = mov.cantidad;
+        let costoUnitarioSalida = 0;
 
         if (metodo === 'promedio_ponderado') {
-          costoUnitarioResultante = saldoCantidad > 0 ? saldoValorTotal / saldoCantidad : 0;
-          costoSalidaTotal = cantidadSalida * costoUnitarioResultante;
+          costoUnitarioSalida = saldoCantidad > 0 ? saldoValorTotal / saldoCantidad : 0;
+          costoSalidaTotal = mov.cantidad * costoUnitarioSalida;
         } else {
-          let costoAcumuladoSalida = 0;
-          let cantidadProcesada = 0;
-          
-          while (cantidadSalida > 0 && capas.length > 0) {
+          let cantidadSalidaRestante = mov.cantidad;
+          let costoAcumulado = 0;
+
+          while (cantidadSalidaRestante > 0 && capas.length > 0) {
             const capaIndex = metodo === 'peps' ? 0 : capas.length - 1;
             const capa = capas[capaIndex];
+            const cantidadAConsumir = Math.min(cantidadSalidaRestante, capa.cantidad);
             
-            const cantidadAConsumir = Math.min(cantidadSalida, capa.cantidad);
-            
-            costoAcumuladoSalida += cantidadAConsumir * capa.costoUnitario;
-            cantidadProcesada += cantidadAConsumir;
-            
+            costoAcumulado += cantidadAConsumir * capa.costoUnitario;
             capa.cantidad -= cantidadAConsumir;
-            cantidadSalida -= cantidadAConsumir;
+            cantidadSalidaRestante -= cantidadAConsumir;
 
             if (capa.cantidad === 0) {
               if (metodo === 'peps') capas.shift(); else capas.pop();
             }
           }
-          costoSalidaTotal = costoAcumuladoSalida;
-          costoUnitarioResultante = cantidadProcesada > 0 ? costoAcumuladoSalida / cantidadProcesada : 0;
+          costoSalidaTotal = costoAcumulado;
+          costoUnitarioSalida = mov.cantidad > 0 ? costoSalidaTotal / mov.cantidad : 0;
         }
         
+        salida = {
+          cantidad: mov.cantidad,
+          costoUnitario: costoUnitarioSalida,
+          costoTotal: costoSalidaTotal,
+        };
+
         saldoCantidad -= mov.cantidad;
         saldoValorTotal -= costoSalidaTotal;
       }
       
+      const costoUnitarioSaldo = saldoCantidad > 0 ? saldoValorTotal / saldoCantidad : 0;
+
       lineas.push({
-        movimiento: mov,
-        costoUnitarioResultante,
-        saldoCantidad,
-        saldoValorTotal,
+        fecha: new Date(mov.fecha).toLocaleDateString(),
+        concepto: mov.tipo.replace(/_/g, ' '),
+        documento: mov.documento,
+        entrada,
+        salida,
+        saldo: {
+          cantidad: saldoCantidad,
+          costoUnitario: costoUnitarioSaldo,
+          costoTotal: saldoValorTotal,
+        },
       });
     }
 
@@ -229,10 +244,9 @@ export function useKardex() {
   }, [items, movimientos]);
   
   const actualizarConfiguracion = useCallback((config: ConfiguracionKardex) => {
-    setConfiguracion(config);
-    if (configDocRef) {
-      setDocumentNonBlocking(configDocRef, config, { merge: true });
-    }
+    if (!configDocRef) return;
+    setDocumentNonBlocking(configDocRef, config, { merge: true });
+    setConfiguracion(config); // Update local state optimistically
   }, [configDocRef]);
   
   const isLoading = isConfigLoading || areItemsLoading || areMovimientosLoading;

@@ -1,3 +1,4 @@
+
 'use client';
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -26,8 +27,9 @@ export default function KardexTabla({ items, calcularKardex }: KardexTablaProps)
         }
     };
     
-    const costoTotalVentas = lineas.filter(l => l.movimiento.tipo.startsWith('salida')).reduce((sum, l) => sum + (l.movimiento.cantidad * l.costoUnitarioResultante), 0);
-    const unidadesRotadas = lineas.filter(l => l.movimiento.tipo.startsWith('salida')).reduce((sum, l) => sum + l.movimiento.cantidad, 0);
+    const costoTotalVentas = lineas.reduce((sum, l) => sum + (l.salida?.costoTotal ?? 0), 0);
+    const unidadesRotadas = lineas.reduce((sum, l) => sum + (l.salida?.cantidad ?? 0), 0);
+    const diasStock = 0; // Placeholder
 
     return (
         <Card>
@@ -43,12 +45,52 @@ export default function KardexTabla({ items, calcularKardex }: KardexTablaProps)
                     <Button onClick={handleCalculate}>Calcular Kardex</Button>
                 </div>
 
-                <div className="rounded-md border"><Table><TableHeader><TableRow><TableHead>Fecha</TableHead><TableHead>Concepto</TableHead><TableHead>Doc.</TableHead><TableHead>Entrada</TableHead><TableHead>Salida</TableHead><TableHead>Saldo Cant.</TableHead><TableHead>Costo Unit.</TableHead><TableHead>Saldo Total</TableHead></TableRow></TableHeader><TableBody>
-                    {lineas.length > 0 ? lineas.map((linea, index) => (
-                        <TableRow key={index}><TableCell>{new Date(linea.movimiento.fecha).toLocaleDateString()}</TableCell><TableCell>{linea.movimiento.tipo.replace(/_/g, ' ')}</TableCell><TableCell>{linea.movimiento.documento}</TableCell><TableCell className="text-green-600">{linea.movimiento.tipo.startsWith('entrada') ? linea.movimiento.cantidad : ''}</TableCell><TableCell className="text-red-600">{linea.movimiento.tipo.startsWith('salida') ? linea.movimiento.cantidad : ''}</TableCell><TableCell>{linea.saldoCantidad}</TableCell><TableCell>{formatCurrency(linea.costoUnitarioResultante)}</TableCell><TableCell className="font-bold">{formatCurrency(linea.saldoValorTotal)}</TableCell></TableRow>
-                    )) : (<TableRow><TableCell colSpan={8} className="h-24 text-center">Selecciona un ítem y calcula para ver los datos.</TableCell></TableRow>)}
-                </TableBody></Table></div>
-                <div className="grid grid-cols-3 gap-4 mt-6">
+                <div className="rounded-md border">
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead rowSpan={2} className="align-bottom">Fecha</TableHead>
+                                <TableHead rowSpan={2} className="align-bottom">Concepto</TableHead>
+                                <TableHead colSpan={3} className="text-center border-l">Entrada</TableHead>
+                                <TableHead colSpan={3} className="text-center border-l">Salida</TableHead>
+                                <TableHead colSpan={3} className="text-center border-l">Saldo</TableHead>
+                            </TableRow>
+                             <TableRow>
+                                <TableHead className="text-center border-l">Cant.</TableHead>
+                                <TableHead className="text-right">C. Unit</TableHead>
+                                <TableHead className="text-right">C. Total</TableHead>
+                                <TableHead className="text-center border-l">Cant.</TableHead>
+                                <TableHead className="text-right">C. Unit</TableHead>
+                                <TableHead className="text-right">C. Total</TableHead>
+                                <TableHead className="text-center border-l">Cant.</TableHead>
+                                <TableHead className="text-right">C. Unit</TableHead>
+                                <TableHead className="text-right">C. Total</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {lineas.length > 0 ? lineas.map((linea, index) => (
+                                <TableRow key={index}>
+                                    <TableCell>{linea.fecha}</TableCell>
+                                    <TableCell className="capitalize">{linea.concepto}</TableCell>
+                                    <TableCell className="text-center">{linea.entrada?.cantidad ?? ''}</TableCell>
+                                    <TableCell className="text-right">{linea.entrada ? formatCurrency(linea.entrada.costoUnitario) : ''}</TableCell>
+                                    <TableCell className="text-right">{linea.entrada ? formatCurrency(linea.entrada.costoTotal) : ''}</TableCell>
+                                    <TableCell className="text-center">{linea.salida?.cantidad ?? ''}</TableCell>
+                                    <TableCell className="text-right">{linea.salida ? formatCurrency(linea.salida.costoUnitario) : ''}</TableCell>
+                                    <TableCell className="text-right">{linea.salida ? formatCurrency(linea.salida.costoTotal) : ''}</TableCell>
+                                    <TableCell className="text-center font-semibold">{linea.saldo.cantidad}</TableCell>
+                                    <TableCell className="text-right font-semibold">{formatCurrency(linea.saldo.costoUnitario)}</TableCell>
+                                    <TableCell className="text-right font-bold">{formatCurrency(linea.saldo.costoTotal)}</TableCell>
+                                </TableRow>
+                            )) : (
+                                <TableRow>
+                                    <TableCell colSpan={11} className="h-24 text-center">No hay datos para mostrar. Selecciona un ítem y calcula.</TableCell>
+                                </TableRow>
+                            )}
+                        </TableBody>
+                    </Table>
+                </div>
+                 <div className="grid grid-cols-3 gap-4 mt-6">
                     <Card><CardHeader><CardTitle>Costo de Ventas</CardTitle></CardHeader><CardContent><p className="text-2xl font-bold">{formatCurrency(costoTotalVentas)}</p></CardContent></Card>
                     <Card><CardHeader><CardTitle>Unidades Rotadas</CardTitle></CardHeader><CardContent><p className="text-2xl font-bold">{unidadesRotadas}</p></CardContent></Card>
                     <Card><CardHeader><CardTitle>Días de Stock</CardTitle></CardHeader><CardContent><p className="text-2xl font-bold">N/A</p></CardContent></Card>
@@ -57,3 +99,4 @@ export default function KardexTabla({ items, calcularKardex }: KardexTablaProps)
         </Card>
     );
 }
+
