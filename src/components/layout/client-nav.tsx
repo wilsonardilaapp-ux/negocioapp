@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -19,6 +19,7 @@ import {
   Package,
   Share2,
   HardDrive,
+  Calculator, // Importado el nuevo ícono
 } from "lucide-react";
 import { MessageCircle as MessageCircleIcon } from "@/components/icons";
 
@@ -34,6 +35,7 @@ const allNavItems = [
   { href: "/dashboard/pedidos", icon: ShoppingBag, label: "Pedidos" },
   { href: "/dashboard/empaque", icon: Package, label: "Empaque" },
   { href: "/dashboard/pagos", icon: CreditCard, label: "Pagos" },
+  { href: "/dashboard/contabilidad", icon: Calculator, label: "Contabilidad", moduleId: 'inventario-kardex' }, // Línea añadida
   { href: "/dashboard/configuracion/factura", icon: FileText, label: "Editor Factura" },
   { href: "/dashboard/configuracion/impresoras", icon: Printer, label: "Impresoras" },
   { href: "/dashboard/backups", icon: HardDrive, label: "Backups" },
