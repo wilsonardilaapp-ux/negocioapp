@@ -115,6 +115,9 @@ service cloud.firestore {
       match /backupSchedules/{scheduleId} {
         allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
       }
+      match /kardexConfig/{docId} {
+        allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
+      }
 
       // Contabilidad
       match /asientos/{asientoId} {
@@ -174,3 +177,5 @@ service cloud.firestore {
     }
   }
 }
+
+    

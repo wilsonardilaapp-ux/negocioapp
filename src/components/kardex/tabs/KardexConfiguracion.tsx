@@ -8,6 +8,9 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { ConfiguracionKardex, MetodoValuacion, Bodega } from '@/types/kardex.types';
+import { useState } from 'react';
+import { useToast } from "@/hooks/use-toast";
+import { Save } from "lucide-react";
 
 interface KardexConfiguracionProps {
     config: ConfiguracionKardex;
@@ -16,11 +19,17 @@ interface KardexConfiguracionProps {
 }
 
 export default function KardexConfiguracion({ config, setConfig, bodegas }: KardexConfiguracionProps) {
+    const { toast } = useToast();
 
     const handleConfigChange = (field: keyof ConfiguracionKardex, value: any) => {
         setConfig({...config, [field]: value});
     };
     
+    const handleSave = () => {
+        setConfig(config);
+        toast({ title: 'Configuración Guardada', description: 'Tus preferencias para el Kardex han sido guardadas.' });
+    };
+
     return (
         <div className="grid md:grid-cols-2 gap-6">
             <Card>
@@ -38,7 +47,9 @@ export default function KardexConfiguracion({ config, setConfig, bodegas }: Kard
                     </div>
                     <div className="flex items-center space-x-2"><Switch id="alertas-stock" checked={config.alertasStockMinimo} onCheckedChange={(val) => handleConfigChange('alertasStockMinimo', val)} /><Label htmlFor="alertas-stock">Activar alertas de stock mínimo</Label></div>
                     <div className="flex items-center space-x-2"><Switch id="stock-negativo" checked={config.permitirStockNegativo} onCheckedChange={(val) => handleConfigChange('permitirStockNegativo', val)} /><Label htmlFor="stock-negativo">Permitir stock negativo</Label></div>
-                    <Button className="w-full">Guardar Configuración</Button>
+                    <Button className="w-full" onClick={handleSave}>
+                        <Save className="mr-2 h-4 w-4" /> Guardar Configuración
+                    </Button>
                 </CardContent>
             </Card>
 

@@ -1,7 +1,9 @@
 
 'use client';
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useUser, useFirestore, useDoc, useMemoFirebase, setDocumentNonBlocking } from '@/firebase';
+import { doc } from 'firebase/firestore';
 import type {
   ItemInventario,
   MovimientoKardex,
@@ -15,6 +17,7 @@ import type {
   NuevoItemForm,
 } from '@/types/kardex.types';
 
+// --- DATOS DE EJEMPLO ---
 const getInitialMockData = () => {
     const items: ItemInventario[] = [
         { id: 'item-001', codigo: 'CAM-01', nombre: 'Camisa Polo Azul', tipoItem: 'producto', categoria: 'Ropa', unidadMedida: 'unidad', stockActual: 50, stockMinimo: 10, stockMaximo: 100, costoUnitario: 35000, cuentaContablePUC: '143501', bodega: 'Principal', estado: 'normal', activo: true },
@@ -38,18 +41,37 @@ const getInitialMockData = () => {
     return { items, movimientos, bodegas };
 }
 
-export function useKardex() {
-  const [items, setItems] = useState<ItemInventario[]>(() => getInitialMockData().items);
-  const [movimientos, setMovimientos] = useState<MovimientoKardex[]>(() => getInitialMockData().movimientos);
-  const [configuracion, setConfiguracion] = useState<ConfiguracionKardex>({
+const initialConfig: ConfiguracionKardex = {
     metodoValuacion: 'promedio_ponderado',
     generarAsientoAutomatico: false,
     cuentaInventarioPUC: '1435',
     cuentaCostoVentasPUC: '6135',
     alertasStockMinimo: true,
     permitirStockNegativo: false,
-  });
+};
+
+export function useKardex() {
+  const [items, setItems] = useState<ItemInventario[]>(() => getInitialMockData().items);
+  const [movimientos, setMovimientos] = useState<MovimientoKardex[]>(() => getInitialMockData().movimientos);
+  const [configuracion, setConfiguracion] = useState<ConfiguracionKardex>(initialConfig);
   const [bodegas, setBodegas] = useState<Bodega[]>(() => getInitialMockData().bodegas);
+
+  const { user } = useUser();
+  const firestore = useFirestore();
+
+  const configDocRef = useMemoFirebase(
+    () => (user ? doc(firestore, `businesses/${user.uid}/kardexConfig`, 'main') : null),
+    [user, firestore]
+  );
+  
+  const { data: savedConfig, isLoading: isConfigLoading } = useDoc<ConfiguracionKardex>(configDocRef);
+
+  useEffect(() => {
+    if (savedConfig) {
+      setConfiguracion(prev => ({ ...prev, ...savedConfig }));
+    }
+  }, [savedConfig]);
+
 
   const registrarOActualizarItem = useCallback((data: NuevoItemForm) => {
     setItems(prevItems => {
@@ -120,7 +142,6 @@ export function useKardex() {
     let saldoCantidad = 0;
     let saldoValorTotal = 0;
     
-    // For PEPS/UEPS, we need to track layers of inventory
     let capas: { cantidad: number; costoUnitario: number }[] = [];
 
     for (const mov of movimientosProducto) {
@@ -142,7 +163,7 @@ export function useKardex() {
         if (metodo === 'promedio_ponderado') {
           costoUnitarioResultante = saldoCantidad > 0 ? saldoValorTotal / saldoCantidad : 0;
           costoSalidaTotal = cantidadSalida * costoUnitarioResultante;
-        } else { // PEPS o UEPS
+        } else {
           let costoAcumuladoSalida = 0;
           let cantidadProcesada = 0;
           
@@ -202,9 +223,12 @@ export function useKardex() {
     return { totalItems, totalProductos, totalInsumos, valorTotalInventario, costoVentasMes, itemsBajoMinimo, itemsAgotados, movimientosMes };
   }, [items, movimientos]);
   
-  const actualizarConfiguracion = (config: ConfiguracionKardex) => {
+  const actualizarConfiguracion = useCallback((config: ConfiguracionKardex) => {
     setConfiguracion(config);
-  };
+    if (configDocRef) {
+      setDocumentNonBlocking(configDocRef, config, { merge: true });
+    }
+  }, [configDocRef]);
   
   const determinarEstadoStock = (stock: number, min: number, max: number): EstadoStock => {
       if (stock <= 0) return 'agotado';
@@ -223,5 +247,6 @@ export function useKardex() {
     calcularKardex,
     actualizarConfiguracion,
     registrarOActualizarItem,
+    isLoading: isConfigLoading,
   };
 }
