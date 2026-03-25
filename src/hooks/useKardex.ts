@@ -2,8 +2,8 @@
 'use client';
 
 import { useState, useMemo, useCallback, useEffect } from 'react';
-import { useUser, useFirestore, useDoc, useMemoFirebase, setDocumentNonBlocking } from '@/firebase';
-import { doc } from 'firebase/firestore';
+import { useUser, useFirestore, useDoc, useCollection, useMemoFirebase, setDocumentNonBlocking, addDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase';
+import { doc, collection, query, orderBy } from 'firebase/firestore';
 import type {
   ItemInventario,
   MovimientoKardex,
@@ -17,30 +17,6 @@ import type {
   NuevoItemForm,
 } from '@/types/kardex.types';
 
-// --- DATOS DE EJEMPLO ---
-const getInitialMockData = () => {
-    const items: ItemInventario[] = [
-        { id: 'item-001', codigo: 'CAM-01', nombre: 'Camisa Polo Azul', tipoItem: 'producto', categoria: 'Ropa', unidadMedida: 'unidad', stockActual: 50, stockMinimo: 10, stockMaximo: 100, costoUnitario: 35000, cuentaContablePUC: '143501', bodega: 'Principal', estado: 'normal', activo: true },
-        { id: 'item-002', codigo: 'PAN-01', nombre: 'Pantalón Jean Clásico', tipoItem: 'producto', categoria: 'Ropa', unidadMedida: 'unidad', stockActual: 8, stockMinimo: 15, stockMaximo: 80, costoUnitario: 70000, cuentaContablePUC: '143501', bodega: 'Principal', estado: 'bajo', activo: true },
-        { id: 'item-003', codigo: 'TEN-01', nombre: 'Tenis Deportivos Blancos', tipoItem: 'producto', categoria: 'Calzado', unidadMedida: 'par', stockActual: 0, stockMinimo: 5, stockMaximo: 50, costoUnitario: 120000, cuentaContablePUC: '143501', bodega: 'Principal', estado: 'agotado', activo: true },
-        { id: 'item-004', codigo: 'GOR-01', nombre: 'Gorra Negra Logo', tipoItem: 'producto', categoria: 'Accesorios', unidadMedida: 'unidad', stockActual: 120, stockMinimo: 20, stockMaximo: 100, costoUnitario: 25000, cuentaContablePUC: '143501', bodega: 'Principal', estado: 'sobre_stock', activo: true },
-        { id: 'item-005', codigo: 'INS-01', nombre: 'Hilo de Algodón (metro)', tipoItem: 'insumo', categoria: 'Materia Prima', unidadMedida: 'metro', stockActual: 500, stockMinimo: 100, stockMaximo: 1000, costoUnitario: 200, cuentaContablePUC: '140501', bodega: 'Principal', estado: 'normal', activo: true },
-        { id: 'item-006', codigo: 'INS-02', nombre: 'Botón Plástico (unidad)', tipoItem: 'insumo', categoria: 'Materia Prima', unidadMedida: 'unidad', stockActual: 2000, stockMinimo: 500, stockMaximo: 5000, costoUnitario: 50, cuentaContablePUC: '140501', bodega: 'Principal', estado: 'normal', activo: true },
-        { id: 'item-007', codigo: 'INS-03', nombre: 'Etiqueta de Marca (unidad)', tipoItem: 'insumo', categoria: 'Materia Prima', unidadMedida: 'unidad', stockActual: 800, stockMinimo: 200, stockMaximo: 2000, costoUnitario: 150, cuentaContablePUC: '140501', bodega: 'Principal', estado: 'normal', activo: true },
-    ];
-    const movimientos: MovimientoKardex[] = [
-        { id: 'mov-001', fecha: '2023-10-01T10:00:00Z', tipo: 'entrada_compra', itemId: 'item-001', documento: 'FC-1020', cantidad: 40, costoUnitario: 34000, costoTotal: 1360000, saldoCantidad: 40, saldoValorTotal: 1360000, observaciones: 'Compra inicial' },
-        { id: 'mov-002', fecha: '2023-10-05T14:00:00Z', tipo: 'salida_venta', itemId: 'item-001', documento: 'FV-501', cantidad: 10, costoUnitario: 34000, costoTotal: 340000, saldoCantidad: 30, saldoValorTotal: 1020000, observaciones: 'Venta cliente minorista' },
-        { id: 'mov-003', fecha: '2023-10-10T11:00:00Z', tipo: 'entrada_compra', itemId: 'item-001', documento: 'FC-1055', cantidad: 30, costoUnitario: 36000, costoTotal: 1080000, saldoCantidad: 60, saldoValorTotal: 2100000, observaciones: 'Re-stock' },
-        { id: 'mov-004', fecha: '2023-10-15T09:30:00Z', tipo: 'salida_venta', itemId: 'item-001', documento: 'FV-520', cantidad: 10, costoUnitario: 35000, costoTotal: 350000, saldoCantidad: 50, saldoValorTotal: 1750000, observaciones: '' },
-    ];
-    const bodegas: Bodega[] = [
-        { id: 'bod-01', nombre: 'Bodega Principal', descripcion: 'Almacén central', totalItems: 7, valorTotal: 0 },
-        { id: 'bod-02', nombre: 'Bodega Secundaria', descripcion: 'Punto de venta', totalItems: 0, valorTotal: 0 },
-    ];
-    return { items, movimientos, bodegas };
-}
-
 const initialConfig: ConfiguracionKardex = {
     metodoValuacion: 'promedio_ponderado',
     generarAsientoAutomatico: false,
@@ -50,21 +26,40 @@ const initialConfig: ConfiguracionKardex = {
     permitirStockNegativo: false,
 };
 
-export function useKardex() {
-  const [items, setItems] = useState<ItemInventario[]>(() => getInitialMockData().items);
-  const [movimientos, setMovimientos] = useState<MovimientoKardex[]>(() => getInitialMockData().movimientos);
-  const [configuracion, setConfiguracion] = useState<ConfiguracionKardex>(initialConfig);
-  const [bodegas, setBodegas] = useState<Bodega[]>(() => getInitialMockData().bodegas);
+const initialBodegas: Bodega[] = [
+    { id: 'bod-01', nombre: 'Bodega Principal', descripcion: 'Almacén central', totalItems: 0, valorTotal: 0 },
+    { id: 'bod-02', nombre: 'Bodega Secundaria', descripcion: 'Punto de venta', totalItems: 0, valorTotal: 0 },
+];
 
+export function useKardex() {
   const { user } = useUser();
   const firestore = useFirestore();
 
+  // Firestore References
   const configDocRef = useMemoFirebase(
     () => (user ? doc(firestore, `businesses/${user.uid}/kardexConfig`, 'main') : null),
     [user, firestore]
   );
-  
+  const itemsQuery = useMemoFirebase(
+    () => (user ? collection(firestore, `businesses/${user.uid}/kardexItems`) : null),
+    [user, firestore]
+  );
+  const movimientosQuery = useMemoFirebase(
+    () => (user ? query(collection(firestore, `businesses/${user.uid}/kardexMovimientos`), orderBy('fecha', 'asc')) : null),
+    [user, firestore]
+  );
+
+  // Data fetching
   const { data: savedConfig, isLoading: isConfigLoading } = useDoc<ConfiguracionKardex>(configDocRef);
+  const { data: itemsData, isLoading: areItemsLoading } = useCollection<ItemInventario>(itemsQuery);
+  const { data: movimientosData, isLoading: areMovimientosLoading } = useCollection<MovimientoKardex>(movimientosQuery);
+
+  // State
+  const [configuracion, setConfiguracion] = useState<ConfiguracionKardex>(initialConfig);
+  const [bodegas, setBodegas] = useState<Bodega[]>(initialBodegas);
+
+  const items = itemsData ?? [];
+  const movimientos = movimientosData ?? [];
 
   useEffect(() => {
     if (savedConfig) {
@@ -72,66 +67,81 @@ export function useKardex() {
     }
   }, [savedConfig]);
 
+  const determinarEstadoStock = (stock: number, min: number, max: number): EstadoStock => {
+      if (stock <= 0) return 'agotado';
+      if (stock <= min) return 'bajo';
+      if (stock > max) return 'sobre_stock';
+      return 'normal';
+  };
 
-  const registrarOActualizarItem = useCallback((data: NuevoItemForm) => {
-    setItems(prevItems => {
+  const registrarOActualizarItem = useCallback(async (data: NuevoItemForm) => {
+    if (!user || !firestore) return;
+    const itemCollectionRef = collection(firestore, `businesses/${user.uid}/kardexItems`);
+
+    if (data.id) { // Update
+        const itemDocRef = doc(itemCollectionRef, data.id);
+        const itemToUpdate = { ...data };
+        delete itemToUpdate.id;
+        await setDocumentNonBlocking(itemDocRef, itemToUpdate, { merge: true });
+    } else { // Create
         const estado = determinarEstadoStock(0, data.stockMinimo, data.stockMaximo);
+        const nuevoItem: Omit<ItemInventario, 'id'> = {
+            ...data,
+            stockActual: 0,
+            estado,
+            activo: true,
+        };
+        await addDocumentNonBlocking(itemCollectionRef, nuevoItem);
+    }
+  }, [user, firestore]);
 
-        if (data.id) { // Actualizar
-            return prevItems.map(item => item.id === data.id ? { ...item, ...data } : item);
-        } else { // Crear
-            const nuevoItem: ItemInventario = {
-                ...data,
-                id: `item-${Date.now()}`,
-                stockActual: 0,
-                estado,
-                activo: true,
-            };
-            return [nuevoItem, ...prevItems];
-        }
-    });
-  }, []);
+  const registrarMovimiento = useCallback(async (form: NuevoMovimientoForm) => {
+    if (!user || !firestore || !items) {
+      throw new Error('Usuario, base de datos o ítems no disponibles.');
+    }
 
-  const registrarMovimiento = useCallback((form: NuevoMovimientoForm) => {
-    setMovimientos(prevMovs => {
-      const item = items.find(i => i.id === form.itemId);
-      if (!item) return prevMovs;
+    const item = items.find(i => i.id === form.itemId);
+    if (!item) {
+      throw new Error('El ítem seleccionado no existe.');
+    }
 
-      const costoTotal = form.cantidad * form.costoUnitario;
-      const ultimoMovimiento = prevMovs.filter(m => m.itemId === form.itemId).pop();
-      const saldoAnterior = ultimoMovimiento ? { cant: ultimoMovimiento.saldoCantidad, total: ultimoMovimiento.saldoValorTotal } : { cant: 0, total: 0 };
-      
-      let nuevoSaldoCantidad = saldoAnterior.cant;
-      let nuevoSaldoValorTotal = saldoAnterior.total;
+    const costoTotal = form.cantidad * form.costoUnitario;
 
-      if (form.tipo.startsWith('entrada')) {
-        nuevoSaldoCantidad += form.cantidad;
-        nuevoSaldoValorTotal += costoTotal;
-      } else {
-        if (!configuracion.permitirStockNegativo && form.cantidad > item.stockActual) {
-          throw new Error('Stock insuficiente para la salida.');
-        }
-        nuevoSaldoCantidad -= form.cantidad;
-        let costoSalida = costoTotal;
-        if(configuracion.metodoValuacion === 'promedio_ponderado' && saldoAnterior.cant > 0) {
-            costoSalida = form.cantidad * (saldoAnterior.total / saldoAnterior.cant);
-        }
-        nuevoSaldoValorTotal -= costoSalida;
+    if (form.tipo.startsWith('salida')) {
+      if (!configuracion.permitirStockNegativo && form.cantidad > item.stockActual) {
+        throw new Error('Stock insuficiente para la salida.');
       }
-      
-      const nuevoMovimiento: MovimientoKardex = { ...form, id: `mov-${Date.now()}`, costoTotal, saldoCantidad: nuevoSaldoCantidad, saldoValorTotal: nuevoSaldoValorTotal };
-      
-      setItems(prevItems => prevItems.map(p => {
-          if (p.id === form.itemId) {
-              const estado = determinarEstadoStock(nuevoSaldoCantidad, p.stockMinimo, p.stockMaximo);
-              return { ...p, stockActual: nuevoSaldoCantidad, estado };
-          }
-          return p;
-      }));
+    }
+    
+    const nuevoMovimientoData: Omit<MovimientoKardex, 'id'> = { ...form, costoTotal, saldoCantidad: 0, saldoValorTotal: 0 };
+    const movCollectionRef = collection(firestore, `businesses/${user.uid}/kardexMovimientos`);
+    await addDocumentNonBlocking(movCollectionRef, nuevoMovimientoData);
 
-      return [...prevMovs, nuevoMovimiento];
-    });
-  }, [items, configuracion.permitirStockNegativo, configuracion.metodoValuacion]);
+    const nuevoStockActual = form.tipo.startsWith('entrada')
+      ? item.stockActual + form.cantidad
+      : item.stockActual - form.cantidad;
+      
+    const nuevoEstado = determinarEstadoStock(nuevoStockActual, item.stockMinimo, item.stockMaximo);
+    
+    const updatedItemData: Partial<ItemInventario> = {
+        stockActual: nuevoStockActual,
+        estado: nuevoEstado,
+    };
+
+    if (form.tipo === 'entrada_compra') {
+        if (configuracion.metodoValuacion === 'promedio_ponderado') {
+            const valorTotalAnterior = item.stockActual * item.costoUnitario;
+            const nuevoValorTotal = valorTotalAnterior + costoTotal;
+            updatedItemData.costoUnitario = nuevoStockActual > 0 ? nuevoValorTotal / nuevoStockActual : form.costoUnitario;
+        } else {
+            updatedItemData.costoUnitario = form.costoUnitario;
+        }
+    }
+    
+    const itemDocRef = doc(firestore, `businesses/${user.uid}/kardexItems`, item.id);
+    await updateDocumentNonBlocking(itemDocRef, updatedItemData);
+
+  }, [user, firestore, items, configuracion]);
 
   const calcularKardex = useCallback((itemId: string, metodo: MetodoValuacion): LineaKardexCalculada[] => {
     const movimientosProducto = movimientos
@@ -141,7 +151,6 @@ export function useKardex() {
     const lineas: LineaKardexCalculada[] = [];
     let saldoCantidad = 0;
     let saldoValorTotal = 0;
-    
     let capas: { cantidad: number; costoUnitario: number }[] = [];
 
     for (const mov of movimientosProducto) {
@@ -180,11 +189,7 @@ export function useKardex() {
             cantidadSalida -= cantidadAConsumir;
 
             if (capa.cantidad === 0) {
-              if (metodo === 'peps') {
-                capas.shift();
-              } else {
-                capas.pop();
-              }
+              if (metodo === 'peps') capas.shift(); else capas.pop();
             }
           }
           costoSalidaTotal = costoAcumuladoSalida;
@@ -230,12 +235,7 @@ export function useKardex() {
     }
   }, [configDocRef]);
   
-  const determinarEstadoStock = (stock: number, min: number, max: number): EstadoStock => {
-      if (stock <= 0) return 'agotado';
-      if (stock <= min) return 'bajo';
-      if (stock > max) return 'sobre_stock';
-      return 'normal';
-  };
+  const isLoading = isConfigLoading || areItemsLoading || areMovimientosLoading;
 
   return {
     items,
@@ -247,6 +247,8 @@ export function useKardex() {
     calcularKardex,
     actualizarConfiguracion,
     registrarOActualizarItem,
-    isLoading: isConfigLoading,
+    isLoading,
   };
 }
+
+  

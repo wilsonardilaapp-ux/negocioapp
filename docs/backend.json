@@ -887,6 +887,47 @@
             "alertasStockMinimo": { "type": "boolean" },
             "permitirStockNegativo": { "type": "boolean" }
         }
+    },
+    "ItemInventario": {
+      "title": "ItemInventario",
+      "description": "Represents a single inventory item (product or supply) in the Kardex system.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "codigo": { "type": "string" },
+        "nombre": { "type": "string" },
+        "tipoItem": { "type": "string", "enum": ["producto", "insumo"] },
+        "categoria": { "type": "string" },
+        "unidadMedida": { "type": "string" },
+        "stockActual": { "type": "number" },
+        "stockMinimo": { "type": "number" },
+        "stockMaximo": { "type": "number" },
+        "costoUnitario": { "type": "number" },
+        "cuentaContablePUC": { "type": "string" },
+        "bodega": { "type": "string" },
+        "estado": { "type": "string", "enum": ["normal", "bajo", "agotado", "sobre_stock"] },
+        "activo": { "type": "boolean" }
+      },
+      "required": ["id", "codigo", "nombre", "tipoItem", "categoria", "unidadMedida", "stockActual", "costoUnitario", "bodega", "estado", "activo"]
+    },
+    "MovimientoKardex": {
+      "title": "MovimientoKardex",
+      "description": "Represents a single inventory movement in the Kardex system.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "fecha": { "type": "string", "format": "date-time" },
+        "tipo": { "type": "string", "enum": ["entrada_compra", "entrada_devolucion_cliente", "salida_venta", "salida_devolucion_proveedor", "ajuste_danio", "ajuste_inventario_fisico", "transferencia_bodega"] },
+        "itemId": { "type": "string" },
+        "documento": { "type": "string" },
+        "cantidad": { "type": "number" },
+        "costoUnitario": { "type": "number" },
+        "costoTotal": { "type": "number" },
+        "observaciones": { "type": "string" },
+        "bodegaOrigen": { "type": "string" },
+        "bodegaDestino": { "type": "string" }
+      },
+      "required": ["id", "fecha", "tipo", "itemId", "documento", "cantidad", "costoUnitario", "costoTotal"]
     }
   },
   "auth": {
@@ -1089,6 +1130,30 @@
           "description": "Stores the Kardex configuration for a specific business.",
           "params": [
             { "name": "businessId", "description": "The unique identifier for the business." }
+          ]
+        }
+      },
+      {
+        "path": "/businesses/{businessId}/kardexItems/{itemId}",
+        "definition": {
+          "entityName": "ItemInventario",
+          "schema": { "$ref": "#/backend/entities/ItemInventario" },
+          "description": "Stores Kardex inventory items for a specific business.",
+          "params": [
+            { "name": "businessId", "description": "The unique identifier for the business." },
+            { "name": "itemId", "description": "The unique identifier for the inventory item." }
+          ]
+        }
+      },
+      {
+        "path": "/businesses/{businessId}/kardexMovimientos/{movimientoId}",
+        "definition": {
+          "entityName": "MovimientoKardex",
+          "schema": { "$ref": "#/backend/entities/MovimientoKardex" },
+          "description": "Stores Kardex inventory movements for a specific business.",
+          "params": [
+            { "name": "businessId", "description": "The unique identifier for the business." },
+            { "name": "movimientoId", "description": "The unique identifier for the inventory movement." }
           ]
         }
       },
@@ -1300,5 +1365,4 @@
     "reasoning": "The Firestore structure is designed to ensure Authorization Independence and support the application's QAPs (Queries are not Filters). Authorization Independence is achieved by avoiding `get()` calls in security rules through denormalization.  Specifically, the `LandingPage`, `Product`, `ContactForm`, `ContactSubmission` and `ChatbotConfig` subcollections under `/businesses/{businessId}` include the `businessId` field, which duplicates the parent document's ID, but allows security rules to validate access without requiring a `get()` call to the parent `business` document.\n\nStructural Segregation is applied by separating user-specific data (`/users/{userId}`) from business-related data (`/businesses/{businessId}/...`).  Each collection has a homogeneous security posture. Path-based ownership (`/users/{userId}`) is used for private user data like payment settings.\n\nThe membership model is implicitly supported through the businessId on resources linked to each business.\n\nGlobal roles are managed using content over existence, within the User document under role (e.g., `/users/{uid}` has `role: 'super_admin'`).\n\nQAPs (Rules are not Filters) are supported through structural segregation. Listing operations are secured based on the path and, where applicable, the denormalized `businessId` field in subcollections, allowing secure querying without filtering on insecure data.\n\nExplicit state modeling is used through the `status` field in entities like `User` and `SystemService`."
   }
 }
-
-    
+  

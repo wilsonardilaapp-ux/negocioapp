@@ -118,6 +118,12 @@ service cloud.firestore {
       match /kardexConfig/{docId} {
         allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
       }
+      match /kardexItems/{itemId} {
+        allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
+      }
+      match /kardexMovimientos/{movimientoId} {
+        allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
+      }
 
       // Contabilidad
       match /asientos/{asientoId} {
@@ -178,4 +184,4 @@ service cloud.firestore {
   }
 }
 
-    
+  

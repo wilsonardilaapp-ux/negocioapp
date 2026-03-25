@@ -52,8 +52,8 @@ export interface MovimientoKardex {
   cantidad: number;
   costoUnitario: number;
   costoTotal: number;
-  saldoCantidad: number;
-  saldoValorTotal: number;
+  saldoCantidad?: number;
+  saldoValorTotal?: number;
   observaciones: string;
   bodegaOrigen?: string;
   bodegaDestino?: string;
@@ -113,3 +113,5 @@ export interface Bodega {
   totalItems: number;
   valorTotal: number;
 }
+
+  
