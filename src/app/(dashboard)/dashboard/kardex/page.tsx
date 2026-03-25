@@ -1,8 +1,7 @@
-
 'use client';
 
 import { useState } from 'react';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useKardex } from '@/hooks/useKardex';
 import type { TabKardex } from '@/types/kardex.types';
@@ -40,7 +39,7 @@ export default function KardexPage() {
                 </TabsContent>
                 <TabsContent value="kardex">
                     <KardexTabla 
-                        items={kardexData.items} 
+                        items={kardexData.items}
                         calcularKardex={kardexData.calcularKardex}
                     />
                 </TabsContent>

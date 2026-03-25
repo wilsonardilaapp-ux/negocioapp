@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useCallback } from 'react';
@@ -85,31 +84,79 @@ export function useKardex() {
   }, [items, configuracion.permitirStockNegativo, configuracion.metodoValuacion]);
 
   const calcularKardex = useCallback((itemId: string, metodo: MetodoValuacion): LineaKardexCalculada[] => {
-    // Placeholder implementation, a real implementation would be more complex
-    const movs = movimientos.filter(m => m.itemId === itemId).sort((a,b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime());
+    const movimientosProducto = movimientos
+      .filter(m => m.itemId === itemId)
+      .sort((a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime());
+
+    const lineas: LineaKardexCalculada[] = [];
     let saldoCantidad = 0;
     let saldoValorTotal = 0;
     
-    return movs.map(mov => {
-        let costoUnitarioResultante = mov.costoUnitario;
-        if (mov.tipo.startsWith('entrada')) {
-            saldoCantidad += mov.cantidad;
-            saldoValorTotal += mov.costoTotal;
-        } else {
-            if(metodo === 'promedio_ponderado' && saldoCantidad > 0){
-                costoUnitarioResultante = saldoValorTotal / saldoCantidad;
-            }
-            saldoCantidad -= mov.cantidad;
-            saldoValorTotal -= (mov.cantidad * costoUnitarioResultante);
-        }
-        return {
-            movimiento: mov,
-            costoUnitarioResultante,
-            saldoCantidad,
-            saldoValorTotal,
-        }
-    });
+    // For PEPS/UEPS, we need to track layers of inventory
+    let capas: { cantidad: number; costoUnitario: number }[] = [];
 
+    for (const mov of movimientosProducto) {
+      let costoUnitarioResultante = mov.costoUnitario;
+
+      if (mov.tipo.startsWith('entrada')) {
+        saldoCantidad += mov.cantidad;
+        saldoValorTotal += mov.costoTotal;
+        costoUnitarioResultante = mov.costoUnitario;
+        
+        if (metodo === 'peps' || metodo === 'ueps') {
+          capas.push({ cantidad: mov.cantidad, costoUnitario: mov.costoUnitario });
+        }
+
+      } else if (mov.tipo.startsWith('salida')) {
+        let costoSalidaTotal = 0;
+        let cantidadSalida = mov.cantidad;
+
+        if (metodo === 'promedio_ponderado') {
+          costoUnitarioResultante = saldoCantidad > 0 ? saldoValorTotal / saldoCantidad : 0;
+          costoSalidaTotal = cantidadSalida * costoUnitarioResultante;
+        } else { // PEPS o UEPS
+          let costoAcumuladoSalida = 0;
+          let cantidadProcesada = 0;
+          
+          while (cantidadSalida > 0 && capas.length > 0) {
+            const capaIndex = metodo === 'peps' ? 0 : capas.length - 1;
+            const capa = capas[capaIndex];
+            
+            const cantidadAConsumir = Math.min(cantidadSalida, capa.cantidad);
+            
+            costoAcumuladoSalida += cantidadAConsumir * capa.costoUnitario;
+            cantidadProcesada += cantidadAConsumir;
+            
+            capa.cantidad -= cantidadAConsumir;
+            cantidadSalida -= cantidadAConsumir;
+
+            if (capa.cantidad === 0) {
+              if (metodo === 'peps') {
+                capas.shift();
+              } else {
+                capas.pop();
+              }
+            }
+          }
+          costoSalidaTotal = costoAcumuladoSalida;
+          costoUnitarioResultante = cantidadProcesada > 0 ? costoAcumuladoSalida / cantidadProcesada : 0;
+        }
+        
+        saldoCantidad -= mov.cantidad;
+        saldoValorTotal -= costoSalidaTotal;
+      }
+      
+      // Ajustes y otros tipos de movimiento pueden necesitar lógica adicional
+      
+      lineas.push({
+        movimiento: mov,
+        costoUnitarioResultante,
+        saldoCantidad,
+        saldoValorTotal,
+      });
+    }
+
+    return lineas;
   }, [movimientos]);
 
   const resumen = useMemo((): ResumenKardex => {
