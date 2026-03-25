@@ -6,6 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import InventarioKardex from './InventarioKardex';
 import KardexResumen from './secciones/KardexResumen';
 import PlanDeCuentas from './secciones/PlanDeCuentas';
+import AsientosContables from './secciones/AsientosContables'; // Importar el nuevo componente
 import { useInventarioKardex } from '@/hooks/useInventarioKardex';
 
 // Placeholder para las secciones existentes
@@ -45,7 +46,7 @@ export default function Contabilidad() {
           </CardDescription>
         </CardHeader>
       </Card>
-      <Tabs defaultValue="cuentas" className="w-full">
+      <Tabs defaultValue="asientos" className="w-full">
         <TabsList className="grid w-full grid-cols-4 md:grid-cols-8">
           {sections.map(section => (
             <TabsTrigger key={section.id} value={section.id}>
@@ -61,6 +62,8 @@ export default function Contabilidad() {
                     <KardexResumen resumen={kardexData.resumen} movimientos={kardexData.movimientos} />
                 ) : section.id === 'cuentas' ? (
                     <PlanDeCuentas />
+                ) : section.id === 'asientos' ? (
+                    <AsientosContables />
                 ) : (
                     <PlaceholderSection title={section.label} />
                 )}
