@@ -1,10 +1,11 @@
-
 'use client';
 
 import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import InventarioKardex from './InventarioKardex'; // Importar el nuevo componente
+import InventarioKardex from './InventarioKardex';
+import KardexResumen from './secciones/KardexResumen';
+import { useInventarioKardex } from '@/hooks/useInventarioKardex';
 
 // Placeholder para las secciones existentes
 const PlaceholderSection = ({ title }: { title: string }) => (
@@ -27,10 +28,12 @@ const sections = [
   { id: 'reportes', label: 'Reportes' },
   { id: 'conciliacion', label: 'Conciliación' },
   { id: 'activos_fijos', label: 'Activos Fijos' },
-  { id: 'inventario_kardex', label: 'Inventario Kardex' }, // Nueva sección
+  { id: 'inventario_kardex', label: 'Inventario Kardex' },
 ];
 
 export default function Contabilidad() {
+  const kardexData = useInventarioKardex();
+
   return (
     <div className="space-y-6">
       <Card>
@@ -53,6 +56,8 @@ export default function Contabilidad() {
             <TabsContent key={section.id} value={section.id}>
                 {section.id === 'inventario_kardex' ? (
                     <InventarioKardex />
+                ) : section.id === 'resumen' ? (
+                    <KardexResumen resumen={kardexData.resumen} />
                 ) : (
                     <PlaceholderSection title={section.label} />
                 )}
