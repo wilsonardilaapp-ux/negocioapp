@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useFirestore } from "@/firebase";
+import { useFirestore, useMemoFirebase } from "@/firebase";
 import { collection, onSnapshot, doc, getDoc, type Unsubscribe, type Timestamp } from "firebase/firestore";
 import type { User } from "@/models/user";
 import type { Subscription } from "@/models/subscription";
