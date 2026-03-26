@@ -91,18 +91,25 @@ export default function SuperAdminPublicLandingPage() {
   }, [docRef, toast]);
 
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!docRef || !data) return;
     setIsSaving(true);
     
     const dataToSave = JSON.parse(JSON.stringify(data));
     
-    setDocumentNonBlocking(docRef, dataToSave, { merge: true });
-    
-    setTimeout(() => {
-      setIsSaving(false);
+    try {
+      await setDocumentNonBlocking(docRef, dataToSave, { merge: true });
       toast({ title: "Guardado", description: "Cambios en la Landing Pública aplicados." });
-    }, 1000);
+    } catch (error: any) {
+      console.error("Save error:", error);
+      toast({
+        variant: "destructive",
+        title: "Error al Guardar",
+        description: `No se pudieron guardar los cambios. Es posible que no tengas conexión. Error: ${error.message}`,
+      });
+    } finally {
+      setIsSaving(false);
+    }
   };
   
   if (isFetching) {
