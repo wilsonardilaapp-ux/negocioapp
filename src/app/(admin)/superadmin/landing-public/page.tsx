@@ -52,9 +52,7 @@ export default function SuperAdminPublicLandingPage() {
   const { data: savedData, isLoading } = useDoc<LandingPageData>(docRef);
 
   useEffect(() => {
-    // This effect runs only when the data is loaded from Firestore for the first time,
-    // or if the component is somehow reset. It avoids overwriting local state during edits.
-    if (savedData && data === null) {
+    if (savedData) {
       const mergedData = {
         ...initialLandingData,
         ...savedData,
@@ -66,11 +64,10 @@ export default function SuperAdminPublicLandingPage() {
         seo: { ...initialLandingData.seo, ...savedData.seo },
       };
       setData(mergedData);
-    } else if (!savedData && !isLoading && data === null) {
-      // If no data is found in Firestore and it's not loading, initialize with default data.
+    } else if (!isLoading) {
       setData(initialLandingData);
     }
-  }, [savedData, isLoading, data]);
+  }, [savedData, isLoading]);
 
   const handleSave = () => {
     if (!docRef || !data) return;
