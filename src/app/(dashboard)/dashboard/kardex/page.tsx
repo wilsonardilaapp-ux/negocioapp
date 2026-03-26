@@ -44,7 +44,10 @@ export default function KardexPage() {
                     />
                 </TabsContent>
                 <TabsContent value="productos">
-                    <KardexProductos items={kardexData.items} />
+                    <KardexProductos 
+                        items={kardexData.items}
+                        registrarOActualizarItem={kardexData.registrarOActualizarItem}
+                    />
                 </TabsContent>
                 <TabsContent value="movimientos">
                     <KardexMovimientos 

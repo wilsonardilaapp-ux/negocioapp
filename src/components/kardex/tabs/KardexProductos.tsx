@@ -1,4 +1,3 @@
-
 'use client';
 import { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -10,13 +9,16 @@ import type { ItemInventario, EstadoStock, TipoItem, NuevoItemForm } from '@/typ
 import { Button } from '@/components/ui/button';
 import { PlusCircle, Edit } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { useKardex } from '@/hooks/useKardex';
 import ItemForm from '../ItemForm';
 
 const formatCurrency = (value: number) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(value);
 
-export default function KardexProductos() {
-    const { items, registrarOActualizarItem } = useKardex();
+interface KardexProductosProps {
+    items: ItemInventario[];
+    registrarOActualizarItem: (data: NuevoItemForm) => void;
+}
+
+export default function KardexProductos({ items, registrarOActualizarItem }: KardexProductosProps) {
     const [searchTerm, setSearchTerm] = useState('');
     const [filterCategory, setFilterCategory] = useState('all');
     const [filterStatus, setFilterStatus] = useState('all');
