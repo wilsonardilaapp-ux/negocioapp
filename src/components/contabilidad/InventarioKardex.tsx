@@ -2,11 +2,11 @@
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { useInventarioKardex } from "@/hooks/useInventarioKardex";
-import KardexResumen from "./secciones/KardexResumen";
-import KardexTabla from "./secciones/KardexTabla";
-import KardexProductos from "./secciones/KardexProductos";
-import KardexMovimientos from "./secciones/KardexMovimientos";
-import KardexConfiguracion from "./secciones/KardexConfiguracion";
+import KardexResumen from "@/components/kardex/tabs/KardexResumen";
+import KardexTabla from "@/components/kardex/tabs/KardexTabla";
+import KardexProductos from "@/components/kardex/tabs/KardexProductos";
+import KardexMovimientos from "@/components/kardex/tabs/KardexMovimientos";
+import KardexConfiguracion from "@/components/kardex/tabs/KardexConfiguracion";
 
 interface InventarioKardexProps {
     kardexData: ReturnType<typeof useInventarioKardex>;
