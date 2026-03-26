@@ -2,34 +2,17 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getFirestore, collection, query, orderBy, getDocs, doc, getDoc } from "firebase/firestore";
 import { firebaseConfig } from "@/firebase/config";
-import type { SubscriptionPlan } from "@/models/subscription-plan";
 import type { LandingPageData } from "@/models/landing-page";
-import PublicPlanCard from "@/components/pricing/public-plan-card";
-import Header from "@/components/layout/header";
-import Footer from "@/components/layout/footer";
+import LandingPageContent from "@/components/landing-page/landing-page-content";
 import { ChatbotWidget } from "@/components/chatbot/chatbot-widget";
 import type { Module } from "@/models/module";
 
 const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-async function getPlans(): Promise<SubscriptionPlan[]> {
-    try {
-        const q = query(collection(db, "plans"), orderBy("price", "asc"));
-        const snapshot = await getDocs(q);
-        if (snapshot.empty) {
-            return [];
-        }
-        return snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })) as SubscriptionPlan[];
-    } catch (error) {
-        console.error("Error fetching plans:", error);
-        return [];
-    }
-}
-
-async function getHomePageData(): Promise<{ 
-    businessId: string | null, 
-    navigation: LandingPageData['navigation'] | null,
+async function getLandingPageData(): Promise<{ 
+    landingData: LandingPageData | null,
+    businessId: string | null,
     chatbot: {
         enabled: boolean;
         businessName: string;
@@ -38,66 +21,50 @@ async function getHomePageData(): Promise<{
     } | null
 }> {
     try {
+        const landingSnap = await getDoc(doc(db, "landing_configs", "main"));
+        const landingData = landingSnap.exists() ? (landingSnap.data() as LandingPageData) : null;
+        
+        // We still need a businessId for the chatbot, let's use the global one if available.
         const configSnap = await getDoc(doc(db, "globalConfig", "system"));
         const mainBusinessId = configSnap.exists() ? configSnap.data().mainBusinessId : null;
 
-        if (!mainBusinessId) {
-            return { businessId: null, navigation: null, chatbot: null };
-        }
-
-        const landingSnap = await getDoc(doc(db, "businesses", mainBusinessId, "landingPages", "main"));
-        const landingData = landingSnap.exists() ? (landingSnap.data() as LandingPageData) : null;
-        
         const chatbotModuleSnap = await getDoc(doc(db, 'modules', 'chatbot-integrado-con-whatsapp-para-soporte-y-ventas'));
         const isChatbotEnabled = chatbotModuleSnap.exists() ? chatbotModuleSnap.data().status === 'active' : false;
         
-        const chatbotData = isChatbotEnabled ? {
+        const chatbotData = (isChatbotEnabled && landingData) ? {
             enabled: true,
-            businessName: landingData?.header?.businessInfo?.name || 'Asistente',
-            avatarUrl: landingData?.chatbot?.avatarUrl || '',
-            greeting: landingData?.chatbot?.greeting || '¡Hola! ¿En qué puedo ayudarte?',
+            businessName: landingData.header?.businessInfo?.name || 'Asistente',
+            avatarUrl: landingData.chatbot?.avatarUrl || '',
+            greeting: landingData.chatbot?.greeting || '¡Hola! ¿En qué puedo ayudarte?',
         } : null;
 
         return { 
-            businessId: mainBusinessId, 
-            navigation: landingData?.navigation || null,
+            landingData, 
+            businessId: mainBusinessId,
             chatbot: chatbotData
         };
     } catch (error) {
-        console.error("Error fetching home page data:", error);
-        return { businessId: null, navigation: null, chatbot: null };
+        console.error("Error fetching landing page data:", error);
+        return { landingData: null, businessId: null, chatbot: null };
     }
 }
 
 
 export default async function RootPage() {
-    const plans = await getPlans();
-    const { businessId, navigation, chatbot } = await getHomePageData();
+    const { landingData, businessId, chatbot } = await getLandingPageData();
+
+    if (!landingData) {
+        return (
+            <div className="flex h-screen w-full flex-col items-center justify-center text-center">
+                 <h1 className="text-2xl font-bold">Página en Construcción</h1>
+                 <p className="text-muted-foreground">La página principal aún no ha sido configurada por el administrador.</p>
+            </div>
+        )
+    }
 
     return (
         <div className="w-full bg-background">
-            <Header businessId={businessId} navigation={navigation} />
-            <main className="container mx-auto px-4 py-16 md:py-24">
-                <div className="text-center max-w-3xl mx-auto mb-12">
-                    <h1 className="text-4xl md:text-5xl font-bold tracking-tight">Planes para cada necesidad</h1>
-                    <p className="mt-4 text-lg text-muted-foreground">
-                        Elige el plan que mejor se adapte al crecimiento de tu negocio.
-                    </p>
-                </div>
-
-                {plans.length > 0 ? (
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start max-w-5xl mx-auto">
-                        {plans.map(plan => (
-                            <PublicPlanCard key={plan.id} plan={plan} />
-                        ))}
-                    </div>
-                ) : (
-                    <div className="text-center py-16">
-                        <p className="text-muted-foreground">No hay planes de suscripción disponibles en este momento.</p>
-                        <p className="text-sm text-muted-foreground">Por favor, contacta al administrador.</p>
-                    </div>
-                )}
-            </main>
+            <LandingPageContent data={landingData} />
             
             {chatbot && businessId && (
                  <ChatbotWidget 
@@ -108,8 +75,6 @@ export default async function RootPage() {
                     greeting={chatbot.greeting}
                 />
             )}
-            
-            <Footer />
         </div>
     );
 }

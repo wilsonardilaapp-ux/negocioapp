@@ -30,6 +30,7 @@ const navItems = [
   { href: "/superadmin/plans", icon: Package, label: "Planes" },
   { href: "/superadmin/payment-methods", icon: CreditCard, label: "Pasarelas de Pago" },
   { href: "/superadmin/blog", icon: FileText, label: "Blog" },
+  { href: "/superadmin/landing-public", icon: FileText, label: "Landing Pública" },
   { href: "/superadmin/servicios", icon: Server, label: "Servicios" },
   { href: "/superadmin/modulos", icon: Box, label: "Módulos" },
   { href: "/superadmin/integraciones", icon: Plug, label: "Integraciones" },

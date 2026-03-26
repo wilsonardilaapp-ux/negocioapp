@@ -246,6 +246,21 @@
         "seoDescription"
       ]
     },
+    "PublicLandingPage": {
+      "title": "Public Landing Page",
+      "description": "Stores the complete configuration for the main public-facing landing page.",
+      "type": "object",
+      "properties": {
+          "hero": { "type": "object", "description": "Hero section configuration." },
+          "navigation": { "type": "object", "description": "Navigation bar configuration." },
+          "sections": { "type": "array", "description": "Array of content sections." },
+          "testimonials": { "type": "array", "description": "Array of testimonials." },
+          "seo": { "type": "object", "description": "SEO configuration." },
+          "form": { "type": "object", "description": "Contact form configuration." },
+          "header": { "type": "object", "description": "Header configuration." },
+          "footer": { "type": "object", "description": "Footer configuration." }
+      }
+    },
     "Product": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Product",
@@ -996,6 +1011,16 @@
         }
       },
       {
+        "path": "/landing_configs/main",
+        "definition": {
+          "entityName": "PublicLandingPage",
+          "schema": {
+            "$ref": "#/backend/entities/PublicLandingPage"
+          },
+          "description": "Stores the configuration for the main public landing page."
+        }
+      },
+      {
         "path": "/businesses/{businessId}",
         "definition": {
           "entityName": "Business",
@@ -1365,4 +1390,3 @@
     "reasoning": "The Firestore structure is designed to ensure Authorization Independence and support the application's QAPs (Queries are not Filters). Authorization Independence is achieved by avoiding `get()` calls in security rules through denormalization.  Specifically, the `LandingPage`, `Product`, `ContactForm`, `ContactSubmission` and `ChatbotConfig` subcollections under `/businesses/{businessId}` include the `businessId` field, which duplicates the parent document's ID, but allows security rules to validate access without requiring a `get()` call to the parent `business` document.\n\nStructural Segregation is applied by separating user-specific data (`/users/{userId}`) from business-related data (`/businesses/{businessId}/...`).  Each collection has a homogeneous security posture. Path-based ownership (`/users/{userId}`) is used for private user data like payment settings.\n\nThe membership model is implicitly supported through the businessId on resources linked to each business.\n\nGlobal roles are managed using content over existence, within the User document under role (e.g., `/users/{uid}` has `role: 'super_admin'`).\n\nQAPs (Rules are not Filters) are supported through structural segregation. Listing operations are secured based on the path and, where applicable, the denormalized `businessId` field in subcollections, allowing secure querying without filtering on insecure data.\n\nExplicit state modeling is used through the `status` field in entities like `User` and `SystemService`."
   }
 }
-  
