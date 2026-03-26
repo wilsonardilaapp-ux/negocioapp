@@ -85,33 +85,42 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
         
         // Centralized redirection logic
         const isAuthPage = pathname === '/login' || pathname === '/register' || pathname === '/forgot-password';
-        const isProtectedPage = pathname.startsWith('/dashboard') || pathname.startsWith('/superadmin');
+        const isDashboardPage = pathname.startsWith('/dashboard');
+        const isSuperAdminPage = pathname.startsWith('/superadmin');
 
         if (currentUser) {
-            if (isAuthPage) {
-                // Fetch user role from Firestore to decide where to redirect
-                const userDocRef = doc(firestore, 'users', currentUser.uid);
-                try {
-                    const userDocSnap = await getDoc(userDocRef);
-                    if (userDocSnap.exists()) {
-                        const userProfile = userDocSnap.data();
-                        if (userProfile.role === 'super_admin') {
+            const userDocRef = doc(firestore, 'users', currentUser.uid);
+            try {
+                const userDocSnap = await getDoc(userDocRef);
+                if (userDocSnap.exists()) {
+                    const userProfile = userDocSnap.data();
+                    if (userProfile.role === 'super_admin') {
+                        // If a super admin is on an auth page or a client dashboard page, redirect them to superadmin.
+                        if (isAuthPage || isDashboardPage) {
                             router.replace('/superadmin');
-                        } else {
-                            router.replace('/dashboard');
                         }
                     } else {
-                        // Fallback if user profile doesn't exist for some reason
-                        router.replace('/dashboard');
+                        // If a regular user is on an auth page or a superadmin page, redirect them to dashboard.
+                        if (isAuthPage || isSuperAdminPage) {
+                            router.replace('/dashboard');
+                        }
                     }
-                } catch (e) {
-                    console.error("Error fetching user profile for redirection:", e);
-                    router.replace('/dashboard'); // Fallback on error
+                } else {
+                    // Fallback if user profile doesn't exist for some reason
+                    if (isAuthPage || isSuperAdminPage) {
+                         router.replace('/dashboard');
+                    }
+                }
+            } catch (e) {
+                console.error("Error fetching user profile for redirection:", e);
+                // Fallback on error
+                if (isAuthPage || isSuperAdminPage) {
+                   router.replace('/dashboard');
                 }
             }
         } else {
-          // If user is not logged in and on a protected page, redirect to login
-          if (isProtectedPage) {
+          // If user is not logged in and on a protected page (dashboard or superadmin), redirect to login
+          if (isDashboardPage || isSuperAdminPage) {
              router.replace('/login');
           }
         }
