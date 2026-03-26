@@ -52,8 +52,6 @@ export default function SuperAdminLayout({ children }: { children: ReactNode }) 
   // Fetch user profile data once
   useEffect(() => {
     if (isUserLoading || !user || !firestore) {
-        // If the user isn't loaded yet, we can't fetch the profile.
-        // We set loading to false only if we know for sure there's no user.
         if (!isUserLoading && !user) {
             setIsProfileLoading(false);
         }
@@ -63,6 +61,8 @@ export default function SuperAdminLayout({ children }: { children: ReactNode }) 
     let isMounted = true;
     const fetchProfile = async () => {
         setIsProfileLoading(true);
+        const SUPER_ADMIN_EMAILS = ['allseosoporte@gmail.com'];
+        
         try {
             const userDocRef = doc(firestore, 'users', user.uid);
             const userDocSnap = await getDoc(userDocRef);
@@ -70,13 +70,39 @@ export default function SuperAdminLayout({ children }: { children: ReactNode }) 
                 if (userDocSnap.exists()) {
                     setUserProfile(userDocSnap.data() as UserType);
                 } else {
-                    setUserProfile(null); // User document not found
+                    // Fallback if doc doesn't exist
+                    if (SUPER_ADMIN_EMAILS.includes(user.email ?? '')) {
+                         setUserProfile({ 
+                            id: user.uid,
+                            role: 'super_admin', 
+                            email: user.email ?? '',
+                            name: user.displayName ?? 'Super Admin',
+                            status: 'active',
+                            createdAt: new Date().toISOString(),
+                            lastLogin: new Date().toISOString()
+                        } as UserType);
+                    } else {
+                        setUserProfile(null);
+                    }
                 }
             }
         } catch (error) {
             console.error("Error fetching user profile:", error);
             if (isMounted) {
-                setUserProfile(null);
+                // Fallback on network error etc.
+                if (SUPER_ADMIN_EMAILS.includes(user.email ?? '')) {
+                     setUserProfile({ 
+                        id: user.uid,
+                        role: 'super_admin', 
+                        email: user.email ?? '',
+                        name: user.displayName ?? 'Super Admin',
+                        status: 'active',
+                        createdAt: new Date().toISOString(),
+                        lastLogin: new Date().toISOString()
+                    } as UserType);
+                } else {
+                    setUserProfile(null);
+                }
             }
         } finally {
             if (isMounted) {
