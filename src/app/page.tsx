@@ -1,6 +1,6 @@
 
 import { initializeApp, getApps, getApp } from "firebase/app";
-import { getFirestore, collection, query, orderBy, getDocs, doc, getDoc } from "firebase/firestore";
+import { getFirestore, doc, getDoc } from "firebase/firestore";
 import { firebaseConfig } from "@/firebase/config";
 import type { LandingPageData } from "@/models/landing-page";
 import LandingPageContent from "@/components/landing-page/landing-page-content";
