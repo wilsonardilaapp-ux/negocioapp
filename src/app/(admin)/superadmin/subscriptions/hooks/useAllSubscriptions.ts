@@ -1,11 +1,18 @@
+'use client';
 
-"use client";
-
-import { useState, useEffect } from "react";
-import { useFirestore, useMemoFirebase } from "@/firebase";
-import { collection, onSnapshot, doc, getDoc, type Unsubscribe, type Timestamp } from "firebase/firestore";
-import type { User } from "@/models/user";
-import type { Subscription } from "@/models/subscription";
+import { useState, useEffect } from 'react';
+import { useFirestore, useMemoFirebase } from '@/firebase';
+import {
+  collection,
+  onSnapshot,
+  doc,
+  getDoc,
+  getDocs,
+  type Unsubscribe,
+  type Timestamp,
+} from 'firebase/firestore';
+import type { User } from '@/models/user';
+import type { Subscription } from '@/models/subscription';
 
 export interface ClientWithSubscription extends User {
   userId: string;
@@ -19,54 +26,55 @@ export function useAllSubscriptions() {
   const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
-    if (!firestore) return;
+    if (!firestore) {
+      setIsLoading(false);
+      return;
+    }
 
-    setIsLoading(true);
-    const usersCollectionRef = collection(firestore, "users");
-    
-    // Listen for changes in the users collection
-    const unsubscribeUsers = onSnapshot(
-      usersCollectionRef,
-      async (usersSnapshot) => {
-        try {
-          const usersData = usersSnapshot.docs.map(d => ({ ...d.data(), id: d.id } as User));
+    const fetchAllSubscriptions = async () => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const usersCollectionRef = collection(firestore, 'users');
+        const usersSnapshot = await getDocs(usersCollectionRef);
 
-          // For each user, fetch their subscription data
-          const clientsWithSubs = await Promise.all(
-            usersData.map(async (user) => {
-              const subDocRef = doc(firestore, `businesses/${user.id}/subscription`, "current");
-              const subSnap = await getDoc(subDocRef);
-              
-              const subscription = subSnap.exists() 
-                ? (subSnap.data() as Subscription) 
-                : null;
-                
-              return {
-                ...user,
-                userId: user.id, // Ensure userId is present for convenience
-                subscription,
-              };
-            })
-          );
-          
-          setClients(clientsWithSubs);
-          setError(null);
-        } catch (e: any) {
-          console.error("Error fetching subscription data for users:", e);
-          setError(e);
-        } finally {
-          setIsLoading(false);
-        }
-      },
-      (err) => {
-        console.error("Error listening to users collection:", err);
-        setError(err);
+        const usersData = usersSnapshot.docs.map(
+          (d) => ({ ...d.data(), id: d.id } as User)
+        );
+
+        const clientsWithSubs = await Promise.all(
+          usersData.map(async (user) => {
+            const subDocRef = doc(
+              firestore,
+              `businesses/${user.id}/subscription`,
+              'current'
+            );
+            const subSnap = await getDoc(subDocRef);
+
+            const subscription = subSnap.exists()
+              ? (subSnap.data() as Subscription)
+              : null;
+
+            return {
+              ...user,
+              userId: user.id, // Ensure userId is present for convenience
+              subscription,
+            };
+          })
+        );
+
+        setClients(clientsWithSubs);
+      } catch (e: any) {
+        console.error('Error fetching all subscription data:', e);
+        setError(e);
+      } finally {
         setIsLoading(false);
       }
-    );
+    };
 
-    // Cleanup subscription
-    return () => unsubscribeUsers();
+    fetchAllSubscriptions();
+
+    // No cleanup needed as getDocs is a one-time fetch
   }, [firestore]);
 
   return { clients, isLoading, error };
