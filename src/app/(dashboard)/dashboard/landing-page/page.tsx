@@ -7,8 +7,8 @@ import { Save, Loader2 } from 'lucide-react';
 import type { LandingPageData } from '@/models/landing-page';
 import EditorLandingForm from '@/components/landing-page/editor-landing-form';
 import EditorLandingPreview from '@/components/landing-page/editor-landing-preview';
-import { useUser, useFirestore, useDoc, useMemoFirebase, setDocumentNonBlocking } from '@/firebase';
-import { doc } from 'firebase/firestore';
+import { useUser, useFirestore, useMemoFirebase, setDocumentNonBlocking } from '@/firebase';
+import { doc, getDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -45,26 +45,50 @@ const initialLandingData: LandingPageData = {
 export default function LandingPageBuilder() {
   const [data, setData] = useState<LandingPageData>(initialLandingData);
   const [isSaving, setIsSaving] = useState(false);
+  const [isFetching, setIsFetching] = useState(true);
   const { user } = useUser();
   const firestore = useFirestore();
   const { toast } = useToast();
 
-  const docRef = useMemoFirebase(() => user ? doc(firestore!, 'businesses', user.uid, 'landingPages', 'main') : null, [firestore, user]);
-  const { data: savedData, isLoading } = useDoc<LandingPageData>(docRef);
-
+  const docRef = useMemoFirebase(() => user ? doc(firestore, 'businesses', user.uid, 'landingPages', 'main') : null, [firestore, user]);
+  
   useEffect(() => {
-    if (savedData) {
-      const mergedData = {
-        ...initialLandingData,
-        ...savedData,
-        hero: { ...initialLandingData.hero, ...savedData.hero },
-        header: { ...initialLandingData.header, ...savedData.header },
-        navigation: { ...initialLandingData.navigation, ...savedData.navigation },
-        footer: { ...initialLandingData.footer, ...savedData.footer },
-      };
-      setData(mergedData);
-    }
-  }, [savedData]);
+    if (!docRef) {
+        setIsFetching(false);
+        return;
+    };
+
+    const fetchData = async () => {
+      setIsFetching(true);
+      try {
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          const savedData = docSnap.data() as LandingPageData;
+          const mergedData = {
+            ...initialLandingData,
+            ...savedData,
+            hero: { ...initialLandingData.hero, ...savedData.hero },
+            header: { ...initialLandingData.header, ...savedData.header },
+            navigation: { ...initialLandingData.navigation, ...savedData.navigation },
+            footer: { ...initialLandingData.footer, ...savedData.footer },
+          };
+          setData(mergedData);
+        }
+      } catch (error) {
+        console.error("Error fetching landing page data:", error);
+        toast({
+          variant: "destructive",
+          title: "Error de Carga",
+          description: "No se pudieron cargar los datos de la landing page.",
+        });
+      } finally {
+        setIsFetching(false);
+      }
+    };
+    
+    fetchData();
+  }, [docRef, toast]);
+
 
   const handleSave = () => {
     if (!docRef || !data) return;
@@ -84,7 +108,7 @@ export default function LandingPageBuilder() {
     }, 1000);
   };
   
-  if (isLoading) {
+  if (isFetching) {
     return (
       <div className="flex justify-center items-center h-full">
         <Loader2 className="h-10 w-10 animate-spin text-primary" />

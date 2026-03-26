@@ -1,14 +1,14 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Save, Loader2 } from 'lucide-react';
 import type { LandingPageData } from '@/models/landing-page';
 import EditorLandingForm from '@/components/landing-page/editor-landing-form';
 import SuperAdminEditorLandingPreview from '@/components/landing-page/superadmin-editor-landing-preview';
-import { useFirestore, useDoc, useMemoFirebase, setDocumentNonBlocking } from '@/firebase';
-import { doc } from 'firebase/firestore';
+import { useFirestore, useMemoFirebase, setDocumentNonBlocking } from '@/firebase';
+import { doc, getDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -45,33 +45,56 @@ const initialLandingData: LandingPageData = {
 export default function SuperAdminPublicLandingPage() {
   const [data, setData] = useState<LandingPageData>(initialLandingData);
   const [isSaving, setIsSaving] = useState(false);
+  const [isFetching, setIsFetching] = useState(true);
   const firestore = useFirestore();
   const { toast } = useToast();
 
   const docRef = useMemoFirebase(() => firestore ? doc(firestore, 'landing_configs', 'main') : null, [firestore]);
-  const { data: savedData, isLoading } = useDoc<LandingPageData>(docRef);
 
   useEffect(() => {
-    if (savedData) {
-      const mergedData = {
-        ...initialLandingData,
-        ...savedData,
-        hero: { ...initialLandingData.hero, ...savedData.hero },
-        header: { ...initialLandingData.header, ...savedData.header },
-        navigation: { ...initialLandingData.navigation, ...savedData.navigation },
-        footer: { ...initialLandingData.footer, ...savedData.footer },
-        form: { ...initialLandingData.form, ...savedData.form },
-        seo: { ...initialLandingData.seo, ...savedData.seo },
-      };
-      setData(mergedData);
-    }
-  }, [savedData]);
+    if (!docRef) {
+      setIsFetching(false);
+      return;
+    };
+
+    const fetchData = async () => {
+      setIsFetching(true);
+      try {
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          const savedData = docSnap.data() as LandingPageData;
+           const mergedData = {
+            ...initialLandingData,
+            ...savedData,
+            hero: { ...initialLandingData.hero, ...savedData.hero },
+            header: { ...initialLandingData.header, ...savedData.header },
+            navigation: { ...initialLandingData.navigation, ...savedData.navigation },
+            footer: { ...initialLandingData.footer, ...savedData.footer },
+            form: { ...initialLandingData.form, ...savedData.form },
+            seo: { ...initialLandingData.seo, ...savedData.seo },
+          };
+          setData(mergedData);
+        }
+      } catch (error) {
+        console.error("Error fetching landing page data:", error);
+        toast({
+          variant: "destructive",
+          title: "Error de Carga",
+          description: "No se pudieron cargar los datos de la landing page.",
+        });
+      } finally {
+        setIsFetching(false);
+      }
+    };
+    
+    fetchData();
+  }, [docRef, toast]);
+
 
   const handleSave = () => {
     if (!docRef || !data) return;
     setIsSaving(true);
     
-    // Deep copy to avoid issues with undefined values in Firestore
     const dataToSave = JSON.parse(JSON.stringify(data));
     
     setDocumentNonBlocking(docRef, dataToSave, { merge: true });
@@ -82,7 +105,7 @@ export default function SuperAdminPublicLandingPage() {
     }, 1000);
   };
   
-  if (isLoading) {
+  if (isFetching) {
     return (
       <div className="flex justify-center items-center h-full">
           <Loader2 className="h-10 w-10 animate-spin text-primary" />
