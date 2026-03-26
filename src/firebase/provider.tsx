@@ -21,6 +21,7 @@ interface UserAuthState {
   isUserLoading: boolean;
   userError: Error | null;
   role: string | null;
+  roleLoaded: boolean;
 }
 
 // Combined state for the Firebase context
@@ -69,6 +70,7 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
     isUserLoading: true, // Start loading until first auth event
     userError: null,
     role: null,
+    roleLoaded: false,
   });
   
   const router = useRouter();
@@ -78,7 +80,7 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
   // Does not depend on `pathname` to avoid re-subscribing on route changes.
   useEffect(() => {
     if (!auth) { 
-      setUserAuthState({ user: null, isUserLoading: false, userError: new Error("Auth service not provided."), role: null });
+      setUserAuthState({ user: null, isUserLoading: false, userError: new Error("Auth service not provided."), role: null, roleLoaded: true });
       return;
     }
 
@@ -97,11 +99,11 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
                 console.error("FirebaseProvider: error fetching user role:", e);
             }
         }
-        setUserAuthState({ user: currentUser, isUserLoading: false, userError: null, role });
+        setUserAuthState({ user: currentUser, isUserLoading: false, userError: null, role, roleLoaded: true });
       },
       (error) => {
         console.error("FirebaseProvider: onAuthStateChanged error:", error);
-        setUserAuthState({ user: null, isUserLoading: false, userError: error, role: null });
+        setUserAuthState({ user: null, isUserLoading: false, userError: error, role: null, roleLoaded: true });
       }
     );
     return () => unsubscribe();
@@ -111,7 +113,7 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
   // Runs when auth state or path changes.
   useEffect(() => {
     if (userAuthState.isUserLoading) return; // Wait until auth state is determined
-    if (userAuthState.user && userAuthState.role === null) return; // Wait for role to be fetched
+    if (userAuthState.user && !userAuthState.roleLoaded) return; // Wait for role fetch attempt to complete
 
     const isAuthPage = pathname === '/login' || pathname === '/register' || pathname === '/forgot-password';
     const isDashboardPage = pathname.startsWith('/dashboard');
@@ -123,7 +125,7 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
             if (isAuthPage || isDashboardPage) {
                 router.replace('/superadmin');
             }
-        } else { // Regular user or undefined role
+        } else { // Handles regular user and role === null (e.g., on fetch error)
             if (isAuthPage || isSuperAdminPage) {
                 router.replace('/dashboard');
             }
