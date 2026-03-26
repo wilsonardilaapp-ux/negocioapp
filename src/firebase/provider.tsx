@@ -2,7 +2,7 @@
 
 import React, { DependencyList, createContext, useContext, ReactNode, useMemo, useState, useEffect } from 'react';
 import { FirebaseApp } from 'firebase/app';
-import { Firestore, doc, getDoc } from 'firebase/firestore';
+import { Firestore, doc, getDocFromServer, getDocFromCache } from 'firebase/firestore';
 import { Auth, User, onAuthStateChanged } from 'firebase/auth';
 import { FirebaseErrorListener } from '@/components/FirebaseErrorListener'
 import { useRouter, usePathname } from 'next/navigation';
@@ -56,6 +56,8 @@ export interface UserHookResult { // Renamed from UserAuthHookResult for consist
 // React Context
 export const FirebaseContext = createContext<FirebaseContextState | undefined>(undefined);
 
+const SUPER_ADMIN_EMAILS = ['allseosoporte@gmail.com'];
+
 /**
  * FirebaseProvider manages and provides Firebase services and user authentication state.
  */
@@ -77,7 +79,6 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
   const pathname = usePathname();
 
   // Effect 1: Manages auth state changes only.
-  // Does not depend on `pathname` to avoid re-subscribing on route changes.
   useEffect(() => {
     if (!auth) { 
       setUserAuthState({ user: null, isUserLoading: false, userError: new Error("Auth service not provided."), role: null, roleLoaded: true });
@@ -88,18 +89,41 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
       auth,
       async (currentUser) => {
         let role: string | null = null;
+        let roleLoaded = false;
         if (currentUser) {
             try {
                 const userDocRef = doc(firestore, 'users', currentUser.uid);
-                const userDocSnap = await getDoc(userDocRef);
+                const userDocSnap = await getDocFromServer(userDocRef);
                 if (userDocSnap.exists()) {
                     role = userDocSnap.data().role as string ?? null;
                 }
-            } catch (e) {
-                console.error("FirebaseProvider: error fetching user role:", e);
+            } catch (error: any) {
+                console.warn("Could not fetch role from server, trying cache. Error:", error.code);
+                try {
+                    const userDocRef = doc(firestore, 'users', currentUser.uid);
+                    const userDocSnapFromCache = await getDocFromCache(userDocRef);
+                    if (userDocSnapFromCache.exists()) {
+                        role = userDocSnapFromCache.data().role as string ?? null;
+                    } else {
+                         if (SUPER_ADMIN_EMAILS.includes(currentUser.email || '')) {
+                            console.log("Fallback after cache miss: Assigning 'super_admin' role based on email.");
+                            role = 'super_admin';
+                        }
+                    }
+                } catch (cacheError) {
+                     console.error("Cache fetch failed. Using email fallback. Error:", cacheError);
+                     if (SUPER_ADMIN_EMAILS.includes(currentUser.email || '')) {
+                        console.log("Fallback in cache error: Assigning 'super_admin' role based on email.");
+                        role = 'super_admin';
+                    }
+                }
+            } finally {
+                roleLoaded = true;
             }
+        } else {
+            roleLoaded = true;
         }
-        setUserAuthState({ user: currentUser, isUserLoading: false, userError: null, role, roleLoaded: true });
+        setUserAuthState({ user: currentUser, isUserLoading: false, userError: null, role, roleLoaded });
       },
       (error) => {
         console.error("FirebaseProvider: onAuthStateChanged error:", error);
@@ -110,7 +134,6 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
   }, [auth, firestore]);
 
   // Effect 2: Manages redirection logic.
-  // Runs when auth state or path changes.
   useEffect(() => {
     if (userAuthState.isUserLoading) return; // Wait until auth state is determined
     if (userAuthState.user && !userAuthState.roleLoaded) return; // Wait for role fetch attempt to complete
