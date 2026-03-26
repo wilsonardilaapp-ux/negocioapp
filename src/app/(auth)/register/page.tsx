@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -27,7 +27,7 @@ import { useToast } from "@/hooks/use-toast";
 import { ToastAction } from "@/components/ui/toast";
 import { useAuth, useUser, useFirestore, initiateEmailSignUp } from "@/firebase";
 import { useEffect, useState } from "react";
-import { doc, setDoc, writeBatch, getDoc, Timestamp } from 'firebase/firestore';
+import { doc, setDoc, writeBatch, getDoc, Timestamp, collection } from 'firebase/firestore';
 import type { Business } from '@/models/business';
 import type { User as AppUser } from "@/models/user";
 import Link from "next/link";
@@ -40,6 +40,7 @@ import type { KnowledgeDocument } from "@/models/chatbot-config";
 import { isFirstUser } from '@/actions/user';
 import { Eye, EyeOff } from 'lucide-react';
 import type { Subscription } from "@/models/subscription";
+import { STRIPE_PRICE_IDS } from "@/lib/stripe";
 
 const registerSchema = z.object({
   name: z.string().min(1, { message: "Por favor, introduce tu nombre." }),
@@ -198,6 +199,7 @@ const slugify = (text: string) =>
 
 export default function RegisterPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { toast } = useToast();
   const auth = useAuth();
   const firestore = useFirestore();
@@ -215,9 +217,14 @@ export default function RegisterPage() {
 
   useEffect(() => {
     if (!isUserLoading && user) {
-        router.push("/dashboard");
+        const plan = searchParams.get('plan');
+        if (plan && plan !== 'free') {
+          router.push(`/dashboard/subscription?new_plan=${plan}`);
+        } else {
+          router.push("/dashboard");
+        }
     }
-  }, [user, isUserLoading, router]);
+  }, [user, isUserLoading, router, searchParams]);
 
   async function onSubmit(values: z.infer<typeof registerSchema>) {
     if (!auth || !firestore) return;
@@ -228,11 +235,9 @@ export default function RegisterPage() {
       
       const batch = writeBatch(firestore);
 
-      // Determine the user's role
       const isFirst = await isFirstUser();
       const userRole = isFirst ? 'super_admin' : 'cliente_admin';
 
-      // 1. Crear documento de Usuario
       const userDocRef = doc(firestore, 'users', newUser.uid);
       const userData: AppUser = {
         id: newUser.uid,
@@ -245,7 +250,6 @@ export default function RegisterPage() {
       };
       batch.set(userDocRef, userData);
       
-      // 2. Crear documento de Negocio
       const businessDocRef = doc(firestore, 'businesses', newUser.uid);
       const businessData: Business = {
         id: newUser.uid,
@@ -258,8 +262,6 @@ export default function RegisterPage() {
       };
       batch.set(businessDocRef, businessData);
 
-      // --- LÓGICA DE SINCRONIZACIÓN DE PÁGINA DE INICIO ---
-      // Si no hay una página principal configurada, establece este nuevo negocio como la principal.
       const configRef = doc(firestore, 'globalConfig', 'system');
       const configSnap = await getDoc(configRef);
 
@@ -267,7 +269,6 @@ export default function RegisterPage() {
         batch.set(configRef, { mainBusinessId: newUser.uid }, { merge: true });
       }
 
-      // 3. Crear documento de Landing Page por defecto
       const landingPageDocRef = doc(firestore, 'businesses', newUser.uid, 'landingPages', 'main');
       
       const dynamicLinks: NavLink[] = [
@@ -290,12 +291,10 @@ export default function RegisterPage() {
         footer: { ...initialLandingPageData.footer, contactInfo: { ...initialLandingPageData.footer.contactInfo, email: newUser.email || 'info@tunegocio.com' }, copyright: { ...initialLandingPageData.footer.copyright, companyName: businessData.name }},
       });
 
-      // 4. Crear documento de PaymentSettings por defecto
       const paymentSettingsDocRef = doc(firestore, 'paymentSettings', newUser.uid);
       const paymentSettingsData: PaymentSettings = { id: newUser.uid, userId: newUser.uid, ...initialPaymentSettings };
       batch.set(paymentSettingsDocRef, paymentSettingsData);
       
-      // --- Creación de Módulos y Servicios por Defecto ---
       const defaultModules: Omit<Module, 'id'>[] = [
         { name: 'Catálogo', description: 'Módulo para gestionar el catálogo de productos.', status: 'inactive', createdAt: new Date().toISOString() },
         { name: 'Blog', description: 'Módulo para gestionar el blog', status: 'inactive', createdAt: new Date().toISOString() },
@@ -308,7 +307,6 @@ export default function RegisterPage() {
       
       defaultModules.forEach(mod => {
           let modId = slugify(mod.name);
-          // Corrección clave: asegurar que el módulo de catálogo siempre tenga el ID 'catalogo'
            if (mod.name.toLowerCase().includes('catálogo')) {
               modId = 'catalogo';
           } else if (mod.name.includes('Chatbot')) {
@@ -328,7 +326,6 @@ export default function RegisterPage() {
       const productLimitData: SystemService = { id: 'product_limit', name: 'Limite de Productos', status: 'active', limit: 10, lastUpdate: new Date().toISOString() };
       batch.set(productLimitServiceRef, productLimitData, { merge: true });
       
-      // 7. Crear la entrada manual para la Oferta de Café de Arándanos
       const coffeeOfferRef = doc(firestore, 'businesses', newUser.uid, 'chatbotConfig', 'main', 'knowledgeBase', 'oferta-cafe-arandanos');
       const coffeeOfferData: Omit<KnowledgeDocument, 'id'> = {
         fileName: "Oferta Especial: Café de Arándanos",
@@ -355,26 +352,54 @@ export default function RegisterPage() {
       };
       batch.set(coffeeOfferRef, coffeeOfferData);
 
-      // 8. Crear documento de Suscripción por defecto
+      // Lógica de suscripción
+      const planId = searchParams.get('plan') as 'pro' | 'enterprise' | null;
       const subscriptionDocRef = doc(firestore, 'businesses', newUser.uid, 'subscription', 'current');
-      const now = Timestamp.now();
-      const freeSubscription: Subscription = {
-        plan: 'free',
-        status: 'active',
-        stripeCustomerId: null,
-        stripeSubscriptionId: null,
-        currentPeriodEnd: null,
-        createdAt: now,
-        updatedAt: now,
-      };
-      batch.set(subscriptionDocRef, freeSubscription);
-
-      await batch.commit();
       
-      toast({
-        title: "Cuenta Creada con Éxito",
-        description: `Se te ha asignado el rol de ${userRole.replace('_', ' ')}. Serás redirigido...`,
-      });
+      if (planId && planId !== 'free') {
+        const upperPlanId = planId.toUpperCase() as keyof typeof STRIPE_PRICE_IDS;
+        const priceId = STRIPE_PRICE_IDS[upperPlanId];
+        
+        if (!priceId || priceId.includes('placeholder')) {
+            toast({
+                variant: "destructive",
+                title: "Error de Configuración",
+                description: `El plan '${planId}' no está configurado correctamente para pagos. Contacta al soporte.`,
+            });
+            throw new Error("Stripe Price ID no configurado.");
+        }
+
+        const response = await fetch('/api/stripe/create-checkout-session', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ priceId, businessId: newUser.uid, userId: newUser.uid, email: newUser.email }),
+        });
+        const session = await response.json();
+        if (session.url) {
+            await batch.commit();
+            window.location.href = session.url;
+        } else {
+            throw new Error('No se pudo crear la sesión de checkout.');
+        }
+
+      } else {
+        const now = Timestamp.now();
+        const freeSubscription: Subscription = {
+          plan: 'free',
+          status: 'active',
+          stripeCustomerId: null,
+          stripeSubscriptionId: null,
+          currentPeriodEnd: null,
+          createdAt: now,
+          updatedAt: now,
+        };
+        batch.set(subscriptionDocRef, freeSubscription);
+        await batch.commit();
+        toast({
+            title: "Cuenta Creada con Éxito",
+            description: `Se te ha asignado el rol de ${userRole.replace('_', ' ')}. Serás redirigido...`,
+        });
+      }
       
     } catch (error: any) {
       if (error.code === 'auth/email-already-in-use') {
@@ -500,5 +525,3 @@ export default function RegisterPage() {
     </Card>
   );
 }
-
-    
