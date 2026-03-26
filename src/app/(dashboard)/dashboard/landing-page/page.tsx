@@ -1,11 +1,9 @@
-
-
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Save } from 'lucide-react';
+import { Save, Loader2 } from 'lucide-react';
 import type { LandingPageData } from '@/models/landing-page';
 import EditorLandingForm from '@/components/landing-page/editor-landing-form';
 import EditorLandingPreview from '@/components/landing-page/editor-landing-preview';
@@ -45,7 +43,7 @@ const initialLandingData: LandingPageData = {
 };
 
 export default function LandingPageBuilder() {
-  const [data, setData] = useState<LandingPageData>(initialLandingData);
+  const [data, setData] = useState<LandingPageData | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const { user } = useUser();
   const firestore = useFirestore();
@@ -55,7 +53,9 @@ export default function LandingPageBuilder() {
   const { data: savedData, isLoading } = useDoc<LandingPageData>(docRef);
 
   useEffect(() => {
-    if (savedData) {
+    // This effect runs only when the data is loaded from Firestore for the first time,
+    // or if the component is somehow reset. It avoids overwriting local state during edits.
+    if (savedData && data === null) {
       const mergedData = {
         ...initialLandingData,
         ...savedData,
@@ -65,11 +65,14 @@ export default function LandingPageBuilder() {
         footer: { ...initialLandingData.footer, ...savedData.footer },
       };
       setData(mergedData);
+    } else if (!savedData && !isLoading && data === null) {
+      // If no data is found in Firestore and it's not loading, initialize with default data.
+      setData(initialLandingData);
     }
-  }, [savedData]);
+  }, [savedData, isLoading, data]);
 
   const handleSave = () => {
-    if (!docRef) return;
+    if (!docRef || !data) return;
     setIsSaving(true);
     
     const dataToSave = JSON.parse(JSON.stringify(data));
@@ -88,7 +91,11 @@ export default function LandingPageBuilder() {
     }, 1000);
   };
   
-  if (isLoading) return <div className="p-10 text-center text-muted-foreground animate-pulse">Cargando...</div>;
+  if (isLoading || !data) return (
+    <div className="flex justify-center items-center h-full">
+      <Loader2 className="h-10 w-10 animate-spin text-primary" />
+    </div>
+  );
 
   return (
     <div className="flex flex-col gap-6">
@@ -102,7 +109,7 @@ export default function LandingPageBuilder() {
             </Button>
         </Card>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2"><EditorLandingForm data={data} setData={setData} /></div>
+            <div className="lg:col-span-2"><EditorLandingForm data={data} setData={setData as any} /></div>
             <div className="lg:col-span-1"><EditorLandingPreview data={data} /></div>
         </div>
     </div>

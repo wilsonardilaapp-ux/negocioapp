@@ -12,7 +12,6 @@ import { doc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { v4 as uuidv4 } from 'uuid';
 
-// This initial data should be a robust fallback.
 const initialLandingData: LandingPageData = {
   hero: {
     title: 'Innovación que impulsa tu negocio al futuro',
@@ -44,7 +43,7 @@ const initialLandingData: LandingPageData = {
 };
 
 export default function SuperAdminPublicLandingPage() {
-  const [data, setData] = useState<LandingPageData>(initialLandingData);
+  const [data, setData] = useState<LandingPageData | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const firestore = useFirestore();
   const { toast } = useToast();
@@ -53,7 +52,9 @@ export default function SuperAdminPublicLandingPage() {
   const { data: savedData, isLoading } = useDoc<LandingPageData>(docRef);
 
   useEffect(() => {
-    if (savedData) {
+    // This effect runs only when the data is loaded from Firestore for the first time,
+    // or if the component is somehow reset. It avoids overwriting local state during edits.
+    if (savedData && data === null) {
       const mergedData = {
         ...initialLandingData,
         ...savedData,
@@ -65,11 +66,14 @@ export default function SuperAdminPublicLandingPage() {
         seo: { ...initialLandingData.seo, ...savedData.seo },
       };
       setData(mergedData);
+    } else if (!savedData && !isLoading && data === null) {
+      // If no data is found in Firestore and it's not loading, initialize with default data.
+      setData(initialLandingData);
     }
-  }, [savedData]);
+  }, [savedData, isLoading, data]);
 
   const handleSave = () => {
-    if (!docRef) return;
+    if (!docRef || !data) return;
     setIsSaving(true);
     
     // Deep copy to avoid issues with undefined values in Firestore
@@ -83,7 +87,7 @@ export default function SuperAdminPublicLandingPage() {
     }, 1000);
   };
   
-  if (isLoading) return (
+  if (isLoading || !data) return (
     <div className="flex justify-center items-center h-full">
         <Loader2 className="h-10 w-10 animate-spin text-primary" />
     </div>
@@ -102,7 +106,7 @@ export default function SuperAdminPublicLandingPage() {
             </Button>
         </Card>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-            <div className="lg:col-span-2"><EditorLandingForm data={data} setData={setData} /></div>
+            <div className="lg:col-span-2"><EditorLandingForm data={data} setData={setData as any} /></div>
             <div className="lg:col-span-1"><SuperAdminEditorLandingPreview data={data} /></div>
         </div>
     </div>
