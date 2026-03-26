@@ -38,7 +38,7 @@ export default function SettingsPage() {
   const firestore = useFirestore();
   const { toast } = useToast();
 
-  const configDocRef = useMemo(() => {
+  const configDocRef = useMemoFirebase(() => {
     if (!firestore) return null;
     return doc(firestore, 'globalConfig', 'system');
   }, [firestore]);
