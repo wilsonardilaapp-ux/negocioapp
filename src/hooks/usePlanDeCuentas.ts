@@ -10,9 +10,9 @@ export function usePlanDeCuentas() {
   const firestore = useFirestore();
 
   const cuentasQuery = useMemoFirebase(() => {
-    if (!firestore || !user) return null;
+    if (!firestore || !user?.uid) return null;
     return query(collection(firestore, `businesses/${user.uid}/cuentas`), orderBy('codigo'));
-  }, [firestore, user]);
+  }, [firestore, user?.uid]);
 
   const { data: cuentas, isLoading } = useCollection<Cuenta>(cuentasQuery);
 

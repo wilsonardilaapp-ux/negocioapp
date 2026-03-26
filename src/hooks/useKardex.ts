@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useCallback, useEffect } from 'react';
@@ -37,16 +36,16 @@ export function useKardex() {
 
   // Firestore References
   const configDocRef = useMemoFirebase(
-    () => (user ? doc(firestore, `businesses/${user.uid}/kardexConfig`, 'main') : null),
-    [user, firestore]
+    () => (user?.uid ? doc(firestore, `businesses/${user.uid}/kardexConfig`, 'main') : null),
+    [user?.uid, firestore]
   );
   const itemsQuery = useMemoFirebase(
-    () => (user ? collection(firestore, `businesses/${user.uid}/kardexItems`) : null),
-    [user, firestore]
+    () => (user?.uid ? collection(firestore, `businesses/${user.uid}/kardexItems`) : null),
+    [user?.uid, firestore]
   );
   const movimientosQuery = useMemoFirebase(
-    () => (user ? query(collection(firestore, `businesses/${user.uid}/kardexMovimientos`), orderBy('fecha', 'asc')) : null),
-    [user, firestore]
+    () => (user?.uid ? query(collection(firestore, `businesses/${user.uid}/kardexMovimientos`), orderBy('fecha', 'asc')) : null),
+    [user?.uid, firestore]
   );
 
   // Data fetching
@@ -75,7 +74,7 @@ export function useKardex() {
   };
 
   const registrarOActualizarItem = useCallback(async (data: NuevoItemForm) => {
-    if (!user || !firestore) return;
+    if (!user?.uid || !firestore) return;
     const itemCollectionRef = collection(firestore, `businesses/${user.uid}/kardexItems`);
 
     if (data.id) { // Update
@@ -93,10 +92,10 @@ export function useKardex() {
         };
         await addDocumentNonBlocking(itemCollectionRef, nuevoItem);
     }
-  }, [user, firestore]);
+  }, [user?.uid, firestore]);
 
   const registrarMovimiento = useCallback(async (form: NuevoMovimientoForm) => {
-    if (!user || !firestore || !items) {
+    if (!user?.uid || !firestore || !items) {
       throw new Error('Usuario, base de datos o ítems no disponibles.');
     }
 
@@ -141,7 +140,7 @@ export function useKardex() {
     const itemDocRef = doc(firestore, `businesses/${user.uid}/kardexItems`, item.id);
     await updateDocumentNonBlocking(itemDocRef, updatedItemData);
 
-  }, [user, firestore, items, configuracion]);
+  }, [user?.uid, firestore, items, configuracion]);
 
   const calcularKardex = useCallback((itemId: string, metodo: MetodoValuacion): LineaKardexCalculada[] => {
     const movimientosProducto = movimientos
@@ -264,5 +263,3 @@ export function useKardex() {
     isLoading,
   };
 }
-
-  

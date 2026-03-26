@@ -10,9 +10,9 @@ export function useAsientosContables() {
   const firestore = useFirestore();
 
   const asientosQuery = useMemoFirebase(() => {
-    if (!firestore || !user) return null;
+    if (!firestore || !user?.uid) return null;
     return query(collection(firestore, `businesses/${user.uid}/asientos`), orderBy('fecha', 'desc'));
-  }, [firestore, user]);
+  }, [firestore, user?.uid]);
 
   const { data: asientos, isLoading } = useCollection<AsientoContable>(asientosQuery);
 
