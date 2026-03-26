@@ -1,6 +1,6 @@
 'use client';
 
-import React, { DependencyList, createContext, useContext, ReactNode, useMemo, useState, useEffect, useRef } from 'react';
+import React, { DependencyList, createContext, useContext, ReactNode, useMemo, useState, useEffect } from 'react';
 import { FirebaseApp } from 'firebase/app';
 import { Firestore, doc, getDoc } from 'firebase/firestore';
 import { Auth, User, onAuthStateChanged } from 'firebase/auth';
@@ -20,6 +20,7 @@ interface UserAuthState {
   user: User | null;
   isUserLoading: boolean;
   userError: Error | null;
+  role: string | null;
 }
 
 // Combined state for the Firebase context
@@ -67,9 +68,9 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
     user: null,
     isUserLoading: true, // Start loading until first auth event
     userError: null,
+    role: null,
   });
   
-  const userRoleRef = useRef<string | null>(null);
   const router = useRouter();
   const pathname = usePathname();
 
@@ -77,35 +78,30 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
   // Does not depend on `pathname` to avoid re-subscribing on route changes.
   useEffect(() => {
     if (!auth) { 
-      setUserAuthState({ user: null, isUserLoading: false, userError: new Error("Auth service not provided.") });
+      setUserAuthState({ user: null, isUserLoading: false, userError: new Error("Auth service not provided."), role: null });
       return;
     }
 
     const unsubscribe = onAuthStateChanged(
       auth,
       async (currentUser) => {
+        let role: string | null = null;
         if (currentUser) {
             try {
                 const userDocRef = doc(firestore, 'users', currentUser.uid);
                 const userDocSnap = await getDoc(userDocRef);
                 if (userDocSnap.exists()) {
-                    userRoleRef.current = userDocSnap.data().role as string ?? null;
-                } else {
-                    userRoleRef.current = null;
+                    role = userDocSnap.data().role as string ?? null;
                 }
             } catch (e) {
                 console.error("FirebaseProvider: error fetching user role:", e);
-                userRoleRef.current = null;
             }
-        } else {
-            userRoleRef.current = null;
         }
-        setUserAuthState({ user: currentUser, isUserLoading: false, userError: null });
+        setUserAuthState({ user: currentUser, isUserLoading: false, userError: null, role });
       },
       (error) => {
         console.error("FirebaseProvider: onAuthStateChanged error:", error);
-        userRoleRef.current = null;
-        setUserAuthState({ user: null, isUserLoading: false, userError: error });
+        setUserAuthState({ user: null, isUserLoading: false, userError: error, role: null });
       }
     );
     return () => unsubscribe();
@@ -119,7 +115,7 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
     const isAuthPage = pathname === '/login' || pathname === '/register' || pathname === '/forgot-password';
     const isDashboardPage = pathname.startsWith('/dashboard');
     const isSuperAdminPage = pathname.startsWith('/superadmin');
-    const role = userRoleRef.current;
+    const role = userAuthState.role;
 
     if (userAuthState.user) {
         if (role === 'super_admin') {
