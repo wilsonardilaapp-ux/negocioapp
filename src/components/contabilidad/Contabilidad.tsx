@@ -4,7 +4,6 @@ import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import InventarioKardex from './InventarioKardex';
-import KardexResumen from './secciones/KardexResumen';
 import PlanDeCuentas from './secciones/PlanDeCuentas';
 import AsientosContables from './secciones/AsientosContables';
 import Impuestos from './secciones/Impuestos';
@@ -26,14 +25,13 @@ const PlaceholderSection = ({ title }: { title: string }) => (
 );
 
 const sections = [
-  { id: 'resumen', label: 'Resumen' },
-  { id: 'cuentas', label: 'Cuentas' },
   { id: 'asientos', label: 'Asientos' },
-  { id: 'impuestos', label: 'Impuestos' },
-  { id: 'reportes', label: 'Reportes' },
-  { id: 'conciliacion', label: 'Conciliación' },
+  { id: 'cuentas', label: 'Cuentas' },
+  { id: 'inventario_kardex', label: 'Inventario' },
   { id: 'activos_fijos', label: 'Activos Fijos' },
-  { id: 'inventario_kardex', label: 'Inventario Kardex' },
+  { id: 'impuestos', label: 'Impuestos' },
+  { id: 'conciliacion', label: 'Conciliación' },
+  { id: 'reportes', label: 'Reportes' },
 ];
 
 export default function Contabilidad() {
@@ -50,36 +48,20 @@ export default function Contabilidad() {
         </CardHeader>
       </Card>
       <Tabs defaultValue="asientos" className="w-full">
-        <TabsList className="grid w-full grid-cols-4 md:grid-cols-8">
+        <TabsList className="grid w-full grid-cols-3 md:grid-cols-7">
           {sections.map(section => (
             <TabsTrigger key={section.id} value={section.id}>
                 {section.label}
             </TabsTrigger>
           ))}
         </TabsList>
-        {sections.map(section => (
-            <TabsContent key={section.id} value={section.id}>
-                {section.id === 'inventario_kardex' ? (
-                    <InventarioKardex />
-                ) : section.id === 'resumen' ? (
-                    <KardexResumen resumen={kardexData.resumen} movimientos={kardexData.movimientos} />
-                ) : section.id === 'cuentas' ? (
-                    <PlanDeCuentas />
-                ) : section.id === 'asientos' ? (
-                    <AsientosContables />
-                ) : section.id === 'impuestos' ? (
-                    <Impuestos />
-                ) : section.id === 'reportes' ? (
-                    <Reportes />
-                ) : section.id === 'conciliacion' ? (
-                    <ConciliacionBancaria />
-                ) : section.id === 'activos_fijos' ? (
-                    <ActivosFijos />
-                ) : (
-                    <PlaceholderSection title={section.label} />
-                )}
-            </TabsContent>
-        ))}
+        <TabsContent value="asientos"><AsientosContables /></TabsContent>
+        <TabsContent value="cuentas"><PlanDeCuentas /></TabsContent>
+        <TabsContent value="inventario_kardex"><InventarioKardex kardexData={kardexData} /></TabsContent>
+        <TabsContent value="activos_fijos"><ActivosFijos /></TabsContent>
+        <TabsContent value="impuestos"><Impuestos /></TabsContent>
+        <TabsContent value="conciliacion"><ConciliacionBancaria /></TabsContent>
+        <TabsContent value="reportes"><Reportes /></TabsContent>
       </Tabs>
     </div>
   );

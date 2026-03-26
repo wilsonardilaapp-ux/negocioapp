@@ -1,16 +1,18 @@
 'use client';
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useInventarioKardex } from "@/hooks/useInventarioKardex";
+import type { useInventarioKardex } from "@/hooks/useInventarioKardex";
 import KardexResumen from "./secciones/KardexResumen";
 import KardexTabla from "./secciones/KardexTabla";
 import KardexProductos from "./secciones/KardexProductos";
 import KardexMovimientos from "./secciones/KardexMovimientos";
 import KardexConfiguracion from "./secciones/KardexConfiguracion";
 
-export default function InventarioKardex() {
-    const kardexData = useInventarioKardex();
+interface InventarioKardexProps {
+    kardexData: ReturnType<typeof useInventarioKardex>;
+}
 
+export default function InventarioKardex({ kardexData }: InventarioKardexProps) {
     return (
         <Tabs defaultValue="resumen" className="w-full">
             <TabsList className="grid w-full grid-cols-5">
@@ -21,21 +23,23 @@ export default function InventarioKardex() {
                 <TabsTrigger value="configuracion">Configuración</TabsTrigger>
             </TabsList>
             <TabsContent value="resumen">
-                <KardexResumen resumen={kardexData.resumen} movimientos={kardexData.movimientos} />
+                <KardexResumen resumen={kardexData.resumen} movimientos={kardexData.movimientos} items={kardexData.items} />
             </TabsContent>
             <TabsContent value="kardex">
                 <KardexTabla 
-                    productos={kardexData.productos} 
-                    metodo={kardexData.configuracion.metodoValuacion}
-                    calcularLineasKardex={kardexData.calcularLineasKardex}
+                    items={kardexData.items}
+                    calcularKardex={kardexData.calcularKardex}
                 />
             </TabsContent>
             <TabsContent value="productos">
-                <KardexProductos productos={kardexData.productos} />
+                <KardexProductos 
+                    items={kardexData.items}
+                    registrarOActualizarItem={kardexData.registrarOActualizarItem}
+                />
             </TabsContent>
             <TabsContent value="movimientos">
                 <KardexMovimientos 
-                    productos={kardexData.productos} 
+                    items={kardexData.items} 
                     movimientos={kardexData.movimientos}
                     registrarMovimiento={kardexData.registrarMovimiento}
                 />
@@ -43,7 +47,8 @@ export default function InventarioKardex() {
             <TabsContent value="configuracion">
                 <KardexConfiguracion 
                     config={kardexData.configuracion} 
-                    setConfig={kardexData.setConfiguracion}
+                    setConfig={kardexData.actualizarConfiguracion}
+                    bodegas={kardexData.bodegas}
                 />
             </TabsContent>
         </Tabs>
