@@ -94,7 +94,7 @@ export interface NuevoMovimientoForm {
   costoUnitario: number;
   documento: string;
   fecha: string;
-  observaciones: string;
+  observaciones?: string;
   bodegaOrigen?: string;
   bodegaDestino?: string;
 }
