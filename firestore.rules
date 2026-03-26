@@ -48,6 +48,10 @@ service cloud.firestore {
       allow read: if true;
       allow write: if isSuperAdmin();
     }
+    match /landing_configs/{docId} {
+      allow read: if true;
+      allow write: if isSuperAdmin();
+    }
 
     // User-specific data
     match /users/{userId} {
@@ -183,5 +187,3 @@ service cloud.firestore {
     }
   }
 }
-
-  
