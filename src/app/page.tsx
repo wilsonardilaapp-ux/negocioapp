@@ -9,8 +9,9 @@ import { Loader2, Frown } from 'lucide-react';
 import type { Module } from '@/models/module';
 import { useMemo, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
+import type { GlobalConfig } from '@/models/global-config';
 
-// Datos de respaldo para usar en caso de error de conexión
+// Datos de respaldo para usar cuando Firestore está offline en desarrollo
 const initialLandingData: LandingPageData = {
   hero: {
     title: 'Innovación que impulsa tu negocio al futuro',
@@ -57,52 +58,33 @@ export default function RootPage() {
     [firestore]);
 
     const { data: landingData, isLoading: isLandingLoading, error } = useDoc<LandingPageData>(landingConfigRef);
-    const { data: globalConfig, isLoading: isGlobalConfigLoading } = useDoc<{ mainBusinessId?: string }>(globalConfigRef);
+    const { data: globalConfig, isLoading: isGlobalConfigLoading } = useDoc<GlobalConfig>(globalConfigRef);
     const { data: chatbotModule, isLoading: isModuleLoading } = useDoc<Module>(chatbotModuleRef);
 
     const isLoading = isLandingLoading || isGlobalConfigLoading || isModuleLoading;
-    
-    useEffect(() => {
-        if (error) {
-            console.warn("ADVERTENCIA: No se pudo cargar la configuración de la landing page desde Firestore. Se usarán datos de respaldo. Error:", error.message);
-        }
-    }, [error]);
-
     const businessId = globalConfig?.mainBusinessId;
     const isChatbotEnabled = chatbotModule?.status === 'active';
-    
-    const finalData = useMemo(() => {
-      // Si hay un error, usa los datos de respaldo. Si no, usa los datos de Firestore.
-      const sourceData = error ? initialLandingData : landingData;
-      
-      if (!sourceData) return null;
-      
-      const cleanImageUrl =
-        sourceData.hero?.imageUrl &&
-        typeof sourceData.hero.imageUrl === 'string' &&
-        sourceData.hero.imageUrl.trim().length > 0 &&
-        sourceData.hero.imageUrl.startsWith('http')
-          ? sourceData.hero.imageUrl
-          : null;
 
-      return {
-        ...sourceData,
-        hero: {
-          ...sourceData.hero,
-          imageUrl: cleanImageUrl,
-        },
-      };
-    }, [landingData, error]);
-
-    if (isLoading && !error) { // No muestres el loader si ya hay un error, para mostrar el fallback inmediatamente.
+    // 1. Manejar estado de carga
+    if (isLoading) {
         return (
             <div className="flex h-screen w-full items-center justify-center bg-background">
                 <Loader2 className="h-12 w-12 animate-spin text-primary" />
             </div>
         );
     }
-
-    if (!finalData) {
+    
+    // 2. Determinar qué datos usar (en vivo o de respaldo)
+    let finalData: LandingPageData;
+    if (error) {
+        // Si hay un error (ej. offline), usamos los datos de respaldo
+        console.warn("ADVERTENCIA: No se pudo cargar la configuración desde Firestore. Usando datos de respaldo. Error:", error.message);
+        finalData = initialLandingData;
+    } else if (landingData) {
+        // Si hay datos de Firestore, los usamos
+        finalData = landingData;
+    } else {
+        // Si no hay error y no hay datos, la página no está configurada
         return (
             <div className="flex h-screen w-full flex-col items-center justify-center bg-background text-center px-4">
                 <Frown className="h-16 w-16 text-muted-foreground mb-4" />
@@ -114,6 +96,7 @@ export default function RootPage() {
         );
     }
 
+    // 3. Renderizar la página con los datos decididos
     return (
         <div className="w-full bg-background">
             <LandingPageContent data={finalData} businessId={businessId} />
