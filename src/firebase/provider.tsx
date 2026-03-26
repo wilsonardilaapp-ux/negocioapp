@@ -1,6 +1,6 @@
 'use client';
 
-import React, { DependencyList, createContext, useContext, ReactNode, useMemo, useState, useEffect } from 'react';
+import React, { DependencyList, createContext, useContext, ReactNode, useMemo, useState, useEffect, useRef } from 'react';
 import { FirebaseApp } from 'firebase/app';
 import { Firestore, doc, getDoc } from 'firebase/firestore';
 import { Auth, User, onAuthStateChanged } from 'firebase/auth';
@@ -68,72 +68,75 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
     isUserLoading: true, // Start loading until first auth event
     userError: null,
   });
-
+  
+  const userRoleRef = useRef<string | null>(null);
   const router = useRouter();
   const pathname = usePathname();
 
-  // Effect to subscribe to Firebase auth state changes
+  // Effect 1: Manages auth state changes only.
+  // Does not depend on `pathname` to avoid re-subscribing on route changes.
   useEffect(() => {
-    if (!auth) { // If no Auth service instance, cannot determine user state
+    if (!auth) { 
       setUserAuthState({ user: null, isUserLoading: false, userError: new Error("Auth service not provided.") });
       return;
     }
 
     const unsubscribe = onAuthStateChanged(
       auth,
-      async (currentUser) => { // Auth state determined
-        
-        // Centralized redirection logic
-        const isAuthPage = pathname === '/login' || pathname === '/register' || pathname === '/forgot-password';
-        const isDashboardPage = pathname.startsWith('/dashboard');
-        const isSuperAdminPage = pathname.startsWith('/superadmin');
-
+      async (currentUser) => {
         if (currentUser) {
-            const userDocRef = doc(firestore, 'users', currentUser.uid);
             try {
+                const userDocRef = doc(firestore, 'users', currentUser.uid);
                 const userDocSnap = await getDoc(userDocRef);
                 if (userDocSnap.exists()) {
-                    const userProfile = userDocSnap.data();
-                    if (userProfile.role === 'super_admin') {
-                        // If a super admin is on an auth page or a client dashboard page, redirect them to superadmin.
-                        if (isAuthPage || isDashboardPage) {
-                            router.replace('/superadmin');
-                        }
-                    } else {
-                        // If a regular user is on an auth page or a superadmin page, redirect them to dashboard.
-                        if (isAuthPage || isSuperAdminPage) {
-                            router.replace('/dashboard');
-                        }
-                    }
+                    userRoleRef.current = userDocSnap.data().role as string ?? null;
                 } else {
-                    // Fallback if user profile doesn't exist for some reason
-                    if (isAuthPage || isSuperAdminPage) {
-                         router.replace('/dashboard');
-                    }
+                    userRoleRef.current = null;
                 }
             } catch (e) {
-                console.error("Error fetching user profile for redirection:", e);
-                // Fallback on error
-                if (isAuthPage || isSuperAdminPage) {
-                   router.replace('/dashboard');
-                }
+                console.error("FirebaseProvider: error fetching user role:", e);
+                userRoleRef.current = null;
             }
         } else {
-          // If user is not logged in and on a protected page (dashboard or superadmin), redirect to login
-          if (isDashboardPage || isSuperAdminPage) {
-             router.replace('/login');
-          }
+            userRoleRef.current = null;
         }
-        
         setUserAuthState({ user: currentUser, isUserLoading: false, userError: null });
       },
-      (error) => { // Auth listener error
+      (error) => {
         console.error("FirebaseProvider: onAuthStateChanged error:", error);
+        userRoleRef.current = null;
         setUserAuthState({ user: null, isUserLoading: false, userError: error });
       }
     );
-    return () => unsubscribe(); // Cleanup
-  }, [auth, pathname, router, firestore]); // Depends on the auth instance
+    return () => unsubscribe();
+  }, [auth, firestore]);
+
+  // Effect 2: Manages redirection logic.
+  // Runs when auth state or path changes.
+  useEffect(() => {
+    if (userAuthState.isUserLoading) return; // Wait until auth state is determined
+
+    const isAuthPage = pathname === '/login' || pathname === '/register' || pathname === '/forgot-password';
+    const isDashboardPage = pathname.startsWith('/dashboard');
+    const isSuperAdminPage = pathname.startsWith('/superadmin');
+    const role = userRoleRef.current;
+
+    if (userAuthState.user) {
+        if (role === 'super_admin') {
+            if (isAuthPage || isDashboardPage) {
+                router.replace('/superadmin');
+            }
+        } else { // Regular user or undefined role
+            if (isAuthPage || isSuperAdminPage) {
+                router.replace('/dashboard');
+            }
+        }
+    } else { // No user logged in
+        if (isDashboardPage || isSuperAdminPage) {
+            router.replace('/login');
+        }
+    }
+  }, [userAuthState, pathname, router]);
 
   // Memoize the context value
   const contextValue = useMemo((): FirebaseContextState => {
