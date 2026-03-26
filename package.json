@@ -44,7 +44,7 @@
     "dotenv": "^16.5.0",
     "embla-carousel-autoplay": "^8.1.5",
     "embla-carousel-react": "^8.6.0",
-    "firebase": "^11.9.1",
+    "firebase": "11.9.1",
     "firebase-admin": "^12.7.0",
     "genkit": "1.25.0",
     "html-to-image": "^1.11.11",
