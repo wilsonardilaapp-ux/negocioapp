@@ -32,7 +32,7 @@ export interface ItemInventario {
   stockMinimo: number;
   stockMaximo: number;
   costoUnitario: number;
-  cuentaContablePUC: string;
+  cuentaContablePUC?: string;
   bodega: string;
   estado: EstadoStock;
   activo: boolean;
