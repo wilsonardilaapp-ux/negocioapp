@@ -70,7 +70,7 @@ export default function SuperAdminLayout({ children }: { children: ReactNode }) 
                 if (userDocSnap.exists()) {
                     setUserProfile(userDocSnap.data() as UserType);
                 } else {
-                    // Fallback if doc doesn't exist
+                    // Fallback if doc doesn't exist but email matches
                     if (SUPER_ADMIN_EMAILS.includes(user.email ?? '')) {
                          setUserProfile({ 
                             id: user.uid,
