@@ -111,6 +111,7 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
   // Runs when auth state or path changes.
   useEffect(() => {
     if (userAuthState.isUserLoading) return; // Wait until auth state is determined
+    if (userAuthState.user && userAuthState.role === null) return; // Wait for role to be fetched
 
     const isAuthPage = pathname === '/login' || pathname === '/register' || pathname === '/forgot-password';
     const isDashboardPage = pathname.startsWith('/dashboard');
