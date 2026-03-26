@@ -28,7 +28,7 @@ import { doc } from "firebase/firestore";
 
 interface EditorLandingFormProps {
   data: LandingPageData;
-  setData: (updater: (prevData: LandingPageData) => LandingPageData) => void;
+  setData: React.Dispatch<React.SetStateAction<LandingPageData>>;
 }
 
 const MediaUploader = ({
@@ -160,7 +160,7 @@ export default function EditorLandingForm({ data, setData }: EditorLandingFormPr
                 }
                 return section;
             });
-            setData(() => ({ ...data, sections: updatedSections }));
+            setData((prevData) => ({ ...prevData, sections: updatedSections }));
         }
     };
     

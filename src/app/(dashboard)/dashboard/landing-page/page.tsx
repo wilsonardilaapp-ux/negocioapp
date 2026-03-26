@@ -43,7 +43,7 @@ const initialLandingData: LandingPageData = {
 };
 
 export default function LandingPageBuilder() {
-  const [data, setData] = useState<LandingPageData | null>(null);
+  const [data, setData] = useState<LandingPageData>(initialLandingData);
   const [isSaving, setIsSaving] = useState(false);
   const { user } = useUser();
   const firestore = useFirestore();
@@ -63,10 +63,8 @@ export default function LandingPageBuilder() {
         footer: { ...initialLandingData.footer, ...savedData.footer },
       };
       setData(mergedData);
-    } else if (!isLoading) {
-      setData(initialLandingData);
     }
-  }, [savedData, isLoading]);
+  }, [savedData]);
 
   const handleSave = () => {
     if (!docRef || !data) return;
@@ -78,8 +76,6 @@ export default function LandingPageBuilder() {
       delete dataToSave.hero.imageUrl;
     }
     
-    console.log('[handleSave] Datos a guardar en Firestore:', dataToSave);
-
     setDocumentNonBlocking(docRef, dataToSave, { merge: true });
     
     setTimeout(() => {
@@ -88,11 +84,13 @@ export default function LandingPageBuilder() {
     }, 1000);
   };
   
-  if (isLoading || !data) return (
-    <div className="flex justify-center items-center h-full">
-      <Loader2 className="h-10 w-10 animate-spin text-primary" />
-    </div>
-  );
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center h-full">
+        <Loader2 className="h-10 w-10 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -106,7 +104,7 @@ export default function LandingPageBuilder() {
             </Button>
         </Card>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2"><EditorLandingForm data={data} setData={setData as any} /></div>
+            <div className="lg:col-span-2"><EditorLandingForm data={data} setData={setData} /></div>
             <div className="lg:col-span-1"><EditorLandingPreview data={data} /></div>
         </div>
     </div>

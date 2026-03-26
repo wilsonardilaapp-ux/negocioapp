@@ -43,7 +43,7 @@ const initialLandingData: LandingPageData = {
 };
 
 export default function SuperAdminPublicLandingPage() {
-  const [data, setData] = useState<LandingPageData | null>(null);
+  const [data, setData] = useState<LandingPageData>(initialLandingData);
   const [isSaving, setIsSaving] = useState(false);
   const firestore = useFirestore();
   const { toast } = useToast();
@@ -64,10 +64,8 @@ export default function SuperAdminPublicLandingPage() {
         seo: { ...initialLandingData.seo, ...savedData.seo },
       };
       setData(mergedData);
-    } else if (!isLoading) {
-      setData(initialLandingData);
     }
-  }, [savedData, isLoading]);
+  }, [savedData]);
 
   const handleSave = () => {
     if (!docRef || !data) return;
@@ -84,11 +82,13 @@ export default function SuperAdminPublicLandingPage() {
     }, 1000);
   };
   
-  if (isLoading || !data) return (
-    <div className="flex justify-center items-center h-full">
-        <Loader2 className="h-10 w-10 animate-spin text-primary" />
-    </div>
-  );
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center h-full">
+          <Loader2 className="h-10 w-10 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -103,7 +103,7 @@ export default function SuperAdminPublicLandingPage() {
             </Button>
         </Card>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-            <div className="lg:col-span-2"><EditorLandingForm data={data} setData={setData as any} /></div>
+            <div className="lg:col-span-2"><EditorLandingForm data={data} setData={setData} /></div>
             <div className="lg:col-span-1"><SuperAdminEditorLandingPreview data={data} /></div>
         </div>
     </div>
