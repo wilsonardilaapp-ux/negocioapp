@@ -1,15 +1,2 @@
-
-'use client';
-
-import { useFirebase } from '@/firebase';
-
-export interface UserHookResult {
-  user: any | null; // Replace 'any' with your User type
-  isUserLoading: boolean;
-  userError: Error | null;
-}
-
-export const useUser = (): UserHookResult => {
-  const { user, isUserLoading, userError } = useFirebase();
-  return { user, isUserLoading, userError };
-};
+// This file is intentionally left blank to resolve a build error caused by duplicate exports.
+// The 'useUser' hook is now exported solely from 'src/firebase/provider.tsx'.
