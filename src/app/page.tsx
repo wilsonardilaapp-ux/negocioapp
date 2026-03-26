@@ -6,9 +6,41 @@ import type { LandingPageData } from "@/models/landing-page";
 import LandingPageContent from "@/components/landing-page/landing-page-content";
 import { ChatbotWidget } from "@/components/chatbot/chatbot-widget";
 import type { Module } from "@/models/module";
+import { v4 as uuidv4 } from 'uuid';
 
 const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 const db = getFirestore(app);
+
+// Default data to be used as a fallback in development if Firestore is offline
+const initialLandingData: LandingPageData = {
+  hero: {
+    title: 'Innovación que impulsa tu negocio al futuro',
+    subtitle: 'Transformamos tecnología en crecimiento real',
+    additionalContent: '',
+    imageUrl: 'https://picsum.photos/seed/vintagecar/1200/800', 
+    backgroundColor: '#FFFFFF',
+    textColor: '#000000',
+    buttonColor: '#4CAF50',
+    ctaButtonText: 'Contáctanos',
+    ctaButtonUrl: '#contact'
+  },
+  navigation: { enabled: true, logoUrl: '', businessName: 'Mi Negocio', logoAlt: 'Logo', logoWidth: 120, logoAlignment: 'left', links: [], backgroundColor: '#FFFFFF', textColor: '#000000', hoverColor: '#4CAF50', fontSize: 16, spacing: 4, useShadow: true },
+  sections: [], 
+  testimonials: [], 
+  seo: { title: 'Mi Negocio', description: '', keywords: [] }, 
+  form: { fields: [], destinationEmail: '' }, 
+  header: { 
+    banner: { mediaUrl: null, mediaType: null }, 
+    businessInfo: { name: '', address: '', phone: '', email: '' }, 
+    socialLinks: { tiktok: '', instagram: '', facebook: '', whatsapp: '', twitter: '' }, 
+    carouselItems: [
+        { id: uuidv4(), mediaUrl: null, mediaType: null, slogan: '' },
+        { id: uuidv4(), mediaUrl: null, mediaType: null, slogan: '' },
+        { id: uuidv4(), mediaUrl: null, mediaType: null, slogan: '' },
+    ]
+  },
+  footer: { enabled: true, contactInfo: { address: '', phone: '', email: '', hours: '' }, quickLinks: [], legalLinks: { privacyPolicyUrl: '', termsAndConditionsUrl: '', cookiesPolicyUrl: '', legalNoticeUrl: '' }, socialLinks: { facebookUrl: '', instagramUrl: '', tiktokUrl: '', youtubeUrl: '', linkedinUrl: '', showIcons: true }, logo: { url: null, slogan: '' }, certifications: [], copyright: { companyName: '', additionalText: '' }, cta: { text: '', url: '', enabled: false }, visuals: { backgroundImageUrl: null, opacity: 80, backgroundColor: '#FFFFFF', textColor: '#000000', darkMode: false, showBackToTop: true }, adminExtras: { systemVersion: '1.0.0', supportLink: '', documentationLink: '' } },
+};
 
 async function getLandingPageData(): Promise<{ 
     landingData: LandingPageData | null,
@@ -24,7 +56,6 @@ async function getLandingPageData(): Promise<{
         const landingSnap = await getDoc(doc(db, "landing_configs", "main"));
         const landingData = landingSnap.exists() ? (landingSnap.data() as LandingPageData) : null;
         
-        // We still need a businessId for the chatbot, let's use the global one if available.
         const configSnap = await getDoc(doc(db, "globalConfig", "system"));
         const mainBusinessId = configSnap.exists() ? configSnap.data().mainBusinessId : null;
 
@@ -54,12 +85,13 @@ export default async function RootPage() {
     const { landingData, businessId, chatbot } = await getLandingPageData();
 
     if (!landingData) {
+        console.warn("ADVERTENCIA: No se pudieron cargar los datos de la landing page desde Firestore. Se utilizarán datos de fallback para desarrollo.");
         return (
-            <div className="flex h-screen w-full flex-col items-center justify-center text-center">
-                 <h1 className="text-2xl font-bold">Página en Construcción</h1>
-                 <p className="text-muted-foreground">La página principal aún no ha sido configurada por el administrador.</p>
+            <div className="w-full bg-background">
+                <LandingPageContent data={initialLandingData} />
+                {/* The chatbot will not be displayed in fallback mode as it requires a specific businessId */}
             </div>
-        )
+        );
     }
 
     return (
