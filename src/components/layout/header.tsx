@@ -1,61 +1,31 @@
-'use client'; // Marcar como Client Component para usar hooks
+'use client';
 
 import * as React from "react";
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/icons";
 import type { LandingPageData, NavLink } from "@/models/landing-page";
-import { useDoc, useFirestore, useMemoFirebase } from "@/firebase";
-import { doc, getDoc } from 'firebase/firestore';
 
-async function getMainBusinessId(firestore: any): Promise<string | null> {
-    if (!firestore) return null;
-    try {
-        const configSnap = await getDoc(doc(firestore, "globalConfig", "system"));
-        return configSnap.exists() ? configSnap.data().mainBusinessId : null;
-    } catch (error) {
-        console.error("Error fetching global config:", error);
-        return null;
-    }
-}
-
+// Helper function remains outside the component
 const getLinkUrl = (link: NavLink, currentBusinessId: string | null | undefined): string => {
-    if (link.url && link.url !== '#') {
-        return link.url;
-    }
-    const text = link.text.toLowerCase();
-    if (text.includes('blog')) return '/blog';
-    if (text.includes('catálogo')) return currentBusinessId ? `/catalog/${currentBusinessId}` : '#';
-    if (text.includes('contacto')) return '/contact';
-    if (text.includes('inicio')) return currentBusinessId ? `/landing/${currentBusinessId}` : '/';
-    return '#';
+  if (link.url && link.url !== '#') {
+    return link.url;
+  }
+  const text = link.text.toLowerCase();
+  if (text.includes('blog')) return '/blog';
+  if (text.includes('catálogo')) return currentBusinessId ? `/catalog/${currentBusinessId}` : '#';
+  if (text.includes('contacto')) return '/contact';
+  if (text.includes('inicio')) return currentBusinessId ? `/landing/${currentBusinessId}` : '/';
+  return '#';
 };
 
-export default function Header() {
-  const firestore = useFirestore();
+// Define props for the Header
+interface HeaderProps {
+  businessId: string | null;
+  navigation: LandingPageData['navigation'] | null;
+}
 
-  // Usamos un estado para el ID del negocio para que se resuelva en el cliente
-  const [businessId, setBusinessId] = React.useState<string | null>(null);
-
-  React.useEffect(() => {
-    async function fetchBusinessId() {
-      const id = await getMainBusinessId(firestore);
-      setBusinessId(id);
-    }
-    if (firestore) {
-      fetchBusinessId();
-    }
-  }, [firestore]);
-
-  const landingPageRef = useMemoFirebase(() => {
-    if (!firestore || !businessId) return null;
-    return doc(firestore, 'businesses', businessId, 'landingPages', 'main');
-  }, [firestore, businessId]);
-
-  const { data } = useDoc<LandingPageData>(landingPageRef);
-
-  const navigation = data?.navigation;
-  const logoUrl = data?.navigation?.logoUrl;
+export default function Header({ businessId, navigation }: HeaderProps) {
+  const logoUrl = navigation?.logoUrl;
   const businessName = navigation?.businessName || "Negocio V03";
 
   return (
@@ -75,7 +45,7 @@ export default function Header() {
           )}
         </Link>
         <nav className="hidden items-center gap-6 md:flex">
-           {navigation?.links.filter(l => l.enabled).map(link => (
+           {navigation?.links?.filter(l => l.enabled).map(link => (
                 <Link 
                     key={link.id} 
                     href={getLinkUrl(link, businessId)} 
