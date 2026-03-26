@@ -1,10 +1,10 @@
 
-"use client";
+'use client';
 
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo } from "react";
+import { useEffect, useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -26,9 +26,9 @@ import {
 } from "@/components/ui/sidebar";
 import { Logo } from "@/components/icons";
 import { SuperAdminNav } from "@/components/layout/super-admin-nav";
-import { useAuth, useUser, useFirestore, useDoc, useMemoFirebase } from "@/firebase";
+import { useAuth, useUser, useFirestore } from "@/firebase";
 import type { User as UserType } from '@/models/user';
-import { doc } from 'firebase/firestore';
+import { doc, getDoc } from 'firebase/firestore';
 import { Loader2 } from "lucide-react";
 
 const LoadingScreen = () => (
@@ -46,21 +46,68 @@ export default function SuperAdminLayout({ children }: { children: ReactNode }) 
   const router = useRouter();
   const firestore = useFirestore();
 
-  const userProfileRef = useMemoFirebase(() => {
-    if (!firestore || !user) return null;
-    return doc(firestore, 'users', user.uid);
-  }, [firestore, user]);
+  const [userProfile, setUserProfile] = useState<UserType | null>(null);
+  const [isProfileLoading, setIsProfileLoading] = useState(true);
 
-  const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserType>(userProfileRef);
-
+  // Fetch user profile data once
   useEffect(() => {
-    if (!isUserLoading && !user) {
-      router.push("/login");
+    if (isUserLoading || !user || !firestore) {
+        // If the user isn't loaded yet, we can't fetch the profile.
+        // We set loading to false only if we know for sure there's no user.
+        if (!isUserLoading && !user) {
+            setIsProfileLoading(false);
+        }
+        return;
+    }
+    
+    let isMounted = true;
+    const fetchProfile = async () => {
+        setIsProfileLoading(true);
+        try {
+            const userDocRef = doc(firestore, 'users', user.uid);
+            const userDocSnap = await getDoc(userDocRef);
+            if (isMounted) {
+                if (userDocSnap.exists()) {
+                    setUserProfile(userDocSnap.data() as UserType);
+                } else {
+                    setUserProfile(null); // User document not found
+                }
+            }
+        } catch (error) {
+            console.error("Error fetching user profile:", error);
+            if (isMounted) {
+                setUserProfile(null);
+            }
+        } finally {
+            if (isMounted) {
+                setIsProfileLoading(false);
+            }
+        }
+    };
+
+    fetchProfile();
+
+    return () => {
+        isMounted = false;
+    };
+  }, [user, firestore, isUserLoading]);
+
+  // Handle redirection
+  useEffect(() => {
+    // Wait until both user auth and profile fetch are complete
+    if (isUserLoading || isProfileLoading) {
       return;
     }
     
-    if (!isProfileLoading && userProfile && userProfile.role !== 'super_admin') {
-      router.push("/");
+    // If no user, redirect to login
+    if (!user) {
+      router.replace("/login");
+      return;
+    }
+    
+    // If user exists but is not a super_admin, redirect to client dashboard
+    if (!userProfile || userProfile.role !== 'super_admin') {
+      router.replace("/");
     }
   }, [user, isUserLoading, userProfile, isProfileLoading, router]);
 
@@ -68,6 +115,7 @@ export default function SuperAdminLayout({ children }: { children: ReactNode }) 
     if (!auth) return;
     try {
       await auth.signOut();
+      router.push('/login'); // Explicit redirect on logout
     } catch (error) {
       console.error("Error signing out: ", error);
     }
@@ -79,8 +127,10 @@ export default function SuperAdminLayout({ children }: { children: ReactNode }) 
     return <LoadingScreen />;
   }
 
+  // After loading, if the user is not a valid super admin,
+  // we render the loading screen while the redirect effect takes place.
   if (!user || !userProfile || userProfile.role !== 'super_admin') {
-    return null; 
+    return <LoadingScreen />;
   }
 
   return (
