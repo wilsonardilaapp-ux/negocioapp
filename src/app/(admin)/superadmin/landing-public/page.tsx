@@ -5,7 +5,7 @@ import { getLandingConfig } from '@/actions/save-landing-config';
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-// Corrected initial data with static IDs to prevent hydration errors.
+// La plantilla de respaldo unificada con IDs estáticos.
 const initialLandingData: LandingPageData = {
   hero: {
     title: 'Innovación que impulsa tu negocio al futuro',
@@ -21,10 +21,10 @@ const initialLandingData: LandingPageData = {
   navigation: {
     enabled: true,
     logoUrl: '',
-    businessName: 'Mi Negocio',
     logoAlt: 'Logo de Mi Negocio',
     logoWidth: 120,
     logoAlignment: 'left',
+    businessName: 'Mi Negocio',
     links: [
       { id: 'nav-link-1', text: 'Inicio', url: '#', openInNewTab: false, enabled: true },
       { id: 'nav-link-2', text: 'Servicios', url: '#', openInNewTab: false, enabled: true },
@@ -139,8 +139,7 @@ const initialLandingData: LandingPageData = {
   },
 };
 
-
-// A deep merge function to safely combine initial data with fetched data.
+// Función para fusionar de forma segura los datos iniciales con los de la base de datos.
 function deepMerge(target: any, source: any): any {
     const output = { ...target };
     if (target && typeof target === 'object' && source && typeof source === 'object') {
@@ -151,7 +150,7 @@ function deepMerge(target: any, source: any): any {
                 output[key] = source[key];
             }
         });
-        // Ensure all keys from the target are in the output, even if not in the source
+        // Asegura que todas las claves de la plantilla inicial estén presentes.
         Object.keys(target).forEach(key => {
             if (!(key in source)) {
                 output[key] = target[key];
@@ -161,14 +160,13 @@ function deepMerge(target: any, source: any): any {
     return output;
 }
 
-
+// Este es el Componente de Servidor que obtiene los datos y los pasa al editor.
 export default async function SuperAdminPublicLandingPage() {
-    // This server component now reliably fetches data using the Admin SDK via a server action.
     const fetchedData = await getLandingConfig();
     
-    // Merge fetched data with initial data to ensure all fields are present and avoid runtime errors.
+    // Fusiona los datos para evitar errores si faltan campos en Firestore.
     const data = deepMerge(initialLandingData, fetchedData);
     
-    // Pass the confirmed data to the client component for editing.
+    // Renderiza el componente cliente con los datos iniciales.
     return <LandingPageEditor initialData={data} />;
 }

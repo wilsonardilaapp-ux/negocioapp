@@ -11,16 +11,16 @@ import SuperAdminEditorLandingPreview from '@/components/landing-page/superadmin
 import { useToast } from '@/hooks/use-toast';
 import { saveLandingConfig } from '@/actions/save-landing-config';
 
-// This is now a CLIENT component that receives its data from its parent server component.
+// Este es un Componente de Cliente que recibe los datos iniciales del servidor.
 export function LandingPageEditor({ initialData }: { initialData: LandingPageData }) {
-  // The state is managed entirely on the client, initialized with server-fetched data.
+  // El estado local (`data`) es la "fuente de la verdad" para el editor y la vista previa en tiempo real.
   const [data, setData] = useState<LandingPageData>(initialData);
   const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
-  const router = useRouter();
+  
+  // Usamos una referencia para asegurarnos de que el estado solo se inicialice una vez.
   const isFirstLoad = useRef(true);
 
-  // This useEffect now only runs on the first load, preventing re-sync issues.
   useEffect(() => {
     if (isFirstLoad.current) {
         isFirstLoad.current = false;
@@ -31,15 +31,14 @@ export function LandingPageEditor({ initialData }: { initialData: LandingPageDat
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      // Calls the server action to save the data reliably.
+      // La acción de servidor se encarga de guardar y de invalidar la caché.
       const result = await saveLandingConfig(data);
 
       if (result.success) {
         toast({
           title: '¡Guardado con Éxito!',
-          description: 'Los cambios se han guardado correctamente en la base de datos.',
+          description: 'Los cambios se han guardado y publicado correctamente.',
         });
-        // router.refresh() is REMOVED to prevent overwriting the local state.
       } else {
         throw new Error(result.error || 'Ocurrió un error desconocido en el servidor.');
       }

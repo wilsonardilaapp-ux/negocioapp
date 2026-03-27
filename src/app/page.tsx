@@ -2,10 +2,11 @@ import LandingPageContent from '@/components/landing-page/landing-page-content';
 import type { LandingPageData } from '@/models/landing-page';
 import { getLandingConfig } from '@/actions/save-landing-config';
 
+// Fuerza la renderización dinámica en el servidor, evitando la caché de la página.
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-// UNIFIED: This data is now identical to the editor's initial data.
+// Plantilla de respaldo unificada, idéntica a la del editor.
 const fallbackData: LandingPageData = {
   hero: {
     title: 'Innovación que impulsa tu negocio al futuro',
@@ -159,11 +160,9 @@ function deepMerge(target: any, source: any): any {
 }
 
 export default async function RootPage() {
-    // This server component now reliably fetches data using the Admin SDK via a server action.
     const fetchedData = await getLandingConfig();
-    console.log("FIRESTORE DATA:", JSON.stringify(fetchedData)?.slice(0, 200));
-
-    // Use fallbackData if the fetch returns null (e.g., doc doesn't exist or server error).
+    
+    // Fusiona los datos para una renderización segura, usando fallbackData si es necesario.
     const dataToRender = deepMerge(fallbackData, fetchedData);
     
     return (

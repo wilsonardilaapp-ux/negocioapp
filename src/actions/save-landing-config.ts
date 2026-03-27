@@ -4,18 +4,22 @@ import { getAdminFirestore } from '@/firebase/server-init';
 import type { LandingPageData } from '@/models/landing-page';
 import { revalidatePath, unstable_noStore as noStore } from 'next/cache';
 
+/**
+ * Guarda la configuración completa de la landing page en Firestore.
+ * @param {LandingPageData} data - El objeto completo de configuración de la página.
+ * @returns {Promise<{ success: boolean; error?: string }>} Resultado de la operación.
+ */
 export async function saveLandingConfig(data: LandingPageData): Promise<{ success: boolean; error?: string }> {
   try {
     const firestore = await getAdminFirestore();
     const docRef = firestore.collection('landing_configs').doc('main');
     
-    // Cleaning the data to remove any `undefined` values that Firestore Admin SDK cannot serialize.
+    // Limpia el objeto de datos para eliminar valores `undefined` antes de guardarlo.
     const cleanData = JSON.parse(JSON.stringify(data));
 
-    // Overwrite the document completely to ensure no old fields remain.
     await docRef.set(cleanData);
     
-    // Revalidate BOTH the home page and the editor page path to ensure the cache is cleared.
+    // **SOLUCIÓN DEFINITIVA**: Invalida la caché para la página de inicio y el editor.
     revalidatePath('/');
     revalidatePath('/superadmin/landing-public');
     
@@ -27,12 +31,12 @@ export async function saveLandingConfig(data: LandingPageData): Promise<{ succes
 }
 
 /**
- * Fetches landing page data from Firestore using the Admin SDK.
- * This function runs on the server.
- * @returns {Promise<LandingPageData | null>} The landing page data or null if an error occurs or the doc doesn't exist.
+ * Obtiene los datos de la landing page desde Firestore usando el Admin SDK.
+ * @returns {Promise<LandingPageData | null>} Los datos de la landing page o null si hay un error.
  */
 export async function getLandingConfig(): Promise<LandingPageData | null> {
-    noStore(); // Opt-out of data caching for this function
+    // Desactiva la caché de datos para esta función específica.
+    noStore();
     try {
         const firestore = await getAdminFirestore();
         const docRef = firestore.collection('landing_configs').doc('main');
