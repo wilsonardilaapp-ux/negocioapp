@@ -3,9 +3,8 @@
 import { LandingPageEditor } from './editor';
 import type { LandingPageData } from '@/models/landing-page';
 import { v4 as uuidv4 } from 'uuid';
-import { getLandingDataFromRestApi } from '@/lib/landing-page-data';
+import { getLandingConfig } from '@/actions/save-landing-config';
 
-// This is the default structure.
 const initialLandingData: LandingPageData = {
   hero: {
     title: 'Innovación que impulsa tu negocio al futuro',
@@ -163,10 +162,12 @@ function deepMerge(target: any, source: any): any {
 
 
 export default async function SuperAdminPublicLandingPage() {
-    const fetchedData = await getLandingDataFromRestApi();
+    // This server component now reliably fetches data using the Admin SDK via a server action.
+    const fetchedData = await getLandingConfig();
     
-    // Merge fetched data with initial data to ensure all fields are present.
+    // Merge fetched data with initial data to ensure all fields are present and avoid runtime errors.
     const data = deepMerge(initialLandingData, fetchedData);
     
+    // Pass the confirmed data to the client component for editing.
     return <LandingPageEditor initialData={data} />;
 }

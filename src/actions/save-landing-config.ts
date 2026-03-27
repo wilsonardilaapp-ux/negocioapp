@@ -25,6 +25,11 @@ export async function saveLandingConfig(data: LandingPageData): Promise<{ succes
   }
 }
 
+/**
+ * Fetches landing page data from Firestore using the Admin SDK.
+ * This function runs on the server.
+ * @returns {Promise<LandingPageData | null>} The landing page data or null if an error occurs or the doc doesn't exist.
+ */
 export async function getLandingConfig(): Promise<LandingPageData | null> {
     try {
         const firestore = await getAdminFirestore();
@@ -34,10 +39,10 @@ export async function getLandingConfig(): Promise<LandingPageData | null> {
         if (docSnap.exists()) {
             return docSnap.data() as LandingPageData;
         }
+        console.log("Document 'landing_configs/main' does not exist.");
         return null;
     } catch (error) {
-        console.error("Error getting landing config from server action:", error);
-        // In case of a server-side error, we return null and let the page handle the fallback.
+        console.error("Critical error fetching landing data via Admin SDK:", error);
         return null;
     }
 }

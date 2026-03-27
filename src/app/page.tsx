@@ -1,12 +1,11 @@
-'use client';
+// This is now a SERVER component
 
 import LandingPageContent from '@/components/landing-page/landing-page-content';
 import { ChatbotWidget } from '@/components/chatbot/chatbot-widget';
 import type { LandingPageData } from '@/models/landing-page';
 import { v4 as uuidv4 } from 'uuid';
-import { useDoc, useFirestore, useMemoFirebase } from '@/firebase';
-import { doc } from 'firebase/firestore';
-import { Loader2, Frown } from 'lucide-react';
+import { getLandingConfig } from '@/actions/save-landing-config';
+import { Frown, Loader2 } from 'lucide-react';
 
 
 const fallbackData: LandingPageData = {
@@ -161,33 +160,17 @@ function deepMerge(target: any, source: any): any {
     return output;
 }
 
-export default function RootPage() {
-    const firestore = useFirestore();
-    
-    // Subscribe to the public landing page config document in real-time
-    const landingConfigRef = useMemoFirebase(
-      () => (firestore ? doc(firestore, 'landing_configs/main') : null),
-      [firestore]
-    );
+export default async function RootPage() {
+    // This server component now reliably fetches data using the Admin SDK via a server action.
+    const fetchedData = await getLandingConfig();
 
-    const { data, isLoading, error } = useDoc<LandingPageData>(landingConfigRef);
-
-    if (isLoading) {
-        return (
-            <div className="flex h-screen w-full items-center justify-center bg-background">
-                <Loader2 className="h-12 w-12 animate-spin text-primary" />
-            </div>
-        );
-    }
-    
-    // In case of error OR if the document doesn't exist (data is null), we use the fallback.
-    // This makes the page resilient to connection issues.
-    const dataToRender = deepMerge(fallbackData, data);
+    // Use fallbackData if the fetch returns null (e.g., doc doesn't exist or server error).
+    const dataToRender = deepMerge(fallbackData, fetchedData);
     
     return (
         <div className="w-full bg-background">
             <LandingPageContent data={dataToRender} />
-            {/* The ChatbotWidget could be added here if needed, fetching its own config or receiving it */}
+            {/* Chatbot can be added here if needed */}
         </div>
     );
 }
