@@ -5,6 +5,8 @@ import LandingPageContent from '@/components/landing-page/landing-page-content';
 import type { LandingPageData } from '@/models/landing-page';
 import { getLandingConfig } from '@/actions/save-landing-config';
 
+export const dynamic = 'force-dynamic';
+
 // UNIFIED: This data is now identical to the editor's initial data.
 const fallbackData: LandingPageData = {
   hero: {
