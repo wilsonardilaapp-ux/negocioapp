@@ -15,8 +15,9 @@ export async function saveLandingConfig(data: LandingPageData): Promise<{ succes
     // Overwrite the document completely to ensure no old fields remain.
     await docRef.set(cleanData);
     
-    // Revalidate the home page path to ensure the cache is cleared and new data is shown.
+    // Revalidate BOTH the home page and the editor page path to ensure the cache is cleared.
     revalidatePath('/');
+    revalidatePath('/superadmin/landing-public');
     
     return { success: true };
   } catch (error: any) {
