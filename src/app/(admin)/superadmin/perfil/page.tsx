@@ -21,8 +21,6 @@ import { uploadMedia } from '@/ai/flows/upload-media-flow';
 
 const profileSchema = z.object({
   name: z.string().min(3, { message: "El nombre debe tener al menos 3 caracteres." }),
-  phone: z.string().optional(),
-  title: z.string().optional(),
 });
 
 const passwordSchema = z.object({
@@ -42,17 +40,38 @@ export default function SuperAdminProfilePage() {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [isProfileLoading, setIsProfileLoading] = useState(true);
 
+  const { register, handleSubmit, formState: { errors, isSubmitting }, reset } = useForm<z.infer<typeof profileSchema>>({
+    resolver: zodResolver(profileSchema),
+  });
+
+  const { register: registerPassword, handleSubmit: handleSubmitPassword, formState: { errors: passwordErrors, isSubmitting: isChangingPassword }, reset: resetPasswordForm } = useForm<z.infer<typeof passwordSchema>>({
+    resolver: zodResolver(passwordSchema),
+  });
+
   useEffect(() => {
     if (isUserLoading || !user || !firestore) {
-      if (!isUserLoading) setIsProfileLoading(false);
+      if (!isUserLoading && !user) {
+        setIsProfileLoading(false);
+      }
       return;
     }
-    
+
     let isMounted = true;
+    const SUPER_ADMIN_EMAILS = ['allseosoporte@gmail.com'];
+
+    const createFallbackProfile = (): UserProfile => ({
+        id: user.uid,
+        name: user.displayName || 'Super Admin',
+        email: user.email!,
+        role: 'super_admin',
+        status: 'active',
+        createdAt: user.metadata.creationTime || new Date().toISOString(),
+        lastLogin: user.metadata.lastSignInTime || new Date().toISOString(),
+        photoURL: user.photoURL || undefined,
+    });
+
     const fetchProfile = async () => {
       setIsProfileLoading(true);
-      const SUPER_ADMIN_EMAILS = ['allseosoporte@gmail.com'];
-      
       try {
         const userDocRef = doc(firestore, 'users', user.uid);
         const userDocSnap = await getDoc(userDocRef);
@@ -60,55 +79,55 @@ export default function SuperAdminProfilePage() {
           if (userDocSnap.exists()) {
             setUserProfile(userDocSnap.data() as UserProfile);
           } else if (SUPER_ADMIN_EMAILS.includes(user.email ?? '')) {
-            const fallbackProfile: UserProfile = {
-              id: user.uid,
-              name: user.displayName || 'Super Admin',
-              email: user.email!,
-              role: 'super_admin',
-              status: 'active',
-              createdAt: user.metadata.creationTime || new Date().toISOString(),
-              lastLogin: user.metadata.lastSignInTime || new Date().toISOString(),
-            };
-            setUserProfile(fallbackProfile);
+            setUserProfile(createFallbackProfile());
           } else {
             setUserProfile(null);
           }
         }
       } catch (error) {
-        console.error("Error fetching user profile:", error);
-        if (isMounted) setUserProfile(null);
+        console.error("Error fetching user profile, using fallback:", error);
+        if (isMounted && SUPER_ADMIN_EMAILS.includes(user.email ?? '')) {
+          setUserProfile(createFallbackProfile());
+        } else if (isMounted) {
+          setUserProfile(null);
+        }
       } finally {
-        if (isMounted) setIsProfileLoading(false);
+        if (isMounted) {
+          setIsProfileLoading(false);
+        }
       }
     };
 
     fetchProfile();
-
     return () => { isMounted = false; };
   }, [user, firestore, isUserLoading]);
-
-  const { register, handleSubmit, formState: { errors, isSubmitting }, reset } = useForm<z.infer<typeof profileSchema>>({
-    resolver: zodResolver(profileSchema),
-  });
   
   useEffect(() => {
     if(userProfile) {
         reset({
             name: userProfile.name || '',
-            phone: (userProfile as any)?.phone || '',
-            title: (userProfile as any)?.title || '',
         });
     }
   }, [userProfile, reset]);
 
-  const { register: registerPassword, handleSubmit: handleSubmitPassword, formState: { errors: passwordErrors, isSubmitting: isChangingPassword }, reset: resetPasswordForm } = useForm<z.infer<typeof passwordSchema>>({
-    resolver: zodResolver(passwordSchema),
-  });
-
   const onProfileSubmit = (data: z.infer<typeof profileSchema>) => {
     if (!user || !firestore) return;
     const userProfileRef = doc(firestore, 'users', user.uid);
-    setDocumentNonBlocking(userProfileRef, data, { merge: true });
+    const dataToSave: Partial<UserProfile> = {
+        name: data.name
+    };
+    
+    // Al guardar, se asegura de que los campos básicos del superadmin existan
+    if (userProfile?.role === 'super_admin') {
+      dataToSave.email = userProfile.email;
+      dataToSave.role = 'super_admin';
+      dataToSave.status = 'active';
+      if (!userProfile.createdAt) {
+        dataToSave.createdAt = new Date().toISOString();
+      }
+    }
+    
+    setDocumentNonBlocking(userProfileRef, dataToSave, { merge: true });
     
     setUserProfile(prev => prev ? { ...prev, ...data } as UserProfile : null);
 
@@ -151,7 +170,7 @@ export default function SuperAdminProfilePage() {
               const mediaDataUri = reader.result as string;
               const result = await uploadMedia({ mediaDataUri });
               setDocumentNonBlocking(userProfileRef, { photoURL: result.secure_url }, { merge: true });
-              setUserProfile(prev => prev ? { ...prev, photoURL: result.secure_url } as UserProfile & { photoURL?: string } : null);
+              setUserProfile(prev => prev ? { ...prev, photoURL: result.secure_url } : null);
               toast({ title: 'Avatar actualizado!' });
           };
       } catch (error: any) {
@@ -179,9 +198,9 @@ export default function SuperAdminProfilePage() {
         <CardContent className="p-6 flex flex-col md:flex-row items-center gap-6">
           <div className="relative group">
             <Avatar className="h-24 w-24">
-              <AvatarImage src={(userProfile as any).photoURL || user.photoURL || undefined} alt={userProfile.name} />
+              <AvatarImage src={userProfile.photoURL || user.photoURL || undefined} alt={userProfile.name} />
               <AvatarFallback className="text-3xl">
-                {userProfile.name.charAt(0)}
+                {userProfile.name?.charAt(0) || 'S'}
               </AvatarFallback>
             </Avatar>
             <Button
@@ -222,14 +241,6 @@ export default function SuperAdminProfilePage() {
                      <div>
                         <Label htmlFor="email">Correo Electrónico</Label>
                         <Input id="email" value={user.email || ''} readOnly disabled />
-                    </div>
-                    <div>
-                        <Label htmlFor="phone">Teléfono</Label>
-                        <Input id="phone" {...register('phone')} />
-                    </div>
-                    <div>
-                        <Label htmlFor="title">Cargo / Título</Label>
-                        <Input id="title" {...register('title')} />
                     </div>
                 </CardContent>
                  <div className="p-6 pt-0">

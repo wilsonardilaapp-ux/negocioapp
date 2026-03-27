@@ -6,4 +6,5 @@ export type User = {
     status: 'active' | 'inactive';
     createdAt: string;
     lastLogin: string;
+    photoURL?: string;
 };
