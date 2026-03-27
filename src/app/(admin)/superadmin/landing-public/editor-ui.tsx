@@ -11,27 +11,27 @@ import { useToast } from '@/hooks/use-toast';
 import { saveLandingConfig } from '@/actions/save-landing-config';
 
 interface EditorUIProps {
-  initialData: LandingPageData;
+  initialData: LandingPageData | null;
 }
 
 export default function EditorUI({ initialData }: EditorUIProps) {
   const { toast } = useToast();
   
-  const [editorData, setEditorData] = useState<LandingPageData>(initialData);
+  // The state for the editor, initialized with server-fetched data.
+  const [editorData, setEditorData] = useState<LandingPageData | null>(initialData);
   const [isSaving, setIsSaving] = useState(false);
-  const isFirstLoad = useRef(true);
-
-  // This effect ensures that the editor is only populated with server data
-  // on the very first load, preventing subsequent re-renders (like after saving)
-  // from overwriting the user's local state.
+  
+  // This effect ensures that if the initialData prop changes (e.g., on a server-side refresh),
+  // the local state is updated.
   useEffect(() => {
-    if (isFirstLoad.current) {
-        setEditorData(initialData);
-        isFirstLoad.current = false;
-    }
+    setEditorData(initialData);
   }, [initialData]);
 
   const handleSave = async () => {
+    if (!editorData) {
+        toast({ variant: "destructive", title: "Error", description: "No hay datos para guardar." });
+        return;
+    }
     setIsSaving(true);
     try {
       const result = await saveLandingConfig(editorData);
@@ -47,6 +47,16 @@ export default function EditorUI({ initialData }: EditorUIProps) {
       setIsSaving(false);
     }
   };
+  
+  // If there's no data (e.g., initial fetch failed), show a loading or error state.
+  if (!editorData) {
+      return (
+          <div className="flex items-center justify-center h-64">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              <p className="ml-2">Cargando datos del editor...</p>
+          </div>
+      )
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -61,7 +71,7 @@ export default function EditorUI({ initialData }: EditorUIProps) {
         </Button>
       </Card>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-        <div className="lg:col-span-2"><EditorLandingForm data={editorData} setData={setEditorData} /></div>
+        <div className="lg:col-span-2"><EditorLandingForm data={editorData} setData={setEditorData as React.Dispatch<React.SetStateAction<LandingPageData>>} /></div>
         <div className="lg:col-span-1"><SuperAdminEditorLandingPreview data={editorData} /></div>
       </div>
     </div>

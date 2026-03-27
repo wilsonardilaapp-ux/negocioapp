@@ -1,11 +1,12 @@
-'use client';
-import { useState, useEffect, useRef } from 'react';
-import { useDoc, useFirestore, useMemoFirebase } from '@/firebase';
-import { doc, getDoc } from 'firebase/firestore';
-import type { LandingPageData } from '@/models/landing-page';
-import EditorUI from './editor-ui'; // New client component
+import { getLandingConfig } from '@/actions/save-landing-config';
+import EditorUI from './editor-ui'; 
 import { v4 as uuidv4 } from 'uuid';
-import { Loader2 } from 'lucide-react';
+import type { LandingPageData } from '@/models/landing-page';
+
+// FORZAR QUE NO HAYA CACHÉ EN DESARROLLO
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 
 // Fallback data in case the document doesn't exist yet.
 const fallbackData: LandingPageData = {
@@ -76,9 +77,9 @@ const fallbackData: LandingPageData = {
       twitter: '',
     },
     carouselItems: [
-      { id: 'carousel-item-1', mediaUrl: null, mediaType: null, slogan: '' },
-      { id: 'carousel-item-2', mediaUrl: null, mediaType: null, slogan: '' },
-      { id: 'carousel-item-3', mediaUrl: null, mediaType: null, slogan: '' },
+      { id: uuidv4(), mediaUrl: null, mediaType: null, slogan: '' },
+      { id: uuidv4(), mediaUrl: null, mediaType: null, slogan: '' },
+      { id: uuidv4(), mediaUrl: null, mediaType: null, slogan: '' },
     ],
   },
   footer: {
@@ -90,12 +91,12 @@ const fallbackData: LandingPageData = {
       hours: 'Lunes a Viernes, 9am - 6pm',
     },
     quickLinks: [
-      { id: 'footer-link-1', text: 'Inicio', url: '#' },
-      { id: 'footer-link-2', text: 'Sobre nosotros', url: '#' },
-      { id: 'footer-link-3', text: 'Servicios', url: '#' },
-      { id: 'footer-link-4', text: 'Blog', url: '#' },
-      { id: 'footer-link-5', text: 'Contacto', url: '#' },
-      { id: 'footer-link-6', text: 'FAQ', url: '#' },
+      { id: uuidv4(), text: 'Inicio', url: '#' },
+      { id: uuidv4(), text: 'Sobre nosotros', url: '#' },
+      { id: uuidv4(), text: 'Servicios', url: '#' },
+      { id: uuidv4(), text: 'Blog', url: '#' },
+      { id: uuidv4(), text: 'Contacto', url: '#' },
+      { id: uuidv4(), text: 'FAQ', url: '#' },
     ],
     legalLinks: {
       privacyPolicyUrl: '#',
@@ -160,20 +161,10 @@ function deepMerge(target: any, source: any): any {
     return output;
 }
 
-export default function SuperAdminPublicLandingPage() {
-    const firestore = useFirestore();
-    const docRef = useMemoFirebase(() => doc(firestore, 'landing_configs', 'main'), [firestore]);
-    const { data: fetchedData, isLoading } = useDoc<LandingPageData>(docRef);
+export default async function SuperAdminPublicLandingPage() {
+    const fetchedData = await getLandingConfig();
 
-    const initialData = deepMerge(fallbackData, fetchedData || {});
-
-    if (isLoading) {
-        return (
-            <div className="flex justify-center items-center h-screen">
-                <Loader2 className="h-10 w-10 animate-spin" />
-            </div>
-        );
-    }
+    const initialData = deepMerge(fallbackData, fetchedData ?? {});
 
     return <EditorUI initialData={initialData} />;
 }
