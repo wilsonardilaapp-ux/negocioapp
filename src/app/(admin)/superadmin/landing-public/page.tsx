@@ -7,9 +7,6 @@ import EditorUI from './editor-ui'; // New client component
 import { v4 as uuidv4 } from 'uuid';
 import { Loader2 } from 'lucide-react';
 
-export const dynamic = 'force-dynamic';
-export const revalidate = 0;
-
 // Fallback data in case the document doesn't exist yet.
 const fallbackData: LandingPageData = {
   hero: {
