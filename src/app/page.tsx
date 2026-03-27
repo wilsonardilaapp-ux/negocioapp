@@ -1,14 +1,12 @@
-'use client';
 
 import LandingPageContent from '@/components/landing-page/landing-page-content';
 import type { LandingPageData } from '@/models/landing-page';
-import { useFirestore, useDoc, useMemoFirebase } from '@/firebase';
-import { doc } from 'firebase/firestore';
+import { getLandingConfig } from '@/actions/save-landing-config';
 import { Loader2, Frown } from 'lucide-react';
 import React from 'react';
 
+export const dynamic = 'force-dynamic';
 
-// UNIFIED: This data is now identical to the editor's initial data.
 const fallbackData: LandingPageData = {
   hero: {
     title: 'Innovación que impulsa tu negocio al futuro',
@@ -161,38 +159,20 @@ function deepMerge(target: any, source: any): any {
     return output;
 }
 
-export default function RootPage() {
-    const firestore = useFirestore();
+export default async function RootPage() {
+    const fetchedData = await getLandingConfig();
+    console.log("FIRESTORE DATA:", JSON.stringify(fetchedData)?.slice(0, 200));
 
-    const docRef = useMemoFirebase(() => {
-        if (!firestore) return null;
-        return doc(firestore, 'landing_configs', 'main');
-    }, [firestore]);
-
-    const { data: fetchedData, isLoading, error } = useDoc<LandingPageData>(docRef);
-
-    if (isLoading) {
+    if (!fetchedData) {
+        console.log("Document 'landing_configs/main' does not exist or is empty. Using fallback data.");
+        const dataToRender = fallbackData;
         return (
-            <div className="flex h-screen w-full items-center justify-center bg-background">
-                <Loader2 className="h-12 w-12 animate-spin text-primary" />
+            <div className="w-full bg-background">
+                <LandingPageContent data={dataToRender} />
             </div>
         );
     }
-    
-    if (error) {
-        return (
-             <div className="flex h-screen w-full flex-col items-center justify-center bg-background text-center px-4">
-                <Frown className="h-16 w-16 text-destructive mb-4" />
-                <h1 className="text-2xl font-bold text-destructive">Error al Cargar la Página</h1>
-                <p className="text-muted-foreground mt-2 max-w-md">
-                   No se pudo conectar con la base de datos para cargar la configuración de la página.
-                </p>
-                <pre className="mt-4 p-4 bg-muted rounded-md text-left text-xs overflow-auto">{error.message}</pre>
-            </div>
-        )
-    }
-    
-    // Merge fetched data with fallback to ensure no fields are missing
+
     const dataToRender = deepMerge(fallbackData, fetchedData);
     
     return (
