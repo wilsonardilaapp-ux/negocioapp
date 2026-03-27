@@ -1,4 +1,3 @@
-
 import LandingPageContent from '@/components/landing-page/landing-page-content';
 import type { LandingPageData } from '@/models/landing-page';
 import { getLandingConfig } from '@/actions/save-landing-config';
@@ -6,6 +5,7 @@ import { Loader2, Frown } from 'lucide-react';
 import React from 'react';
 
 export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 const fallbackData: LandingPageData = {
   hero: {

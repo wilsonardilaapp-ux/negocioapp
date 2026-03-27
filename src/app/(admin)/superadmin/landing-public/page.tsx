@@ -3,6 +3,9 @@ import type { LandingPageData } from '@/models/landing-page';
 import EditorUI from './editor-ui'; // New client component
 import { v4 as uuidv4 } from 'uuid';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 // Fallback data in case the document doesn't exist yet.
 const fallbackData: LandingPageData = {
   hero: {
