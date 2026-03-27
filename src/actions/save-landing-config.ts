@@ -1,3 +1,4 @@
+
 'use server';
 
 import { getAdminFirestore } from '@/firebase/server-init';
@@ -17,9 +18,11 @@ export async function saveLandingConfig(data: LandingPageData): Promise<{ succes
     // Limpia el objeto de datos para eliminar valores `undefined` antes de guardarlo.
     const cleanData = JSON.parse(JSON.stringify(data));
 
-    await docRef.set(cleanData);
+    // Utiliza { merge: true } para una escritura más segura, que actualiza campos
+    // existentes en lugar de sobreescribir todo el documento.
+    await docRef.set(cleanData, { merge: true });
     
-    // **SOLUCIÓN DEFINITIVA**: Invalida la caché para la página de inicio y el editor.
+    // Invalida la caché para la página de inicio y el editor.
     revalidatePath('/');
     revalidatePath('/superadmin/landing-public');
     
