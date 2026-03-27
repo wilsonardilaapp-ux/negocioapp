@@ -63,8 +63,13 @@ export async function uploadMedia(input: UploadMediaInput): Promise<{ secure_url
       throw new Error('Las credenciales de Cloudinary tienen un formato incorrecto y no se pueden leer.');
   }
   
-  if (!cloudinaryConfig?.cloud_name || !cloudinaryConfig?.api_key || !cloudinaryConfig?.api_secret) {
-    throw new Error('Las credenciales de Cloudinary están incompletas. Por favor, configúralas en el panel de integraciones.');
+  const missingFields = [];
+  if (!cloudinaryConfig?.cloud_name) missingFields.push('Cloud Name');
+  if (!cloudinaryConfig?.api_key) missingFields.push('API Key');
+  if (!cloudinaryConfig?.api_secret) missingFields.push('API Secret');
+
+  if (missingFields.length > 0) {
+    throw new Error(`Las credenciales de Cloudinary están incompletas. Falta(n): ${missingFields.join(', ')}. Por favor, configúralas en el panel de Integraciones.`);
   }
 
   // Combine client input with server-side config and call the internal flow

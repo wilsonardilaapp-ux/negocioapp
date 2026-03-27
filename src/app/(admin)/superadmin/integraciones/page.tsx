@@ -49,6 +49,7 @@ import { testWhapiConnection } from "@/ai/flows/test-whapi-connection-flow";
 
 
 const CloudinaryForm = ({ integration, onSave }: { integration: Integration, onSave: (data: Integration) => void }) => {
+    const { toast } = useToast();
     const [fields, setFields] = useState<CloudinaryFields>(() => {
         let parsedFields = {};
         if (typeof integration.fields === 'string' && integration.fields.trim()) {
@@ -70,6 +71,14 @@ const CloudinaryForm = ({ integration, onSave }: { integration: Integration, onS
     };
 
     const handleSave = () => {
+        if (!fields.cloud_name || !fields.api_key || !fields.api_secret) {
+            toast({
+                variant: "destructive",
+                title: "Campos Incompletos",
+                description: "Por favor, completa los campos: Cloud Name, API Key y API Secret.",
+            });
+            return;
+        }
         const updatedIntegration = { ...integration, fields: JSON.stringify(fields) };
         onSave(updatedIntegration);
     };
