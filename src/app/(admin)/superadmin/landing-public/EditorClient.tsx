@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Save, Loader2 } from 'lucide-react';
@@ -17,24 +17,24 @@ interface EditorClientProps {
 export default function LandingEditorClient({ initialData }: EditorClientProps) {
   const { toast } = useToast();
   
-  const [editorData, setEditorData] = useState<LandingPageData | null>(initialData);
+  const [formData, setFormData] = useState<LandingPageData | null>(initialData);
   const [isSaving, setIsSaving] = useState(false);
   
-  // VITAL: This effect syncs the server-fetched data to the client state on load/refresh.
+  // EFECTO VITAL: Si refrescas y el servidor trae datos nuevos, actualiza el form
   useEffect(() => {
     if (initialData) {
-      setEditorData(initialData);
+      setFormData(initialData);
     }
   }, [initialData]);
 
   const handleSave = async () => {
-    if (!editorData) {
+    if (!formData) {
         toast({ variant: "destructive", title: "Error", description: "No hay datos para guardar." });
         return;
     }
     setIsSaving(true);
     try {
-      const result = await saveLandingConfig(editorData);
+      const result = await saveLandingConfig(formData);
       if (result.success) {
         toast({ title: '¡Guardado con Éxito!', description: 'Los cambios se han publicado.' });
       } else {
@@ -48,7 +48,7 @@ export default function LandingEditorClient({ initialData }: EditorClientProps) 
     }
   };
   
-  if (!editorData) {
+  if (!formData) {
       return (
           <div className="flex items-center justify-center h-64">
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -70,8 +70,8 @@ export default function LandingEditorClient({ initialData }: EditorClientProps) 
         </Button>
       </Card>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-        <div className="lg:col-span-2"><EditorLandingForm data={editorData} setData={setEditorData as React.Dispatch<React.SetStateAction<LandingPageData>>} /></div>
-        <div className="lg:col-span-1"><SuperAdminEditorLandingPreview data={editorData} /></div>
+        <div className="lg:col-span-2"><EditorLandingForm data={formData} setData={setFormData as React.Dispatch<React.SetStateAction<LandingPageData>>} /></div>
+        <div className="lg:col-span-1"><SuperAdminEditorLandingPreview data={formData} /></div>
       </div>
     </div>
   );

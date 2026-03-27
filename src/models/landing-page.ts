@@ -13,6 +13,7 @@ export type LandingPageData = {
     greeting: string;
     avatarUrl: string;
   };
+  updatedAt?: number;
 };
 
 export type HeroSection = {

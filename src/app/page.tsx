@@ -1,11 +1,12 @@
-import React from 'react';
+import { getLandingData } from '@/lib/get-landing-data';
 import LandingPageContent from '@/components/landing-page/landing-page-content';
 import type { LandingPageData } from '@/models/landing-page';
-import { getLandingConfig } from '@/actions/save-landing-config';
 import { v4 as uuidv4 } from 'uuid';
 import { unstable_noStore as noStore } from 'next/cache';
 
+// Forzamos comportamiento dinámico total
 export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
 export const revalidate = 0;
 
 const fallbackData: LandingPageData = {
@@ -23,10 +24,10 @@ const fallbackData: LandingPageData = {
   navigation: {
     enabled: true,
     logoUrl: '',
-    businessName: 'Mi Negocio',
     logoAlt: 'Logo de Mi Negocio',
     logoWidth: 120,
     logoAlignment: 'left',
+    businessName: 'Mi Negocio',
     links: [
       { id: 'nav-link-1', text: 'Inicio', url: '#', openInNewTab: false, enabled: true },
       { id: 'nav-link-2', text: 'Servicios', url: '#', openInNewTab: false, enabled: true },
@@ -161,28 +162,23 @@ function deepMerge(target: any, source: any): any {
 }
 
 export default async function RootPage() {
-    noStore(); // Segunda capa de seguridad contra el caché
-    try {
-        const fetchedData = await getLandingConfig();
-        // MEZCLA MANUAL: Prioridad absoluta a la Base de Datos
-        const dataToRender = {
-            ...fallbackData,
-            ...fetchedData,
-            // Aseguramos que los objetos anidados no se pierdan
-            hero: { ...fallbackData.hero, ...(fetchedData?.hero || {}) },
-            navigation: { ...fallbackData.navigation, ...(fetchedData?.navigation || {}) },
-            footer: { ...fallbackData.footer, ...(fetchedData?.footer || {}) },
-            header: { ...fallbackData.header, ...(fetchedData?.header || {}) },
-        };
+  noStore();
 
-        return (
-            <div className="w-full bg-background">
-                <LandingPageContent data={dataToRender as LandingPageData} />
-            </div>
-        );
-    } catch (error) {
-        console.error("Error en RootPage:", error);
-        // Fallback to default data in case of error
-        return <LandingPageContent data={fallbackData} />;
-    }
+  try {
+    const dbData = await getLandingData();
+    const dataToRender = deepMerge(fallbackData, dbData ?? {});
+
+    return (
+      <main className="w-full">
+        <LandingPageContent data={dataToRender} />
+      </main>
+    );
+  } catch (error) {
+      console.error("Error en Home:", error);
+      return (
+        <main className="w-full">
+            <LandingPageContent data={fallbackData} />
+        </main>
+      );
+  }
 }

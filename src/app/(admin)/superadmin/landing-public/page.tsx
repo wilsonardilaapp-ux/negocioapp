@@ -1,12 +1,9 @@
-import { getLandingConfig } from '@/actions/save-landing-config';
+import { getLandingData } from '@/lib/get-landing-data';
 import LandingEditorClient from './EditorClient';
-import { v4 as uuidv4 } from 'uuid';
 import type { LandingPageData } from '@/models/landing-page';
+import { v4 as uuidv4 } from 'uuid';
 
-// FORZAR QUE NO HAYA CACHÉ EN DESARROLLO
 export const dynamic = 'force-dynamic';
-export const revalidate = 0;
-
 
 const fallbackData: LandingPageData = {
   hero: {
@@ -141,28 +138,14 @@ const fallbackData: LandingPageData = {
   },
 };
 
-function deepMerge(target: any, source: any): any {
-    const output = { ...target };
-    if (target && typeof target === 'object' && source && typeof source === 'object') {
-        Object.keys(source).forEach(key => {
-            if (source[key] && typeof source[key] === 'object' && key in target && typeof target[key] === 'object' && !Array.isArray(source[key])) {
-                output[key] = deepMerge(target[key], source[key]);
-            } else {
-                output[key] = source[key];
-            }
-        });
-        Object.keys(target).forEach(key => {
-            if (!(key in source)) {
-                output[key] = target[key];
-            }
-        });
-    }
-    return output;
-}
+export default async function Page() {
+  const data = await getLandingData();
+  const initialData = (data as LandingPageData) || fallbackData;
 
-export default async function SuperAdminPublicLandingPage() {
-    const fetchedData = await getLandingConfig();
-    const initialData = deepMerge(fallbackData, fetchedData ?? {});
-
-    return <LandingEditorClient initialData={initialData} />;
+  return (
+    <LandingEditorClient 
+      key={JSON.stringify(initialData?.updatedAt || 'initial')} 
+      initialData={initialData} 
+    />
+  );
 }
