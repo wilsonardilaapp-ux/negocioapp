@@ -1,11 +1,13 @@
 'use client';
 
-import React, { useMemo } from 'react';
+import React from 'react';
 import LandingPageContent from '@/components/landing-page/landing-page-content';
 import type { LandingPageData } from '@/models/landing-page';
+import { getLandingConfig } from '@/actions/save-landing-config';
+import { Loader2, Frown } from 'lucide-react';
 import { useDoc, useFirestore, useMemoFirebase } from '@/firebase';
 import { doc } from 'firebase/firestore';
-import { Loader2, Frown } from 'lucide-react';
+
 
 const fallbackData: LandingPageData = {
   hero: {
@@ -169,7 +171,7 @@ export default function RootPage() {
 
   const { data: fetchedData, isLoading, error } = useDoc<LandingPageData>(landingConfigRef);
 
-  const dataToRender = useMemo(() => {
+  const dataToRender = React.useMemo(() => {
     // Merge fetched data with fallback to ensure all properties exist
     return deepMerge(fallbackData, fetchedData ?? {});
   }, [fetchedData]);

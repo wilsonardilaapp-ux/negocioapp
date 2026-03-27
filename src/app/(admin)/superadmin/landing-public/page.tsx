@@ -1,7 +1,11 @@
-import { getLandingConfig } from '@/actions/save-landing-config';
+'use client';
+import { useState, useEffect, useRef } from 'react';
+import { useDoc, useFirestore, useMemoFirebase } from '@/firebase';
+import { doc, getDoc } from 'firebase/firestore';
 import type { LandingPageData } from '@/models/landing-page';
 import EditorUI from './editor-ui'; // New client component
 import { v4 as uuidv4 } from 'uuid';
+import { Loader2 } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -159,9 +163,20 @@ function deepMerge(target: any, source: any): any {
     return output;
 }
 
-export default async function SuperAdminPublicLandingPage() {
-    const fetchedData = await getLandingConfig();
+export default function SuperAdminPublicLandingPage() {
+    const firestore = useFirestore();
+    const docRef = useMemoFirebase(() => doc(firestore, 'landing_configs', 'main'), [firestore]);
+    const { data: fetchedData, isLoading } = useDoc<LandingPageData>(docRef);
+
     const initialData = deepMerge(fallbackData, fetchedData || {});
+
+    if (isLoading) {
+        return (
+            <div className="flex justify-center items-center h-screen">
+                <Loader2 className="h-10 w-10 animate-spin" />
+            </div>
+        );
+    }
 
     return <EditorUI initialData={initialData} />;
 }

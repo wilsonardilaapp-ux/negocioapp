@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Save, Loader2 } from 'lucide-react';
@@ -17,9 +17,19 @@ interface EditorUIProps {
 export default function EditorUI({ initialData }: EditorUIProps) {
   const { toast } = useToast();
   
-  // The local state for editing, initialized once from the server prop.
   const [editorData, setEditorData] = useState<LandingPageData>(initialData);
   const [isSaving, setIsSaving] = useState(false);
+  const isFirstLoad = useRef(true);
+
+  // This effect ensures that the editor is only populated with server data
+  // on the very first load, preventing subsequent re-renders (like after saving)
+  // from overwriting the user's local state.
+  useEffect(() => {
+    if (isFirstLoad.current) {
+        setEditorData(initialData);
+        isFirstLoad.current = false;
+    }
+  }, [initialData]);
 
   const handleSave = async () => {
     setIsSaving(true);
