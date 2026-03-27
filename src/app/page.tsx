@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useFirestore, useDoc, useMemoFirebase } from '@/firebase';
@@ -9,27 +10,37 @@ import { Loader2 } from 'lucide-react';
 import type { Module } from '@/models/module';
 import { useMemo } from 'react';
 import type { GlobalConfig } from '@/models/global-config';
+import { v4 as uuidv4 } from 'uuid';
 
-// Fallback data to be used if Firestore is offline or the document doesn't exist.
+// Fallback data that matches the editor's initial state.
 const fallbackData: LandingPageData = {
   hero: {
-    title: 'Bienvenido',
-    subtitle: 'Estamos configurando esta página',
+    title: 'Innovación que impulsa tu negocio al futuro',
+    subtitle: 'Transformamos tecnología en crecimiento real',
     additionalContent: '',
-    imageUrl: '',
+    imageUrl: 'https://picsum.photos/seed/vintagecar/1200/800', 
     backgroundColor: '#FFFFFF',
     textColor: '#000000',
     buttonColor: '#4CAF50',
     ctaButtonText: 'Contáctanos',
     ctaButtonUrl: '#contact'
   },
-  navigation: { enabled: false, logoUrl: '', businessName: '', logoAlt: '', logoWidth: 120, logoAlignment: 'left', links: [], backgroundColor: '#FFFFFF', textColor: '#000000', hoverColor: '#4CAF50', fontSize: 16, spacing: 4, useShadow: false },
-  sections: [],
-  testimonials: [],
-  seo: { title: 'Mi SaaS', description: '', keywords: [] },
-  form: { fields: [], destinationEmail: '' },
-  header: { banner: { mediaUrl: null, mediaType: null }, businessInfo: { name: '', address: '', phone: '', email: '' }, socialLinks: { tiktok: '', instagram: '', facebook: '', whatsapp: '', twitter: '' }, carouselItems: [] },
-  footer: { enabled: false, contactInfo: { address: '', phone: '', email: '', hours: '' }, quickLinks: [], legalLinks: { privacyPolicyUrl: '', termsAndConditionsUrl: '', cookiesPolicyUrl: '', legalNoticeUrl: '' }, socialLinks: { facebookUrl: '', instagramUrl: '', tiktokUrl: '', youtubeUrl: '', linkedinUrl: '', showIcons: false }, logo: { url: null, slogan: '' }, certifications: [], copyright: { companyName: '', additionalText: '' }, cta: { text: '', url: '', enabled: false }, visuals: { backgroundImageUrl: null, opacity: 80, backgroundColor: '#FFFFFF', textColor: '#000000', darkMode: false, showBackToTop: false }, adminExtras: { systemVersion: '1.0.0', supportLink: '', documentationLink: '' } },
+  navigation: { enabled: true, logoUrl: '', businessName: 'Mi Negocio', logoAlt: 'Logo', logoWidth: 120, logoAlignment: 'left', links: [], backgroundColor: '#FFFFFF', textColor: '#000000', hoverColor: '#4CAF50', fontSize: 16, spacing: 4, useShadow: true },
+  sections: [], 
+  testimonials: [], 
+  seo: { title: 'Mi Negocio', description: '', keywords: [] }, 
+  form: { fields: [], destinationEmail: '' }, 
+  header: { 
+    banner: { mediaUrl: null, mediaType: null }, 
+    businessInfo: { name: '', address: '', phone: '', email: '' }, 
+    socialLinks: { tiktok: '', instagram: '', facebook: '', whatsapp: '', twitter: '' }, 
+    carouselItems: [
+        { id: uuidv4(), mediaUrl: null, mediaType: null, slogan: '' },
+        { id: uuidv4(), mediaUrl: null, mediaType: null, slogan: '' },
+        { id: uuidv4(), mediaUrl: null, mediaType: null, slogan: '' },
+    ]
+  },
+  footer: { enabled: true, contactInfo: { address: '', phone: '', email: '', hours: '' }, quickLinks: [], legalLinks: { privacyPolicyUrl: '', termsAndConditionsUrl: '', cookiesPolicyUrl: '', legalNoticeUrl: '' }, socialLinks: { facebookUrl: '', instagramUrl: '', tiktokUrl: '', youtubeUrl: '', linkedinUrl: '', showIcons: true }, logo: { url: null, slogan: '' }, certifications: [], copyright: { companyName: '', additionalText: '' }, cta: { text: '', url: '', enabled: false }, visuals: { backgroundImageUrl: null, opacity: 80, backgroundColor: '#FFFFFF', textColor: '#000000', darkMode: false, showBackToTop: true }, adminExtras: { systemVersion: '1.0.0', supportLink: '', documentationLink: '' } },
 };
 
 export default function RootPage() {
@@ -65,7 +76,7 @@ export default function RootPage() {
         );
     }
 
-    // If there's a Firestore error or no data, use the fallback. Otherwise, use the live data.
+    // If there's a Firestore error (like offline) or no data, use the fallback. Otherwise, use the live data.
     const dataToRender = landingData ?? fallbackData;
     
     if (error) {

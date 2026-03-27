@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -44,6 +45,27 @@ const initialLandingData: LandingPageData = {
   footer: { enabled: true, contactInfo: { address: '', phone: '', email: '', hours: '' }, quickLinks: [], legalLinks: { privacyPolicyUrl: '', termsAndConditionsUrl: '', cookiesPolicyUrl: '', legalNoticeUrl: '' }, socialLinks: { facebookUrl: '', instagramUrl: '', tiktokUrl: '', youtubeUrl: '', linkedinUrl: '', showIcons: true }, logo: { url: null, slogan: '' }, certifications: [], copyright: { companyName: '', additionalText: '' }, cta: { text: '', url: '', enabled: false }, visuals: { backgroundImageUrl: null, opacity: 80, backgroundColor: '#FFFFFF', textColor: '#000000', darkMode: false, showBackToTop: true }, adminExtras: { systemVersion: '1.0.0', supportLink: '', documentationLink: '' } },
 };
 
+// Helper function to deeply merge saved data with the initial structure
+function deepMerge(target: any, source: any): any {
+    const output = { ...target };
+    if (target && typeof target === 'object' && source && typeof source === 'object') {
+        Object.keys(source).forEach(key => {
+            if (source[key] && typeof source[key] === 'object' && key in target && typeof target[key] === 'object') {
+                output[key] = deepMerge(target[key], source[key]);
+            } else {
+                output[key] = source[key];
+            }
+        });
+        // Ensure all keys from target are in output, even if not in source
+        Object.keys(target).forEach(key => {
+            if (!(key in source)) {
+                output[key] = target[key];
+            }
+        });
+    }
+    return output;
+}
+
 export default function SuperAdminPublicLandingPage() {
   const [data, setData] = useState<LandingPageData>(initialLandingData);
   const [isSaving, setIsSaving] = useState(false);
@@ -69,27 +91,17 @@ export default function SuperAdminPublicLandingPage() {
         try {
           docSnap = await getDocFromCache(docRef);
         } catch (cacheError: any) {
-          console.error('Cache fetch also failed. Using initial data.', cacheError);
-          docSnap = null;
+          console.error('Cache fetch also failed. Displaying initial data as fallback.', cacheError);
+          docSnap = null; // Important: set to null if both fail
         }
       }
 
       if (docSnap && docSnap.exists()) {
         const savedData = docSnap.data() as LandingPageData;
-        const mergedData = {
-          ...initialLandingData,
-          ...savedData,
-          hero: { ...initialLandingData.hero, ...savedData.hero },
-          header: { ...initialLandingData.header, ...savedData.header },
-          navigation: { ...initialLandingData.navigation, ...savedData.navigation },
-          footer: { ...initialLandingData.footer, ...savedData.footer },
-          form: { ...initialLandingData.form, ...savedData.form },
-          seo: { ...initialLandingData.seo, ...savedData.seo },
-        };
+        const mergedData = deepMerge(initialLandingData, savedData);
         setData(mergedData);
-      } else {
-        setData(initialLandingData);
       }
+      // If docSnap is null or doesn't exist, the state will remain as 'initialLandingData', preventing resets.
       
       setIsFetching(false);
     };
