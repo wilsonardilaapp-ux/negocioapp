@@ -7,10 +7,11 @@ import { Save, Loader2 } from 'lucide-react';
 import type { LandingPageData } from '@/models/landing-page';
 import EditorLandingForm from '@/components/landing-page/editor-landing-form';
 import SuperAdminEditorLandingPreview from '@/components/landing-page/superadmin-editor-landing-preview';
-import { useFirestore, useMemoFirebase, setDocumentNonBlocking } from '@/firebase';
+import { useFirestore, useMemoFirebase } from '@/firebase';
 import { doc, getDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { v4 as uuidv4 } from 'uuid';
+import { saveLandingConfig } from '@/actions/save-landing-config';
 
 const initialLandingData: LandingPageData = {
   hero: {
@@ -91,24 +92,31 @@ export default function SuperAdminPublicLandingPage() {
   }, [docRef, toast]);
 
 
-  const handleSave = () => {
-    if (!docRef || !data) return;
+  const handleSave = async () => {
+    if (!data) return;
     setIsSaving(true);
     
-    const dataToSave = JSON.parse(JSON.stringify(data));
-    
-    // Intentar guardar (puede fallar silenciosamente en desarrollo)
     try {
-      setDocumentNonBlocking(docRef, dataToSave, { merge: true });
-    } catch (e) {
-      console.warn('Save attempt failed (possibly offline):', e);
+        const result = await saveLandingConfig(data);
+
+        if (result.success) {
+            toast({
+                title: '¡Guardado con Éxito!',
+                description: 'Los cambios se han guardado correctamente en la base de datos.',
+            });
+        } else {
+            throw new Error(result.error || 'Ocurrió un error desconocido en el servidor.');
+        }
+    } catch (error: any) {
+        console.error("Error al llamar saveLandingConfig:", error);
+        toast({
+            variant: "destructive",
+            title: "Error al Guardar",
+            description: `No se pudieron guardar los cambios. Error: ${error.message}`,
+        });
+    } finally {
+        setIsSaving(false);
     }
-    
-    // Siempre completar después de 1500ms para evitar bloqueo en UI
-    setTimeout(() => {
-      setIsSaving(false);
-      toast({ title: "Guardado", description: "Cambios aplicados." });
-    }, 1500);
   };
   
   if (isFetching) {
