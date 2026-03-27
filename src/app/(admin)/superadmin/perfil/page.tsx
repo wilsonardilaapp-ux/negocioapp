@@ -1,12 +1,14 @@
+
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
-import { useUser, useFirestore, setDocumentNonBlocking } from '@/firebase';
-import { doc, getDoc } from 'firebase/firestore';
+import { useState, useRef, useEffect, useMemo } from 'react';
+import { useUser, useFirestore, setDocumentNonBlocking, useDoc, useMemoFirebase } from '@/firebase';
+import { doc } from 'firebase/firestore';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { updatePassword } from 'firebase/auth';
+import Image from 'next/image';
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -15,9 +17,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Camera } from 'lucide-react';
+import { Loader2, Camera, Pencil, UploadCloud, Trash2 } from 'lucide-react';
 import type { User as UserProfile } from '@/models/user';
+import type { GlobalConfig } from '@/models/global-config';
 import { uploadMedia } from '@/ai/flows/upload-media-flow';
+import { cn } from '@/lib/utils';
 
 const profileSchema = z.object({
   name: z.string().min(3, { message: "El nombre debe tener al menos 3 caracteres." }),
@@ -33,6 +37,68 @@ const passwordSchema = z.object({
   path: ["confirmPassword"],
 });
 
+// Helper component inside page.tsx
+const MediaUploader = ({
+    label,
+    mediaUrl,
+    onUpload,
+    onRemove,
+    dimensions,
+    isUploading,
+    aspectRatio = 'aspect-video',
+    isIcon = false,
+}: {
+    label: string;
+    mediaUrl: string | null | undefined;
+    onUpload: (file: File) => void;
+    onRemove: () => void;
+    dimensions: string;
+    isUploading: boolean;
+    aspectRatio?: string;
+    isIcon?: boolean;
+}) => {
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    return (
+        <div className="space-y-2">
+            <Label>{label}</Label>
+            <div
+                className={cn(
+                    "relative w-full border-2 border-dashed rounded-lg flex items-center justify-center text-center p-4 group",
+                    mediaUrl && isIcon ? 'h-24' : (!mediaUrl ? 'h-32' : aspectRatio)
+                )}
+                onClick={() => !mediaUrl && fileInputRef.current?.click()}
+                >
+                {isUploading ? (
+                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                ) : mediaUrl ? (
+                    <>
+                         {isIcon ? (
+                            <div className="relative w-16 h-16 mx-auto">
+                                <Image src={mediaUrl} alt={label} fill sizes="4rem" className="object-contain" />
+                            </div>
+                        ) : (
+                            <Image src={mediaUrl} alt={label} layout="fill" sizes="100%" className="object-contain rounded-md" />
+                        )}
+                        <div className="absolute top-1 right-1 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => fileInputRef.current?.click()}><Pencil className="h-4 w-4" /></Button>
+                            <Button variant="destructive" size="icon" className="h-7 w-7" onClick={onRemove}><Trash2 className="h-4 w-4" /></Button>
+                        </div>
+                    </>
+                ) : (
+                    <div className="cursor-pointer">
+                        <UploadCloud className="h-8 w-8 mx-auto text-muted-foreground" />
+                        <p className="mt-2 text-sm font-semibold">Subir {label}</p>
+                        <p className="text-xs text-muted-foreground">{dimensions}</p>
+                    </div>
+                )}
+            </div>
+            <input type="file" ref={fileInputRef} onChange={(e) => e.target.files && onUpload(e.target.files[0])} className="hidden" accept="image/*,.ico" />
+        </div>
+    );
+};
+
+
 export default function SuperAdminProfilePage() {
   const { user, isUserLoading } = useUser();
   const firestore = useFirestore();
@@ -41,6 +107,11 @@ export default function SuperAdminProfilePage() {
   const [isUploading, setIsUploading] = useState(false);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [isProfileLoading, setIsProfileLoading] = useState(true);
+  const [uploadingField, setUploadingField] = useState<string | null>(null);
+
+
+  const globalConfigDocRef = useMemoFirebase(() => !firestore ? null : doc(firestore, 'globalConfig', 'system'), [firestore]);
+  const { data: globalConfig, isLoading: isGlobalConfigLoading } = useDoc<GlobalConfig>(globalConfigDocRef);
 
   const { register, handleSubmit, formState: { errors, isSubmitting }, reset } = useForm<z.infer<typeof profileSchema>>({
     resolver: zodResolver(profileSchema),
@@ -125,7 +196,6 @@ export default function SuperAdminProfilePage() {
         phone: data.phone,
     };
     
-    // Al guardar, se asegura de que los campos básicos del superadmin existan
     if (userProfile?.role === 'super_admin') {
       dataToSave.email = userProfile.email;
       dataToSave.role = 'super_admin';
@@ -188,7 +258,35 @@ export default function SuperAdminProfilePage() {
       }
   };
 
-  if (isUserLoading || isProfileLoading) {
+  const handleMediaUpload = async (file: File, field: keyof GlobalConfig) => {
+    if (!globalConfigDocRef) return;
+    setUploadingField(field);
+
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onloadend = async () => {
+        const mediaDataUri = reader.result as string;
+        try {
+            const result = await uploadMedia({ mediaDataUri });
+            await setDocumentNonBlocking(globalConfigDocRef, { [field]: result.secure_url }, { merge: true });
+            toast({ title: "Imagen actualizada", description: `La imagen de ${field} ha sido guardada.` });
+        } catch (error: any) {
+            toast({ variant: 'destructive', title: "Error al subir", description: error.message });
+        } finally {
+            setUploadingField(null);
+        }
+    };
+  };
+
+  const handleRemoveMedia = async (field: keyof GlobalConfig) => {
+    if (!globalConfigDocRef) return;
+    await setDocumentNonBlocking(globalConfigDocRef, { [field]: null }, { merge: true });
+  };
+
+
+  const isLoading = isUserLoading || isProfileLoading || isGlobalConfigLoading;
+
+  if (isLoading) {
     return (
       <div className="flex justify-center items-center h-64">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -196,8 +294,8 @@ export default function SuperAdminProfilePage() {
     );
   }
   
-  if (!user || !userProfile) {
-    return <div>No se pudo cargar el perfil del usuario.</div>
+  if (!user || !userProfile || !globalConfig) {
+    return <div>No se pudo cargar el perfil del usuario o la configuración global.</div>
   }
 
   return (
@@ -233,7 +331,7 @@ export default function SuperAdminProfilePage() {
         </CardContent>
       </Card>
       
-      <div className="grid md:grid-cols-2 gap-6">
+      <div className="grid md:grid-cols-2 gap-6 items-start">
           <Card>
             <CardHeader>
                 <CardTitle>Información Personal</CardTitle>
@@ -269,35 +367,74 @@ export default function SuperAdminProfilePage() {
                 </div>
             </form>
           </Card>
-           <Card>
-            <CardHeader>
-                <CardTitle>Seguridad</CardTitle>
-                <CardDescription>Gestiona la seguridad de tu cuenta.</CardDescription>
-            </CardHeader>
-            <form onSubmit={handleSubmitPassword(onPasswordSubmit)}>
-                <CardContent className="space-y-4">
-                     <div>
-                        <Label htmlFor="newPassword">Nueva Contraseña</Label>
-                        <Input id="newPassword" type="password" {...registerPassword('newPassword')} />
-                        {passwordErrors.newPassword && <p className="text-sm text-destructive mt-1">{passwordErrors.newPassword.message}</p>}
+          <div className="space-y-6">
+            <Card>
+                <CardHeader>
+                    <CardTitle>Seguridad</CardTitle>
+                    <CardDescription>Gestiona la seguridad de tu cuenta.</CardDescription>
+                </CardHeader>
+                <form onSubmit={handleSubmitPassword(onPasswordSubmit)}>
+                    <CardContent className="space-y-4">
+                        <div>
+                            <Label htmlFor="newPassword">Nueva Contraseña</Label>
+                            <Input id="newPassword" type="password" {...registerPassword('newPassword')} />
+                            {passwordErrors.newPassword && <p className="text-sm text-destructive mt-1">{passwordErrors.newPassword.message}</p>}
+                        </div>
+                        <div>
+                            <Label htmlFor="confirmPassword">Confirmar Contraseña</Label>
+                            <Input id="confirmPassword" type="password" {...registerPassword('confirmPassword')} />
+                            {passwordErrors.confirmPassword && <p className="text-sm text-destructive mt-1">{passwordErrors.confirmPassword.message}</p>}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                            Último acceso: {user.metadata.lastSignInTime ? new Date(user.metadata.lastSignInTime).toLocaleString() : 'N/A'}
+                        </p>
+                    </CardContent>
+                    <div className="p-6 pt-0">
+                        <Button type="submit" variant="outline" disabled={isChangingPassword}>
+                            {isChangingPassword && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            Actualizar Contraseña
+                        </Button>
                     </div>
-                    <div>
-                        <Label htmlFor="confirmPassword">Confirmar Contraseña</Label>
-                        <Input id="confirmPassword" type="password" {...registerPassword('confirmPassword')} />
-                        {passwordErrors.confirmPassword && <p className="text-sm text-destructive mt-1">{passwordErrors.confirmPassword.message}</p>}
-                    </div>
-                     <p className="text-xs text-muted-foreground">
-                        Último acceso: {user.metadata.lastSignInTime ? new Date(user.metadata.lastSignInTime).toLocaleString() : 'N/A'}
-                    </p>
-                </CardContent>
-                <div className="p-6 pt-0">
-                    <Button type="submit" variant="outline" disabled={isChangingPassword}>
-                         {isChangingPassword && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                        Actualizar Contraseña
-                    </Button>
-                </div>
-            </form>
-          </Card>
+                </form>
+            </Card>
+            
+            <Card>
+              <CardHeader>
+                <CardTitle>Identidad Visual de la Plataforma</CardTitle>
+                <CardDescription>Gestiona el logo y banner que se usarán en la aplicación.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <MediaUploader
+                  label="Logo de la Aplicación"
+                  mediaUrl={globalConfig.logoURL}
+                  onUpload={(file) => handleMediaUpload(file, 'logoURL')}
+                  onRemove={() => handleRemoveMedia('logoURL')}
+                  dimensions="Recomendado: 400x100px"
+                  isUploading={uploadingField === 'logoURL'}
+                  aspectRatio="aspect-[4/1]"
+                />
+                <MediaUploader
+                  label="Banner Principal"
+                  mediaUrl={globalConfig.bannerUrl}
+                  onUpload={(file) => handleMediaUpload(file, 'bannerUrl')}
+                  onRemove={() => handleRemoveMedia('bannerUrl')}
+                  dimensions="Recomendado: 1200x400px"
+                  isUploading={uploadingField === 'bannerUrl'}
+                  aspectRatio="aspect-[3/1]"
+                />
+                <MediaUploader
+                  label="Favicon"
+                  mediaUrl={globalConfig.faviconUrl}
+                  onUpload={(file) => handleMediaUpload(file, 'faviconUrl')}
+                  onRemove={() => handleRemoveMedia('faviconUrl')}
+                  dimensions="Cuadrado: 32x32 o 64x64"
+                  isUploading={uploadingField === 'faviconUrl'}
+                  aspectRatio="aspect-square"
+                  isIcon={true}
+                />
+              </CardContent>
+            </Card>
+          </div>
       </div>
     </div>
   );
