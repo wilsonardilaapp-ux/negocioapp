@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useRef, useEffect, useMemo } from 'react';
@@ -270,22 +271,29 @@ export default function SuperAdminProfilePage() {
 
   const handleMediaUpload = async (file: File, field: keyof GlobalConfig) => {
     if (!globalConfigDocRef) return;
+    
     setUploadingField(field);
 
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onloadend = async () => {
-        const mediaDataUri = reader.result as string;
-        try {
-            const result = await uploadMedia({ mediaDataUri });
-            await setDocumentNonBlocking(globalConfigDocRef, { [field]: result.secure_url }, { merge: true });
-            toast({ title: "Imagen actualizada", description: `La imagen de ${field} ha sido guardada.` });
-        } catch (error: any) {
-            toast({ variant: 'destructive', title: "Error al subir", description: error.message });
-        } finally {
-            setUploadingField(null);
-        }
-    };
+    try {
+        const readFileAsDataURL = (fileToRead: File): Promise<string> => {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onloadend = () => resolve(reader.result as string);
+                reader.onerror = reject;
+                reader.readAsDataURL(fileToRead);
+            });
+        };
+
+        const mediaDataUri = await readFileAsDataURL(file);
+        const result = await uploadMedia({ mediaDataUri });
+        await setDocumentNonBlocking(globalConfigDocRef, { [field]: result.secure_url }, { merge: true });
+        toast({ title: "Imagen actualizada", description: `La imagen de ${field} ha sido guardada.` });
+
+    } catch (error: any) {
+        toast({ variant: 'destructive', title: "Error al subir", description: error.message });
+    } finally {
+        setUploadingField(null);
+    }
   };
 
   const handleRemoveMedia = async (field: keyof GlobalConfig) => {
@@ -307,7 +315,7 @@ export default function SuperAdminProfilePage() {
   const globalConfig = globalConfigData ?? fallbackGlobalConfig;
 
   if (!user || !userProfile) {
-    return <div>No se pudo cargar el perfil del usuario.</div>
+    return <div>No se pudo cargar el perfil del usuario o la configuración global.</div>
   }
 
   return (
