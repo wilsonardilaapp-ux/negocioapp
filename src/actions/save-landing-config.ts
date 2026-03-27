@@ -1,3 +1,4 @@
+
 'use server';
 
 import { getAdminFirestore } from '@/firebase/server-init';
@@ -9,9 +10,12 @@ export async function saveLandingConfig(data: LandingPageData): Promise<{ succes
     const docRef = firestore.collection('landing_configs').doc('main');
     
     // Cleaning the data to remove any `undefined` values that Firestore Admin SDK cannot serialize.
+    // This is a robust way to ensure the data is clean before sending.
     const cleanData = JSON.parse(JSON.stringify(data));
 
-    await docRef.set(cleanData, { merge: true });
+    // Using set without merge performs a complete overwrite of the document.
+    // This ensures no old or partial data (like 'initialized: true') remains.
+    await docRef.set(cleanData);
     
     return { success: true };
   } catch (error: any) {

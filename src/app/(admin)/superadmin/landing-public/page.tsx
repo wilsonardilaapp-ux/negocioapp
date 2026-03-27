@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -7,12 +8,13 @@ import { Save, Loader2 } from 'lucide-react';
 import type { LandingPageData } from '@/models/landing-page';
 import EditorLandingForm from '@/components/landing-page/editor-landing-form';
 import SuperAdminEditorLandingPreview from '@/components/landing-page/superadmin-editor-landing-preview';
-import { useFirestore, useMemoFirebase } from '@/firebase';
-import { doc, getDoc } from 'firebase/firestore';
+import { useFirestore, useMemoFirebase, useDoc } from '@/firebase';
+import { doc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { v4 as uuidv4 } from 'uuid';
 import { saveLandingConfig } from '@/actions/save-landing-config';
 
+// Define the initial structure of the landing page data
 const initialLandingData: LandingPageData = {
   hero: {
     title: 'Innovación que impulsa tu negocio al futuro',
@@ -46,83 +48,61 @@ const initialLandingData: LandingPageData = {
 export default function SuperAdminPublicLandingPage() {
   const [data, setData] = useState<LandingPageData>(initialLandingData);
   const [isSaving, setIsSaving] = useState(false);
-  const [isFetching, setIsFetching] = useState(true);
   const firestore = useFirestore();
   const { toast } = useToast();
 
   const docRef = useMemoFirebase(() => firestore ? doc(firestore, 'landing_configs', 'main') : null, [firestore]);
+  const { data: savedData, isLoading: isFetching } = useDoc<LandingPageData>(docRef);
 
   useEffect(() => {
-    if (!docRef) {
-      setIsFetching(false);
-      return;
-    };
-
-    const fetchData = async () => {
-      setIsFetching(true);
-      try {
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) {
-          const savedData = docSnap.data() as LandingPageData;
-           const mergedData = {
-            ...initialLandingData,
-            ...savedData,
-            hero: { ...initialLandingData.hero, ...savedData.hero },
-            header: { ...initialLandingData.header, ...savedData.header },
-            navigation: { ...initialLandingData.navigation, ...savedData.navigation },
-            footer: { ...initialLandingData.footer, ...savedData.footer },
-            form: { ...initialLandingData.form, ...savedData.form },
-            seo: { ...initialLandingData.seo, ...savedData.seo },
-          };
-          setData(mergedData);
-        }
-      } catch (error) {
-        console.error("Error fetching landing page data:", error);
-        toast({
-          variant: "destructive",
-          title: "Error de Carga",
-          description: "No se pudieron cargar los datos de la landing page.",
-        });
-      } finally {
-        setIsFetching(false);
-      }
-    };
-    
-    fetchData();
-  }, [docRef, toast]);
-
+    if (savedData) {
+      // Deep merge saved data with initial data to ensure all fields are present
+      const mergedData = {
+        ...initialLandingData,
+        ...savedData,
+        hero: { ...initialLandingData.hero, ...savedData.hero },
+        header: { ...initialLandingData.header, ...savedData.header },
+        navigation: { ...initialLandingData.navigation, ...savedData.navigation },
+        footer: { ...initialLandingData.footer, ...savedData.footer },
+        form: { ...initialLandingData.form, ...savedData.form },
+        seo: { ...initialLandingData.seo, ...savedData.seo },
+      };
+      setData(mergedData);
+    } else if (!isFetching) {
+      // If no data is saved in DB and we are not fetching, use initial data.
+      setData(initialLandingData);
+    }
+  }, [savedData, isFetching]);
 
   const handleSave = async () => {
-    if (!data) return;
     setIsSaving(true);
-    
     try {
-        const result = await saveLandingConfig(data);
+      const result = await saveLandingConfig(data);
 
-        if (result.success) {
-            toast({
-                title: '¡Guardado con Éxito!',
-                description: 'Los cambios se han guardado correctamente en la base de datos.',
-            });
-        } else {
-            throw new Error(result.error || 'Ocurrió un error desconocido en el servidor.');
-        }
-    } catch (error: any) {
-        console.error("Error al llamar saveLandingConfig:", error);
+      if (result.success) {
         toast({
-            variant: "destructive",
-            title: "Error al Guardar",
-            description: `No se pudieron guardar los cambios. Error: ${error.message}`,
+          title: '¡Guardado con Éxito!',
+          description: 'Los cambios se han guardado correctamente en la base de datos.',
         });
+      } else {
+        throw new Error(result.error || 'Ocurrió un error desconocido en el servidor.');
+      }
+    } catch (error: any) {
+      console.error("Error al llamar saveLandingConfig:", error);
+      toast({
+        variant: "destructive",
+        title: "Error al Guardar",
+        description: `No se pudieron guardar los cambios. Error: ${error.message}`,
+      });
     } finally {
-        setIsSaving(false);
+      setIsSaving(false);
     }
   };
   
   if (isFetching) {
     return (
       <div className="flex justify-center items-center h-full">
-          <Loader2 className="h-10 w-10 animate-spin text-primary" />
+        <Loader2 className="h-10 w-10 animate-spin text-primary" />
       </div>
     );
   }
