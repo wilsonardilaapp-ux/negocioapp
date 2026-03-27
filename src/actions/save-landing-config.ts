@@ -2,7 +2,7 @@
 
 import { getAdminFirestore } from '@/firebase/server-init';
 import type { LandingPageData } from '@/models/landing-page';
-import { revalidatePath } from 'next/cache';
+import { revalidatePath, unstable_noStore as noStore } from 'next/cache';
 
 export async function saveLandingConfig(data: LandingPageData): Promise<{ success: boolean; error?: string }> {
   try {
@@ -32,6 +32,7 @@ export async function saveLandingConfig(data: LandingPageData): Promise<{ succes
  * @returns {Promise<LandingPageData | null>} The landing page data or null if an error occurs or the doc doesn't exist.
  */
 export async function getLandingConfig(): Promise<LandingPageData | null> {
+    noStore(); // Opt-out of data caching for this function
     try {
         const firestore = await getAdminFirestore();
         const docRef = firestore.collection('landing_configs').doc('main');
