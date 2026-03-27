@@ -161,14 +161,23 @@ function deepMerge(target: any, source: any): any {
 }
 
 export default async function RootPage() {
-    noStore(); // Explicitly prevent caching for this component
+    noStore(); // Segunda capa de seguridad contra el caché
     try {
         const fetchedData = await getLandingConfig();
-        const dataToRender = deepMerge(fallbackData, fetchedData ?? {});
+        // MEZCLA MANUAL: Prioridad absoluta a la Base de Datos
+        const dataToRender = {
+            ...fallbackData,
+            ...fetchedData,
+            // Aseguramos que los objetos anidados no se pierdan
+            hero: { ...fallbackData.hero, ...(fetchedData?.hero || {}) },
+            navigation: { ...fallbackData.navigation, ...(fetchedData?.navigation || {}) },
+            footer: { ...fallbackData.footer, ...(fetchedData?.footer || {}) },
+            header: { ...fallbackData.header, ...(fetchedData?.header || {}) },
+        };
 
         return (
             <div className="w-full bg-background">
-                <LandingPageContent data={dataToRender} />
+                <LandingPageContent data={dataToRender as LandingPageData} />
             </div>
         );
     } catch (error) {

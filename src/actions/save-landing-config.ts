@@ -2,7 +2,8 @@
 
 import { getAdminFirestore } from '@/firebase/server-init';
 import type { LandingPageData } from '@/models/landing-page';
-import { revalidatePath, unstable_noStore as noStore } from 'next/cache';
+import { revalidatePath } from 'next/cache';
+import { unstable_noStore as noStore } from 'next/cache';
 
 /**
  * Guarda la configuración completa de la landing page en Firestore.
@@ -14,6 +15,7 @@ export async function saveLandingConfig(data: LandingPageData): Promise<{ succes
     const firestore = await getAdminFirestore();
     const docRef = firestore.collection('landing_configs').doc('main');
     
+    // Limpia los datos para evitar errores con valores `undefined`
     const cleanData = JSON.parse(JSON.stringify(data));
 
     await docRef.set({
