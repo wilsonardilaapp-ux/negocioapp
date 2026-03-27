@@ -10,6 +10,8 @@
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 import { v2 as cloudinary } from 'cloudinary';
+import { getAdminFirestore } from '@/firebase/server-init';
+import type { CloudinaryFields } from '@/models/integration';
 
 // Full schema for the internal flow
 const UploadMediaFlowInputSchema = z.object({
@@ -33,17 +35,36 @@ const UploadMediaOutputSchema = z.object({
 });
 
 // This is the wrapper function that will be called from the client.
-// It securely injects credentials on the server side.
+// It securely injects credentials on the server side by fetching them from Firestore.
 export async function uploadMedia(input: UploadMediaInput): Promise<{ secure_url: string }> {
-  // Securely get credentials from environment variables on the server
-  const cloudinaryConfig = {
-    cloud_name: process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME!,
-    api_key: process.env.NEXT_PUBLIC_CLOUDINARY_API_KEY!,
-    api_secret: process.env.CLOUDINARY_API_SECRET!,
-  };
+  const firestore = await getAdminFirestore();
+  const cloudinaryIntegrationDoc = await firestore.doc('integrations/cloudinary').get();
 
-  if (!cloudinaryConfig.cloud_name || !cloudinaryConfig.api_key || !cloudinaryConfig.api_secret) {
-    throw new Error('Cloudinary credentials are not configured on the server.');
+  if (!cloudinaryIntegrationDoc.exists) {
+      throw new Error('La integración de Cloudinary no está configurada.');
+  }
+  
+  const integrationData = cloudinaryIntegrationDoc.data();
+  if (integrationData?.status !== 'active') {
+      throw new Error('La integración de Cloudinary no está activa.');
+  }
+
+  let cloudinaryConfig: CloudinaryFields;
+  try {
+    if (typeof integrationData.fields === 'string' && integrationData.fields.trim() !== '') {
+        cloudinaryConfig = JSON.parse(integrationData.fields);
+    } else if (typeof integrationData.fields === 'object' && integrationData.fields !== null) {
+        cloudinaryConfig = integrationData.fields as CloudinaryFields;
+    } else {
+      throw new Error('Formato de credenciales inválido o vacío.');
+    }
+  } catch (e) {
+      console.error("Error parsing Cloudinary fields from Firestore:", e);
+      throw new Error('Las credenciales de Cloudinary tienen un formato incorrecto y no se pueden leer.');
+  }
+  
+  if (!cloudinaryConfig?.cloud_name || !cloudinaryConfig?.api_key || !cloudinaryConfig?.api_secret) {
+    throw new Error('Las credenciales de Cloudinary están incompletas. Por favor, configúralas en el panel de integraciones.');
   }
 
   // Combine client input with server-side config and call the internal flow
