@@ -42,8 +42,8 @@ async function getGlobalConfig() {
         const chatbotModuleRef = doc(firestore, 'modules/chatbot-integrado-con-whatsapp-para-soporte-y-ventas');
 
         const [configSnap, chatbotModuleSnap] = await Promise.all([
-            configDocRef.get(),
-            chatbotModuleRef.get()
+            getDoc(configDocRef),
+            getDoc(chatbotModuleRef)
         ]);
         
         const businessId = configSnap.exists() ? configSnap.data()?.mainBusinessId : null;
@@ -58,7 +58,6 @@ async function getGlobalConfig() {
 }
 
 export default async function RootPage() {
-    // Await all server-side data fetching
     const landingData = await getLandingConfig();
     const { businessId, chatbotModule } = await getGlobalConfig();
 
@@ -69,23 +68,14 @@ export default async function RootPage() {
         console.warn("Could not fetch landing page data from server. Using fallback data.");
     }
     
-    if (!businessId) {
-       return (
-            <div className="flex h-screen w-full flex-col items-center justify-center bg-background text-center px-4">
-                <Frown className="h-16 w-16 text-muted-foreground mb-4" />
-                <h1 className="text-2xl font-bold">Página de Inicio no Configurada</h1>
-                <p className="text-muted-foreground mt-2 max-w-md">
-                    El administrador aún no ha asignado un negocio principal para mostrar en la página de inicio.
-                </p>
-            </div>
-        );
-    }
+    // The main landing page should always render if the superadmin has configured it.
+    // The 'businessId' is optional for chatbot and dynamic links, but not for rendering the page itself.
     
     return (
         <div className="w-full bg-background">
             <LandingPageContent data={dataToRender} businessId={businessId} />
             
-            {isChatbotEnabled && (
+            {isChatbotEnabled && businessId && ( // Only show chatbot if businessId is available
                  <ChatbotWidget 
                     enabled={isChatbotEnabled}
                     businessId={businessId}
