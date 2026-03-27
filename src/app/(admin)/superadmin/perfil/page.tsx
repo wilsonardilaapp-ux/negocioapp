@@ -1,9 +1,8 @@
-
 'use client';
 
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { useUser, useFirestore, setDocumentNonBlocking, useDoc, useMemoFirebase } from '@/firebase';
-import { doc } from 'firebase/firestore';
+import { doc, getDoc } from 'firebase/firestore';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -98,6 +97,17 @@ const MediaUploader = ({
     );
 };
 
+const fallbackGlobalConfig: GlobalConfig = {
+    id: 'system',
+    maintenance: false,
+    logoURL: '',
+    bannerUrl: '',
+    faviconUrl: '',
+    theme: 'default',
+    supportEmail: 'support@example.com',
+    defaultLimits: 100,
+    allowUserRegistration: true,
+};
 
 export default function SuperAdminProfilePage() {
   const { user, isUserLoading } = useUser();
@@ -111,7 +121,7 @@ export default function SuperAdminProfilePage() {
 
 
   const globalConfigDocRef = useMemoFirebase(() => !firestore ? null : doc(firestore, 'globalConfig', 'system'), [firestore]);
-  const { data: globalConfig, isLoading: isGlobalConfigLoading } = useDoc<GlobalConfig>(globalConfigDocRef);
+  const { data: globalConfigData, isLoading: isGlobalConfigLoading } = useDoc<GlobalConfig>(globalConfigDocRef);
 
   const { register, handleSubmit, formState: { errors, isSubmitting }, reset } = useForm<z.infer<typeof profileSchema>>({
     resolver: zodResolver(profileSchema),
@@ -294,8 +304,10 @@ export default function SuperAdminProfilePage() {
     );
   }
   
-  if (!user || !userProfile || !globalConfig) {
-    return <div>No se pudo cargar el perfil del usuario o la configuración global.</div>
+  const globalConfig = globalConfigData ?? fallbackGlobalConfig;
+
+  if (!user || !userProfile) {
+    return <div>No se pudo cargar el perfil del usuario.</div>
   }
 
   return (
