@@ -1,6 +1,4 @@
 
-'use server';
-
 import LandingPageContent from '@/components/landing-page/landing-page-content';
 import type { LandingPageData } from '@/models/landing-page';
 import { getLandingConfig } from '@/actions/save-landing-config';
