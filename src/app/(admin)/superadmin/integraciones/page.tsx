@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -42,7 +43,7 @@ import type { Module } from '@/models/module';
 import { testApiKey } from '@/ai/flows/test-api-key-flow';
 import { testWhapiConnection } from '@/ai/flows/test-whapi-connection-flow';
 
-const CloudinaryForm = ({ integration, onSave, onCancel }: { integration: Integration, onSave: (data: Integration) => Promise<void>, onCancel: () => void }) => {
+const CloudinaryForm = ({ integration, onSave, onCancel, isSaving }: { integration: Integration, onSave: (data: Integration) => void, onCancel: () => void, isSaving: boolean }) => {
     const { toast } = useToast();
     const [fields, setFields] = useState<CloudinaryFields>(() => {
         let parsedFields = {};
@@ -59,13 +60,12 @@ const CloudinaryForm = ({ integration, onSave, onCancel }: { integration: Integr
     });
 
     const [showApiSecret, setShowApiSecret] = useState(false);
-    const [isSaving, setIsSaving] = useState(false);
 
     const handleFieldChange = (key: keyof CloudinaryFields, value: string) => {
         setFields(prev => ({ ...prev, [key]: value }));
     };
 
-    const handleSaveClick = async () => {
+    const handleSaveClick = () => {
         if (!fields.cloud_name || !fields.api_key || !fields.api_secret) {
             toast({
                 variant: "destructive",
@@ -74,10 +74,8 @@ const CloudinaryForm = ({ integration, onSave, onCancel }: { integration: Integr
             });
             return;
         }
-        setIsSaving(true);
         const updatedIntegration = { ...integration, fields: JSON.stringify(fields) };
-        await onSave(updatedIntegration);
-        setIsSaving(false);
+        onSave(updatedIntegration);
     };
 
     return (
@@ -110,7 +108,7 @@ const CloudinaryForm = ({ integration, onSave, onCancel }: { integration: Integr
                 </Button>
             </div>
             <DialogFooter>
-                <Button variant="outline" onClick={onCancel}>Cancelar</Button>
+                <Button variant="outline" onClick={onCancel} disabled={isSaving}>Cancelar</Button>
                 <Button onClick={handleSaveClick} disabled={isSaving}>
                     {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                     Guardar Cambios
@@ -124,7 +122,7 @@ type Provider = 'google' | 'openai' | 'groq';
 type TestStatus = 'idle' | 'testing' | 'success' | 'error';
 type ModalState = { isOpen: boolean; title: string; message: string; };
 
-const AIProviderForm = ({ integration, onSave, onCancel }: { integration: Integration, onSave: (data: Integration) => Promise<void>, onCancel: () => void }) => {
+const AIProviderForm = ({ integration, onSave, onCancel, isSaving }: { integration: Integration, onSave: (data: Integration) => void, onCancel: () => void, isSaving: boolean }) => {
     const [fields, setFields] = useState<AIProviderFields>(() => {
         let parsed = {};
         if (typeof integration.fields === 'string' && integration.fields.trim()) {
@@ -157,7 +155,6 @@ const AIProviderForm = ({ integration, onSave, onCancel }: { integration: Integr
         groq: 'idle',
     });
     const [modalState, setModalState] = useState<ModalState>({ isOpen: false, title: '', message: '' });
-    const [isSaving, setIsSaving] = useState(false);
 
     const handleFieldChange = (provider: Provider, key: 'apiKey', value: string) => {
         setFields(prev => ({
@@ -167,10 +164,8 @@ const AIProviderForm = ({ integration, onSave, onCancel }: { integration: Integr
         setTestStatus(prev => ({ ...prev, [provider]: 'idle' }));
     };
 
-    const handleSaveClick = async () => {
-        setIsSaving(true);
-        await onSave({ ...integration, fields: JSON.stringify(fields) });
-        setIsSaving(false);
+    const handleSaveClick = () => {
+        onSave({ ...integration, fields: JSON.stringify(fields) });
     };
 
     const handleTestConnection = async (provider: Provider) => {
@@ -243,7 +238,7 @@ const AIProviderForm = ({ integration, onSave, onCancel }: { integration: Integr
                 </CardContent>
             </Card>
             <DialogFooter>
-                <Button variant="outline" onClick={onCancel}>Cancelar</Button>
+                <Button variant="outline" onClick={onCancel} disabled={isSaving}>Cancelar</Button>
                 <Button onClick={handleSaveClick} disabled={isSaving}>
                     {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                     Guardar Cambios
@@ -267,7 +262,7 @@ const AIProviderForm = ({ integration, onSave, onCancel }: { integration: Integr
     );
 };
 
-const WhapiForm = ({ integration, onSave, onCancel }: { integration: Integration, onSave: (data: Integration) => Promise<void>, onCancel: () => void }) => {
+const WhapiForm = ({ integration, onSave, onCancel, isSaving }: { integration: Integration, onSave: (data: Integration) => void, onCancel: () => void, isSaving: boolean }) => {
     const [fields, setFields] = useState<WhapiFields>(() => {
         let parsed = { apiKey: "", instanceId: "" };
         if (typeof integration.fields === 'string' && integration.fields.trim()) {
@@ -282,17 +277,14 @@ const WhapiForm = ({ integration, onSave, onCancel }: { integration: Integration
 
     const [testStatus, setTestStatus] = useState<TestStatus>('idle');
     const [modalState, setModalState] = useState<ModalState>({ isOpen: false, title: '', message: '' });
-    const [isSaving, setIsSaving] = useState(false);
 
     const handleFieldChange = (key: keyof WhapiFields, value: string) => {
         setFields(prev => ({ ...prev, [key]: value }));
         setTestStatus('idle');
     };
 
-    const handleSaveClick = async () => {
-        setIsSaving(true);
-        await onSave({ ...integration, fields: JSON.stringify(fields) });
-        setIsSaving(false);
+    const handleSaveClick = () => {
+        onSave({ ...integration, fields: JSON.stringify(fields) });
     };
 
     const handleTestConnection = async () => {
@@ -344,7 +336,7 @@ const WhapiForm = ({ integration, onSave, onCancel }: { integration: Integration
                 <TestButton />
             </div>
             <DialogFooter className="pt-4">
-                <Button variant="outline" onClick={onCancel}>Cancelar</Button>
+                <Button variant="outline" onClick={onCancel} disabled={isSaving}>Cancelar</Button>
                 <Button onClick={handleSaveClick} disabled={isSaving}>
                     {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                     Guardar Cambios
@@ -370,6 +362,7 @@ export default function IntegrationsPage() {
     const firestore = useFirestore();
     const { toast } = useToast();
     const [editingIntegration, setEditingIntegration] = useState<Integration | null>(null);
+    const [isSaving, setIsSaving] = useState(false);
     
     const integrationsQuery = useMemoFirebase(() => !firestore ? null : collection(firestore, 'integrations'), [firestore]);
     const modulesQuery = useMemoFirebase(() => !firestore ? null : collection(firestore, 'modules'), [firestore]);
@@ -442,18 +435,21 @@ export default function IntegrationsPage() {
         toast({ title: "Estado Actualizado", description: `La integración "${integration.name}" ahora está ${newStatus === 'active' ? 'activa' : 'inactiva'}.` });
     };
 
-    const handleSave = async (integration: Integration) => {
+    const handleSave = async (integrationData: Integration) => {
         if (!firestore) {
             toast({ variant: 'destructive', title: 'Error', description: 'Firestore no está disponible.' });
             return;
         }
+        setIsSaving(true);
         try {
-            await setDocumentNonBlocking(doc(firestore, 'integrations', integration.id), integration, { merge: true });
-            toast({ title: "Configuración Guardada", description: `La integración "${integration.name}" ha sido actualizada.` });
+            await setDocumentNonBlocking(doc(firestore, 'integrations', integrationData.id), integrationData, { merge: true });
+            toast({ title: "Configuración Guardada", description: `La integración "${integrationData.name}" ha sido actualizada.` });
             setEditingIntegration(null); 
         } catch (error) {
             console.error("Error al guardar la integración:", error);
             toast({ variant: 'destructive', title: 'Error al Guardar', description: 'No se pudo guardar la configuración. Inténtalo de nuevo.' });
+        } finally {
+            setIsSaving(false);
         }
     };
 
@@ -575,7 +571,7 @@ export default function IntegrationsPage() {
                 </div>
             )}
             
-            <Dialog open={!!editingIntegration} onOpenChange={(isOpen) => !isOpen && setEditingIntegration(null)}>
+            <Dialog open={!!editingIntegration} onOpenChange={(isOpen) => {if (!isSaving && !isOpen) {setEditingIntegration(null);}}}>
                 {editingIntegration && (
                     <DialogContent className="max-w-2xl">
                         <DialogHeader>
@@ -584,9 +580,9 @@ export default function IntegrationsPage() {
                             {editingIntegration.id === 'chatbot-integrado-con-whatsapp-para-soporte-y-ventas' && <DialogDescription>Configura las API Keys para los proveedores de IA de tu Chatbot.</DialogDescription>}
                             {editingIntegration.id === 'whapi-whatsapp' && <DialogDescription>Introduce tus credenciales de la API de WHAPI.</DialogDescription>}
                         </DialogHeader>
-                        {editingIntegration.id === 'cloudinary' && <CloudinaryForm integration={editingIntegration} onSave={handleSave} onCancel={() => setEditingIntegration(null)} />}
-                        {editingIntegration.id === 'chatbot-integrado-con-whatsapp-para-soporte-y-ventas' && <AIProviderForm integration={editingIntegration} onSave={handleSave} onCancel={() => setEditingIntegration(null)} />}
-                        {editingIntegration.id === 'whapi-whatsapp' && <WhapiForm integration={editingIntegration} onSave={handleSave} onCancel={() => setEditingIntegration(null)} />}
+                        {editingIntegration.id === 'cloudinary' && <CloudinaryForm integration={editingIntegration} onSave={handleSave} onCancel={() => setEditingIntegration(null)} isSaving={isSaving} />}
+                        {editingIntegration.id === 'chatbot-integrado-con-whatsapp-para-soporte-y-ventas' && <AIProviderForm integration={editingIntegration} onSave={handleSave} onCancel={() => setEditingIntegration(null)} isSaving={isSaving} />}
+                        {editingIntegration.id === 'whapi-whatsapp' && <WhapiForm integration={editingIntegration} onSave={handleSave} onCancel={() => setEditingIntegration(null)} isSaving={isSaving} />}
                     </DialogContent>
                 )}
             </Dialog>
