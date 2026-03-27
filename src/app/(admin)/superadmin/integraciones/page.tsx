@@ -400,6 +400,38 @@ export default function IntegrationsPage() {
           }
       }
     }, [isIntegrationsLoading, integrations, firestore]);
+    
+    // This new hook will create the MODULE documents if they don't exist
+    useEffect(() => {
+      if (!isModulesLoading && firestore) {
+          const requiredModules: { [id: string]: { name: string; description: string } } = {
+              'cloudinary': { name: 'Cloudinary', description: 'Almacenamiento y entrega de imágenes y videos.' },
+              'chatbot-integrado-con-whatsapp-para-soporte-y-ventas': { name: 'Chatbot IA (Google/OpenAI/Groq)', description: 'Motores de IA para el chatbot (Google, OpenAI, Groq).' },
+              'whapi-whatsapp': { name: 'WHAPI (WhatsApp)', description: 'Envío de mensajes de WhatsApp a través de WHAPI.' }
+          };
+  
+          const checkAndCreateModules = async () => {
+              const moduleIds = Object.keys(requiredModules);
+              const existingModules = modules || [];
+              const existingModuleIds = existingModules.map(m => m.id);
+              
+              for (const id of moduleIds) {
+                  if (!existingModuleIds.includes(id)) {
+                      const moduleData = requiredModules[id];
+                      const newModule: Omit<Module, 'id'> = {
+                          name: moduleData.name!,
+                          description: moduleData.description!,
+                          status: 'inactive', // Always create as inactive
+                          createdAt: new Date().toISOString(),
+                      };
+                      await setDocumentNonBlocking(doc(firestore, 'modules', id), newModule);
+                  }
+              }
+          };
+          checkAndCreateModules();
+      }
+    }, [isModulesLoading, modules, firestore]);
+
 
     const handleStatusChange = (integration: Integration) => {
         if (!firestore) return;
@@ -415,14 +447,14 @@ export default function IntegrationsPage() {
         setEditingIntegration(null);
     };
 
-    const isCloudinaryModuleActive = modules?.find(m => m.id === 'cloudinary')?.status === 'active';
-    const isChatbotModuleActive = modules?.find(m => m.id === 'chatbot-integrado-con-whatsapp-para-soporte-y-ventas')?.status === 'active';
-    const isWhapiModuleActive = modules?.find(m => m.name.includes('WHAPI'))?.status === 'active';
+    const isCloudinaryModuleActive = modules?.some(m => m.id === 'cloudinary');
+    const isChatbotModuleActive = modules?.some(m => m.id === 'chatbot-integrado-con-whatsapp-para-soporte-y-ventas');
+    const isWhapiModuleActive = modules?.some(m => m.id === 'whapi-whatsapp');
 
     const initialLoading = isIntegrationsLoading || isModulesLoading;
 
     const renderCardFooter = (integration: Integration) => {
-        let isModuleActive = true;
+        let isModuleActive = false;
         if (integration.id === 'cloudinary') {
             isModuleActive = !!isCloudinaryModuleActive;
         } else if (integration.id === 'chatbot-integrado-con-whatsapp-para-soporte-y-ventas') {
@@ -486,7 +518,7 @@ export default function IntegrationsPage() {
             ) : (
                 <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                     {integrations?.filter(i => ['cloudinary', 'chatbot-integrado-con-whatsapp-para-soporte-y-ventas', 'whapi-whatsapp'].includes(i.id)).map(integration => {
-                         let isModuleActive = true;
+                         let isModuleActive = false;
                          let icon;
                          let description;
 
