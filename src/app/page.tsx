@@ -1,13 +1,11 @@
-// This is now a SERVER component
+
+'use server';
 
 import LandingPageContent from '@/components/landing-page/landing-page-content';
-import { ChatbotWidget } from '@/components/chatbot/chatbot-widget';
 import type { LandingPageData } from '@/models/landing-page';
-import { v4 as uuidv4 } from 'uuid';
 import { getLandingConfig } from '@/actions/save-landing-config';
-import { Frown, Loader2 } from 'lucide-react';
 
-
+// UNIFIED: This data is now identical to the editor's initial data.
 const fallbackData: LandingPageData = {
   hero: {
     title: 'Innovación que impulsa tu negocio al futuro',
@@ -28,11 +26,11 @@ const fallbackData: LandingPageData = {
     logoWidth: 120,
     logoAlignment: 'left',
     links: [
-      { id: uuidv4(), text: 'Inicio', url: '#', openInNewTab: false, enabled: true },
-      { id: uuidv4(), text: 'Servicios', url: '#', openInNewTab: false, enabled: true },
-      { id: uuidv4(), text: 'Contacto', url: '#', openInNewTab: false, enabled: true },
-      { id: uuidv4(), text: 'Catálogo', url: '#', openInNewTab: false, enabled: true },
-      { id: uuidv4(), text: 'Blog', url: '#', openInNewTab: false, enabled: true },
+      { id: 'nav-link-1', text: 'Inicio', url: '#', openInNewTab: false, enabled: true },
+      { id: 'nav-link-2', text: 'Servicios', url: '#', openInNewTab: false, enabled: true },
+      { id: 'nav-link-3', text: 'Contacto', url: '#', openInNewTab: false, enabled: true },
+      { id: 'nav-link-4', text: 'Catálogo', url: '#', openInNewTab: false, enabled: true },
+      { id: 'nav-link-5', text: 'Blog', url: '#', openInNewTab: false, enabled: true },
     ],
     backgroundColor: '#FFFFFF',
     textColor: '#000000',
@@ -50,10 +48,10 @@ const fallbackData: LandingPageData = {
   },
   form: {
     fields: [
-        { id: uuidv4(), label: 'Nombre Completo', type: 'text', placeholder: 'ej. Juan Pérez', required: true },
-        { id: uuidv4(), label: 'Correo Electrónico', type: 'email', placeholder: 'ej. juan.perez@correo.com', required: true },
-        { id: uuidv4(), label: 'WhatsApp', type: 'tel', placeholder: 'ej. 3001234567', required: false },
-        { id: uuidv4(), label: 'Mensaje', type: 'textarea', placeholder: 'Escribe tu consulta aquí...', required: true },
+        { id: 'form-field-1', label: 'Nombre Completo', type: 'text', placeholder: 'ej. Juan Pérez', required: true },
+        { id: 'form-field-2', label: 'Correo Electrónico', type: 'email', placeholder: 'ej. juan.perez@correo.com', required: true },
+        { id: 'form-field-3', label: 'WhatsApp', type: 'tel', placeholder: 'ej. 3001234567', required: false },
+        { id: 'form-field-4', label: 'Mensaje', type: 'textarea', placeholder: 'Escribe tu consulta aquí...', required: true },
     ],
     destinationEmail: '',
   },
@@ -76,9 +74,9 @@ const fallbackData: LandingPageData = {
       twitter: '',
     },
     carouselItems: [
-      { id: uuidv4(), mediaUrl: null, mediaType: null, slogan: '' },
-      { id: uuidv4(), mediaUrl: null, mediaType: null, slogan: '' },
-      { id: uuidv4(), mediaUrl: null, mediaType: null, slogan: '' },
+      { id: 'carousel-item-1', mediaUrl: null, mediaType: null, slogan: '' },
+      { id: 'carousel-item-2', mediaUrl: null, mediaType: null, slogan: '' },
+      { id: 'carousel-item-3', mediaUrl: null, mediaType: null, slogan: '' },
     ],
   },
   footer: {
@@ -90,12 +88,12 @@ const fallbackData: LandingPageData = {
       hours: 'Lunes a Viernes, 9am - 6pm',
     },
     quickLinks: [
-      { id: uuidv4(), text: 'Inicio', url: '#' },
-      { id: uuidv4(), text: 'Sobre nosotros', url: '#' },
-      { id: uuidv4(), text: 'Servicios', url: '#' },
-      { id: uuidv4(), text: 'Blog', url: '#' },
-      { id: uuidv4(), text: 'Contacto', url: '#' },
-      { id: uuidv4(), text: 'FAQ', url: '#' },
+      { id: 'footer-link-1', text: 'Inicio', url: '#' },
+      { id: 'footer-link-2', text: 'Sobre nosotros', url: '#' },
+      { id: 'footer-link-3', text: 'Servicios', url: '#' },
+      { id: 'footer-link-4', text: 'Blog', url: '#' },
+      { id: 'footer-link-5', text: 'Contacto', url: '#' },
+      { id: 'footer-link-6', text: 'FAQ', url: '#' },
     ],
     legalLinks: {
       privacyPolicyUrl: '#',
@@ -170,7 +168,6 @@ export default async function RootPage() {
     return (
         <div className="w-full bg-background">
             <LandingPageContent data={dataToRender} />
-            {/* Chatbot can be added here if needed */}
         </div>
     );
 }

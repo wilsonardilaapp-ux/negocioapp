@@ -1,10 +1,11 @@
+
 'use server';
 
 import { LandingPageEditor } from './editor';
 import type { LandingPageData } from '@/models/landing-page';
-import { v4 as uuidv4 } from 'uuid';
 import { getLandingConfig } from '@/actions/save-landing-config';
 
+// Corrected initial data with static IDs to prevent hydration errors.
 const initialLandingData: LandingPageData = {
   hero: {
     title: 'Innovación que impulsa tu negocio al futuro',
@@ -25,11 +26,11 @@ const initialLandingData: LandingPageData = {
     logoWidth: 120,
     logoAlignment: 'left',
     links: [
-      { id: uuidv4(), text: 'Inicio', url: '#', openInNewTab: false, enabled: true },
-      { id: uuidv4(), text: 'Servicios', url: '#', openInNewTab: false, enabled: true },
-      { id: uuidv4(), text: 'Contacto', url: '#', openInNewTab: false, enabled: true },
-      { id: uuidv4(), text: 'Catálogo', url: '#', openInNewTab: false, enabled: true },
-      { id: uuidv4(), text: 'Blog', url: '#', openInNewTab: false, enabled: true },
+      { id: 'nav-link-1', text: 'Inicio', url: '#', openInNewTab: false, enabled: true },
+      { id: 'nav-link-2', text: 'Servicios', url: '#', openInNewTab: false, enabled: true },
+      { id: 'nav-link-3', text: 'Contacto', url: '#', openInNewTab: false, enabled: true },
+      { id: 'nav-link-4', text: 'Catálogo', url: '#', openInNewTab: false, enabled: true },
+      { id: 'nav-link-5', text: 'Blog', url: '#', openInNewTab: false, enabled: true },
     ],
     backgroundColor: '#FFFFFF',
     textColor: '#000000',
@@ -47,10 +48,10 @@ const initialLandingData: LandingPageData = {
   },
   form: {
     fields: [
-        { id: uuidv4(), label: 'Nombre Completo', type: 'text', placeholder: 'ej. Juan Pérez', required: true },
-        { id: uuidv4(), label: 'Correo Electrónico', type: 'email', placeholder: 'ej. juan.perez@correo.com', required: true },
-        { id: uuidv4(), label: 'WhatsApp', type: 'tel', placeholder: 'ej. 3001234567', required: false },
-        { id: uuidv4(), label: 'Mensaje', type: 'textarea', placeholder: 'Escribe tu consulta aquí...', required: true },
+        { id: 'form-field-1', label: 'Nombre Completo', type: 'text', placeholder: 'ej. Juan Pérez', required: true },
+        { id: 'form-field-2', label: 'Correo Electrónico', type: 'email', placeholder: 'ej. juan.perez@correo.com', required: true },
+        { id: 'form-field-3', label: 'WhatsApp', type: 'tel', placeholder: 'ej. 3001234567', required: false },
+        { id: 'form-field-4', label: 'Mensaje', type: 'textarea', placeholder: 'Escribe tu consulta aquí...', required: true },
     ],
     destinationEmail: '',
   },
@@ -73,9 +74,9 @@ const initialLandingData: LandingPageData = {
       twitter: '',
     },
     carouselItems: [
-      { id: uuidv4(), mediaUrl: null, mediaType: null, slogan: '' },
-      { id: uuidv4(), mediaUrl: null, mediaType: null, slogan: '' },
-      { id: uuidv4(), mediaUrl: null, mediaType: null, slogan: '' },
+      { id: 'carousel-item-1', mediaUrl: null, mediaType: null, slogan: '' },
+      { id: 'carousel-item-2', mediaUrl: null, mediaType: null, slogan: '' },
+      { id: 'carousel-item-3', mediaUrl: null, mediaType: null, slogan: '' },
     ],
   },
   footer: {
@@ -87,12 +88,12 @@ const initialLandingData: LandingPageData = {
       hours: 'Lunes a Viernes, 9am - 6pm',
     },
     quickLinks: [
-      { id: uuidv4(), text: 'Inicio', url: '#' },
-      { id: uuidv4(), text: 'Sobre nosotros', url: '#' },
-      { id: uuidv4(), text: 'Servicios', url: '#' },
-      { id: uuidv4(), text: 'Blog', url: '#' },
-      { id: uuidv4(), text: 'Contacto', url: '#' },
-      { id: uuidv4(), text: 'FAQ', url: '#' },
+      { id: 'footer-link-1', text: 'Inicio', url: '#' },
+      { id: 'footer-link-2', text: 'Sobre nosotros', url: '#' },
+      { id: 'footer-link-3', text: 'Servicios', url: '#' },
+      { id: 'footer-link-4', text: 'Blog', url: '#' },
+      { id: 'footer-link-5', text: 'Contacto', url: '#' },
+      { id: 'footer-link-6', text: 'FAQ', url: '#' },
     ],
     legalLinks: {
       privacyPolicyUrl: '#',

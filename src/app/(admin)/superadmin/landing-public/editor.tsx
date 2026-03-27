@@ -1,6 +1,8 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Save, Loader2 } from 'lucide-react';
@@ -16,6 +18,7 @@ export function LandingPageEditor({ initialData }: { initialData: LandingPageDat
   const [data, setData] = useState<LandingPageData>(initialData);
   const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
+  const router = useRouter();
 
   // If the server-fetched data changes (e.g., on a hard refresh or revalidation), update the local state.
   useEffect(() => {
@@ -33,6 +36,8 @@ export function LandingPageEditor({ initialData }: { initialData: LandingPageDat
           title: '¡Guardado con Éxito!',
           description: 'Los cambios se han guardado correctamente en la base de datos.',
         });
+        // After a successful save, refresh the server components to get the latest data.
+        router.refresh();
       } else {
         throw new Error(result.error || 'Ocurrió un error desconocido en el servidor.');
       }
