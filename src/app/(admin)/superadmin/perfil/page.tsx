@@ -21,6 +21,8 @@ import { uploadMedia } from '@/ai/flows/upload-media-flow';
 
 const profileSchema = z.object({
   name: z.string().min(3, { message: "El nombre debe tener al menos 3 caracteres." }),
+  title: z.string().optional(),
+  phone: z.string().optional(),
 });
 
 const passwordSchema = z.object({
@@ -64,6 +66,8 @@ export default function SuperAdminProfilePage() {
         name: user.displayName || 'Super Admin',
         email: user.email!,
         role: 'super_admin',
+        title: 'Super Administrador',
+        phone: '',
         status: 'active',
         createdAt: user.metadata.creationTime || new Date().toISOString(),
         lastLogin: user.metadata.lastSignInTime || new Date().toISOString(),
@@ -106,6 +110,8 @@ export default function SuperAdminProfilePage() {
     if(userProfile) {
         reset({
             name: userProfile.name || '',
+            title: userProfile.title || '',
+            phone: userProfile.phone || '',
         });
     }
   }, [userProfile, reset]);
@@ -114,7 +120,9 @@ export default function SuperAdminProfilePage() {
     if (!user || !firestore) return;
     const userProfileRef = doc(firestore, 'users', user.uid);
     const dataToSave: Partial<UserProfile> = {
-        name: data.name
+        name: data.name,
+        title: data.title,
+        phone: data.phone,
     };
     
     // Al guardar, se asegura de que los campos básicos del superadmin existan
@@ -237,6 +245,16 @@ export default function SuperAdminProfilePage() {
                         <Label htmlFor="name">Nombre Completo</Label>
                         <Input id="name" {...register('name')} />
                         {errors.name && <p className="text-sm text-destructive mt-1">{errors.name.message}</p>}
+                    </div>
+                    <div>
+                        <Label htmlFor="title">Cargo / Título</Label>
+                        <Input id="title" placeholder="Ej: Administrador" {...register('title')} />
+                        {errors.title && <p className="text-sm text-destructive mt-1">{errors.title.message}</p>}
+                    </div>
+                     <div>
+                        <Label htmlFor="phone">Teléfono</Label>
+                        <Input id="phone" placeholder="Ej: +57 300 123 4567" {...register('phone')} />
+                        {errors.phone && <p className="text-sm text-destructive mt-1">{errors.phone.message}</p>}
                     </div>
                      <div>
                         <Label htmlFor="email">Correo Electrónico</Label>
