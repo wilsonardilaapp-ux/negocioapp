@@ -1,9 +1,8 @@
-
 'use client';
 
-import { useState, useRef } from 'react';
-import { useUser, useFirestore, useDoc, useMemoFirebase, setDocumentNonBlocking } from '@/firebase';
-import { doc } from 'firebase/firestore';
+import { useState, useRef, useEffect } from 'react';
+import { useUser, useFirestore, setDocumentNonBlocking } from '@/firebase';
+import { doc, getDoc } from 'firebase/firestore';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -15,9 +14,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Camera, UserCircle } from 'lucide-react';
+import { Loader2, Camera } from 'lucide-react';
 import type { User as UserProfile } from '@/models/user';
 import { uploadMedia } from '@/ai/flows/upload-media-flow';
 
@@ -41,31 +39,78 @@ export default function SuperAdminProfilePage() {
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [isProfileLoading, setIsProfileLoading] = useState(true);
 
-  const userProfileRef = useMemoFirebase(() => {
-    if (!firestore || !user) return null;
-    return doc(firestore, 'users', user.uid);
-  }, [firestore, user]);
-
-  const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userProfileRef);
-
-  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<z.infer<typeof profileSchema>>({
-    resolver: zodResolver(profileSchema),
-    values: {
-      name: userProfile?.name || user?.displayName || '',
-      phone: (userProfile as any)?.phone || '',
-      title: (userProfile as any)?.title || '',
+  useEffect(() => {
+    if (isUserLoading || !user || !firestore) {
+      if (!isUserLoading) setIsProfileLoading(false);
+      return;
     }
+    
+    let isMounted = true;
+    const fetchProfile = async () => {
+      setIsProfileLoading(true);
+      const SUPER_ADMIN_EMAILS = ['allseosoporte@gmail.com'];
+      
+      try {
+        const userDocRef = doc(firestore, 'users', user.uid);
+        const userDocSnap = await getDoc(userDocRef);
+        if (isMounted) {
+          if (userDocSnap.exists()) {
+            setUserProfile(userDocSnap.data() as UserProfile);
+          } else if (SUPER_ADMIN_EMAILS.includes(user.email ?? '')) {
+            const fallbackProfile: UserProfile = {
+              id: user.uid,
+              name: user.displayName || 'Super Admin',
+              email: user.email!,
+              role: 'super_admin',
+              status: 'active',
+              createdAt: user.metadata.creationTime || new Date().toISOString(),
+              lastLogin: user.metadata.lastSignInTime || new Date().toISOString(),
+            };
+            setUserProfile(fallbackProfile);
+          } else {
+            setUserProfile(null);
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching user profile:", error);
+        if (isMounted) setUserProfile(null);
+      } finally {
+        if (isMounted) setIsProfileLoading(false);
+      }
+    };
+
+    fetchProfile();
+
+    return () => { isMounted = false; };
+  }, [user, firestore, isUserLoading]);
+
+  const { register, handleSubmit, formState: { errors, isSubmitting }, reset } = useForm<z.infer<typeof profileSchema>>({
+    resolver: zodResolver(profileSchema),
   });
+  
+  useEffect(() => {
+    if(userProfile) {
+        reset({
+            name: userProfile.name || '',
+            phone: (userProfile as any)?.phone || '',
+            title: (userProfile as any)?.title || '',
+        });
+    }
+  }, [userProfile, reset]);
 
   const { register: registerPassword, handleSubmit: handleSubmitPassword, formState: { errors: passwordErrors, isSubmitting: isChangingPassword }, reset: resetPasswordForm } = useForm<z.infer<typeof passwordSchema>>({
     resolver: zodResolver(passwordSchema),
   });
 
   const onProfileSubmit = (data: z.infer<typeof profileSchema>) => {
-    if (!userProfileRef) return;
-    
+    if (!user || !firestore) return;
+    const userProfileRef = doc(firestore, 'users', user.uid);
     setDocumentNonBlocking(userProfileRef, data, { merge: true });
+    
+    setUserProfile(prev => prev ? { ...prev, ...data } as UserProfile : null);
 
     toast({
       title: 'Perfil Actualizado',
@@ -93,7 +138,7 @@ export default function SuperAdminProfilePage() {
   
   const handleAvatarChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
       const file = event.target.files?.[0];
-      if (!file || !userProfileRef) return;
+      if (!file || !user || !firestore) return;
       
       setIsUploading(true);
       toast({ title: "Subiendo imagen...", description: "Por favor, espera." });
@@ -102,10 +147,11 @@ export default function SuperAdminProfilePage() {
           const reader = new FileReader();
           reader.readAsDataURL(file);
           reader.onloadend = async () => {
+              const userProfileRef = doc(firestore, 'users', user.uid);
               const mediaDataUri = reader.result as string;
               const result = await uploadMedia({ mediaDataUri });
-              // This is a hypothetical field. Assuming user profile might have a photoURL field.
               setDocumentNonBlocking(userProfileRef, { photoURL: result.secure_url }, { merge: true });
+              setUserProfile(prev => prev ? { ...prev, photoURL: result.secure_url } as UserProfile & { photoURL?: string } : null);
               toast({ title: 'Avatar actualizado!' });
           };
       } catch (error: any) {
