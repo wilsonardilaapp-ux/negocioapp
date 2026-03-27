@@ -1,12 +1,19 @@
-import { LandingPageEditor } from './editor';
+'use client';
+
+import { useState, useEffect, useMemo, useRef } from 'react';
+import { Button } from '@/components/ui/button';
+import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Save, Loader2 } from 'lucide-react';
 import type { LandingPageData } from '@/models/landing-page';
-import { getLandingConfig } from '@/actions/save-landing-config';
+import EditorLandingForm from '@/components/landing-page/editor-landing-form';
+import SuperAdminEditorLandingPreview from '@/components/landing-page/superadmin-editor-landing-preview';
+import { useToast } from '@/hooks/use-toast';
+import { saveLandingConfig } from '@/actions/save-landing-config';
+import { useDoc, useFirestore, useMemoFirebase } from '@/firebase';
+import { doc } from 'firebase/firestore';
 
-export const dynamic = 'force-dynamic';
-export const revalidate = 0;
-
-// La plantilla de respaldo unificada con IDs estáticos.
-const initialLandingData: LandingPageData = {
+// Fallback data in case the document doesn't exist yet.
+const fallbackData: LandingPageData = {
   hero: {
     title: 'Innovación que impulsa tu negocio al futuro',
     subtitle: 'Transformamos tecnología en crecimiento real',
@@ -139,7 +146,6 @@ const initialLandingData: LandingPageData = {
   },
 };
 
-// Función para fusionar de forma segura los datos iniciales con los de la base de datos.
 function deepMerge(target: any, source: any): any {
     const output = { ...target };
     if (target && typeof target === 'object' && source && typeof source === 'object') {
@@ -150,7 +156,6 @@ function deepMerge(target: any, source: any): any {
                 output[key] = source[key];
             }
         });
-        // Asegura que todas las claves de la plantilla inicial estén presentes.
         Object.keys(target).forEach(key => {
             if (!(key in source)) {
                 output[key] = target[key];
@@ -160,13 +165,69 @@ function deepMerge(target: any, source: any): any {
     return output;
 }
 
-// Este es el Componente de Servidor que obtiene los datos y los pasa al editor.
-export default async function SuperAdminPublicLandingPage() {
-    const fetchedData = await getLandingConfig();
+export default function SuperAdminPublicLandingPage() {
+    const firestore = useFirestore();
+    const { toast } = useToast();
+
+    // 1. Fetch data directly on the client with useDoc for real-time updates
+    const docRef = useMemoFirebase(() => doc(firestore, 'landing_configs', 'main'), [firestore]);
+    const { data: fetchedData, isLoading: isFetching } = useDoc<LandingPageData>(docRef);
     
-    // Fusiona los datos para evitar errores si faltan campos en Firestore.
-    const data = deepMerge(initialLandingData, fetchedData);
-    
-    // Renderiza el componente cliente con los datos iniciales.
-    return <LandingPageEditor initialData={data} />;
+    // 2. Local state for editing (the "Doble Sincronización")
+    const [editorData, setEditorData] = useState<LandingPageData>(fallbackData);
+    const [isSaving, setIsSaving] = useState(false);
+    const isFirstLoad = useRef(true);
+
+    // 3. Populate local state only on first load with fetched data
+    useEffect(() => {
+        if (fetchedData && isFirstLoad.current) {
+            isFirstLoad.current = false;
+            const mergedData = deepMerge(fallbackData, fetchedData);
+            setEditorData(mergedData);
+        }
+    }, [fetchedData]);
+
+    const handleSave = async () => {
+        setIsSaving(true);
+        try {
+            const result = await saveLandingConfig(editorData); // Save local state
+            if (result.success) {
+                toast({ title: '¡Guardado con Éxito!', description: 'Los cambios se han publicado.' });
+            } else {
+                throw new Error(result.error || 'Ocurrió un error desconocido.');
+            }
+        } catch (error: any) {
+            console.error("Error al guardar:", error);
+            toast({ variant: "destructive", title: "Error al Guardar", description: error.message });
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    if (isFetching && isFirstLoad.current) {
+        return (
+            <div className="flex h-screen w-full items-center justify-center bg-background">
+                <Loader2 className="h-12 w-12 animate-spin text-primary" />
+            </div>
+        );
+    }
+
+    return (
+        <div className="flex flex-col gap-6">
+            <Card className="p-6 flex justify-between items-center bg-card shadow">
+                <div>
+                    <CardTitle className="text-2xl font-bold">Editor de Landing Page Pública</CardTitle>
+                    <CardDescription>Modifica el contenido de la página de inicio principal de la aplicación.</CardDescription>
+                </div>
+                <Button onClick={handleSave} disabled={isSaving}>
+                    {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                    Guardar Cambios
+                </Button>
+            </Card>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+                <div className="lg:col-span-2"><EditorLandingForm data={editorData} setData={setEditorData} /></div>
+                <div className="lg:col-span-1"><SuperAdminEditorLandingPreview data={editorData} /></div>
+            </div>
+        </div>
+    );
 }
