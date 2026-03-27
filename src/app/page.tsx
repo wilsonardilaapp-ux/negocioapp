@@ -1,7 +1,11 @@
+'use client';
+
+import React, { useMemo } from 'react';
 import LandingPageContent from '@/components/landing-page/landing-page-content';
 import type { LandingPageData } from '@/models/landing-page';
-import { getLandingConfig } from '@/actions/save-landing-config';
-import React from 'react';
+import { useDoc, useFirestore, useMemoFirebase } from '@/firebase';
+import { doc } from 'firebase/firestore';
+import { Loader2, Frown } from 'lucide-react';
 
 const fallbackData: LandingPageData = {
   hero: {
@@ -155,10 +159,43 @@ function deepMerge(target: any, source: any): any {
     return output;
 }
 
-export default async function RootPage() {
-  const fetchedData = await getLandingConfig();
-  const dataToRender: LandingPageData = deepMerge(fallbackData, fetchedData ?? {});
+export default function RootPage() {
+  const firestore = useFirestore();
 
+  const landingConfigRef = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return doc(firestore, 'landing_configs', 'main');
+  }, [firestore]);
+
+  const { data: fetchedData, isLoading, error } = useDoc<LandingPageData>(landingConfigRef);
+
+  const dataToRender = useMemo(() => {
+    // Merge fetched data with fallback to ensure all properties exist
+    return deepMerge(fallbackData, fetchedData ?? {});
+  }, [fetchedData]);
+
+  if (isLoading) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center bg-background">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+        <div className="flex h-screen w-full flex-col items-center justify-center bg-background text-center px-4">
+            <Frown className="h-16 w-16 text-destructive mb-4" />
+            <h1 className="text-2xl font-bold text-destructive">Error al Cargar la Página</h1>
+            <p className="text-muted-foreground mt-2 max-w-md">
+                No se pudo cargar la configuración de la página de inicio.
+                Por favor, verifica los permisos de lectura en Firestore para la colección `landing_configs`.
+            </p>
+            <pre className="mt-4 p-4 bg-muted rounded-md text-left text-xs overflow-auto max-w-full">{error.message}</pre>
+        </div>
+    );
+  }
+  
   return (
     <div className="w-full bg-background">
       <LandingPageContent data={dataToRender} />
