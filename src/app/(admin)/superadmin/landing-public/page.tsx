@@ -3,6 +3,7 @@ import type { LandingPageData } from '@/models/landing-page';
 import { getLandingConfig } from '@/actions/save-landing-config';
 
 export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 // Corrected initial data with static IDs to prevent hydration errors.
 const initialLandingData: LandingPageData = {
