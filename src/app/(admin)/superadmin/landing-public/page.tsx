@@ -8,13 +8,10 @@ import { Save, Loader2 } from 'lucide-react';
 import type { LandingPageData } from '@/models/landing-page';
 import EditorLandingForm from '@/components/landing-page/editor-landing-form';
 import SuperAdminEditorLandingPreview from '@/components/landing-page/superadmin-editor-landing-preview';
-import { useFirestore, useMemoFirebase } from '@/firebase';
-import { doc, getDocFromServer, getDocFromCache } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { v4 as uuidv4 } from 'uuid';
-import { saveLandingConfig } from '@/actions/save-landing-config';
+import { saveLandingConfig, getLandingConfig } from '@/actions/save-landing-config';
 
-// Define the initial structure of the landing page data
 const initialLandingData: LandingPageData = {
   hero: {
     title: 'Innovación que impulsa tu negocio al futuro',
@@ -45,7 +42,6 @@ const initialLandingData: LandingPageData = {
   footer: { enabled: true, contactInfo: { address: '', phone: '', email: '', hours: '' }, quickLinks: [], legalLinks: { privacyPolicyUrl: '', termsAndConditionsUrl: '', cookiesPolicyUrl: '', legalNoticeUrl: '' }, socialLinks: { facebookUrl: '', instagramUrl: '', tiktokUrl: '', youtubeUrl: '', linkedinUrl: '', showIcons: true }, logo: { url: null, slogan: '' }, certifications: [], copyright: { companyName: '', additionalText: '' }, cta: { text: '', url: '', enabled: false }, visuals: { backgroundImageUrl: null, opacity: 80, backgroundColor: '#FFFFFF', textColor: '#000000', darkMode: false, showBackToTop: true }, adminExtras: { systemVersion: '1.0.0', supportLink: '', documentationLink: '' } },
 };
 
-// Helper function to deeply merge saved data with the initial structure
 function deepMerge(target: any, source: any): any {
     const output = { ...target };
     if (target && typeof target === 'object' && source && typeof source === 'object') {
@@ -56,7 +52,6 @@ function deepMerge(target: any, source: any): any {
                 output[key] = source[key];
             }
         });
-        // Ensure all keys from target are in output, even if not in source
         Object.keys(target).forEach(key => {
             if (!(key in source)) {
                 output[key] = target[key];
@@ -70,44 +65,30 @@ export default function SuperAdminPublicLandingPage() {
   const [data, setData] = useState<LandingPageData>(initialLandingData);
   const [isSaving, setIsSaving] = useState(false);
   const [isFetching, setIsFetching] = useState(true);
-  const firestore = useFirestore();
   const { toast } = useToast();
 
-  const docRef = useMemoFirebase(() => firestore ? doc(firestore, 'landing_configs', 'main') : null, [firestore]);
-
   useEffect(() => {
-    if (!docRef) {
-      setIsFetching(false);
-      return;
-    }
-
-    const fetchData = async () => {
-      setIsFetching(true);
-      let docSnap;
-      try {
-        docSnap = await getDocFromServer(docRef);
-      } catch (serverError: any) {
-        console.warn('Could not fetch from server, trying cache...', serverError.code);
+    async function fetchData() {
+        setIsFetching(true);
         try {
-          docSnap = await getDocFromCache(docRef);
-        } catch (cacheError: any) {
-          console.error('Cache fetch also failed. Displaying initial data as fallback.', cacheError);
-          docSnap = null; // Important: set to null if both fail
+            const savedData = await getLandingConfig();
+            if (savedData) {
+                const mergedData = deepMerge(initialLandingData, savedData);
+                setData(mergedData);
+            }
+        } catch (error) {
+            console.error("Error fetching data via server action:", error);
+            toast({
+                variant: 'destructive',
+                title: 'Error de Carga',
+                description: 'No se pudieron cargar los datos. Se muestra la plantilla inicial.',
+            });
+        } finally {
+            setIsFetching(false);
         }
-      }
-
-      if (docSnap && docSnap.exists()) {
-        const savedData = docSnap.data() as LandingPageData;
-        const mergedData = deepMerge(initialLandingData, savedData);
-        setData(mergedData);
-      }
-      // If docSnap is null or doesn't exist, the state will remain as 'initialLandingData', preventing resets.
-      
-      setIsFetching(false);
-    };
-
+    }
     fetchData();
-  }, [docRef]);
+  }, [toast]);
 
   const handleSave = async () => {
     setIsSaving(true);
