@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -8,8 +7,8 @@ import { Save, Loader2 } from 'lucide-react';
 import type { LandingPageData } from '@/models/landing-page';
 import EditorLandingForm from '@/components/landing-page/editor-landing-form';
 import SuperAdminEditorLandingPreview from '@/components/landing-page/superadmin-editor-landing-preview';
-import { useFirestore, useMemoFirebase, useDoc } from '@/firebase';
-import { doc } from 'firebase/firestore';
+import { useFirestore, useMemoFirebase } from '@/firebase';
+import { doc, getDocFromServer, getDocFromCache } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { v4 as uuidv4 } from 'uuid';
 import { saveLandingConfig } from '@/actions/save-landing-config';
@@ -48,31 +47,55 @@ const initialLandingData: LandingPageData = {
 export default function SuperAdminPublicLandingPage() {
   const [data, setData] = useState<LandingPageData>(initialLandingData);
   const [isSaving, setIsSaving] = useState(false);
+  const [isFetching, setIsFetching] = useState(true);
   const firestore = useFirestore();
   const { toast } = useToast();
 
   const docRef = useMemoFirebase(() => firestore ? doc(firestore, 'landing_configs', 'main') : null, [firestore]);
-  const { data: savedData, isLoading: isFetching } = useDoc<LandingPageData>(docRef);
 
   useEffect(() => {
-    if (savedData) {
-      // Deep merge saved data with initial data to ensure all fields are present
-      const mergedData = {
-        ...initialLandingData,
-        ...savedData,
-        hero: { ...initialLandingData.hero, ...savedData.hero },
-        header: { ...initialLandingData.header, ...savedData.header },
-        navigation: { ...initialLandingData.navigation, ...savedData.navigation },
-        footer: { ...initialLandingData.footer, ...savedData.footer },
-        form: { ...initialLandingData.form, ...savedData.form },
-        seo: { ...initialLandingData.seo, ...savedData.seo },
-      };
-      setData(mergedData);
-    } else if (!isFetching) {
-      // If no data is saved in DB and we are not fetching, use initial data.
-      setData(initialLandingData);
+    if (!docRef) {
+      setIsFetching(false);
+      return;
     }
-  }, [savedData, isFetching]);
+
+    const fetchData = async () => {
+      setIsFetching(true);
+      let docSnap;
+      try {
+        docSnap = await getDocFromServer(docRef);
+      } catch (serverError: any) {
+        console.warn('Could not fetch from server, trying cache...', serverError.code);
+        try {
+          docSnap = await getDocFromCache(docRef);
+        } catch (cacheError: any) {
+          console.error('Cache fetch also failed. Using initial data.', cacheError);
+          docSnap = null;
+        }
+      }
+
+      if (docSnap && docSnap.exists()) {
+        const savedData = docSnap.data() as LandingPageData;
+        const mergedData = {
+          ...initialLandingData,
+          ...savedData,
+          hero: { ...initialLandingData.hero, ...savedData.hero },
+          header: { ...initialLandingData.header, ...savedData.header },
+          navigation: { ...initialLandingData.navigation, ...savedData.navigation },
+          footer: { ...initialLandingData.footer, ...savedData.footer },
+          form: { ...initialLandingData.form, ...savedData.form },
+          seo: { ...initialLandingData.seo, ...savedData.seo },
+        };
+        setData(mergedData);
+      } else {
+        setData(initialLandingData);
+      }
+      
+      setIsFetching(false);
+    };
+
+    fetchData();
+  }, [docRef]);
 
   const handleSave = async () => {
     setIsSaving(true);
