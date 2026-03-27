@@ -3,8 +3,10 @@ import LandingPageContent from '@/components/landing-page/landing-page-content';
 import type { LandingPageData } from '@/models/landing-page';
 import { getLandingConfig } from '@/actions/save-landing-config';
 import { v4 as uuidv4 } from 'uuid';
+import { unstable_noStore as noStore } from 'next/cache';
 
 export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 const fallbackData: LandingPageData = {
   hero: {
@@ -159,12 +161,19 @@ function deepMerge(target: any, source: any): any {
 }
 
 export default async function RootPage() {
-    const fetchedData = await getLandingConfig();
-    const dataToRender = deepMerge(fallbackData, fetchedData ?? {});
+    noStore(); // Explicitly prevent caching for this component
+    try {
+        const fetchedData = await getLandingConfig();
+        const dataToRender = deepMerge(fallbackData, fetchedData ?? {});
 
-    return (
-        <div className="w-full bg-background">
-            <LandingPageContent data={dataToRender} />
-        </div>
-    );
+        return (
+            <div className="w-full bg-background">
+                <LandingPageContent data={dataToRender} />
+            </div>
+        );
+    } catch (error) {
+        console.error("Error en RootPage:", error);
+        // Fallback to default data in case of error
+        return <LandingPageContent data={fallbackData} />;
+    }
 }

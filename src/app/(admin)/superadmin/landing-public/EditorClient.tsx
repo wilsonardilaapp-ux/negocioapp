@@ -10,21 +10,21 @@ import SuperAdminEditorLandingPreview from '@/components/landing-page/superadmin
 import { useToast } from '@/hooks/use-toast';
 import { saveLandingConfig } from '@/actions/save-landing-config';
 
-interface EditorUIProps {
+interface EditorClientProps {
   initialData: LandingPageData | null;
 }
 
-export default function EditorUI({ initialData }: EditorUIProps) {
+export default function LandingEditorClient({ initialData }: EditorClientProps) {
   const { toast } = useToast();
   
-  // The state for the editor, initialized with server-fetched data.
   const [editorData, setEditorData] = useState<LandingPageData | null>(initialData);
   const [isSaving, setIsSaving] = useState(false);
   
-  // This effect ensures that if the initialData prop changes (e.g., on a server-side refresh),
-  // the local state is updated.
+  // VITAL: This effect syncs the server-fetched data to the client state on load/refresh.
   useEffect(() => {
-    setEditorData(initialData);
+    if (initialData) {
+      setEditorData(initialData);
+    }
   }, [initialData]);
 
   const handleSave = async () => {
@@ -48,7 +48,6 @@ export default function EditorUI({ initialData }: EditorUIProps) {
     }
   };
   
-  // If there's no data (e.g., initial fetch failed), show a loading or error state.
   if (!editorData) {
       return (
           <div className="flex items-center justify-center h-64">

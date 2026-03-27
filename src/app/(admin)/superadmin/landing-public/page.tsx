@@ -1,5 +1,5 @@
 import { getLandingConfig } from '@/actions/save-landing-config';
-import EditorUI from './editor-ui'; 
+import LandingEditorClient from './EditorClient';
 import { v4 as uuidv4 } from 'uuid';
 import type { LandingPageData } from '@/models/landing-page';
 
@@ -8,7 +8,6 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 
-// Fallback data in case the document doesn't exist yet.
 const fallbackData: LandingPageData = {
   hero: {
     title: 'Innovación que impulsa tu negocio al futuro',
@@ -163,8 +162,7 @@ function deepMerge(target: any, source: any): any {
 
 export default async function SuperAdminPublicLandingPage() {
     const fetchedData = await getLandingConfig();
-
     const initialData = deepMerge(fallbackData, fetchedData ?? {});
 
-    return <EditorUI initialData={initialData} />;
+    return <LandingEditorClient initialData={initialData} />;
 }

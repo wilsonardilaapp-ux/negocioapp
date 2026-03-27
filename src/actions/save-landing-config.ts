@@ -14,20 +14,20 @@ export async function saveLandingConfig(data: LandingPageData): Promise<{ succes
     const firestore = await getAdminFirestore();
     const docRef = firestore.collection('landing_configs').doc('main');
     
-    // Limpia el objeto de datos para eliminar valores `undefined` antes de guardarlo.
     const cleanData = JSON.parse(JSON.stringify(data));
 
-    // Utiliza { merge: true } para una escritura más segura, que actualiza campos
-    // existentes en lugar de sobreescribir todo el documento.
-    await docRef.set(cleanData, { merge: true });
+    await docRef.set({
+      ...cleanData,
+      lastUpdated: new Date().toISOString()
+    }, { merge: true });
     
-    // Invalida la caché para la página de inicio y el editor.
-    revalidatePath('/');
+    // Purga agresivamente la caché
+    revalidatePath('/', 'layout');
     revalidatePath('/superadmin/landing-public');
     
     return { success: true };
   } catch (error: any) {
-    console.error("Error saving landing config via server action:", error);
+    console.error("Error al guardar:", error);
     return { success: false, error: error.message };
   }
 }
@@ -37,7 +37,6 @@ export async function saveLandingConfig(data: LandingPageData): Promise<{ succes
  * @returns {Promise<LandingPageData | null>} Los datos de la landing page o null si hay un error.
  */
 export async function getLandingConfig(): Promise<LandingPageData | null> {
-    // Desactiva la caché de datos para esta función específica.
     noStore();
     try {
         const firestore = await getAdminFirestore();
