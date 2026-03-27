@@ -1,5 +1,3 @@
-'use server';
-
 import { LandingPageEditor } from './editor';
 import type { LandingPageData } from '@/models/landing-page';
 import { getLandingConfig } from '@/actions/save-landing-config';
