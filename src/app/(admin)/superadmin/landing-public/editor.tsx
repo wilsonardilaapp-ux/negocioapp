@@ -10,11 +10,14 @@ import SuperAdminEditorLandingPreview from '@/components/landing-page/superadmin
 import { useToast } from '@/hooks/use-toast';
 import { saveLandingConfig } from '@/actions/save-landing-config';
 
+// The server component now passes the initial data as a prop.
 export function LandingPageEditor({ initialData }: { initialData: LandingPageData }) {
+  // The state is now managed entirely on the client.
   const [data, setData] = useState<LandingPageData>(initialData);
   const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
 
+  // If the server-fetched data changes (e.g., on a hard refresh), update the local state.
   useEffect(() => {
     setData(initialData);
   }, [initialData]);

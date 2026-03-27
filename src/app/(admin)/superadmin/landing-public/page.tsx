@@ -5,12 +5,13 @@ import type { LandingPageData } from '@/models/landing-page';
 import { v4 as uuidv4 } from 'uuid';
 import { getLandingDataFromRestApi } from '@/lib/landing-page-data';
 
+// This is the default structure.
 const initialLandingData: LandingPageData = {
   hero: {
     title: 'Innovación que impulsa tu negocio al futuro',
     subtitle: 'Transformamos tecnología en crecimiento real',
     additionalContent: '<p>En <strong>PS-USER</strong>, combinamos innovación, estrategia y tecnología para impulsar la transformación digital de tu negocio. Desarrollamos soluciones inteligentes en software, automatización, inteligencia artificial y presencia digital que optimizan tus procesos y potencian tus resultados. Nuestro equipo experto te acompaña en cada paso, desde la planificación hasta la implementación, garantizando eficiencia, seguridad y crecimiento sostenible. Conviértete en una empresa más ágil, competitiva y conectada con el futuro. <strong>PS-USER</strong>, tu aliado tecnológico para alcanzar el éxito en la era digital.</p>',
-    imageUrl: 'https://picsum.photos/seed/vintagecar/1200/800',
+    imageUrl: 'https://images.unsplash.com/photo-1588656909074-a9ff6d608eb9?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw4fHxuYXR1cmUlMjB3ZWxsbmVzc3xlbnwwfHx8fDE3NjIyMjAxMzN8MA&ixlib=rb-4.1.0&q=80&w=1080',
     ctaButtonText: 'Contáctanos',
     ctaButtonUrl: '#contact',
     backgroundColor: '#FFFFFF',
@@ -138,6 +139,8 @@ const initialLandingData: LandingPageData = {
   },
 };
 
+
+// A deep merge function to safely combine initial data with fetched data.
 function deepMerge(target: any, source: any): any {
     const output = { ...target };
     if (target && typeof target === 'object' && source && typeof source === 'object') {
@@ -148,6 +151,7 @@ function deepMerge(target: any, source: any): any {
                 output[key] = source[key];
             }
         });
+        // Ensure all keys from the target are in the output, even if not in the source
         Object.keys(target).forEach(key => {
             if (!(key in source)) {
                 output[key] = target[key];
@@ -157,8 +161,11 @@ function deepMerge(target: any, source: any): any {
     return output;
 }
 
+
 export default async function SuperAdminPublicLandingPage() {
     const fetchedData = await getLandingDataFromRestApi();
+    
+    // Merge fetched data with initial data to ensure all fields are present.
     const data = deepMerge(initialLandingData, fetchedData);
     
     return <LandingPageEditor initialData={data} />;

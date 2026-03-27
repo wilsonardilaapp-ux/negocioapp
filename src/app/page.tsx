@@ -1,11 +1,13 @@
-'use server';
+'use client';
 
 import LandingPageContent from '@/components/landing-page/landing-page-content';
 import { ChatbotWidget } from '@/components/chatbot/chatbot-widget';
-import { getLandingDataFromRestApi } from '@/lib/landing-page-data';
-import { getAdminFirestore } from '@/firebase/server-init';
 import type { LandingPageData } from '@/models/landing-page';
 import { v4 as uuidv4 } from 'uuid';
+import { useDoc, useFirestore, useMemoFirebase } from '@/firebase';
+import { doc } from 'firebase/firestore';
+import { Loader2, Frown } from 'lucide-react';
+
 
 const fallbackData: LandingPageData = {
   hero: {
@@ -159,41 +161,33 @@ function deepMerge(target: any, source: any): any {
     return output;
 }
 
-export default async function RootPage() {
-    const landingData = await getLandingDataFromRestApi();
-    const dataToRender = deepMerge(fallbackData, landingData);
+export default function RootPage() {
+    const firestore = useFirestore();
+    
+    // Subscribe to the public landing page config document in real-time
+    const landingConfigRef = useMemoFirebase(
+      () => (firestore ? doc(firestore, 'landing_configs/main') : null),
+      [firestore]
+    );
 
-    let businessId: string | null = null;
-    let isChatbotEnabled = false;
+    const { data, isLoading, error } = useDoc<LandingPageData>(landingConfigRef);
 
-    try {
-        const firestore = await getAdminFirestore();
-        const globalConfigSnap = await firestore.collection('globalConfig').doc('system').get();
-        if (globalConfigSnap.exists()) {
-            businessId = globalConfigSnap.data()?.mainBusinessId || null;
-        }
-
-        if (businessId) {
-            const chatbotModuleSnap = await firestore.collection('modules').doc('chatbot-integrado-con-whatsapp-para-soporte-y-ventas').get();
-            isChatbotEnabled = chatbotModuleSnap.exists() && chatbotModuleSnap.data()?.status === 'active';
-        }
-    } catch(e) {
-        console.warn("Could not fetch supplemental config for RootPage (e.g., chatbot). This can be normal if offline.", e);
+    if (isLoading) {
+        return (
+            <div className="flex h-screen w-full items-center justify-center bg-background">
+                <Loader2 className="h-12 w-12 animate-spin text-primary" />
+            </div>
+        );
     }
-
+    
+    // In case of error OR if the document doesn't exist (data is null), we use the fallback.
+    // This makes the page resilient to connection issues.
+    const dataToRender = deepMerge(fallbackData, data);
+    
     return (
         <div className="w-full bg-background">
-            <LandingPageContent data={dataToRender} businessId={businessId || undefined} />
-            
-            {isChatbotEnabled && businessId && (
-                 <ChatbotWidget 
-                    enabled={isChatbotEnabled}
-                    businessId={businessId}
-                    businessName={dataToRender.header?.businessInfo?.name || 'Asistente'}
-                    avatarUrl={dataToRender.chatbot?.avatarUrl || ''}
-                    greeting={dataToRender.chatbot?.greeting || '¡Hola! ¿En qué puedo ayudarte?'}
-                />
-            )}
+            <LandingPageContent data={dataToRender} />
+            {/* The ChatbotWidget could be added here if needed, fetching its own config or receiving it */}
         </div>
     );
 }
