@@ -1,7 +1,6 @@
-
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -19,10 +18,14 @@ export function LandingPageEditor({ initialData }: { initialData: LandingPageDat
   const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
   const router = useRouter();
+  const isFirstLoad = useRef(true);
 
-  // If the server-fetched data changes (e.g., on a hard refresh or revalidation), update the local state.
+  // This useEffect now only runs on the first load, preventing re-sync issues.
   useEffect(() => {
-    setData(initialData);
+    if (isFirstLoad.current) {
+        isFirstLoad.current = false;
+        setData(initialData);
+    }
   }, [initialData]);
 
   const handleSave = async () => {
@@ -36,8 +39,7 @@ export function LandingPageEditor({ initialData }: { initialData: LandingPageDat
           title: '¡Guardado con Éxito!',
           description: 'Los cambios se han guardado correctamente en la base de datos.',
         });
-        // After a successful save, refresh the server components to get the latest data.
-        router.refresh();
+        // router.refresh() is REMOVED to prevent overwriting the local state.
       } else {
         throw new Error(result.error || 'Ocurrió un error desconocido en el servidor.');
       }
