@@ -1,0 +1,42 @@
+# Explicación Detallada de la Solución al Problema de Sincronización
+
+El problema persistente de desincronización entre el editor de la landing page y la página pública se debía a una combinación de dos factores críticos: caché agresiva por parte del servidor y una incorrecta "hidratación" de datos en el editor.
+
+Esta fue la estrategia definitiva, punto por punto:
+
+### Paso 1: Crear una Fuente de Verdad Única y Sin Caché (`get-landing-data.ts`)
+
+Para eliminar cualquier posibilidad de que el servidor guardara una versión "vieja" de los datos, se centralizó la lectura de la base de datos en una única función de servidor.
+
+- **Archivo Creado:** `src/lib/get-landing-data.ts`
+- **Técnica:** Dentro de esta función, se utilizó `unstable_noStore()`. Esta es una orden directa para Next.js que le prohíbe guardar en caché el resultado de esta función. Cada vez que se llama, está obligada a ir a la base de datos y obtener los datos más frescos.
+
+### Paso 2: Re-arquitectura del Editor con el Patrón "Server-Client"
+
+Aquí se solucionó por qué los datos se "borraban" al refrescar la página del editor.
+
+- **Componente de Servidor (`page.tsx`):** La página principal del editor (`/superadmin/landing-public/page.tsx`) se convirtió en un Componente de Servidor `async`. Su única misión ahora es llamar a nuestra función de confianza `getLandingData()` y pasar los datos como una `prop` (`initialData`) a un componente hijo.
+- **Componente de Cliente (`EditorClient.tsx`):** Toda la lógica interactiva (el editor, los botones, los `useState`) se movió a este componente.
+- **La Clave de la Sincronización:** Al pasar los datos al `EditorClient`, se le añadió una `prop` especial: `key={JSON.stringify(initialData?.updatedAt)}`. React tiene un comportamiento fundamental: si la `key` de un componente cambia, lo destruye y lo vuelve a crear desde cero. Como la acción de guardado actualiza el `timestamp`, al refrescar la página, el `key` es diferente, forzando al editor a reiniciarse con los nuevos datos y evitando que se muestre vacío o con información obsoleta.
+
+### Paso 3: Acción de Guardado "Atómica" (`save-landing-config.ts`)
+
+Para que todo el ciclo funcione, la acción de guardado debía hacer dos cosas cruciales:
+
+1.  **Actualizar el Timestamp:** Ahora, cada vez que se guarda, se escribe un campo `updatedAt` con la fecha y hora actual. Este es el "gatillo" que hace que la `key` del editor cambie.
+2.  **Invalidación Agresiva:** Se mantuvo la llamada a `revalidatePath('/', 'layout')`. Esto le dice a Vercel/Cloud Workstations que no solo la página de inicio, sino toda su estructura (layout), está desactualizada y necesita ser regenerada.
+
+### Paso 4: La Página de Inicio Pública (`page.tsx`)
+
+Finalmente, para asegurar que la página pública siempre muestre los cambios, se configuró como un Componente de Servidor 100% dinámico.
+
+- **Sin Estado de Cliente:** No usa `useState` ni `useEffect`. Es una página simple que llama a `getLandingData()` en cada carga.
+- **Caché Desactivada:** Las directivas `export const dynamic = 'force-dynamic';` y `export const revalidate = 0;` aseguran que el servidor nunca guarde una versión HTML estática de esta página.
+
+### Flujo Final Infalible:
+
+1.  **Editas:** Ves cambios al instante gracias al `useState` en `EditorClient.tsx`.
+2.  **Guardas:** `saveLandingConfig` actualiza la base de datos (incluyendo `updatedAt`).
+3.  **Invalidas:** `revalidatePath` le grita al servidor que la página de inicio está vieja.
+4.  **Refrescas el Editor:** El `page.tsx` del editor obtiene los nuevos datos, el `updatedAt` cambia, la `key` del `EditorClient` cambia y el componente se reconstruye con los datos frescos.
+5.  **Visitas la Página Pública:** El servidor, forzado por `dynamic = 'force-dynamic'`, ignora cualquier caché, ejecuta `getLandingData()` y muestra la versión más reciente.
