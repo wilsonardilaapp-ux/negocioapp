@@ -1,11 +1,7 @@
 import LandingPageContent from '@/components/landing-page/landing-page-content';
 import type { LandingPageData } from '@/models/landing-page';
 import { getLandingConfig } from '@/actions/save-landing-config';
-import { Loader2, Frown } from 'lucide-react';
 import React from 'react';
-
-export const dynamic = 'force-dynamic';
-export const revalidate = 0;
 
 const fallbackData: LandingPageData = {
   hero: {
@@ -160,24 +156,12 @@ function deepMerge(target: any, source: any): any {
 }
 
 export default async function RootPage() {
-    const fetchedData = await getLandingConfig();
-    console.log("FIRESTORE DATA:", JSON.stringify(fetchedData)?.slice(0, 200));
+  const fetchedData = await getLandingConfig();
+  const dataToRender: LandingPageData = deepMerge(fallbackData, fetchedData ?? {});
 
-    if (!fetchedData) {
-        console.log("Document 'landing_configs/main' does not exist or is empty. Using fallback data.");
-        const dataToRender = fallbackData;
-        return (
-            <div className="w-full bg-background">
-                <LandingPageContent data={dataToRender} />
-            </div>
-        );
-    }
-
-    const dataToRender = deepMerge(fallbackData, fetchedData);
-    
-    return (
-        <div className="w-full bg-background">
-            <LandingPageContent data={dataToRender} />
-        </div>
-    );
+  return (
+    <div className="w-full bg-background">
+      <LandingPageContent data={dataToRender} />
+    </div>
+  );
 }
