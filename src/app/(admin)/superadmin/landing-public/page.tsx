@@ -3,7 +3,7 @@
 import { LandingPageEditor } from './editor';
 import type { LandingPageData } from '@/models/landing-page';
 import { v4 as uuidv4 } from 'uuid';
-import { getLandingConfig } from '@/actions/save-landing-config';
+import { getLandingDataFromRestApi } from '@/lib/landing-page-data';
 
 const initialLandingData: LandingPageData = {
   hero: {
@@ -157,13 +157,9 @@ function deepMerge(target: any, source: any): any {
     return output;
 }
 
-// This is now a Server Component responsible for fetching data.
 export default async function SuperAdminPublicLandingPage() {
-    const fetchedData = await getLandingConfig();
-    // Deep merge ensures that if we add new properties to `initialLandingData` in the code,
-    // they get merged with the data from Firestore, preventing errors from missing properties.
+    const fetchedData = await getLandingDataFromRestApi();
     const data = deepMerge(initialLandingData, fetchedData);
     
-    // The editor itself is a client component that receives the fetched data.
     return <LandingPageEditor initialData={data} />;
 }
