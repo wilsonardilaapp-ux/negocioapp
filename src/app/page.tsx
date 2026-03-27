@@ -161,6 +161,7 @@ function deepMerge(target: any, source: any): any {
 export default async function RootPage() {
     // This server component now reliably fetches data using the Admin SDK via a server action.
     const fetchedData = await getLandingConfig();
+    console.log("FIRESTORE DATA:", JSON.stringify(fetchedData)?.slice(0, 200));
 
     // Use fallbackData if the fetch returns null (e.g., doc doesn't exist or server error).
     const dataToRender = deepMerge(fallbackData, fetchedData);
