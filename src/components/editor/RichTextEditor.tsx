@@ -1,9 +1,10 @@
-"use client";
+'use client';
 
 import React, { useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import { uploadMedia } from '@/ai/flows/upload-media-flow';
 import { useToast } from '@/hooks/use-toast';
+import 'quill/dist/quill.snow.css';
 
 // Simplified dynamic import for ReactQuill to prevent SSR issues.
 const QuillEditor = dynamic(
@@ -29,8 +30,12 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({ value, onChange, placeh
         [{ header: [1, 2, 3, 4, 5, 6, false] }],
         [{ font: [] }],
         [{ size: [] }],
-        ['bold', 'italic', 'underline', 'strike', 'blockquote'],
-        [{ list: 'ordered' }, { list: 'bullet' }, { indent: '-1' }, { indent: '+1' }],
+        ['bold', 'italic', 'underline', 'strike', 'blockquote', 'code-block'],
+        [{ color: [] }, { background: [] }],
+        [{ align: [] }],
+        [{ list: 'ordered' }, { list: 'bullet' }],
+        [{ script: 'sub' }, { script: 'super' }],
+        [{ indent: '-1' }, { indent: '+1' }],
         ['link', 'image', 'video'],
         ['clean'],
       ],
