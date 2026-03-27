@@ -1,9 +1,8 @@
-
 'use client';
 
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { useUser, useFirestore, setDocumentNonBlocking, useDoc, useMemoFirebase } from '@/firebase';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc } from 'firebase/firestore';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -37,7 +36,6 @@ const passwordSchema = z.object({
   path: ["confirmPassword"],
 });
 
-// Helper component inside page.tsx
 const MediaUploader = ({
     label,
     mediaUrl,
@@ -58,6 +56,12 @@ const MediaUploader = ({
     isIcon?: boolean;
 }) => {
     const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+        await onUpload(file);
+    };
 
     return (
         <div className="space-y-2">
@@ -93,7 +97,7 @@ const MediaUploader = ({
                     </div>
                 )}
             </div>
-            <input type="file" ref={fileInputRef} onChange={(e) => e.target.files && onUpload(e.target.files[0])} className="hidden" accept="image/*,.ico" />
+            <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept="image/*,.ico" />
         </div>
     );
 };
@@ -111,15 +115,11 @@ const fallbackGlobalConfig: GlobalConfig = {
 };
 
 export default function SuperAdminProfilePage() {
-  const { user, isUserLoading } = useUser();
+  const { user, isUserLoading, profile } = useUser(); // Use the profile from the context
   const firestore = useFirestore();
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [isUploading, setIsUploading] = useState(false);
-  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
-  const [isProfileLoading, setIsProfileLoading] = useState(true);
   const [uploadingField, setUploadingField] = useState<string | null>(null);
-
 
   const globalConfigDocRef = useMemoFirebase(() => !firestore ? null : doc(firestore, 'globalConfig', 'system'), [firestore]);
   const { data: globalConfigData, isLoading: isGlobalConfigLoading } = useDoc<GlobalConfig>(globalConfigDocRef);
@@ -133,70 +133,14 @@ export default function SuperAdminProfilePage() {
   });
 
   useEffect(() => {
-    if (isUserLoading || !user || !firestore) {
-      if (!isUserLoading && !user) {
-        setIsProfileLoading(false);
-      }
-      return;
-    }
-
-    let isMounted = true;
-    const SUPER_ADMIN_EMAILS = ['allseosoporte@gmail.com'];
-
-    const createFallbackProfile = (): UserProfile => ({
-        id: user.uid,
-        name: user.displayName || 'Super Admin',
-        email: user.email!,
-        role: 'super_admin',
-        title: 'Super Administrador',
-        phone: '',
-        status: 'active',
-        createdAt: user.metadata.creationTime || new Date().toISOString(),
-        lastLogin: user.metadata.lastSignInTime || new Date().toISOString(),
-        photoURL: user.photoURL || undefined,
-    });
-
-    const fetchProfile = async () => {
-      setIsProfileLoading(true);
-      try {
-        const userDocRef = doc(firestore, 'users', user.uid);
-        const userDocSnap = await getDoc(userDocRef);
-        if (isMounted) {
-          if (userDocSnap.exists()) {
-            setUserProfile(userDocSnap.data() as UserProfile);
-          } else if (SUPER_ADMIN_EMAILS.includes(user.email ?? '')) {
-            setUserProfile(createFallbackProfile());
-          } else {
-            setUserProfile(null);
-          }
-        }
-      } catch (error) {
-        console.error("Error fetching user profile, using fallback:", error);
-        if (isMounted && SUPER_ADMIN_EMAILS.includes(user.email ?? '')) {
-          setUserProfile(createFallbackProfile());
-        } else if (isMounted) {
-          setUserProfile(null);
-        }
-      } finally {
-        if (isMounted) {
-          setIsProfileLoading(false);
-        }
-      }
-    };
-
-    fetchProfile();
-    return () => { isMounted = false; };
-  }, [user, firestore, isUserLoading]);
-  
-  useEffect(() => {
-    if(userProfile) {
+    if(profile) {
         reset({
-            name: userProfile.name || '',
-            title: userProfile.title || '',
-            phone: userProfile.phone || '',
+            name: profile.name || '',
+            title: profile.title || '',
+            phone: profile.phone || '',
         });
     }
-  }, [userProfile, reset]);
+  }, [profile, reset]);
 
   const onProfileSubmit = (data: z.infer<typeof profileSchema>) => {
     if (!user || !firestore) return;
@@ -205,20 +149,13 @@ export default function SuperAdminProfilePage() {
         name: data.name,
         title: data.title,
         phone: data.phone,
+        email: profile?.email || user.email!,
+        role: 'super_admin',
+        status: 'active',
+        createdAt: profile?.createdAt || new Date().toISOString(),
     };
     
-    if (userProfile?.role === 'super_admin') {
-      dataToSave.email = userProfile.email;
-      dataToSave.role = 'super_admin';
-      dataToSave.status = 'active';
-      if (!userProfile.createdAt) {
-        dataToSave.createdAt = new Date().toISOString();
-      }
-    }
-    
     setDocumentNonBlocking(userProfileRef, dataToSave, { merge: true });
-    
-    setUserProfile(prev => prev ? { ...prev, ...data } as UserProfile : null);
 
     toast({
       title: 'Perfil Actualizado',
@@ -248,7 +185,7 @@ export default function SuperAdminProfilePage() {
       const file = event.target.files?.[0];
       if (!file || !user || !firestore) return;
       
-      setIsUploading(true);
+      setUploadingField('avatar');
       toast({ title: "Subiendo imagen...", description: "Por favor, espera." });
 
       try {
@@ -259,13 +196,12 @@ export default function SuperAdminProfilePage() {
               const mediaDataUri = reader.result as string;
               const result = await uploadMedia({ mediaDataUri });
               setDocumentNonBlocking(userProfileRef, { photoURL: result.secure_url }, { merge: true });
-              setUserProfile(prev => prev ? { ...prev, photoURL: result.secure_url } : null);
               toast({ title: 'Avatar actualizado!' });
+              setUploadingField(null);
           };
       } catch (error: any) {
           toast({ variant: 'destructive', title: 'Error al subir', description: error.message });
-      } finally {
-          setIsUploading(false);
+          setUploadingField(null);
       }
   };
 
@@ -301,8 +237,7 @@ export default function SuperAdminProfilePage() {
     await setDocumentNonBlocking(globalConfigDocRef, { [field]: null }, { merge: true });
   };
 
-
-  const isLoading = isUserLoading || isProfileLoading || isGlobalConfigLoading;
+  const isLoading = isUserLoading || isGlobalConfigLoading;
 
   if (isLoading) {
     return (
@@ -314,7 +249,7 @@ export default function SuperAdminProfilePage() {
   
   const globalConfig = globalConfigData ?? fallbackGlobalConfig;
 
-  if (!user || !userProfile) {
+  if (!user || !profile) {
     return <div>No se pudo cargar el perfil del usuario o la configuración global.</div>
   }
 
@@ -324,9 +259,9 @@ export default function SuperAdminProfilePage() {
         <CardContent className="p-6 flex flex-col md:flex-row items-center gap-6">
           <div className="relative group">
             <Avatar className="h-24 w-24">
-              <AvatarImage src={userProfile.photoURL || user.photoURL || undefined} alt={userProfile.name} />
+              <AvatarImage src={profile.photoURL || user.photoURL || undefined} alt={profile.name} />
               <AvatarFallback className="text-3xl">
-                {userProfile.name?.charAt(0) || 'S'}
+                {profile.name?.charAt(0) || 'S'}
               </AvatarFallback>
             </Avatar>
             <Button
@@ -334,18 +269,18 @@ export default function SuperAdminProfilePage() {
                 size="icon"
                 className="absolute bottom-0 right-0 rounded-full h-8 w-8 group-hover:bg-primary group-hover:text-primary-foreground"
                 onClick={() => fileInputRef.current?.click()}
-                disabled={isUploading}
+                disabled={uploadingField === 'avatar'}
             >
-                {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
+                {uploadingField === 'avatar' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
             </Button>
             <input type="file" ref={fileInputRef} onChange={handleAvatarChange} className="hidden" accept="image/*" />
           </div>
           <div className="flex-1 text-center md:text-left">
-            <h1 className="text-2xl font-bold">{userProfile.name}</h1>
+            <h1 className="text-2xl font-bold">{profile.name}</h1>
             <p className="text-muted-foreground">{user.email}</p>
             <div className="flex items-center justify-center md:justify-start gap-2 mt-2">
-              <Badge variant="destructive">{userProfile.role === 'super_admin' ? 'Super Administrador' : userProfile.role}</Badge>
-              <Badge variant={userProfile.status === 'active' ? 'default' : 'secondary'}>{userProfile.status === 'active' ? 'Activo' : 'Inactivo'}</Badge>
+              <Badge variant="destructive">{profile.role === 'super_admin' ? 'Super Administrador' : profile.role}</Badge>
+              <Badge variant={profile.status === 'active' ? 'default' : 'secondary'}>{profile.status === 'active' ? 'Activo' : 'Inactivo'}</Badge>
             </div>
           </div>
         </CardContent>
