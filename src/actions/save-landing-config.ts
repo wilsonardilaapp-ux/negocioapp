@@ -1,4 +1,3 @@
-
 'use server';
 
 import { getAdminFirestore } from '@/firebase/server-init';
@@ -13,8 +12,10 @@ export async function saveLandingConfig(data: LandingPageData): Promise<{ succes
     // Cleaning the data to remove any `undefined` values that Firestore Admin SDK cannot serialize.
     const cleanData = JSON.parse(JSON.stringify(data));
 
+    // Overwrite the document completely to ensure no old fields remain.
     await docRef.set(cleanData);
     
+    // Revalidate the home page path to ensure the cache is cleared and new data is shown.
     revalidatePath('/');
     
     return { success: true };
@@ -36,6 +37,7 @@ export async function getLandingConfig(): Promise<LandingPageData | null> {
         return null;
     } catch (error) {
         console.error("Error getting landing config from server action:", error);
+        // In case of a server-side error, we return null and let the page handle the fallback.
         return null;
     }
 }

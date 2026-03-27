@@ -1,15 +1,16 @@
-'use client';
 
-import { useMemo, useState, useEffect } from 'react';
-import { useDoc, useFirestore, useMemoFirebase } from '@/firebase';
-import { doc } from 'firebase/firestore';
-import { Loader2, Frown } from 'lucide-react';
-import type { LandingPageData } from '@/models/landing-page';
+'use server';
+
 import LandingPageContent from '@/components/landing-page/landing-page-content';
 import { ChatbotWidget } from '@/components/chatbot/chatbot-widget';
+import { getLandingConfig } from '@/actions/save-landing-config';
+import { getAdminFirestore } from '@/firebase/server-init';
+import type { LandingPageData } from '@/models/landing-page';
+import { v4 as uuidv4 } from 'uuid';
+import { Frown, Loader2 } from 'lucide-react';
 import type { Module } from '@/models/module';
 
-// Datos de respaldo SÓLO si el documento no existe en la base de datos.
+// Fallback data, consistent with the editor's initial state.
 const fallbackData: LandingPageData = {
   hero: {
     title: 'Bienvenido a Nuestra Plataforma',
@@ -36,58 +37,34 @@ const fallbackData: LandingPageData = {
   footer: { enabled: true, contactInfo: { address: '', phone: '', email: '', hours: '' }, quickLinks: [], legalLinks: { privacyPolicyUrl: '', termsAndConditionsUrl: '', cookiesPolicyUrl: '', legalNoticeUrl: '' }, socialLinks: { facebookUrl: '', instagramUrl: '', tiktokUrl: '', youtubeUrl: '', linkedinUrl: '', showIcons: true }, logo: { url: null, slogan: '' }, certifications: [], copyright: { companyName: '', additionalText: '' }, cta: { text: '', url: '', enabled: false }, visuals: { backgroundImageUrl: null, opacity: 80, backgroundColor: '#FFFFFF', textColor: '#000000', darkMode: false, showBackToTop: true }, adminExtras: { systemVersion: '1.0.0', supportLink: '', documentationLink: '' } },
 };
 
-export default function RootPage() {
-    const firestore = useFirestore();
-
-    const landingConfigRef = useMemoFirebase(() =>
-        firestore ? doc(firestore, 'landing_configs', 'main') : null,
-        [firestore]
-    );
-    const globalConfigRef = useMemoFirebase(() =>
-        firestore ? doc(firestore, 'globalConfig', 'system') : null,
-        [firestore]
-    );
-     const chatbotModuleRef = useMemoFirebase(() => 
-        firestore ? doc(firestore, 'modules', 'chatbot-integrado-con-whatsapp-para-soporte-y-ventas') : null,
-        [firestore]
-    );
-
-    const { data: landingData, isLoading: isLandingLoading, error: landingError } = useDoc<LandingPageData>(landingConfigRef);
-    const { data: globalConfig, isLoading: isGlobalConfigLoading } = useDoc<any>(globalConfigRef);
-    const { data: chatbotModule, isLoading: isModuleLoading } = useDoc<Module>(chatbotModuleRef);
-
-    const isLoading = isLandingLoading || isGlobalConfigLoading || isModuleLoading;
-    const businessId = globalConfig?.mainBusinessId;
-    const isChatbotEnabled = chatbotModule?.status === 'active';
-
-    if (isLoading) {
-        return (
-            <div className="flex h-screen w-full items-center justify-center bg-background">
-                <Loader2 className="h-12 w-12 animate-spin text-primary" />
-            </div>
-        );
-    }
+export default async function RootPage() {
+    const landingData = await getLandingConfig();
     
-    // Si hay un error de conexión, useDoc lo maneja y devuelve los datos de la caché si existen.
-    // Mostramos error solo si la carga termina, no hay datos Y hay un error.
-    if (landingError && !landingData) {
-       return (
-            <div className="flex h-screen w-full flex-col items-center justify-center bg-background text-center px-4">
-                <Frown className="h-16 w-16 text-destructive mb-4" />
-                <h1 className="text-2xl font-bold text-destructive">Error de Conexión</h1>
-                <p className="text-muted-foreground mt-2 max-w-md">
-                   No se pudo cargar la configuración de la página. Es posible que estés sin conexión.
-                </p>
-                <pre className="mt-4 p-4 bg-muted rounded-md text-left text-xs overflow-auto">{landingError.message}</pre>
-            </div>
-        );
-    }
-
+    // If fetching fails, use the fallback data. This makes the page resilient.
     const dataToRender = landingData ?? fallbackData;
+
+    let businessId: string | null = null;
+    let isChatbotEnabled = false;
+
+    try {
+        const firestore = await getAdminFirestore();
+        const globalConfigSnap = await firestore.collection('globalConfig').doc('system').get();
+        if (globalConfigSnap.exists()) {
+            businessId = globalConfigSnap.data()?.mainBusinessId || null;
+        }
+
+        // Only check chatbot module if a main business is set.
+        if (businessId) {
+            const chatbotModuleSnap = await firestore.collection('modules').doc('chatbot-integrado-con-whatsapp-para-soporte-y-ventas').get();
+            isChatbotEnabled = chatbotModuleSnap.exists() && chatbotModuleSnap.data()?.status === 'active';
+        }
+    } catch(e) {
+        console.warn("Could not fetch supplemental config for RootPage (e.g., chatbot). This can be normal if offline.", e);
+    }
 
     return (
         <div className="w-full bg-background">
-            <LandingPageContent data={dataToRender} businessId={businessId} />
+            <LandingPageContent data={dataToRender} businessId={businessId || undefined} />
             
             {isChatbotEnabled && businessId && (
                  <ChatbotWidget 
