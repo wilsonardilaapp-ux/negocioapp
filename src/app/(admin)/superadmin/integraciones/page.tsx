@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useCollection, useFirestore, useMemoFirebase, setDocumentNonBlocking, addDocumentNonBlocking } from '@/firebase';
+import { useCollection, useFirestore, useMemoFirebase, setDocumentNonBlocking } from '@/firebase';
 import { collection, doc, getDoc } from 'firebase/firestore';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -46,6 +46,7 @@ import type { Module } from '@/models/module';
 import { testApiKey } from '@/ai/flows/test-api-key-flow';
 import { testWhapiConnection } from '@/ai/flows/test-whapi-connection-flow';
 import { saveIntegration } from '@/actions/save-integration';
+import { updateIntegrationStatus } from '@/actions/update-integration-status';
 
 /**
  * Utility to race promises and prevent infinite hangs in SaaS environments.
@@ -277,7 +278,7 @@ export default function IntegrationsPage() {
     const [isSaving, setIsSaving] = useState(false);
     const [isCreateDialogOpen, setCreateDialogOpen] = useState(false);
     
-    const { register, handleSubmit, reset } = useForm<NewIntegrationFormData>({ resolver: zodResolver(newIntegrationSchema) });
+    const { register, handleSubmit, reset, formState: { errors } } = useForm<NewIntegrationFormData>({ resolver: zodResolver(newIntegrationSchema) });
 
     const integrationsQuery = useMemoFirebase(() => !firestore ? null : collection(firestore, 'integrations'), [firestore]);
     const modulesQuery = useMemoFirebase(() => !firestore ? null : collection(firestore, 'modules'), [firestore]);
@@ -286,27 +287,24 @@ export default function IntegrationsPage() {
     const { data: modules, isLoading: isModulesLoading } = useCollection<Module>(modulesQuery);
 
     useEffect(() => {
-      if (!firestore) return;
-      const bootstrap = async (collectionName: string, defaults: Record<string, Omit<Integration | Module, 'id'>>) => {
-        for (const id in defaults) {
-          const docRef = doc(firestore, collectionName, id);
-          try {
+      if (isIntegrationsLoading || !firestore) return;
+      const bootstrapIntegrations = async () => {
+          const requiredIntegrations = {
+            'cloudinary': { name: "Cloudinary", fields: '{}', status: "inactive" },
+            'chatbot-integrado-con-whatsapp-para-soporte-y-ventas': { name: "Chatbot IA (Google/OpenAI/Groq)", fields: '{}', status: "inactive" },
+            'whapi-whatsapp': { name: "WHAPI (WhatsApp)", fields: '{}', status: "inactive" }
+          };
+          
+          for (const id in requiredIntegrations) {
+            const docRef = doc(firestore, 'integrations', id);
             const docSnap = await getDoc(docRef);
             if (!docSnap.exists()) {
-              await setDocumentNonBlocking(docRef, { id, ...defaults[id] });
+                await setDocumentNonBlocking(docRef, { id, ...requiredIntegrations[id as keyof typeof requiredIntegrations] }, { merge: true });
             }
-          } catch(e) { console.error(`Error bootstrapping ${collectionName}:`, e); }
-        }
+          }
       };
-
-      const requiredIntegrations = {
-        'cloudinary': { name: "Cloudinary", fields: '{}', status: "inactive" },
-        'chatbot-integrado-con-whatsapp-para-soporte-y-ventas': { name: "Chatbot IA (Google/OpenAI/Groq)", fields: '{}', status: "inactive" },
-        'whapi-whatsapp': { name: "WHAPI (WhatsApp)", fields: '{}', status: "inactive" }
-      };
-      bootstrap('integrations', requiredIntegrations);
-
-    }, [firestore]);
+      bootstrapIntegrations();
+    }, [isIntegrationsLoading, firestore]);
 
     const handleStatusChange = async (integration: Integration, checked: boolean) => {
         if (!firestore) return;
@@ -317,6 +315,7 @@ export default function IntegrationsPage() {
             await setDocumentNonBlocking(docRef, { status: newStatus }, { merge: true });
             toast({ title: "Estado Actualizado", description: `"${integration.name}" ahora está ${newStatus}.` });
         } catch (error) {
+            console.error("Error al cambiar estado:", error);
             toast({ variant: 'destructive', title: 'Error', description: 'No se pudo actualizar el estado.' });
         }
     };
@@ -330,7 +329,7 @@ export default function IntegrationsPage() {
             toast({ title: "Guardado", description: `"${editingIntegration.name}" actualizado.` });
             setEditingIntegration(null);
         } catch (error: any) {
-            const msg = error.message === 'TIMEOUT' ? 'El servidor no responde. Reintenta.' : 'Fallo al guardar.';
+            const msg = error.message === 'TIMEOUT' ? 'El servidor no responde (Timeout). Reintenta.' : 'No se pudo guardar la configuración.';
             toast({ variant: 'destructive', title: 'Error de Red', description: msg });
         } finally {
             setIsSaving(false);
@@ -348,7 +347,9 @@ export default function IntegrationsPage() {
           status: 'inactive',
           updatedAt: new Date().toISOString(),
         };
-        await addDocumentNonBlocking(collection(firestore, 'integrations'), newIntegrationData);
+        const docRef = doc(firestore, 'integrations', id);
+        await setDocumentNonBlocking(docRef, newIntegrationData);
+
         toast({ title: "Integración Creada", description: `Se ha creado la integración "${data.name}".` });
         setCreateDialogOpen(false);
         reset();
@@ -373,9 +374,12 @@ export default function IntegrationsPage() {
                         <DialogContent>
                             <DialogHeader><DialogTitle>Crear Nueva Integración</DialogTitle></DialogHeader>
                             <form onSubmit={handleSubmit(handleCreateIntegration)} className="space-y-4">
-                                <div><Label>Nombre</Label><Input {...register('name')} placeholder="Mi Nueva Integración" /></div>
+                                <div><Label>Nombre</Label><Input {...register('name')} placeholder="Mi Nueva Integración" />{errors.name && <p className="text-sm text-destructive mt-1">{errors.name.message}</p>}</div>
                                 <div><Label>Descripción</Label><Textarea {...register('description')} placeholder="¿Qué hace esta integración?" /></div>
-                                <DialogFooter><Button type="submit">Crear</Button></DialogFooter>
+                                <DialogFooter>
+                                    <Button type="button" variant="outline" onClick={() => setCreateDialogOpen(false)}>Cancelar</Button>
+                                    <Button type="submit">Crear</Button>
+                                </DialogFooter>
                             </form>
                         </DialogContent>
                     </Dialog>
@@ -384,7 +388,7 @@ export default function IntegrationsPage() {
             
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                 {integrations?.map(integration => {
-                     const isModuleActive = modules?.some(m => m.id === integration.id && m.status === 'active');
+                     const isModulePresent = modules?.some(m => m.id === integration.id);
                      const icon = integration.id === 'cloudinary' ? <Cloud className="h-8 w-8" /> : (integration.id === 'whapi-whatsapp' ? <WhatsAppIcon className="h-8 w-8" /> : <Bot className="h-8 w-8" />);
                      
                      let isConfigured = false;
@@ -399,7 +403,7 @@ export default function IntegrationsPage() {
                      } catch {}
 
                     return (
-                        <Card key={integration.id} className={!isModuleActive ? 'opacity-60 bg-muted/30' : ''}>
+                        <Card key={integration.id} className={!isModulePresent ? 'opacity-60 bg-muted/30' : ''}>
                             <CardHeader>
                                 <div className="flex justify-between items-start">
                                     <div className="flex items-center gap-4">
@@ -415,12 +419,12 @@ export default function IntegrationsPage() {
                                 <div className="flex items-center justify-between border p-4 rounded-md">
                                     <div className="space-y-1">
                                         <p className="text-sm font-medium">Estado del Servicio</p>
-                                        <p className="text-xs text-muted-foreground">{!isModuleActive ? "Activa el módulo primero" : (integration.status === 'active' ? "Operativo" : "Desactivado")}</p>
+                                        <p className="text-xs text-muted-foreground">{!isModulePresent ? "Requiere el módulo" : (integration.status === 'active' ? "Operativo" : "Desactivado")}</p>
                                     </div>
                                     <Switch 
                                         checked={integration.status === 'active'} 
                                         onCheckedChange={(c) => handleStatusChange(integration, c)} 
-                                        disabled={isSaving || !isModuleActive} 
+                                        disabled={isSaving || !isModulePresent} 
                                     />
                                 </div>
                                 <div className="flex items-center justify-between border p-4 rounded-md">
@@ -433,7 +437,7 @@ export default function IntegrationsPage() {
                                 </div>
                             </CardContent>
                             <CardFooter>
-                                <Button className="w-full" onClick={() => setEditingIntegration(integration)} disabled={isSaving || !isModuleActive}>
+                                <Button className="w-full" onClick={() => setEditingIntegration(integration)} disabled={isSaving || !isModulePresent}>
                                     <Plug className="mr-2 h-4 w-4" /> Editar Configuración
                                 </Button>
                             </CardFooter>
