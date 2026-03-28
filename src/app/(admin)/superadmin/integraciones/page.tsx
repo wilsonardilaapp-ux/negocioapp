@@ -42,6 +42,7 @@ import type { Integration, CloudinaryFields, AIProviderFields, WhapiFields } fro
 import type { Module } from '@/models/module';
 import { testApiKey } from '@/ai/flows/test-api-key-flow';
 import { testWhapiConnection } from '@/ai/flows/test-whapi-connection-flow';
+import { saveIntegration } from '@/actions/save-integration';
 
 const CloudinaryForm = ({ integration, onSave, onCancel, isSaving }: { integration: Integration, onSave: (data: CloudinaryFields) => void, onCancel: () => void, isSaving: boolean }) => {
     const { toast } = useToast();
@@ -356,16 +357,6 @@ const WhapiForm = ({ integration, onSave, onCancel, isSaving }: { integration: I
     );
 };
 
-const withTimeout = (promise: Promise<any>, timeoutMs: number) => {
-    return Promise.race([
-        promise,
-        new Promise((_, reject) =>
-            setTimeout(() => reject(new Error('TIMEOUT')), timeoutMs)
-        )
-    ]);
-};
-
-
 export default function IntegrationsPage() {
     const firestore = useFirestore();
     const { toast } = useToast();
@@ -439,47 +430,41 @@ export default function IntegrationsPage() {
     };
 
     const handleSave = async (formData: any) => {
-        if (!firestore || !editingIntegration) {
-            toast({ variant: 'destructive', title: 'Error', description: 'No se pudo guardar la configuración.' });
+        if (!editingIntegration) {
+            toast({ variant: 'destructive', title: 'Error', description: 'No hay integración seleccionada para guardar.' });
             return;
         }
-
+    
         setIsSaving(true);
-
+    
         try {
             const updatedData = { 
                 ...editingIntegration, 
                 fields: JSON.stringify(formData),
+                updatedAt: new Date().toISOString(),
             };
+            
+            const result = await saveIntegration(editingIntegration.id, updatedData);
 
-            await withTimeout(
-                setDocumentNonBlocking(
-                    doc(firestore, 'integrations', editingIntegration.id), 
-                    updatedData, 
-                    { merge: true }
-                ),
-                8000 // 8 segundos
-            );
-
+            if (!result.success) {
+                throw new Error(result.error);
+            }
+    
             toast({ 
                 title: "Configuración Guardada", 
                 description: `La integración "${editingIntegration.name}" ha sido actualizada.` 
             });
             
             setEditingIntegration(null); 
-
+    
         } catch (error: any) {
             console.error("Error al guardar la integración:", error);
             
             let errorMessage = 'No se pudo guardar la configuración.';
-            
-            if (error.message === 'TIMEOUT') {
-                errorMessage = 'La base de datos no responde. Comprueba tu conexión a internet.';
-            } else if (error.code === 'unavailable' || error.message.includes('offline')) {
-                errorMessage = 'Estás sin conexión. Los cambios se guardarán cuando recuperes el internet.';
-                setEditingIntegration(null); 
+            if (error.message.includes('offline') || error.message.includes('network')) {
+                errorMessage = 'Error de red. Comprueba tu conexión e inténtalo de nuevo.';
             }
-
+    
             toast({ 
                 variant: 'destructive', 
                 title: 'Error de Sincronización', 
@@ -490,7 +475,6 @@ export default function IntegrationsPage() {
             setIsSaving(false);
         }
     };
-
 
     const initialLoading = isIntegrationsLoading || isModulesLoading;
 
@@ -515,7 +499,9 @@ export default function IntegrationsPage() {
             ) : (
                 <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                     {integrations?.filter(i => ['cloudinary', 'chatbot-integrado-con-whatsapp-para-soporte-y-ventas', 'whapi-whatsapp'].includes(i.id)).map(integration => {
-                         const isModulePresent = modules?.some(m => m.id === integration.id);
+                         const module = modules?.find(m => m.id === integration.id);
+                         const isModuleActive = module?.status === 'active';
+                         
                          let icon;
                          let description;
 
@@ -549,7 +535,7 @@ export default function IntegrationsPage() {
                          } catch {}
 
                         return (
-                            <Card key={integration.id} className={!isModulePresent ? 'bg-muted/50' : ''}>
+                            <Card key={integration.id} className={!isModuleActive ? 'bg-muted/50' : ''}>
                                 <CardHeader>
                                     <div className="flex justify-between items-start">
                                         <div className="flex items-center gap-4">
@@ -559,7 +545,7 @@ export default function IntegrationsPage() {
                                                 <CardDescription>{description}</CardDescription>
                                             </div>
                                         </div>
-                                        {isModulePresent && (
+                                        {isModuleActive && (
                                         <Badge variant={integration.status === 'active' ? 'default' : 'secondary'}>
                                             {integration.status === 'active' ? 'Activo' : 'Inactivo'}
                                         </Badge>
@@ -567,7 +553,7 @@ export default function IntegrationsPage() {
                                     </div>
                                 </CardHeader>
                                 <CardContent className="space-y-4">
-                                    {isModulePresent ? (
+                                    {isModuleActive ? (
                                         <>
                                             <div className="flex items-center justify-between space-x-4 rounded-md border p-4">
                                                 <div className="flex-1 space-y-1">
@@ -599,7 +585,7 @@ export default function IntegrationsPage() {
                                     )}
                                 </CardContent>
                                 <CardFooter>
-                                    <Button className="w-full" disabled={!isModulePresent} onClick={() => setEditingIntegration(integration)}>
+                                    <Button className="w-full" disabled={!isModuleActive} onClick={() => setEditingIntegration(integration)}>
                                         <Plug className="mr-2 h-4 w-4" />
                                         Editar Configuración
                                     </Button>
@@ -628,5 +614,3 @@ export default function IntegrationsPage() {
         </div>
     );
 }
-
-    
