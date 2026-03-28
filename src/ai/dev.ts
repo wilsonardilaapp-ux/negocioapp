@@ -7,3 +7,4 @@ import './flows/chat-flow';
 import './flows/suggestion-flow';
 import './flows/update-suggestion-metrics-flow';
 import './flows/sync-suggestion-analytics';
+import './flows/simple-text-flow';
