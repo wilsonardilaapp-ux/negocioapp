@@ -1,9 +1,8 @@
-
 'use client';
 
 import { useState, useEffect, useRef, useTransition } from 'react';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, doc, getDoc, setDoc } from 'firebase/firestore';
+import { collection } from 'firebase/firestore';
 import {
   Card,
   CardHeader,
@@ -38,12 +37,19 @@ import { useToast } from '@/hooks/use-toast';
 import { PlusCircle, Plug, Cloud, CheckCircle, XCircle, Loader2, Eye, EyeOff, Bot } from 'lucide-react';
 import { WhatsAppIcon } from '@/components/icons';
 import type { Integration, CloudinaryFields, AIProviderFields, WhapiFields } from '@/models/integration';
+import type { Module } from '@/models/module';
 import { testApiKey } from '@/ai/flows/test-api-key-flow';
 import { testWhapiConnection } from '@/ai/flows/test-whapi-connection-flow';
 import { createIntegration, saveIntegrationFields, updateIntegrationStatus } from '@/actions/integrations';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 const REQUIRED_INTEGRATIONS: Array<{ id: string; name: string }> = [
   { id: 'cloudinary', name: 'Cloudinary' },
@@ -284,6 +290,12 @@ export default function IntegrationsPage() {
     [firestore],
   );
   const { data: integrations, isLoading: isIntegrationsLoading } = useCollection<Integration>(integrationsQuery);
+  
+  const modulesQuery = useMemoFirebase(
+    () => (!firestore ? null : collection(firestore, 'modules')),
+    [firestore]
+  );
+  const { data: modules, isLoading: areModulesLoading } = useCollection<Module>(modulesQuery);
 
   useEffect(() => {
     if (!firestore || isIntegrationsLoading || !Array.isArray(integrations) || didInit.current) return;
@@ -349,7 +361,9 @@ export default function IntegrationsPage() {
 
   const anyTransitionActive = isCreating || isSaving || isUpdatingStatus;
 
-  if (isIntegrationsLoading) {
+  const isLoading = isIntegrationsLoading || areModulesLoading;
+
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
         <Loader2 className="h-8 w-8 animate-spin" />
@@ -396,6 +410,11 @@ export default function IntegrationsPage() {
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {(integrations ?? []).map((integration) => {
+          const correspondingModule = modules?.find(m => m.id === integration.id);
+          const isModuleActive = !!correspondingModule && correspondingModule.status === 'active';
+          const isControlDisabled = anyTransitionActive || !isModuleActive;
+          const tooltipMessage = !isModuleActive ? 'Activa el módulo correspondiente en la página de "Módulos" para habilitar esta integración.' : '';
+
           const icon =
             integration.id === 'cloudinary'
               ? <Cloud className="h-8 w-8" />
@@ -445,11 +464,20 @@ export default function IntegrationsPage() {
                       {isActive ? 'Operativo' : 'Desactivado'}
                     </p>
                   </div>
-                  <Switch
-                    checked={isActive}
-                    onCheckedChange={(c) => handleStatusChange(integration, c)}
-                    disabled={anyTransitionActive}
-                  />
+                   <TooltipProvider>
+                      <Tooltip>
+                          <TooltipTrigger asChild>
+                              <div>
+                                  <Switch
+                                      checked={isActive}
+                                      onCheckedChange={(c) => handleStatusChange(integration, c)}
+                                      disabled={isControlDisabled}
+                                  />
+                              </div>
+                          </TooltipTrigger>
+                          {tooltipMessage && <TooltipContent><p>{tooltipMessage}</p></TooltipContent>}
+                      </Tooltip>
+                  </TooltipProvider>
                 </div>
                 <div className="flex items-center justify-between border p-4 rounded-md">
                   <div className="space-y-1">
@@ -463,9 +491,18 @@ export default function IntegrationsPage() {
                 </div>
               </CardContent>
               <CardFooter>
-                <Button className="w-full" onClick={() => setEditingIntegration(integration)} disabled={anyTransitionActive}>
-                  <Plug className="mr-2 h-4 w-4" /> Editar Configuración
-                </Button>
+                 <TooltipProvider>
+                      <Tooltip>
+                          <TooltipTrigger asChild>
+                              <div className="w-full">
+                                  <Button className="w-full" onClick={() => setEditingIntegration(integration)} disabled={isControlDisabled}>
+                                      <Plug className="mr-2 h-4 w-4" /> Editar Configuración
+                                  </Button>
+                              </div>
+                          </TooltipTrigger>
+                           {tooltipMessage && <TooltipContent><p>{tooltipMessage}</p></TooltipContent>}
+                      </Tooltip>
+                  </TooltipProvider>
               </CardFooter>
             </Card>
           );
