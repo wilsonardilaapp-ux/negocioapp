@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -42,7 +41,6 @@ import type { Module } from '@/models/module';
 import { testApiKey } from '@/ai/flows/test-api-key-flow';
 import { testWhapiConnection } from '@/ai/flows/test-whapi-connection-flow';
 import { saveIntegration } from '@/actions/save-integration';
-import { updateIntegrationStatus } from '@/actions/update-integration-status';
 
 /**
  * Utilidad de Carrera de Promesas para evitar bloqueos infinitos en SaaS
@@ -269,7 +267,6 @@ export default function IntegrationsPage() {
     const { data: integrations, isLoading: isIntegrationsLoading } = useCollection<Integration>(integrationsQuery);
     const { data: modules, isLoading: isModulesLoading } = useCollection<Module>(modulesQuery);
     
-    // **FIX:** Restored bootstrapping logic with robust checks.
     useEffect(() => {
         if (!isIntegrationsLoading && integrations && firestore) {
             const requiredIntegrations: { [key: string]: Omit<Integration, 'id' | 'updatedAt'> } = {
@@ -282,7 +279,7 @@ export default function IntegrationsPage() {
             for (const id in requiredIntegrations) {
                 if (!existingIds.includes(id)) {
                     const docData = { id, ...requiredIntegrations[id], updatedAt: new Date().toISOString() };
-                    setDocumentNonBlocking(doc(firestore, 'integrations', id), docData);
+                    setDocumentNonBlocking(doc(firestore, 'integrations', id), docData, { merge: true });
                 }
             }
         }
@@ -293,20 +290,19 @@ export default function IntegrationsPage() {
             const requiredModules: { [id: string]: Omit<Module, 'id' | 'createdAt'> } = {
                 'cloudinary': { name: 'Cloudinary', description: 'Almacenamiento y entrega de imágenes y videos.', status: 'inactive' },
                 'chatbot-integrado-con-whatsapp-para-soporte-y-ventas': { name: 'Chatbot IA (Google/OpenAI/Groq)', description: 'Motores de IA para el chatbot (Google, OpenAI, Groq).', status: 'inactive' },
-                'whapi-whatsapp': { name: 'WHAPI (WhatsApp)', description: 'Envío de mensajes de WhatsApp a través de WHAPI.', status: 'inactive' }
+                'whapi-whatsapp': { name: 'WHAPI (WhatsApp)', description: 'Envío de mensajes de WhatsApp a través de WHAPI.' }
             };
     
             const existingIds = modules.map(m => m.id);
             for (const id in requiredModules) {
                 if (!existingIds.includes(id)) {
                     const moduleData = { id, ...requiredModules[id], createdAt: new Date().toISOString() };
-                    setDocumentNonBlocking(doc(firestore, 'modules', id), moduleData);
+                    setDocumentNonBlocking(doc(firestore, 'modules', id), moduleData, { merge: true });
                 }
             }
         }
     }, [isModulesLoading, modules, firestore]);
 
-    // **FIX:** Use direct client-side update for Switch to prevent UI freeze.
     const handleStatusChange = (integration: Integration, checked: boolean) => {
         if (!firestore) return;
         const newStatus = checked ? 'active' : 'inactive';
@@ -318,7 +314,7 @@ export default function IntegrationsPage() {
             );
             toast({
                 title: "Estado Actualizado",
-                description: `"${integration.name}" ahora está ${newStatus}.`,
+                description: `La integración "${integration.name}" ahora está ${newStatus}.`,
             });
         } catch (error) {
             console.error("Error al cambiar estado:", error);
@@ -433,3 +429,4 @@ export default function IntegrationsPage() {
     );
 }
 
+    

@@ -109,18 +109,20 @@ export default function ModulesPage() {
   const onSubmit = (data: z.infer<typeof moduleSchema>) => {
     if (!firestore) return;
     
-    // Generate a consistent ID from the name if creating a new module
     const moduleId = editingModule?.id || slugify(data.name);
     
     const moduleRef = doc(firestore, 'modules', moduleId);
     
-    const moduleData: Omit<Module, 'id'> = {
+    const moduleData: Partial<Module> = {
         name: data.name,
         description: data.description,
-        status: editingModule?.status || 'active', // Preserve status if editing
-        createdAt: editingModule?.createdAt || new Date().toISOString(),
         limit: data.limit,
     };
+    
+    if (!editingModule) {
+        moduleData.status = 'active';
+        moduleData.createdAt = new Date().toISOString();
+    }
 
     setDocumentNonBlocking(moduleRef, moduleData, { merge: true });
     
@@ -260,3 +262,5 @@ export default function ModulesPage() {
     </div>
   );
 }
+
+    
