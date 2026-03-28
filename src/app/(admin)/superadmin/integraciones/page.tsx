@@ -305,7 +305,7 @@ export default function IntegrationsPage() {
             const exists = integrations.some(i => i.id === reqInt.id);
             if (!exists) {
                 console.log(`Integration "${reqInt.name}" missing, creating...`);
-                // Call server action to create. No need to await, useCollection will update UI.
+                // Fire and forget server action call. `useCollection` will update the UI.
                 createIntegration({ name: reqInt.name, description: '' });
             }
         });
@@ -346,7 +346,6 @@ export default function IntegrationsPage() {
         if (result.success) {
             toast({ title: 'Integración Creada', description: `Se ha creado "${data.name}".` });
             handleCreateDialogChange(false);
-            reset();
         } else {
             toast({ variant: 'destructive', title: 'Error', description: result.error || 'No se pudo crear la integración.' });
         }
@@ -365,7 +364,7 @@ export default function IntegrationsPage() {
 
   const isLoading = isIntegrationsLoading || areModulesLoading;
 
-  if (isLoading) {
+  if (isLoading && !integrations) {
     return (
       <div className="flex items-center justify-center h-64">
         <Loader2 className="h-8 w-8 animate-spin" />

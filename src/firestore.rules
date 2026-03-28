@@ -177,8 +177,9 @@ service cloud.firestore {
       allow read: if request.auth != null;
       allow write: if isSuperAdmin();
     }
-    match /integrations/{integrationId} { 
-      allow read, write: if isSuperAdmin();
+    match /integrations/{integrationId} {
+      allow read: if request.auth != null;
+      allow write: if isSuperAdmin();
     }
     
     // Default deny all other paths. This is a security best practice.
