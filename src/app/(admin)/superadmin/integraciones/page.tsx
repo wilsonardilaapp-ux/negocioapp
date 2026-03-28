@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useRef, useTransition } from 'react';
@@ -276,7 +277,7 @@ export default function IntegrationsPage() {
   const firestore = useFirestore();
   const { toast } = useToast();
   const [editingIntegration, setEditingIntegration] = useState<Integration | null>(null);
-  const [isSaving, startTransition] = useTransition();
+  const [isSaving, startSavingTransition] = useTransition();
   const [isCreateDialogOpen, setCreateDialogOpen] = useState(false);
   const [isCreating, startCreateTransition] = useTransition();
   const didInit = useRef(false);
@@ -333,7 +334,7 @@ export default function IntegrationsPage() {
 
   const handleSave = (formData: any) => {
     if (!editingIntegration) return;
-    startTransition(async () => {
+    startSavingTransition(async () => {
       const result = await saveIntegration(editingIntegration.id, { fields: JSON.stringify(formData) });
       if (result.success) {
         toast({ title: 'Éxito', description: 'Configuración guardada correctamente.' });
@@ -343,6 +344,11 @@ export default function IntegrationsPage() {
       }
     });
   };
+
+  const handleCreateDialogOpenChange = (open: boolean) => {
+    if (isCreating) return;
+    setCreateDialogOpen(open);
+  }
 
   const handleCreateIntegration = (data: NewIntegrationFormData) => {
     if (!firestore) return;
@@ -359,7 +365,7 @@ export default function IntegrationsPage() {
             }, { merge: true });
             
             toast({ title: 'Integración Creada', description: `Se ha creado "${data.name}".` });
-            setCreateDialogOpen(false);
+            handleCreateDialogOpenChange(false);
             reset();
         } catch (error) {
             toast({ variant: 'destructive', title: 'Error', description: 'No se pudo crear la integración.' });
@@ -383,7 +389,7 @@ export default function IntegrationsPage() {
             <CardTitle>Gestión de Integraciones</CardTitle>
             <CardDescription>Conecta servicios de terceros para ampliar las funcionalidades.</CardDescription>
           </div>
-          <Dialog open={isCreateDialogOpen} onOpenChange={setCreateDialogOpen}>
+          <Dialog open={isCreateDialogOpen} onOpenChange={handleCreateDialogOpenChange}>
             <DialogTrigger asChild>
               <Button><PlusCircle className="mr-2 h-4 w-4" />Crear Integración</Button>
             </DialogTrigger>
@@ -400,7 +406,7 @@ export default function IntegrationsPage() {
                   <Input {...register('description')} placeholder="¿Para qué sirve?" />
                 </div>
                 <DialogFooter>
-                  <Button type="button" variant="outline" onClick={() => setCreateDialogOpen(false)} disabled={isCreating}>Cancelar</Button>
+                  <Button type="button" variant="outline" onClick={() => handleCreateDialogOpenChange(false)} disabled={isCreating}>Cancelar</Button>
                   <Button type="submit" disabled={isCreating}>
                     {isCreating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     Crear
