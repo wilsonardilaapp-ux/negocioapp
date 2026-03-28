@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useRef, useTransition } from 'react';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, doc, updateDoc, setDoc, getDoc } from 'firebase/firestore';
+import { collection, doc, getDoc, setDoc } from 'firebase/firestore';
 import {
   Card,
   CardHeader,
@@ -40,19 +40,17 @@ import { WhatsAppIcon } from '@/components/icons';
 import type { Integration, CloudinaryFields, AIProviderFields, WhapiFields } from '@/models/integration';
 import { testApiKey } from '@/ai/flows/test-api-key-flow';
 import { testWhapiConnection } from '@/ai/flows/test-whapi-connection-flow';
-import { saveIntegration } from '@/actions/save-integration';
+import { createIntegration, saveIntegrationFields, updateIntegrationStatus } from '@/actions/integrations';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 
-// IDs requeridos del sistema — NUNCA sobreescribir si ya existen
 const REQUIRED_INTEGRATIONS: Array<{ id: string; name: string }> = [
-  { id: 'cloudinary',                                           name: 'Cloudinary' },
+  { id: 'cloudinary', name: 'Cloudinary' },
   { id: 'chatbot-integrado-con-whatsapp-para-soporte-y-ventas', name: 'Chatbot IA (Google/OpenAI/Groq)' },
-  { id: 'whapi-whatsapp',                                       name: 'WHAPI (WhatsApp)' },
+  { id: 'whapi-whatsapp', name: 'WHAPI (WhatsApp)' },
 ];
 
-// ─── Formulario Cloudinary ───────────────────────────────────────────────────
 const CloudinaryForm = ({
   integration, onSave, onCancel, isSaving,
 }: {
@@ -119,7 +117,6 @@ const CloudinaryForm = ({
   );
 };
 
-// ─── Formulario AI Provider ──────────────────────────────────────────────────
 type Provider = 'google' | 'openai' | 'groq';
 type TestStatus = 'idle' | 'testing' | 'success' | 'error';
 type ModalState = { isOpen: boolean; title: string; message: string };
@@ -204,7 +201,6 @@ const AIProviderForm = ({
   );
 };
 
-// ─── Formulario Whapi ────────────────────────────────────────────────────────
 const WhapiForm = ({
   integration, onSave, onCancel, isSaving,
 }: {
@@ -262,25 +258,22 @@ const WhapiForm = ({
   );
 };
 
-// ─── Schema y helpers ────────────────────────────────────────────────────────
-const slugify = (text: string) =>
-  text.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]+/g, '');
-
 const newIntegrationSchema = z.object({
   name: z.string().min(3, 'El nombre debe tener al menos 3 caracteres.'),
   description: z.string().optional(),
 });
 type NewIntegrationFormData = z.infer<typeof newIntegrationSchema>;
 
-// ─── Página principal ────────────────────────────────────────────────────────
 export default function IntegrationsPage() {
   const firestore = useFirestore();
   const { toast } = useToast();
   const [editingIntegration, setEditingIntegration] = useState<Integration | null>(null);
-  const [isSaving, startSavingTransition] = useTransition();
   const [isCreateDialogOpen, setCreateDialogOpen] = useState(false);
-  const [isCreating, startCreateTransition] = useTransition();
   const didInit = useRef(false);
+
+  const [isCreating, startCreateTransition] = useTransition();
+  const [isSaving, startSavingTransition] = useTransition();
+  const [isUpdatingStatus, startStatusTransition] = useTransition();
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<NewIntegrationFormData>({
     resolver: zodResolver(newIntegrationSchema),
@@ -300,42 +293,33 @@ export default function IntegrationsPage() {
             const existingIds = new Set(integrations.map(i => i.id));
             for (const req of REQUIRED_INTEGRATIONS) {
                 if (!existingIds.has(req.id)) {
-                    const docRef = doc(firestore, 'integrations', req.id);
-                    const snap = await getDoc(docRef);
-                    if (!snap.exists()) {
-                        await setDoc(docRef, { 
-                            id: req.id, 
-                            name: req.name, 
-                            status: 'inactive',
-                            fields: '{}',
-                            updatedAt: new Date().toISOString() 
-                        }, { merge: true });
-                    }
+                    await createIntegration({ name: req.name, description: '' });
                 }
             }
             didInit.current = true;
         } catch (e) {
-            console.warn("Firestore offline o cargando: reintentando inicialización...");
+            console.warn("Error en la inicialización de integraciones requeridas:", e);
         }
     };
     runSafeInit();
   }, [firestore, isIntegrationsLoading, integrations]);
 
-  const handleStatusChange = async (integration: Integration, checked: boolean) => {
-    if (!firestore) return;
-    const newStatus = checked ? 'active' : 'inactive';
-    try {
-      await updateDoc(doc(firestore, 'integrations', integration.id), { status: newStatus });
-      toast({ title: 'Estado Actualizado', description: `"${integration.name}" ahora está ${newStatus}.` });
-    } catch {
-      toast({ variant: 'destructive', title: 'Error', description: 'Error al actualizar.' });
-    }
+  const handleStatusChange = (integration: Integration, checked: boolean) => {
+    startStatusTransition(async () => {
+        const newStatus = checked ? 'active' : 'inactive';
+        const result = await updateIntegrationStatus(integration.id, newStatus);
+        if (result.success) {
+            toast({ title: 'Estado Actualizado', description: `"${integration.name}" ahora está ${newStatus}.` });
+        } else {
+            toast({ variant: 'destructive', title: 'Error', description: result.error || 'Error al actualizar.' });
+        }
+    });
   };
 
-  const handleSave = (formData: any) => {
+  const handleSaveFields = (formData: any) => {
     if (!editingIntegration) return;
     startSavingTransition(async () => {
-      const result = await saveIntegration(editingIntegration.id, { fields: JSON.stringify(formData) });
+      const result = await saveIntegrationFields(editingIntegration.id, JSON.stringify(formData));
       if (result.success) {
         toast({ title: 'Éxito', description: 'Configuración guardada correctamente.' });
         setEditingIntegration(null);
@@ -345,33 +329,25 @@ export default function IntegrationsPage() {
     });
   };
 
-  const handleCreateDialogOpenChange = (open: boolean) => {
-    if (isCreating) return;
-    setCreateDialogOpen(open);
-  }
-
   const handleCreateIntegration = (data: NewIntegrationFormData) => {
-    if (!firestore) return;
     startCreateTransition(async () => {
-        const id = slugify(data.name);
-        try {
-            await setDoc(doc(firestore, 'integrations', id), { 
-                id, 
-                name: data.name, 
-                description: data.description || '', 
-                fields: '{}', 
-                status: 'inactive', 
-                updatedAt: new Date().toISOString() 
-            }, { merge: true });
-            
+        const result = await createIntegration(data);
+        if (result.success) {
             toast({ title: 'Integración Creada', description: `Se ha creado "${data.name}".` });
-            handleCreateDialogOpenChange(false);
+            setCreateDialogOpen(false);
             reset();
-        } catch (error) {
-            toast({ variant: 'destructive', title: 'Error', description: 'No se pudo crear la integración.' });
+        } else {
+            toast({ variant: 'destructive', title: 'Error', description: result.error || 'No se pudo crear la integración.' });
         }
     });
   };
+  
+  const handleCreateDialogOpenChange = (open: boolean) => {
+      if (isCreating) return;
+      setCreateDialogOpen(open);
+  }
+
+  const anyTransitionActive = isCreating || isSaving || isUpdatingStatus;
 
   if (isIntegrationsLoading) {
     return (
@@ -472,7 +448,7 @@ export default function IntegrationsPage() {
                   <Switch
                     checked={isActive}
                     onCheckedChange={(c) => handleStatusChange(integration, c)}
-                    disabled={isSaving}
+                    disabled={anyTransitionActive}
                   />
                 </div>
                 <div className="flex items-center justify-between border p-4 rounded-md">
@@ -487,7 +463,7 @@ export default function IntegrationsPage() {
                 </div>
               </CardContent>
               <CardFooter>
-                <Button className="w-full" onClick={() => setEditingIntegration(integration)} disabled={isSaving}>
+                <Button className="w-full" onClick={() => setEditingIntegration(integration)} disabled={anyTransitionActive}>
                   <Plug className="mr-2 h-4 w-4" /> Editar Configuración
                 </Button>
               </CardFooter>
@@ -510,15 +486,14 @@ export default function IntegrationsPage() {
           <DialogContent className="max-w-2xl">
             <DialogHeader><DialogTitle>Configurar {editingIntegration.name}</DialogTitle></DialogHeader>
             {editingIntegration.id === 'cloudinary' && (
-              <CloudinaryForm integration={editingIntegration} onSave={handleSave} onCancel={() => setEditingIntegration(null)} isSaving={isSaving} />
+              <CloudinaryForm integration={editingIntegration} onSave={handleSaveFields} onCancel={() => setEditingIntegration(null)} isSaving={isSaving} />
             )}
             {editingIntegration.id === 'chatbot-integrado-con-whatsapp-para-soporte-y-ventas' && (
-              <AIProviderForm integration={editingIntegration} onSave={handleSave} onCancel={() => setEditingIntegration(null)} isSaving={isSaving} />
+              <AIProviderForm integration={editingIntegration} onSave={handleSaveFields} onCancel={() => setEditingIntegration(null)} isSaving={isSaving} />
             )}
             {editingIntegration.id === 'whapi-whatsapp' && (
-              <WhapiForm integration={editingIntegration} onSave={handleSave} onCancel={() => setEditingIntegration(null)} isSaving={isSaving} />
+              <WhapiForm integration={editingIntegration} onSave={handleSaveFields} onCancel={() => setEditingIntegration(null)} isSaving={isSaving} />
             )}
-            {/* Fallback for custom integrations without a specific form */}
             {!['cloudinary', 'chatbot-integrado-con-whatsapp-para-soporte-y-ventas', 'whapi-whatsapp'].includes(editingIntegration.id) && (
               <div className="p-4 text-center text-muted-foreground text-sm">
                 Esta es una integración personalizada. La configuración avanzada se realiza a través de la API.
