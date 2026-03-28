@@ -1,8 +1,8 @@
 
 "use client";
 
-import { useCollection, useFirestore, updateDocumentNonBlocking, setDocumentNonBlocking, deleteDocumentNonBlocking, useMemoFirebase } from '@/firebase';
-import { collection, doc, writeBatch, updateDoc } from 'firebase/firestore';
+import { useCollection, useFirestore, useMemoFirebase, setDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase';
+import { collection, doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import {
   Card,
   CardHeader,
@@ -51,6 +51,16 @@ const slugify = (text: string) =>
     .replace(/\s+/g, '-')
     .replace(/[^a-z0-9-]/g, '');
 
+const REQUIRED_MODULES: { [id: string]: Omit<Module, 'id' | 'createdAt'> } = {
+    'cloudinary': { name: 'Cloudinary', description: 'Almacenamiento y entrega de imágenes y videos.', status: 'inactive' },
+    'chatbot-integrado-con-whatsapp-para-soporte-y-ventas': { name: 'Chatbot IA (Google/OpenAI/Groq)', description: 'Motores de IA para el chatbot (Google, OpenAI, Groq).', status: 'inactive' },
+    'whapi-whatsapp': { name: 'WHAPI (WhatsApp)', description: 'Envío de mensajes de WhatsApp a través de WHAPI.', status: 'inactive' },
+    'catalogo': { name: 'Catálogo', description: 'Módulo para gestionar el catálogo de productos.', status: 'inactive' },
+    'blog': { name: 'Blog', description: 'Módulo para gestionar el blog', status: 'inactive' },
+    'motor-de-sugerencias-inteligentes': { name: 'Motor de Sugerencias Inteligentes', description: 'Motor para sugerir productos', status: 'inactive' },
+    'google-analytics': { name: 'Google Analytics', description: 'Integración con Google Analytics', status: 'inactive' },
+};
+
 export default function ModulesPage() {
   const firestore = useFirestore();
   const { toast } = useToast();
@@ -66,36 +76,25 @@ export default function ModulesPage() {
   const { data: modules, isLoading } = useCollection<Module>(modulesQuery);
 
   useEffect(() => {
-    if (isLoading || !firestore || didInit.current || modules === undefined) return;
-    
+    if (!firestore || didInit.current) return;
     didInit.current = true;
 
-    const requiredModules: { [id: string]: Omit<Module, 'id' | 'createdAt'> } = {
-        'cloudinary': { name: 'Cloudinary', description: 'Almacenamiento y entrega de imágenes y videos.', status: 'inactive' },
-        'chatbot-integrado-con-whatsapp-para-soporte-y-ventas': { name: 'Chatbot IA (Google/OpenAI/Groq)', description: 'Motores de IA para el chatbot (Google, OpenAI, Groq).', status: 'inactive' },
-        'whapi-whatsapp': { name: 'WHAPI (WhatsApp)', description: 'Envío de mensajes de WhatsApp a través de WHAPI.', status: 'inactive' },
-        'catalogo': { name: 'Catálogo', description: 'Módulo para gestionar el catálogo de productos.', status: 'inactive' },
-        'blog': { name: 'Blog', description: 'Módulo para gestionar el blog', status: 'inactive' },
-        'motor-de-sugerencias-inteligentes': { name: 'Motor de Sugerencias Inteligentes', description: 'Motor para sugerir productos', status: 'inactive' },
-        'google-analytics': { name: 'Google Analytics', description: 'Integración con Google Analytics', status: 'inactive' },
+    const initializeRequiredModules = async () => {
+        for (const id in REQUIRED_MODULES) {
+            const docRef = doc(firestore, 'modules', id);
+            try {
+                const snap = await getDoc(docRef);
+                if (!snap.exists()) {
+                    await setDoc(docRef, { ...REQUIRED_MODULES[id], id, createdAt: new Date().toISOString() });
+                }
+            } catch (e) {
+                console.error(`Error inicializando módulo ${id}:`, e);
+            }
+        }
     };
     
-    const batch = writeBatch(firestore);
-    let writesMade = false;
-    const existingIds = modules.map(m => m.id);
-
-    for (const id in requiredModules) {
-        if (!existingIds.includes(id)) {
-            const docRef = doc(firestore, 'modules', id);
-            batch.set(docRef, { ...requiredModules[id], id, createdAt: new Date().toISOString() }, { merge: true });
-            writesMade = true;
-        }
-    }
-
-    if(writesMade) {
-        batch.commit().catch(err => console.error("Error creating default modules:", err));
-    }
-  }, [isLoading, modules, firestore]);
+    initializeRequiredModules();
+  }, [firestore]);
 
   const { register, handleSubmit, reset, setValue, formState: { errors, isSubmitting } } = useForm<z.infer<typeof moduleSchema>>({
     resolver: zodResolver(moduleSchema),
