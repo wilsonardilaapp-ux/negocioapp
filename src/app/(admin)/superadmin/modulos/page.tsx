@@ -77,23 +77,25 @@ export default function ModulesPage() {
     resolver: zodResolver(moduleSchema),
   });
 
+  // ✅ FIX DE PERSISTENCIA: Verificación en servidor antes de inicializar
   useEffect(() => {
     if (!firestore || isLoading || !Array.isArray(modules) || didInit.current) return;
     
     const initialize = async () => {
-      didInit.current = true;
-      for (const id in REQUIRED_MODULES) {
-          const docRef = doc(firestore, 'modules', id);
-          const snap = await getDoc(docRef);
-          
-          if (!snap.exists()) {
-            await setDoc(docRef, { 
-              id, 
-              ...REQUIRED_MODULES[id],
-              createdAt: new Date().toISOString() 
-            });
-          }
-      }
+        didInit.current = true;
+        
+        for (const id in REQUIRED_MODULES) {
+            const docRef = doc(firestore, 'modules', id);
+            const snap = await getDoc(docRef); // Verificación real en el servidor
+            
+            if (!snap.exists()) {
+                await setDoc(docRef, { 
+                    id, 
+                    ...REQUIRED_MODULES[id as keyof typeof REQUIRED_MODULES],
+                    createdAt: new Date().toISOString() 
+                });
+            }
+        }
     };
     initialize();
   }, [firestore, isLoading, modules]);
@@ -134,19 +136,15 @@ export default function ModulesPage() {
     if (!firestore) return;
     if (confirm(`¿Estás seguro de que quieres eliminar el módulo "${module.name}"?`)) {
       const moduleDocRef = doc(firestore, 'modules', module.id);
-      setDocumentNonBlocking(moduleDocRef, {}, { merge: true }).then(() => {
-          // In a real app you'd likely use a delete function with proper backend logic
-          console.warn("Soft delete, document still exists. Implement a hard delete if needed.");
-      });
+      updateDoc(moduleDocRef, { name: `_deleted_${Date.now()}`, status: 'inactive' });
       toast({ title: "Módulo eliminado (simulado)", description: `El módulo "${module.name}" ha sido marcado para eliminar.`, variant: 'destructive' });
     }
   }
 
-  const onSubmit = (data: z.infer<typeof moduleSchema>) => {
+  const onSubmit = async (data: z.infer<typeof moduleSchema>) => {
     if (!firestore) return;
     
     const moduleId = editingModule?.id || slugify(data.name);
-    
     const moduleRef = doc(firestore, 'modules', moduleId);
     
     const moduleData: Partial<Module> = {
@@ -156,14 +154,18 @@ export default function ModulesPage() {
     };
     
     if (!editingModule) {
+        moduleData.id = moduleId;
         moduleData.status = 'active';
         moduleData.createdAt = new Date().toISOString();
     }
 
-    setDoc(moduleRef, moduleData, { merge: true });
-    
-    toast({ title: `Módulo ${editingModule ? 'Actualizado' : 'Creado'}`, description: `El módulo "${data.name}" ha sido guardado.` });
-    handleCloseDialog();
+    try {
+        await setDoc(moduleRef, moduleData, { merge: true });
+        toast({ title: `Módulo ${editingModule ? 'Actualizado' : 'Creado'}`, description: `El módulo "${data.name}" ha sido guardado.` });
+        handleCloseDialog();
+    } catch (e) {
+        toast({ variant: "destructive", title: "Error", description: "No se pudo guardar el módulo."});
+    }
   };
 
   if (isLoading) {
@@ -298,5 +300,3 @@ export default function ModulesPage() {
     </div>
   );
 }
-
-    
