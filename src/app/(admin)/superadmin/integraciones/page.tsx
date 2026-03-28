@@ -314,9 +314,9 @@ export default function IntegrationsPage() {
     [firestore],
   );
   const { data: integrations, isLoading: isIntegrationsLoading } = useCollection<Integration>(integrationsQuery);
-
+  
   useEffect(() => {
-    if (!firestore || didInit.current) return;
+    if (!firestore || isIntegrationsLoading || didInit.current) return;
     didInit.current = true;
 
     const initializeRequiredIntegrations = async () => {
@@ -339,7 +339,7 @@ export default function IntegrationsPage() {
     };
 
     initializeRequiredIntegrations();
-  }, [firestore]);
+  }, [firestore, isIntegrationsLoading]);
 
   const handleStatusChange = async (integration: Integration, checked: boolean) => {
     if (!firestore) return;

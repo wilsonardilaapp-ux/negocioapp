@@ -1,7 +1,7 @@
 
-"use client";
+'use client';
 
-import { useCollection, useFirestore, useMemoFirebase, setDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase';
+import { useCollection, useFirestore, useMemoFirebase, deleteDocumentNonBlocking } from '@/firebase';
 import { collection, doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import {
   Card,
@@ -76,7 +76,7 @@ export default function ModulesPage() {
   const { data: modules, isLoading } = useCollection<Module>(modulesQuery);
 
   useEffect(() => {
-    if (!firestore || didInit.current) return;
+    if (!firestore || isLoading || didInit.current) return;
     didInit.current = true;
 
     const initializeRequiredModules = async () => {
@@ -94,7 +94,7 @@ export default function ModulesPage() {
     };
     
     initializeRequiredModules();
-  }, [firestore]);
+  }, [firestore, isLoading]);
 
   const { register, handleSubmit, reset, setValue, formState: { errors, isSubmitting } } = useForm<z.infer<typeof moduleSchema>>({
     resolver: zodResolver(moduleSchema),
@@ -159,7 +159,7 @@ export default function ModulesPage() {
         moduleData.createdAt = new Date().toISOString();
     }
 
-    setDocumentNonBlocking(moduleRef, moduleData, { merge: true });
+    setDoc(moduleRef, moduleData, { merge: true });
     
     toast({ title: `Módulo ${editingModule ? 'Actualizado' : 'Creado'}`, description: `El módulo "${data.name}" ha sido guardado.` });
     handleCloseDialog();
