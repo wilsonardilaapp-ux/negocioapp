@@ -1,21 +1,29 @@
-
 'use client';
 
 import { firebaseConfig } from '@/firebase/config';
 import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore'
+import { getFirestore, enableNetwork } from 'firebase/firestore'; // Import enableNetwork
 
-// IMPORTANT: DO NOT MODIFY THIS FUNCTION
+let networkEnabled = false; // Flag to prevent multiple calls
+
 export function initializeFirebase() {
-  if (!getApps().length) {
-    // Always initialize with the explicit config to avoid environment-related issues.
-    const firebaseApp = initializeApp(firebaseConfig);
-    return getSdks(firebaseApp);
+  const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
+  const sdks = getSdks(app);
+
+  // The Firestore client can sometimes default to offline in certain environments.
+  // This explicitly enables network access to prevent "client is offline" errors.
+  // The flag ensures this is only attempted once.
+  if (!networkEnabled) {
+    try {
+      enableNetwork(sdks.firestore);
+      networkEnabled = true;
+    } catch (error) {
+      console.warn('Could not enable Firestore network:', error);
+    }
   }
 
-  // If already initialized, return the SDKs with the already initialized App
-  return getSdks(getApp());
+  return sdks;
 }
 
 export function getSdks(firebaseApp: FirebaseApp) {
