@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useEffect, useRef } from 'react';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { collection, doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import {
@@ -27,10 +28,9 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
-  DialogTrigger,
   DialogFooter,
+  DialogTrigger,
 } from "@/components/ui/dialog";
-import { useState, useEffect, useRef } from 'react';
 
 const moduleSchema = z.object({
   name: z.string().min(3, { message: "El nombre debe tener al menos 3 caracteres." }),
@@ -81,29 +81,26 @@ export default function ModulesPage() {
   useEffect(() => {
     if (!firestore || isLoading || !Array.isArray(modules) || didInit.current) return;
     
-    const runSafeInit = async () => {
-        didInit.current = true;
-        const existingIds = new Set(modules.map(m => m.id));
-
+    const initialize = async () => {
+        didInit.current = true; // Mark that we are running the check
         for (const id in REQUIRED_MODULES) {
-            if (!existingIds.has(id)) {
-                const docRef = doc(firestore, 'modules', id);
-                try {
-                    const snap = await getDoc(docRef);
-                    if (!snap.exists()) {
-                        await setDoc(docRef, { 
-                            id, 
-                            ...REQUIRED_MODULES[id as keyof typeof REQUIRED_MODULES],
-                            createdAt: new Date().toISOString() 
-                        }, { merge: true });
-                    }
-                } catch (e) {
-                     console.warn(`Firestore offline o cargando, reintentando módulos...`);
+            const docRef = doc(firestore, 'modules', id);
+            try {
+                const snap = await getDoc(docRef);
+                if (!snap.exists()) {
+                    await setDoc(docRef, { 
+                        id, 
+                        ...REQUIRED_MODULES[id as keyof typeof REQUIRED_MODULES],
+                        createdAt: new Date().toISOString() 
+                    }, { merge: true });
                 }
+            } catch (e) {
+                 console.warn(`Firestore offline o cargando, reintentando módulos...`);
+                 didInit.current = false; // Allow re-try if it fails
             }
         }
     };
-    runSafeInit();
+    initialize();
   }, [firestore, isLoading, modules]);
 
   useEffect(() => {

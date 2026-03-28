@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, doc, updateDoc, setDoc, getDoc } from 'firebase/firestore';
+import { collection, doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import {
   Card,
   CardHeader,
@@ -34,7 +34,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Plug, Cloud, CheckCircle, XCircle, Loader2, Eye, EyeOff, Bot } from 'lucide-react';
+import { PlusCircle, Plug, Cloud, CheckCircle, XCircle, Loader2, Eye, EyeOff, Bot, Trash2 } from 'lucide-react';
 import { WhatsAppIcon } from '@/components/icons';
 import type { Integration, CloudinaryFields, AIProviderFields, WhapiFields } from '@/models/integration';
 import { testApiKey } from '@/ai/flows/test-api-key-flow';
@@ -60,28 +60,36 @@ const REQUIRED_INTEGRATIONS = [
   { id: 'whapi-whatsapp', name: 'WHAPI (WhatsApp)' },
 ];
 
-// --- Formularios de Configuración ---
-
 const CloudinaryForm = ({ integration, onSave, onCancel, isSaving }: { integration: Integration; onSave: (data: CloudinaryFields) => void; onCancel: () => void; isSaving: boolean; }) => {
+  const { toast } = useToast();
   const [fields, setFields] = useState<CloudinaryFields>(() => {
     let parsed: Partial<CloudinaryFields> = {};
     try {
-      if (typeof integration.fields === 'string' && integration.fields.trim()) {
-        parsed = JSON.parse(integration.fields);
-      } else if (typeof integration.fields === 'object' && integration.fields !== null) {
-        parsed = integration.fields as Partial<CloudinaryFields>;
-      }
-    } catch (e) { console.error('Cloudinary parse error', e); }
-    return { cloud_name: parsed.cloud_name || '', api_key: parsed.api_key || '', api_secret: parsed.api_secret || '' };
+      const f = integration.fields;
+      parsed = typeof f === 'string' ? JSON.parse(f || '{}') : (f || {});
+    } catch { parsed = {}; }
+    return { 
+      cloud_name: parsed.cloud_name || '', 
+      api_key: parsed.api_key || '', 
+      api_secret: parsed.api_secret || '' 
+    };
   });
   const [showApiSecret, setShowApiSecret] = useState(false);
 
+  const handleSaveClick = () => {
+    if (!fields.cloud_name || !fields.api_key || !fields.api_secret) {
+      toast({ variant: 'destructive', title: 'Campos Incompletos', description: 'Completa Cloud Name, API Key y API Secret.' });
+      return;
+    }
+    onSave(fields);
+  };
+  
   return (
     <div className="space-y-4">
-      <div><Label>Cloud Name</Label><Input value={fields.cloud_name} onChange={(e) => setFields(prev => ({ ...prev, cloud_name: e.target.value }))} disabled={isSaving} /></div>
-      <div><Label>API Key</Label><Input value={fields.api_key} onChange={(e) => setFields(prev => ({ ...prev, api_key: e.target.value }))} disabled={isSaving} /></div>
+      <div><Label htmlFor="cloud_name">Cloud Name</Label><Input id="cloud_name" value={fields.cloud_name} onChange={(e) => setFields(prev => ({ ...prev, cloud_name: e.target.value }))} disabled={isSaving} /></div>
+      <div><Label htmlFor="api_key">API Key</Label><Input id="api_key" value={fields.api_key} onChange={(e) => setFields(prev => ({ ...prev, api_key: e.target.value }))} disabled={isSaving} /></div>
       <div className="relative">
-        <Label>API Secret</Label>
+        <Label htmlFor="api_secret">API Secret</Label>
         <Input type={showApiSecret ? 'text' : 'password'} value={fields.api_secret} onChange={(e) => setFields(prev => ({ ...prev, api_secret: e.target.value }))} className="pr-10" disabled={isSaving} />
         <Button type="button" variant="ghost" size="icon" className="absolute right-1 top-7 h-7 w-7" onClick={() => setShowApiSecret(!showApiSecret)} disabled={isSaving}>
           {showApiSecret ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -89,7 +97,7 @@ const CloudinaryForm = ({ integration, onSave, onCancel, isSaving }: { integrati
       </div>
       <DialogFooter>
         <Button variant="outline" onClick={onCancel} disabled={isSaving}>Cancelar</Button>
-        <Button onClick={() => onSave(fields)} disabled={isSaving}>{isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Guardar Cambios</Button>
+        <Button onClick={handleSaveClick} disabled={isSaving}>{isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Guardar Cambios</Button>
       </DialogFooter>
     </div>
   );
@@ -99,12 +107,12 @@ type Provider = 'google' | 'openai' | 'groq';
 type TestStatus = 'idle' | 'testing' | 'success' | 'error';
 type ModalState = { isOpen: boolean; title: string; message: string };
 
-const AIProviderForm = ({ integration, onSave, onCancel, isSaving }: any) => {
+const AIProviderForm = ({ integration, onSave, onCancel, isSaving }: { integration: Integration; onSave: (data: AIProviderFields) => void; onCancel: () => void; isSaving: boolean; }) => {
   const [fields, setFields] = useState<AIProviderFields>(() => {
     let parsed: any = {};
     try {
       parsed = typeof integration.fields === 'string' && integration.fields.trim() ? JSON.parse(integration.fields) : (integration.fields || {});
-    } catch { parsed = {}; }
+    } catch (e) { console.error("AI parse error", e); }
     return {
       google: { apiKey: parsed?.google?.apiKey || '' },
       openai: { apiKey: parsed?.openai?.apiKey || '' },
@@ -112,62 +120,104 @@ const AIProviderForm = ({ integration, onSave, onCancel, isSaving }: any) => {
     };
   });
   const [testStatus, setTestStatus] = useState<Record<Provider, TestStatus>>({ google: 'idle', openai: 'idle', groq: 'idle' });
-  const [modal, setModal] = useState<ModalState>({ isOpen: false, title: '', message: '' });
+  const [modalState, setModalState] = useState<ModalState>({ isOpen: false, title: '', message: '' });
 
-  const handleTest = async (p: Provider) => {
-    if (!fields[p]?.apiKey) {
-      setModal({ isOpen: true, title: 'Error', msg: `Introduce la API Key para ${p}.` });
-      return;
+  const handleTestConnection = async (provider: Provider) => {
+    const apiKey = fields[provider]?.apiKey;
+    if (!apiKey) { setModalState({ isOpen: true, title: 'API Key Requerida', message: `Introduce una API Key para ${provider}.` }); return; }
+    setTestStatus(prev => ({ ...prev, [provider]: 'testing' }));
+    try {
+      const result = await testApiKey({ provider, apiKey });
+      setTestStatus(prev => ({ ...prev, [provider]: result.success ? 'success' : 'error' }));
+      setModalState({ isOpen: true, title: result.success ? 'Éxito' : 'Error', message: result.message });
+    } catch (error: any) {
+      setTestStatus(prev => ({ ...prev, [provider]: 'error' }));
+      setModalState({ isOpen: true, title: 'Error', message: error.message || 'Fallo de conexión.' });
     }
-    setTestStatus(prev => ({ ...prev, [p]: 'testing' }));
-    const res = await testApiKey({ provider: p, apiKey: fields[p]!.apiKey });
-    setTestStatus(prev => ({ ...prev, [p]: res.success ? 'success' : 'error' }));
-    setModal({ isOpen: true, title: res.success ? 'Éxito' : 'Error', msg: res.message });
+  };
+
+  const TestButton = ({ provider }: { provider: Provider }) => {
+    const status = testStatus[provider];
+    if (status === 'testing') return <Button variant="outline" size="sm" disabled><Loader2 className="h-4 w-4 animate-spin mr-2" /> Probando...</Button>;
+    if (status === 'success') return <Button variant="ghost" size="sm" className="text-green-600" disabled><CheckCircle className="h-4 w-4 mr-2" /> ¡Éxito!</Button>;
+    if (status === 'error')   return <Button variant="destructive" size="sm" onClick={() => handleTestConnection(provider)}><XCircle className="h-4 w-4 mr-2" /> Reintentar</Button>;
+    return <Button variant="outline" size="sm" onClick={() => handleTestConnection(provider)}>Probar Conexión</Button>;
   };
 
   return (
     <div className="space-y-6">
       {(['google', 'openai', 'groq'] as Provider[]).map((p) => (
         <Card key={p}>
-          <CardHeader><CardTitle className="text-lg capitalize">{p}</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="text-lg capitalize">{p === 'google' ? 'Google AI Studio' : p}</CardTitle></CardHeader>
           <CardContent className="space-y-3">
             <Label>API Key</Label>
-            <Input type="password" value={fields[p]?.apiKey || ''} onChange={(e) => setFields(prev => ({ ...prev, [p]: { ...prev[p], apiKey: e.target.value } }))} />
-            <Button variant="outline" size="sm" onClick={() => handleTest(p)} disabled={testStatus[p] === 'testing'}>
-              {testStatus[p] === 'testing' ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : 'Probar'}
-            </Button>
+            <Input type="password" value={fields[p]?.apiKey || ''} onChange={(e) => {
+              setFields(prev => ({ ...prev, [p]: { apiKey: e.target.value } }));
+              setTestStatus(prev => ({ ...prev, [p]: 'idle' }));
+            }} disabled={isSaving} />
+            <TestButton provider={p} />
           </CardContent>
         </Card>
       ))}
       <DialogFooter>
-        <Button variant="outline" onClick={onCancel}>Cancelar</Button>
-        <Button onClick={() => onSave(fields)} disabled={isSaving}>Guardar</Button>
+        <Button variant="outline" onClick={onCancel} disabled={isSaving}>Cancelar</Button>
+        <Button onClick={() => onSave(fields)} disabled={isSaving}>
+          {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          Guardar Cambios
+        </Button>
       </DialogFooter>
-      <AlertDialog open={modal.isOpen} onOpenChange={(o) => setModal(m => ({ ...m, open: o }))}>
+      <AlertDialog open={modalState.isOpen} onOpenChange={(open) => setModalState(prev => ({ ...prev, isOpen: open }))}>
         <AlertDialogContent>
-          <AlertDialogHeader><AlertDialogTitle>{modal.title}</AlertDialogTitle><AlertDialogDescription>{modal.msg}</AlertDialogDescription></AlertDialogHeader>
-          <AlertDialogFooter><AlertDialogAction>Cerrar</AlertDialogAction></AlertDialogFooter>
+          <AlertDialogHeader><AlertDialogTitle>{modalState.title}</AlertDialogTitle><AlertDialogDescription>{modalState.message}</AlertDialogDescription></AlertDialogHeader>
+          <AlertDialogFooter><AlertDialogAction onClick={() => setModalState(prev => ({ ...prev, isOpen: false }))}>Cerrar</AlertDialogAction></AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </div>
   );
 };
 
-const WhapiForm = ({ integration, onSave, onCancel, isSaving }: any) => {
+const WhapiForm = ({ integration, onSave, onCancel, isSaving }: { integration: Integration; onSave: (data: WhapiFields) => void; onCancel: () => void; isSaving: boolean; }) => {
   const [fields, setFields] = useState<WhapiFields>(() => {
     let parsed: any = {};
-    try { parsed = typeof integration.fields === 'string' && integration.fields.trim() ? JSON.parse(integration.fields) : (integration.fields || {}); } catch { parsed = {}; }
+    try {
+      parsed = typeof integration.fields === 'string' ? JSON.parse(integration.fields || '{}') : (integration.fields || {});
+    } catch (e) { parsed = {}; }
     return { apiKey: parsed?.apiKey || '', instanceId: parsed?.instanceId || '' };
   });
+  const [testStatus, setTestStatus] = useState<TestStatus>('idle');
+  const [modalState, setModalState] = useState<ModalState>({ isOpen: false, title: '', message: '' });
+
+  const handleTestConnection = async () => {
+    if (!fields.apiKey || !fields.instanceId) return;
+    setTestStatus('testing');
+    try {
+      const result = await testWhapiConnection(fields);
+      setTestStatus(result.success ? 'success' : 'error');
+      setModalState({ isOpen: true, title: result.success ? 'Éxito' : 'Error', message: result.message });
+    } catch { setTestStatus('error'); }
+  };
 
   return (
     <div className="space-y-4">
-      <div><Label>API Key</Label><Input type="password" value={fields.apiKey} onChange={(e) => setFields(prev => ({ ...prev, apiKey: e.target.value }))} /></div>
-      <div><Label>Instance ID</Label><Input value={fields.instanceId} onChange={(e) => setFields(prev => ({ ...prev, instanceId: e.target.value }))} /></div>
-      <DialogFooter>
-        <Button variant="outline" onClick={onCancel}>Cancelar</Button>
-        <Button onClick={() => onSave(fields)} disabled={isSaving}>Guardar</Button>
+      <div><Label>API Key</Label><Input type="password" value={fields.apiKey} onChange={(e) => setFields(prev => ({ ...prev, apiKey: e.target.value }))} disabled={isSaving} /></div>
+      <div><Label>Instance ID</Label><Input value={fields.instanceId} onChange={(e) => setFields(prev => ({ ...prev, instanceId: e.target.value }))} disabled={isSaving} /></div>
+      <Button variant="outline" className="w-full" onClick={handleTestConnection} disabled={isSaving || testStatus === 'testing'}>
+        {testStatus === 'testing' && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+        Probar Conexión
+      </Button>
+      <DialogFooter className="pt-4">
+        <Button variant="outline" onClick={onCancel} disabled={isSaving}>Cancelar</Button>
+        <Button onClick={() => onSave(fields)} disabled={isSaving}>
+          {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          Guardar Cambios
+        </Button>
       </DialogFooter>
+      <AlertDialog open={modalState.isOpen} onOpenChange={(open) => setModalState(prev => ({ ...prev, isOpen: open }))}>
+        <AlertDialogContent>
+          <AlertDialogHeader><AlertDialogTitle>{modalState.title}</AlertDialogTitle><AlertDialogDescription>{modalState.message}</AlertDialogDescription></AlertDialogHeader>
+          <AlertDialogFooter><AlertDialogAction onClick={() => setModalState(prev => ({ ...prev, isOpen: false }))}>Cerrar</AlertDialogAction></AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
@@ -175,9 +225,10 @@ const WhapiForm = ({ integration, onSave, onCancel, isSaving }: any) => {
 const slugify = (text: string) => text.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]+/g, '');
 
 const newIntegrationSchema = z.object({
-  name: z.string().min(3, 'Mínimo 3 caracteres.'),
+  name: z.string().min(3, 'El nombre debe tener al menos 3 caracteres.'),
   description: z.string().optional(),
 });
+type NewIntegrationFormData = z.infer<typeof newIntegrationSchema>;
 
 export default function IntegrationsPage() {
   const firestore = useFirestore();
@@ -187,54 +238,49 @@ export default function IntegrationsPage() {
   const [isCreateDialogOpen, setCreateDialogOpen] = useState(false);
   const didInit = useRef(false);
 
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<z.infer<typeof newIntegrationSchema>>({
+  const { register, handleSubmit, reset, formState: { errors } } = useForm<NewIntegrationFormData>({
     resolver: zodResolver(newIntegrationSchema),
   });
 
-  const integrationsQuery = useMemoFirebase(
-    () => (!firestore ? null : collection(firestore, 'integrations')),
-    [firestore],
-  );
+  const integrationsQuery = useMemoFirebase(() => (!firestore ? null : collection(firestore, 'integrations')), [firestore]);
   const { data: integrations, isLoading } = useCollection<Integration>(integrationsQuery);
-
-  // Inicialización segura de integraciones requeridas
+  
   useEffect(() => {
     if (!firestore || isLoading || !Array.isArray(integrations) || didInit.current) return;
-
-    const initialize = async () => {
-      didInit.current = true;
-      const existingIds = new Set(integrations.map(i => i.id));
-      for (const req of REQUIRED_INTEGRATIONS) {
-        if (!existingIds.has(req.id)) {
-          const docRef = doc(firestore, 'integrations', req.id);
-          try {
-            const snap = await getDoc(docRef);
-            if (!snap.exists()) {
-              await setDoc(docRef, { 
-                id: req.id, 
-                name: req.name, 
-                status: 'inactive',
-                fields: '{}',
-                updatedAt: new Date().toISOString() 
-              });
+    
+    const runSafeInit = async () => {
+        didInit.current = true;
+        try {
+            for (const req of REQUIRED_INTEGRATIONS) {
+                const docRef = doc(firestore, 'integrations', req.id);
+                const docSnap = await getDoc(docRef);
+                if (!docSnap.exists()) {
+                    await setDoc(docRef, { 
+                        id: req.id, 
+                        name: req.name, 
+                        status: 'inactive',
+                        fields: '{}',
+                        updatedAt: new Date().toISOString() 
+                    });
+                }
             }
-          } catch (e) {
-            console.warn(`Firestore no disponible para verificar ${req.id}, se reintentará.`, e);
-          }
+        } catch (e) {
+            console.warn("Firestore offline o cargando: reintentando inicialización...", e);
+            didInit.current = false;
         }
-      }
     };
-    initialize();
+    runSafeInit();
   }, [firestore, isLoading, integrations]);
 
-  const handleStatusChange = async (integration: Integration) => {
+  const handleStatusChange = async (integration: Integration, checked: boolean) => {
     if (!firestore) return;
-    const newStatus = integration.status === 'active' ? 'inactive' : 'active';
+    const newStatus = checked ? 'active' : 'inactive';
     try {
       await updateDoc(doc(firestore, 'integrations', integration.id), { status: newStatus });
-      toast({ title: "Estado actualizado" });
-    } catch {
-      toast({ variant: 'destructive', title: "Error al actualizar" });
+      toast({ title: 'Estado Actualizado', description: `"${integration.name}" ahora está ${newStatus}.` });
+    } catch (error) {
+      console.error('Error al cambiar estado:', error);
+      toast({ variant: 'destructive', title: 'Error', description: 'No se pudo actualizar el estado.' });
     }
   };
 
@@ -242,40 +288,48 @@ export default function IntegrationsPage() {
     if (!editingIntegration || !firestore) return;
     setIsSaving(true);
     try {
-      await saveIntegration(editingIntegration.id, { fields: JSON.stringify(formData) });
-      toast({ title: 'Configuración guardada' });
+      const result = await withTimeout(saveIntegration(editingIntegration.id, { fields: JSON.stringify(formData) }), 15000);
+      if (!result.success) throw new Error(result.error);
+      toast({ title: 'Éxito', description: 'Configuración guardada correctamente.' });
       setEditingIntegration(null);
     } catch (e: any) {
-      toast({ variant: 'destructive', title: 'Error', description: e.message });
+      toast({ variant: 'destructive', title: 'Error', description: e.message || 'Error de red.' });
     } finally {
       setIsSaving(false);
     }
   };
 
-  const handleCreateIntegration = async (data: z.infer<typeof newIntegrationSchema>) => {
+  const handleCreateIntegration = async (data: NewIntegrationFormData) => {
     if (!firestore) return;
     const id = slugify(data.name);
+    const docRef = doc(firestore, 'integrations', id);
     try {
-      await setDoc(doc(firestore, 'integrations', id), { 
-          id, 
-          name: data.name, 
-          description: data.description || '', 
-          fields: '{}', 
-          status: 'inactive', 
-          updatedAt: new Date().toISOString() 
+      await setDoc(docRef, { 
+        id, 
+        name: data.name, 
+        description: data.description || '', 
+        fields: '{}', 
+        status: 'inactive', 
+        updatedAt: new Date().toISOString() 
       }, { merge: true });
-      toast({ title: 'Integración Creada' });
+      toast({ title: 'Creado', description: `Integración "${data.name}" lista.` });
       setCreateDialogOpen(false);
       reset();
     } catch {
-      toast({ variant: 'destructive', title: 'Error al crear' });
+      toast({ variant: 'destructive', title: 'Error', description: 'No se pudo crear.' });
     }
   };
 
-  if (isLoading) return <div className="flex justify-center p-8"><Loader2 className="h-8 w-8 animate-spin" /></div>;
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col gap-6">
       <Card>
         <CardHeader className="flex flex-row justify-between items-center">
           <div>
@@ -283,46 +337,101 @@ export default function IntegrationsPage() {
             <CardDescription>Conecta servicios de terceros para ampliar funcionalidades.</CardDescription>
           </div>
           <Dialog open={isCreateDialogOpen} onOpenChange={setCreateDialogOpen}>
-            <DialogTrigger asChild><Button><PlusCircle className="mr-2 h-4 w-4" />Crear Integración</Button></DialogTrigger>
+            <DialogTrigger asChild>
+              <Button><PlusCircle className="mr-2 h-4 w-4" />Crear Integración</Button>
+            </DialogTrigger>
             <DialogContent>
               <DialogHeader><DialogTitle>Crear Nueva Integración</DialogTitle></DialogHeader>
               <form onSubmit={handleSubmit(handleCreateIntegration)} className="space-y-4">
-                <div><Label>Nombre</Label><Input {...register('name')} />{errors.name && <p className="text-sm text-destructive mt-1">{errors.name.message}</p>}</div>
-                <div><Label>Descripción</Label><Input {...register('description')} /></div>
-                <DialogFooter><Button type="submit">Crear</Button></DialogFooter>
+                <div>
+                  <Label>Nombre</Label>
+                  <Input {...register('name')} placeholder="Mi Nueva Integración" />
+                  {errors.name && <p className="text-sm text-destructive mt-1">{errors.name.message}</p>}
+                </div>
+                <div>
+                  <Label>Descripción</Label>
+                  <Input {...register('description')} placeholder="¿Qué hace esta integración?" />
+                </div>
+                <DialogFooter>
+                  <Button type="button" variant="outline" onClick={() => setCreateDialogOpen(false)}>Cancelar</Button>
+                  <Button type="submit">Crear</Button>
+                </DialogFooter>
               </form>
             </DialogContent>
           </Dialog>
         </CardHeader>
       </Card>
+
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {(integrations ?? []).map((item) => {
-          const icon = item.id === 'cloudinary' ? <Cloud className="h-8 w-8" /> : item.id === 'whapi-whatsapp' ? <WhatsAppIcon className="h-8 w-8" /> : <Bot className="h-8 w-8" />;
+        {(integrations ?? []).map((integration) => {
+          const icon =
+            integration.id === 'cloudinary' ? <Cloud className="h-8 w-8" />
+            : integration.id === 'whapi-whatsapp' ? <WhatsAppIcon className="h-8 w-8" />
+            : <Bot className="h-8 w-8" />;
+
+          let isConfigured = false;
+          try {
+            let fields: any = {};
+            if (typeof integration.fields === 'string' && integration.fields.trim()) {
+              fields = JSON.parse(integration.fields);
+            } else if (typeof integration.fields === 'object' && integration.fields !== null) {
+              fields = integration.fields;
+            }
+            
+            if (integration.id === 'cloudinary') {
+              isConfigured = !!(fields.cloud_name && fields.api_key && fields.api_secret);
+            } else if (integration.id === 'chatbot-integrado-con-whatsapp-para-soporte-y-ventas') {
+              isConfigured = !!(fields.google?.apiKey || fields.openai?.apiKey || fields.groq?.apiKey);
+            } else if (integration.id === 'whapi-whatsapp') {
+              isConfigured = !!(fields.apiKey && fields.instanceId);
+            } else {
+              isConfigured = Object.keys(fields).length > 0;
+            }
+          } catch { isConfigured = false; }
+
+          const isActive = integration.status === 'active';
+
           return (
-            <Card key={item.id}>
+            <Card key={integration.id}>
               <CardHeader>
                 <div className="flex justify-between items-start">
-                  <div className="flex items-center gap-4"><div className="p-3 bg-muted rounded-lg">{icon}</div><CardTitle className="text-base">{item.name}</CardTitle></div>
-                  <Badge variant={item.status === 'active' ? 'default' : 'secondary'}>{item.status}</Badge>
+                  <div className="flex items-center gap-4">
+                    <div className="p-3 bg-muted rounded-lg text-muted-foreground">{icon}</div>
+                    <CardTitle className="text-base">{integration.name}</CardTitle>
+                  </div>
+                  <Badge variant={isActive ? 'default' : 'secondary'}>
+                    {isActive ? 'Activo' : 'Inactivo'}
+                  </Badge>
                 </div>
               </CardHeader>
-              <CardContent>
+              <CardContent className="space-y-4">
                 <div className="flex items-center justify-between border p-4 rounded-md">
-                  <Label>Estado</Label>
-                  <Switch checked={item.status === 'active'} onCheckedChange={() => handleStatusChange(item)} />
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium">Estado del Servicio</p>
+                    <p className="text-xs text-muted-foreground">{isActive ? 'Operativo' : 'Desactivado'}</p>
+                  </div>
+                  <Switch checked={isActive} onCheckedChange={(checked) => handleStatusChange(integration, checked)} />
+                </div>
+                <div className="flex items-center justify-between border p-4 rounded-md">
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium">Configuración</p>
+                    <div className="flex items-center gap-1.5 text-xs">
+                      {isConfigured
+                        ? <><CheckCircle className="h-4 w-4 text-green-500" /> <span className="text-green-600">Listo</span></>
+                        : <><XCircle className="h-4 w-4 text-destructive" /> <span className="text-destructive">Pendiente</span></>}
+                    </div>
+                  </div>
+                  <Dialog open={editingIntegration?.id === integration.id} onOpenChange={(open) => !open && setEditingIntegration(null)}>
+                    <Button variant="outline" size="sm" onClick={() => setEditingIntegration(integration)}>Editar</Button>
+                    <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                      <DialogHeader><DialogTitle>Configurar {integration.name}</DialogTitle></DialogHeader>
+                      {integration.id === 'cloudinary' && <CloudinaryForm integration={integration} onSave={handleSave} onCancel={() => setEditingIntegration(null)} isSaving={isSaving} />}
+                      {integration.id === 'chatbot-integrado-con-whatsapp-para-soporte-y-ventas' && <AIProviderForm integration={integration} onSave={handleSave} onCancel={() => setEditingIntegration(null)} isSaving={isSaving} />}
+                      {integration.id === 'whapi-whatsapp' && <WhapiForm integration={integration} onSave={handleSave} onCancel={() => setEditingIntegration(null)} isSaving={isSaving} />}
+                    </DialogContent>
+                  </Dialog>
                 </div>
               </CardContent>
-              <CardFooter>
-                 <Dialog open={editingIntegration?.id === item.id} onOpenChange={(o) => !o && setEditingIntegration(null)}>
-                  <DialogTrigger asChild><Button variant="outline" className="w-full" onClick={() => setEditingIntegration(item)}>Editar</Button></DialogTrigger>
-                  <DialogContent className="max-w-2xl">
-                    <DialogHeader><DialogTitle>Configurar {item.name}</DialogTitle></DialogHeader>
-                    {item.id === 'cloudinary' && <CloudinaryForm integration={item} onSave={handleSave} onCancel={() => setEditingIntegration(null)} isSaving={isSaving} />}
-                    {item.id === 'chatbot-integrado-con-whatsapp-para-soporte-y-ventas' && <AIProviderForm integration={item} onSave={handleSave} onCancel={() => setEditingIntegration(null)} isSaving={isSaving} />}
-                    {item.id === 'whapi-whatsapp' && <WhapiForm integration={item} onSave={handleSave} onCancel={() => setEditingIntegration(null)} isSaving={isSaving} />}
-                  </DialogContent>
-                </Dialog>
-              </CardFooter>
             </Card>
           );
         })}
