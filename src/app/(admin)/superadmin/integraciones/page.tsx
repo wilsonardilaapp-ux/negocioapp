@@ -264,6 +264,12 @@ const newIntegrationSchema = z.object({
 });
 type NewIntegrationFormData = z.infer<typeof newIntegrationSchema>;
 
+const REQUIRED_INTEGRATIONS: Array<{ id: string; name: string }> = [
+    { id: 'cloudinary', name: 'Cloudinary' },
+    { id: 'chatbot-integrado-con-whatsapp-para-soporte-y-ventas', name: 'Chatbot IA (Google/OpenAI/Groq)' },
+    { id: 'whapi-whatsapp', name: 'WHAPI (WhatsApp)' },
+];
+
 export default function IntegrationsPage() {
   const firestore = useFirestore();
   const { toast } = useToast();
@@ -289,6 +295,25 @@ export default function IntegrationsPage() {
     [firestore]
   );
   const { data: modules, isLoading: areModulesLoading } = useCollection<Module>(modulesQuery);
+
+  // Self-healing useEffect to ensure required integrations exist
+  useEffect(() => {
+    if (isIntegrationsLoading || !firestore || !integrations) return;
+
+    const checkAndCreateIntegrations = () => {
+        REQUIRED_INTEGRATIONS.forEach(reqInt => {
+            const exists = integrations.some(i => i.id === reqInt.id);
+            if (!exists) {
+                console.log(`Integration "${reqInt.name}" missing, creating...`);
+                // Call server action to create. No need to await, useCollection will update UI.
+                createIntegration({ name: reqInt.name, description: '' });
+            }
+        });
+    };
+    
+    checkAndCreateIntegrations();
+
+  }, [isIntegrationsLoading, integrations, firestore]);
 
   const handleStatusChange = (integration: Integration, checked: boolean) => {
     startStatusTransition(async () => {
@@ -320,7 +345,7 @@ export default function IntegrationsPage() {
         const result = await createIntegration(data);
         if (result.success) {
             toast({ title: 'Integración Creada', description: `Se ha creado "${data.name}".` });
-            setCreateDialogOpen(false);
+            handleCreateDialogChange(false);
             reset();
         } else {
             toast({ variant: 'destructive', title: 'Error', description: result.error || 'No se pudo crear la integración.' });
@@ -328,9 +353,12 @@ export default function IntegrationsPage() {
     });
   };
   
-  const handleCreateDialogOpenChange = (open: boolean) => {
+  const handleCreateDialogChange = (open: boolean) => {
       if (isCreating) return;
       setCreateDialogOpen(open);
+      if (!open) {
+          reset();
+      }
   }
 
   const anyTransitionActive = isCreating || isSaving || isUpdatingStatus;
@@ -353,7 +381,7 @@ export default function IntegrationsPage() {
             <CardTitle>Gestión de Integraciones</CardTitle>
             <CardDescription>Conecta servicios de terceros para ampliar las funcionalidades.</CardDescription>
           </div>
-          <Dialog open={isCreateDialogOpen} onOpenChange={handleCreateDialogOpenChange}>
+          <Dialog open={isCreateDialogOpen} onOpenChange={handleCreateDialogChange}>
             <DialogTrigger asChild>
               <Button><PlusCircle className="mr-2 h-4 w-4" />Crear Integración</Button>
             </DialogTrigger>
@@ -370,7 +398,7 @@ export default function IntegrationsPage() {
                   <Input {...register('description')} placeholder="¿Para qué sirve?" />
                 </div>
                 <DialogFooter>
-                  <Button type="button" variant="outline" onClick={() => handleCreateDialogOpenChange(false)} disabled={isCreating}>Cancelar</Button>
+                  <Button type="button" variant="outline" onClick={() => handleCreateDialogChange(false)} disabled={isCreating}>Cancelar</Button>
                   <Button type="submit" disabled={isCreating}>
                     {isCreating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     Crear

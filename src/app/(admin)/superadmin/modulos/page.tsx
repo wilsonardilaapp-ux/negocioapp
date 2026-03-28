@@ -42,6 +42,22 @@ const moduleSchema = z.object({
   ),
 });
 
+const DEFAULT_MODULES: Omit<Module, 'id' | 'status' | 'createdAt'>[] = [
+    { name: 'Catálogo', description: 'Módulo para gestionar el catálogo de productos.', limit: 50 },
+    { name: 'Blog', description: 'Módulo para gestionar el blog', limit: 10 },
+    { name: 'Chatbot Integrado con WhatsApp', description: 'Asistente IA para WhatsApp y Web', limit: -1 },
+    { name: 'Motor de Sugerencias Inteligentes', description: 'Motor para sugerir productos', limit: -1 },
+    { name: 'Google Analytics', description: 'Integración con Google Analytics', limit: -1 },
+    { name: 'Cloudinary', description: 'Almacenamiento de medios en la nube', limit: -1 },
+];
+
+const slugify = (text: string) => 
+  text
+    .toLowerCase()
+    .normalize("NFD") 
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, '-')
+    .replace(/[^a-z0-9-]/g, '');
 
 export default function ModulesPage() {
   const firestore = useFirestore();
@@ -56,6 +72,28 @@ export default function ModulesPage() {
   }, [firestore]);
   
   const { data: modules, isLoading } = useCollection<Module>(modulesQuery);
+
+  // Self-healing useEffect
+  useEffect(() => {
+      if (isLoading || !firestore || !modules) return;
+      
+      const checkAndCreateModules = async () => {
+          for (const defaultModule of DEFAULT_MODULES) {
+              const modId = slugify(defaultModule.name);
+              const exists = modules.some(m => m.id === modId);
+              if (!exists) {
+                  console.log(`Module "${defaultModule.name}" missing, creating...`);
+                  await saveModule({
+                      id: modId,
+                      ...defaultModule
+                  });
+              }
+          }
+      };
+
+      checkAndCreateModules();
+
+  }, [isLoading, modules, firestore]);
   
   const { register, handleSubmit, reset, setValue, formState: { errors } } = useForm<z.infer<typeof moduleSchema>>({
       resolver: zodResolver(moduleSchema),
@@ -81,6 +119,7 @@ export default function ModulesPage() {
       setDialogOpen(open);
       if (!open) {
           setEditingModule(null);
+          reset();
       }
   };
   
