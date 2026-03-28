@@ -1,9 +1,9 @@
+
 'use client';
 
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -42,36 +42,28 @@ export default function SuperAdminLayout({ children }: { children: ReactNode }) 
   const auth = useAuth();
   const router = useRouter();
 
-  useEffect(() => {
-    if (isUserLoading) return;
-    
-    if (!user) {
-      router.replace("/login");
-      return;
-    }
-    
-    if (profile?.role !== 'super_admin') {
-      router.replace("/dashboard");
-    }
-  }, [user, isUserLoading, profile, router]);
-
   const handleLogout = async () => {
     if (!auth) return;
     try {
       await auth.signOut();
-      router.push('/login');
+      // The FirebaseProvider will redirect to /login on auth state change.
     } catch (error) {
       console.error("Error signing out: ", error);
     }
   };
   
-  if (isUserLoading || !profile) {
+  if (isUserLoading) {
     return <LoadingScreen />;
   }
 
-  if (profile.role !== 'super_admin') {
-    return <LoadingScreen />;
+  // If loading is done and there's no user, the provider will redirect.
+  // Render nothing to avoid a flash of content.
+  if (!user) {
+    return null;
   }
+  
+  // We now TRUST that the FirebaseProvider will handle redirection for non-super_admins.
+  // This layout no longer needs to check the role, which prevents race conditions.
 
   return (
     <SidebarProvider>
@@ -91,11 +83,11 @@ export default function SuperAdminLayout({ children }: { children: ReactNode }) 
               <Button variant="ghost" className="justify-start w-full p-2 h-auto">
                 <div className="flex items-center gap-3">
                   <Avatar className="h-8 w-8">
-                    <AvatarImage src={profile.photoURL ?? user?.photoURL ?? "https://picsum.photos/seed/admin/100/100"} alt="Super Admin" />
-                    <AvatarFallback>{profile.name?.[0].toUpperCase() ?? 'SA'}</AvatarFallback>
+                    <AvatarImage src={profile?.photoURL ?? user?.photoURL ?? "https://picsum.photos/seed/admin/100/100"} alt="Super Admin" />
+                    <AvatarFallback>{profile?.name?.[0].toUpperCase() ?? 'SA'}</AvatarFallback>
                   </Avatar>
                   <div className="text-left">
-                    <p className="text-sm font-medium">{profile.name ?? "Super Admin"}</p>
+                    <p className="text-sm font-medium">{profile?.name ?? "Super Admin"}</p>
                     <p className="text-xs text-muted-foreground">{user?.email}</p>
                   </div>
                 </div>
@@ -104,7 +96,7 @@ export default function SuperAdminLayout({ children }: { children: ReactNode }) 
             <DropdownMenuContent className="w-56 mb-2" align="end" forceMount>
               <DropdownMenuLabel className="font-normal">
                 <div className="flex flex-col space-y-1">
-                  <p className="text-sm font-medium leading-none">{profile.name ?? "Super Admin"}</p>
+                  <p className="text-sm font-medium leading-none">{profile?.name ?? "Super Admin"}</p>
                   <p className="text-xs leading-none text-muted-foreground">
                     {user?.email}
                   </p>

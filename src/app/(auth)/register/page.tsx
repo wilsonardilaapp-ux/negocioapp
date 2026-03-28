@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useRouter, useSearchParams } from "next/navigation";
@@ -38,7 +37,7 @@ import type { Module } from "@/models/module";
 import type { SystemService } from "@/models/system-service";
 import type { KnowledgeDocument } from "@/models/chatbot-config";
 import { isFirstUser } from '@/actions/user';
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, Loader2 } from 'lucide-react';
 import type { Subscription } from "@/models/subscription";
 import { STRIPE_PRICE_IDS } from "@/lib/stripe";
 
@@ -196,6 +195,15 @@ const slugify = (text: string) =>
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/\s+/g, '-')
     .replace(/[^a-z0-9-]/g, '');
+    
+const LoadingScreen = () => (
+    <div className="flex justify-center items-center h-screen">
+      <div className="text-center flex flex-col items-center gap-2">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <p className="text-muted-foreground">Cargando...</p>
+      </div>
+    </div>
+);
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -214,17 +222,6 @@ export default function RegisterPage() {
       password: "",
     },
   });
-
-  useEffect(() => {
-    if (!isUserLoading && user) {
-        const plan = searchParams.get('plan');
-        if (plan && plan !== 'free') {
-          router.push(`/dashboard/subscription?new_plan=${plan}`);
-        } else {
-          router.push("/dashboard");
-        }
-    }
-  }, [user, isUserLoading, router, searchParams]);
 
   async function onSubmit(values: z.infer<typeof registerSchema>) {
     if (!auth || !firestore) return;
@@ -425,14 +422,10 @@ export default function RegisterPage() {
     }
   }
 
-  if (isUserLoading || user) {
-    return (
-      <div className="flex justify-center items-center h-screen">
-        <div className="text-center">
-          <p>Cargando...</p>
-        </div>
-      </div>
-    );
+  // If Firebase is checking the auth state, show a loading screen.
+  // The provider will handle the redirection if a user is already logged in.
+  if (isUserLoading) {
+    return <LoadingScreen />;
   }
 
   return (

@@ -91,9 +91,9 @@ export default function LoginPage() {
     }
   }
 
-  // If auth state is loading or user is already logged in, show loading screen.
-  // The provider will handle the redirection.
-  if (isUserLoading || user) {
+  // If auth state is loading, show loading screen.
+  // The provider will handle redirection if a user is already logged in.
+  if (isUserLoading) {
     return <LoadingScreen />;
   }
 
