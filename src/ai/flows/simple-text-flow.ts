@@ -7,7 +7,7 @@
  */
 
 import { ai } from '@/ai/genkit';
-import { z } from 'genkit';
+import { z } from 'zod';
 
 const SimpleTextInputSchema = z.string().describe("The text prompt to send to the AI model.");
 export type SimpleTextInput = z.infer<typeof SimpleTextInputSchema>;
@@ -26,10 +26,9 @@ const simpleTextFlow = ai.defineFlow(
     outputSchema: SimpleTextOutputSchema,
   },
   async (prompt) => {
-    // This uses the configured Google AI plugin to call a Gemini model,
-    // which is part of the Vertex AI platform.
+    // This uses the configured Google AI plugin to call a Gemini model.
     const llmResponse = await ai.generate({
-      model: 'googleai/gemini-1.5-flash', // A powerful and fast model from Vertex AI
+      model: 'googleai/gemini-1.5-flash',
       prompt: prompt,
       config: {
         temperature: 0.7,
