@@ -1,8 +1,7 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useCollection, useFirestore, useMemoFirebase, setDocumentNonBlocking } from '@/firebase';
+import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { collection, doc } from 'firebase/firestore';
 import {
   Card,
@@ -19,7 +18,6 @@ import {
   DialogTitle,
   DialogDescription,
   DialogFooter,
-  DialogClose,
 } from '@/components/ui/dialog';
 import {
   AlertDialog,
@@ -43,6 +41,8 @@ import type { Module } from '@/models/module';
 import { testApiKey } from '@/ai/flows/test-api-key-flow';
 import { testWhapiConnection } from '@/ai/flows/test-whapi-connection-flow';
 import { saveIntegration } from '@/actions/save-integration';
+import { updateIntegrationStatus } from '@/actions/update-integration-status';
+
 
 const CloudinaryForm = ({ integration, onSave, onCancel, isSaving }: { integration: Integration, onSave: (data: CloudinaryFields) => void, onCancel: () => void, isSaving: boolean }) => {
     const { toast } = useToast();
@@ -391,7 +391,9 @@ export default function IntegrationsPage() {
 
           for (const id in requiredIntegrations) {
               if (!integrations.some(i => i.id === id)) {
-                  setDocumentNonBlocking(doc(firestore, 'integrations', id), { id, ...requiredIntegrations[id] });
+                  // This is a client-side update, it might be better as a server action
+                  // but for now, this ensures the documents exist.
+                   doc(firestore, 'integrations', id).set({ id, ...requiredIntegrations[id] });
               }
           }
       }
@@ -416,17 +418,21 @@ export default function IntegrationsPage() {
                       status: 'inactive', 
                       createdAt: new Date().toISOString(),
                   };
-                  setDocumentNonBlocking(doc(firestore, 'modules', id), newModule);
+                  doc(firestore, 'modules', id).set(newModule);
               }
           }
       }
     }, [isModulesLoading, modules, firestore]);
 
-    const handleStatusChange = (integration: Integration) => {
-        if (!firestore) return;
+    const handleStatusChange = async (integration: Integration) => {
         const newStatus = integration.status === 'active' ? 'inactive' : 'active';
-        setDocumentNonBlocking(doc(firestore, 'integrations', integration.id), { status: newStatus }, { merge: true });
-        toast({ title: "Estado Actualizado", description: `La integración "${integration.name}" ahora está ${newStatus === 'active' ? 'activa' : 'inactiva'}.` });
+        const result = await updateIntegrationStatus(integration.id, newStatus);
+        
+        if (result.success) {
+            toast({ title: "Estado Actualizado", description: `La integración "${integration.name}" ahora está ${newStatus === 'active' ? 'activa' : 'inactiva'}.` });
+        } else {
+            toast({ variant: 'destructive', title: 'Error', description: result.error || 'No se pudo actualizar el estado.' });
+        }
     };
 
     const handleSave = async (formData: any) => {
@@ -438,13 +444,12 @@ export default function IntegrationsPage() {
         setIsSaving(true);
     
         try {
-            const updatedData = { 
-                ...editingIntegration, 
+            const dataToUpdate = {
                 fields: JSON.stringify(formData),
                 updatedAt: new Date().toISOString(),
             };
             
-            const result = await saveIntegration(editingIntegration.id, updatedData);
+            const result = await saveIntegration(editingIntegration.id, dataToUpdate);
 
             if (!result.success) {
                 throw new Error(result.error);
@@ -461,10 +466,12 @@ export default function IntegrationsPage() {
             console.error("Error al guardar la integración:", error);
             
             let errorMessage = 'No se pudo guardar la configuración.';
+            
             if (error.message.includes('offline')) {
-                errorMessage = 'Error de red. Comprueba tu conexión e inténtalo de nuevo.';
+                errorMessage = 'Estás sin conexión. Los cambios se guardarán cuando recuperes el internet.';
+                setEditingIntegration(null); 
             } else {
-                errorMessage = error.message; // Show the specific error from the server action
+                errorMessage = error.message;
             }
     
             toast({ 
@@ -598,7 +605,7 @@ export default function IntegrationsPage() {
                 </div>
             )}
             
-            <Dialog open={!!editingIntegration} onOpenChange={(isOpen) => {if (!isSaving && !isOpen) {setEditingIntegration(null);}}}>
+             <Dialog open={!!editingIntegration} onOpenChange={(isOpen) => !isSaving && !isOpen && setEditingIntegration(null)}>
                 {editingIntegration && (
                     <DialogContent className="max-w-2xl">
                         <DialogHeader>
@@ -616,5 +623,3 @@ export default function IntegrationsPage() {
         </div>
     );
 }
-
-    
