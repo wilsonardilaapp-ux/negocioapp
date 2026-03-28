@@ -461,8 +461,10 @@ export default function IntegrationsPage() {
             console.error("Error al guardar la integración:", error);
             
             let errorMessage = 'No se pudo guardar la configuración.';
-            if (error.message.includes('offline') || error.message.includes('network')) {
+            if (error.message.includes('offline')) {
                 errorMessage = 'Error de red. Comprueba tu conexión e inténtalo de nuevo.';
+            } else {
+                errorMessage = error.message; // Show the specific error from the server action
             }
     
             toast({ 
@@ -500,7 +502,7 @@ export default function IntegrationsPage() {
                 <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                     {integrations?.filter(i => ['cloudinary', 'chatbot-integrado-con-whatsapp-para-soporte-y-ventas', 'whapi-whatsapp'].includes(i.id)).map(integration => {
                          const module = modules?.find(m => m.id === integration.id);
-                         const isModuleActive = module?.status === 'active';
+                         const isModuleActive = !!module;
                          
                          let icon;
                          let description;
@@ -614,3 +616,5 @@ export default function IntegrationsPage() {
         </div>
     );
 }
+
+    
