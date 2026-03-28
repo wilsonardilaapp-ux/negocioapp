@@ -76,28 +76,29 @@ export default function ModulesPage() {
   const { register, handleSubmit, reset, setValue, formState: { errors, isSubmitting } } = useForm<z.infer<typeof moduleSchema>>({
     resolver: zodResolver(moduleSchema),
   });
-
-  // ✅ FIX DE PERSISTENCIA: Verificación en servidor antes de inicializar
+  
   useEffect(() => {
     if (!firestore || isLoading || !Array.isArray(modules) || didInit.current) return;
     
-    const initialize = async () => {
+    const runSafeInit = async () => {
         didInit.current = true;
-        
-        for (const id in REQUIRED_MODULES) {
-            const docRef = doc(firestore, 'modules', id);
-            const snap = await getDoc(docRef); // Verificación real en el servidor
-            
-            if (!snap.exists()) {
-                await setDoc(docRef, { 
-                    id, 
-                    ...REQUIRED_MODULES[id as keyof typeof REQUIRED_MODULES],
-                    createdAt: new Date().toISOString() 
-                });
+        try {
+            for (const id in REQUIRED_MODULES) {
+                const docRef = doc(firestore, 'modules', id);
+                const snap = await getDoc(docRef);
+                if (!snap.exists()) {
+                    await setDoc(docRef, { 
+                        id, 
+                        ...REQUIRED_MODULES[id as keyof typeof REQUIRED_MODULES],
+                        createdAt: new Date().toISOString() 
+                    }, { merge: true });
+                }
             }
+        } catch (e) {
+            console.warn("Firestore offline: reintentando módulos luego...");
         }
     };
-    initialize();
+    runSafeInit();
   }, [firestore, isLoading, modules]);
 
   useEffect(() => {
