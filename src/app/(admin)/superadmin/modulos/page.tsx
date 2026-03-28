@@ -2,7 +2,7 @@
 "use client";
 
 import { useCollection, useFirestore, updateDocumentNonBlocking, setDocumentNonBlocking, deleteDocumentNonBlocking, useMemoFirebase } from '@/firebase';
-import { collection, doc, getDoc } from 'firebase/firestore';
+import { collection, doc, writeBatch } from 'firebase/firestore';
 import {
   Card,
   CardHeader,
@@ -21,7 +21,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from "@/hooks/use-toast";
-import { PlusCircle, Trash2, Box, FileText, Edit } from 'lucide-react';
+import { PlusCircle, Trash2, Box, FileText, Edit, Loader2 } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -32,7 +32,7 @@ import {
   DialogFooter,
   DialogClose,
 } from "@/components/ui/dialog";
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 const moduleSchema = z.object({
   name: z.string().min(3, { message: "El nombre debe tener al menos 3 caracteres." }),
@@ -56,6 +56,7 @@ export default function ModulesPage() {
   const { toast } = useToast();
   const [isDialogOpen, setDialogOpen] = useState(false);
   const [editingModule, setEditingModule] = useState<Module | null>(null);
+  const didInit = useRef(false);
 
   const modulesQuery = useMemoFirebase(() => {
     if (!firestore) return null;
@@ -65,7 +66,8 @@ export default function ModulesPage() {
   const { data: modules, isLoading } = useCollection<Module>(modulesQuery);
 
   useEffect(() => {
-    if (isLoading || !firestore) return;
+    if (isLoading || !firestore || didInit.current || !modules) return;
+    didInit.current = true;
 
     const requiredModules: { [id: string]: Omit<Module, 'id' | 'createdAt'> } = {
         'cloudinary': { name: 'Cloudinary', description: 'Almacenamiento y entrega de imágenes y videos.', status: 'inactive' },
@@ -77,13 +79,19 @@ export default function ModulesPage() {
         'google-analytics': { name: 'Google Analytics', description: 'Integración con Google Analytics', status: 'inactive' },
     };
     
-    const existingIds = (modules || []).map(m => m.id);
+    const existingIds = modules.map(m => m.id);
+    const batch = writeBatch(firestore);
+    let writes = 0;
 
     for (const id in requiredModules) {
         if (!existingIds.includes(id)) {
             const docRef = doc(firestore, 'modules', id);
-            setDocumentNonBlocking(docRef, { ...requiredModules[id], id, createdAt: new Date().toISOString() }, { merge: true });
+            batch.set(docRef, { ...requiredModules[id], id, createdAt: new Date().toISOString() }, { merge: true });
+            writes++;
         }
+    }
+    if(writes > 0) {
+        batch.commit().catch(err => console.error("Error creating default modules:", err));
     }
   }, [isLoading, modules, firestore]);
 
@@ -153,7 +161,7 @@ export default function ModulesPage() {
   };
 
   if (isLoading) {
-    return <div>Cargando módulos...</div>;
+    return <div className="flex items-center justify-center h-64"><Loader2 className="h-8 w-8 animate-spin" /> Cargando módulos...</div>;
   }
 
   return (
