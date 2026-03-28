@@ -53,6 +53,14 @@ const withTimeout = <T,>(promise: Promise<T>, timeoutMs: number): Promise<T> => 
   ]);
 };
 
+// IDs requeridos del sistema — NUNCA sobreescribir si ya existen
+const REQUIRED_INTEGRATIONS: Array<{ id: string; name: string }> = [
+  { id: 'cloudinary',                                           name: 'Cloudinary' },
+  { id: 'chatbot-integrado-con-whatsapp-para-soporte-y-ventas', name: 'Chatbot IA (Google/OpenAI/Groq)' },
+  { id: 'whapi-whatsapp',                                       name: 'WHAPI (WhatsApp)' },
+];
+
+// ─── Formulario Cloudinary ───────────────────────────────────────────────────
 const CloudinaryForm = ({
   integration, onSave, onCancel, isSaving,
 }: {
@@ -103,10 +111,8 @@ const CloudinaryForm = ({
           className="pr-10"
           disabled={isSaving}
         />
-        <Button
-          type="button" variant="ghost" size="icon" className="absolute right-1 top-7 h-7 w-7"
-          onClick={() => setShowApiSecret(prev => !prev)} disabled={isSaving}
-        >
+        <Button type="button" variant="ghost" size="icon" className="absolute right-1 top-7 h-7 w-7"
+          onClick={() => setShowApiSecret(prev => !prev)} disabled={isSaving}>
           {showApiSecret ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
         </Button>
       </div>
@@ -121,6 +127,7 @@ const CloudinaryForm = ({
   );
 };
 
+// ─── Formulario AI Provider ──────────────────────────────────────────────────
 type Provider = 'google' | 'openai' | 'groq';
 type TestStatus = 'idle' | 'testing' | 'success' | 'error';
 type ModalState = { isOpen: boolean; title: string; message: string };
@@ -148,16 +155,12 @@ const AIProviderForm = ({
       groq:   { apiKey: parsed?.groq?.apiKey   || '' },
     };
   });
-
   const [testStatus, setTestStatus] = useState<Record<Provider, TestStatus>>({ google: 'idle', openai: 'idle', groq: 'idle' });
   const [modalState, setModalState] = useState<ModalState>({ isOpen: false, title: '', message: '' });
 
   const handleTestConnection = async (provider: Provider) => {
     const apiKey = fields[provider]?.apiKey;
-    if (!apiKey) {
-      setModalState({ isOpen: true, title: 'API Key Requerida', message: `Introduce una API Key para ${provider}.` });
-      return;
-    }
+    if (!apiKey) { setModalState({ isOpen: true, title: 'API Key Requerida', message: `Introduce una API Key para ${provider}.` }); return; }
     setTestStatus(prev => ({ ...prev, [provider]: 'testing' }));
     try {
       const result = await testApiKey({ provider, apiKey });
@@ -171,9 +174,9 @@ const AIProviderForm = ({
 
   const TestButton = ({ provider }: { provider: Provider }) => {
     const status = testStatus[provider];
-    if (status === 'testing') return <Button variant="outline" size="sm" disabled><Loader2 className="h-4 w-4 animate-spin mr-2" /> Probando...</Button>;
-    if (status === 'success') return <Button variant="ghost" size="sm" className="text-green-600" disabled><CheckCircle className="h-4 w-4 mr-2" /> ¡Éxito!</Button>;
-    if (status === 'error')   return <Button variant="destructive" size="sm" onClick={() => handleTestConnection(provider)}><XCircle className="h-4 w-4 mr-2" /> Reintentar</Button>;
+    if (status === 'testing') return <Button variant="outline" size="sm" disabled><Loader2 className="h-4 w-4 animate-spin mr-2" />Probando...</Button>;
+    if (status === 'success') return <Button variant="ghost" size="sm" className="text-green-600" disabled><CheckCircle className="h-4 w-4 mr-2" />¡Éxito!</Button>;
+    if (status === 'error')   return <Button variant="destructive" size="sm" onClick={() => handleTestConnection(provider)}><XCircle className="h-4 w-4 mr-2" />Reintentar</Button>;
     return <Button variant="outline" size="sm" onClick={() => handleTestConnection(provider)}>Probar Conexión</Button>;
   };
 
@@ -184,15 +187,10 @@ const AIProviderForm = ({
           <CardHeader><CardTitle className="text-lg capitalize">{p === 'google' ? 'Google AI Studio' : p}</CardTitle></CardHeader>
           <CardContent className="space-y-3">
             <Label>API Key</Label>
-            <Input
-              type="password"
-              value={fields[p]?.apiKey || ''}
-              onChange={(e) => {
-                setFields(prev => ({ ...prev, [p]: { apiKey: e.target.value } }));
-                setTestStatus(prev => ({ ...prev, [p]: 'idle' }));
-              }}
-              disabled={isSaving}
-            />
+            <Input type="password" value={fields[p]?.apiKey || ''} onChange={(e) => {
+              setFields(prev => ({ ...prev, [p]: { apiKey: e.target.value } }));
+              setTestStatus(prev => ({ ...prev, [p]: 'idle' }));
+            }} disabled={isSaving} />
             <TestButton provider={p} />
           </CardContent>
         </Card>
@@ -206,19 +204,15 @@ const AIProviderForm = ({
       </DialogFooter>
       <AlertDialog open={modalState.isOpen} onOpenChange={(open) => setModalState(prev => ({ ...prev, isOpen: open }))}>
         <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{modalState.title}</AlertDialogTitle>
-            <AlertDialogDescription>{modalState.message}</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogAction onClick={() => setModalState(prev => ({ ...prev, isOpen: false }))}>Cerrar</AlertDialogAction>
-          </AlertDialogFooter>
+          <AlertDialogHeader><AlertDialogTitle>{modalState.title}</AlertDialogTitle><AlertDialogDescription>{modalState.message}</AlertDialogDescription></AlertDialogHeader>
+          <AlertDialogFooter><AlertDialogAction onClick={() => setModalState(prev => ({ ...prev, isOpen: false }))}>Cerrar</AlertDialogAction></AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </div>
   );
 };
 
+// ─── Formulario Whapi ────────────────────────────────────────────────────────
 const WhapiForm = ({
   integration, onSave, onCancel, isSaving,
 }: {
@@ -238,7 +232,6 @@ const WhapiForm = ({
     } catch (e) { console.error('Whapi parse error', e); }
     return { apiKey: parsed?.apiKey || '', instanceId: parsed?.instanceId || '' };
   });
-
   const [testStatus, setTestStatus] = useState<TestStatus>('idle');
   const [modalState, setModalState] = useState<ModalState>({ isOpen: false, title: '', message: '' });
 
@@ -269,19 +262,15 @@ const WhapiForm = ({
       </DialogFooter>
       <AlertDialog open={modalState.isOpen} onOpenChange={(open) => setModalState(prev => ({ ...prev, isOpen: open }))}>
         <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{modalState.title}</AlertDialogTitle>
-            <AlertDialogDescription>{modalState.message}</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogAction onClick={() => setModalState(prev => ({ ...prev, isOpen: false }))}>Cerrar</AlertDialogAction>
-          </AlertDialogFooter>
+          <AlertDialogHeader><AlertDialogTitle>{modalState.title}</AlertDialogTitle><AlertDialogDescription>{modalState.message}</AlertDialogDescription></AlertDialogHeader>
+          <AlertDialogFooter><AlertDialogAction onClick={() => setModalState(prev => ({ ...prev, isOpen: false }))}>Cerrar</AlertDialogAction></AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </div>
   );
 };
 
+// ─── Schema y helpers ────────────────────────────────────────────────────────
 const slugify = (text: string) =>
   text.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]+/g, '');
 
@@ -291,12 +280,7 @@ const newIntegrationSchema = z.object({
 });
 type NewIntegrationFormData = z.infer<typeof newIntegrationSchema>;
 
-const REQUIRED_INTEGRATIONS: Array<{ id: string; name: string }> = [
-  { id: 'cloudinary', name: 'Cloudinary' },
-  { id: 'chatbot-integrado-con-whatsapp-para-soporte-y-ventas', name: 'Chatbot IA (Google/OpenAI/Groq)' },
-  { id: 'whapi-whatsapp', name: 'WHAPI (WhatsApp)' },
-];
-
+// ─── Página principal ────────────────────────────────────────────────────────
 export default function IntegrationsPage() {
   const firestore = useFirestore();
   const { toast } = useToast();
@@ -314,33 +298,26 @@ export default function IntegrationsPage() {
     [firestore],
   );
   const { data: integrations, isLoading: isIntegrationsLoading } = useCollection<Integration>(integrationsQuery);
-  
+
+  // ✅ FIX DEFINITIVO:
+  // Usa el snapshot real de `useCollection` para verificar qué falta.
   useEffect(() => {
-    if (!firestore || isIntegrationsLoading || didInit.current) return;
+    if (!firestore || isIntegrationsLoading || !Array.isArray(integrations) || didInit.current) return;
     didInit.current = true;
 
-    const initializeRequiredIntegrations = async () => {
-      for (const item of REQUIRED_INTEGRATIONS) {
-        const docRef = doc(firestore, 'integrations', item.id);
-        try {
-          const snap = await getDoc(docRef);
-          if (!snap.exists()) {
-            await setDoc(docRef, {
-              id: item.id,
-              name: item.name,
-              fields: '{}',
-              status: 'inactive',
-            });
-          }
-        } catch (e) {
-          console.error(`Error inicializando integración ${item.id}:`, e);
-        }
-      }
-    };
+    const existingIds = new Set(integrations.map(i => i.id));
+    const missing = REQUIRED_INTEGRATIONS.filter(r => !existingIds.has(r.id));
+    
+    if (missing.length > 0) {
+        missing.forEach(({ id, name }) => {
+            const docRef = doc(firestore, 'integrations', id);
+            setDoc(docRef, { id, name, fields: '{}', status: 'inactive' }, { merge: true })
+                .catch(e => console.error(`Error creando ${id}:`, e));
+        });
+    }
+  }, [firestore, isIntegrationsLoading, integrations]);
 
-    initializeRequiredIntegrations();
-  }, [firestore, isIntegrationsLoading]);
-
+  // ✅ updateDoc toca ÚNICAMENTE el campo status
   const handleStatusChange = async (integration: Integration, checked: boolean) => {
     if (!firestore) return;
     const newStatus = checked ? 'active' : 'inactive';
@@ -384,14 +361,7 @@ export default function IntegrationsPage() {
     const docRef = doc(firestore, 'integrations', id);
     setDocumentNonBlocking(
       docRef,
-      {
-        id,
-        name: data.name,
-        description: data.description || '',
-        fields: '{}',
-        status: 'inactive',
-        updatedAt: new Date().toISOString(),
-      },
+      { id, name: data.name, description: data.description || '', fields: '{}', status: 'inactive', updatedAt: new Date().toISOString() },
       { merge: true },
     );
     toast({ title: 'Integración Creada', description: `Se ha creado la integración "${data.name}".` });
@@ -399,7 +369,8 @@ export default function IntegrationsPage() {
     reset();
   };
 
-  if (isIntegrationsLoading && !integrations) {
+  // ✅ Muestra loader mientras Firestore carga, evitando renderizar un grid vacío.
+  if (isIntegrationsLoading) {
     return (
       <div className="flex items-center justify-center h-64">
         <Loader2 className="h-8 w-8 animate-spin" />
@@ -407,8 +378,10 @@ export default function IntegrationsPage() {
     );
   }
 
+  // ─── Render ───────────────────────────────────────────────────────────────
   return (
     <div className="flex flex-col gap-6">
+      {/* Header */}
       <Card>
         <CardHeader className="flex flex-row justify-between items-center">
           <div>
@@ -441,8 +414,9 @@ export default function IntegrationsPage() {
         </CardHeader>
       </Card>
 
+      {/* Grid */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {integrations?.map((integration) => {
+        {(integrations ?? []).map((integration) => {
           const icon =
             integration.id === 'cloudinary'
               ? <Cloud className="h-8 w-8" />
@@ -503,8 +477,8 @@ export default function IntegrationsPage() {
                     <p className="text-sm font-medium">Configuración</p>
                     <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                       {isConfigured
-                        ? <><CheckCircle className="h-4 w-4 text-green-500" /> Listo</>
-                        : <><XCircle className="h-4 w-4 text-destructive" /> Pendiente</>}
+                        ? <><CheckCircle className="h-4 w-4 text-green-500" />Listo</>
+                        : <><XCircle className="h-4 w-4 text-destructive" />Pendiente</>}
                     </div>
                   </div>
                 </div>
@@ -519,6 +493,7 @@ export default function IntegrationsPage() {
         })}
       </div>
 
+      {/* Dialog configuración */}
       <Dialog
         open={!!editingIntegration}
         onOpenChange={(open) => !isSaving && !open && setEditingIntegration(null)}
@@ -527,28 +502,13 @@ export default function IntegrationsPage() {
           <DialogContent className="max-w-2xl">
             <DialogHeader><DialogTitle>Configurar {editingIntegration.name}</DialogTitle></DialogHeader>
             {editingIntegration.id === 'cloudinary' && (
-              <CloudinaryForm
-                integration={editingIntegration}
-                onSave={handleSave}
-                onCancel={() => setEditingIntegration(null)}
-                isSaving={isSaving}
-              />
+              <CloudinaryForm integration={editingIntegration} onSave={handleSave} onCancel={() => setEditingIntegration(null)} isSaving={isSaving} />
             )}
             {editingIntegration.id === 'chatbot-integrado-con-whatsapp-para-soporte-y-ventas' && (
-              <AIProviderForm
-                integration={editingIntegration}
-                onSave={handleSave}
-                onCancel={() => setEditingIntegration(null)}
-                isSaving={isSaving}
-              />
+              <AIProviderForm integration={editingIntegration} onSave={handleSave} onCancel={() => setEditingIntegration(null)} isSaving={isSaving} />
             )}
             {editingIntegration.id === 'whapi-whatsapp' && (
-              <WhapiForm
-                integration={editingIntegration}
-                onSave={handleSave}
-                onCancel={() => setEditingIntegration(null)}
-                isSaving={isSaving}
-              />
+              <WhapiForm integration={editingIntegration} onSave={handleSave} onCancel={() => setEditingIntegration(null)} isSaving={isSaving} />
             )}
           </DialogContent>
         )}
