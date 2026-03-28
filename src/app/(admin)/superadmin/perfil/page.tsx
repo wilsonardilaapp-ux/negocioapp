@@ -36,6 +36,15 @@ const passwordSchema = z.object({
   path: ["confirmPassword"],
 });
 
+const withTimeout = <T,>(promise: Promise<T>, timeoutMs: number): Promise<T> => {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error('TIMEOUT')), timeoutMs)
+    ),
+  ]);
+};
+
 const MediaUploader = ({
     label,
     mediaUrl,
@@ -191,16 +200,27 @@ export default function SuperAdminProfilePage() {
       try {
           const reader = new FileReader();
           reader.readAsDataURL(file);
-          reader.onloadend = async () => {
-              const userProfileRef = doc(firestore, 'users', user.uid);
-              const mediaDataUri = reader.result as string;
-              const result = await uploadMedia({ mediaDataUri });
-              setDocumentNonBlocking(userProfileRef, { photoURL: result.secure_url }, { merge: true });
-              toast({ title: 'Avatar actualizado!' });
-              setUploadingField(null);
-          };
+          await new Promise((resolve, reject) => {
+              reader.onloadend = async () => {
+                  const mediaDataUri = reader.result as string;
+                  try {
+                      const result = await withTimeout(uploadMedia({ mediaDataUri }), 15000);
+                      const userProfileRef = doc(firestore, 'users', user.uid);
+                      setDocumentNonBlocking(userProfileRef, { photoURL: result.secure_url }, { merge: true });
+                      toast({ title: 'Avatar actualizado!' });
+                      resolve(result);
+                  } catch(e) {
+                      reject(e);
+                  }
+              };
+              reader.onerror = reject;
+          });
       } catch (error: any) {
-          toast({ variant: 'destructive', title: 'Error al subir', description: error.message });
+          const errorMessage = error.message === 'TIMEOUT' 
+              ? "La subida tardó demasiado. Revisa tu conexión."
+              : error.message || "Ocurrió un error desconocido.";
+          toast({ variant: 'destructive', title: 'Error al subir', description: errorMessage });
+      } finally {
           setUploadingField(null);
       }
   };
@@ -209,6 +229,7 @@ export default function SuperAdminProfilePage() {
     if (!globalConfigDocRef) return;
     
     setUploadingField(field);
+    toast({ title: "Subiendo imagen...", description: "Esto puede tardar un momento." });
 
     try {
         const readFileAsDataURL = (fileToRead: File): Promise<string> => {
@@ -221,12 +242,15 @@ export default function SuperAdminProfilePage() {
         };
 
         const mediaDataUri = await readFileAsDataURL(file);
-        const result = await uploadMedia({ mediaDataUri });
+        const result = await withTimeout(uploadMedia({ mediaDataUri }), 15000);
         await setDocumentNonBlocking(globalConfigDocRef, { [field]: result.secure_url }, { merge: true });
         toast({ title: "Imagen actualizada", description: `La imagen de ${field} ha sido guardada.` });
 
     } catch (error: any) {
-        toast({ variant: 'destructive', title: "Error al subir", description: error.message });
+        const errorMessage = error.message === 'TIMEOUT'
+            ? "La subida tardó demasiado. Revisa tu conexión."
+            : error.message || "Ocurrió un error desconocido.";
+        toast({ variant: 'destructive', title: "Error al subir", description: errorMessage });
     } finally {
         setUploadingField(null);
     }
