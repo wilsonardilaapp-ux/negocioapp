@@ -2,7 +2,7 @@
 "use client";
 
 import { useCollection, useFirestore, updateDocumentNonBlocking, setDocumentNonBlocking, deleteDocumentNonBlocking, useMemoFirebase } from '@/firebase';
-import { collection, doc, writeBatch } from 'firebase/firestore';
+import { collection, doc, writeBatch, updateDoc } from 'firebase/firestore';
 import {
   Card,
   CardHeader,
@@ -66,7 +66,7 @@ export default function ModulesPage() {
   const { data: modules, isLoading } = useCollection<Module>(modulesQuery);
 
   useEffect(() => {
-    if (isLoading || !firestore || didInit.current || !modules) return;
+    if (isLoading || !firestore || didInit.current || modules === undefined) return;
     
     didInit.current = true;
 
@@ -87,7 +87,7 @@ export default function ModulesPage() {
     for (const id in requiredModules) {
         if (!existingIds.includes(id)) {
             const docRef = doc(firestore, 'modules', id);
-            batch.set(docRef, { ...requiredModules[id], id, createdAt: new Date().toISOString() });
+            batch.set(docRef, { ...requiredModules[id], id, createdAt: new Date().toISOString() }, { merge: true });
             writesMade = true;
         }
     }
@@ -121,12 +121,16 @@ export default function ModulesPage() {
     setDialogOpen(false);
   }
 
-  const handleStatusChange = (module: Module) => {
+  const handleStatusChange = async (module: Module) => {
     if (!firestore) return;
     const newStatus = module.status === 'active' ? 'inactive' : 'active';
     const moduleDocRef = doc(firestore, 'modules', module.id);
-    updateDocumentNonBlocking(moduleDocRef, { status: newStatus });
-    toast({ title: "Estado actualizado", description: `El módulo "${module.name}" ahora está ${newStatus === 'active' ? 'activo' : 'inactivo'}.` });
+    try {
+        await updateDoc(moduleDocRef, { status: newStatus });
+        toast({ title: "Estado actualizado", description: `El módulo "${module.name}" ahora está ${newStatus === 'active' ? 'activo' : 'inactivo'}.` });
+    } catch (error) {
+        toast({ variant: 'destructive', title: 'Error', description: 'No se pudo actualizar el estado.' });
+    }
   };
   
   const handleDelete = (module: Module) => {
