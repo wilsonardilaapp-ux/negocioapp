@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useCollection, useFirestore, useMemoFirebase, setDocumentNonBlocking } from '@/firebase';
-import { collection, doc, writeBatch } from 'firebase/firestore';
+import { collection, doc, getDoc, writeBatch } from 'firebase/firestore';
 import {
   Card,
   CardHeader,
@@ -19,7 +19,7 @@ import {
   DialogDescription,
   DialogFooter,
   DialogTrigger,
-} from '@/components/ui/dialog';
+} from "@/components/ui/dialog";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -42,6 +42,9 @@ import type { Module } from '@/models/module';
 import { testApiKey } from '@/ai/flows/test-api-key-flow';
 import { testWhapiConnection } from '@/ai/flows/test-whapi-connection-flow';
 import { saveIntegration } from '@/actions/save-integration';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 
 const withTimeout = <T,>(promise: Promise<T>, timeoutMs: number): Promise<T> => {
   return Promise.race([
@@ -278,31 +281,28 @@ export default function IntegrationsPage() {
     const { data: modules, isLoading: isModulesLoading } = useCollection<Module>(modulesQuery);
 
     useEffect(() => {
-        if (isIntegrationsLoading || !firestore || didInit.current || !integrations) return;
-        
+        if (isIntegrationsLoading || !firestore || didInit.current) return;
         didInit.current = true;
-        const requiredIntegrations: { [key: string]: Omit<Integration, 'id'> } = {
-          'cloudinary': { name: "Cloudinary", fields: '{}', status: "inactive" },
-          'chatbot-integrado-con-whatsapp-para-soporte-y-ventas': { name: "Chatbot IA (Google/OpenAI/Groq)", fields: '{}', status: "inactive" },
-          'whapi-whatsapp': { name: "WHAPI (WhatsApp)", fields: '{}', status: "inactive" }
+
+        const checkAndCreateIntegrations = async () => {
+            const requiredIntegrations: { [key: string]: Omit<Integration, 'id'> } = {
+              'cloudinary': { name: "Cloudinary", fields: '{}', status: "inactive" },
+              'chatbot-integrado-con-whatsapp-para-soporte-y-ventas': { name: "Chatbot IA (Google/OpenAI/Groq)", fields: '{}', status: "inactive" },
+              'whapi-whatsapp': { name: "WHAPI (WhatsApp)", fields: '{}', status: "inactive" }
+            };
+
+            for (const id in requiredIntegrations) {
+                const docRef = doc(firestore, 'integrations', id);
+                const docSnap = await getDoc(docRef);
+                if (!docSnap.exists()) {
+                    await setDocumentNonBlocking(docRef, { id, ...requiredIntegrations[id] });
+                }
+            }
         };
 
-        const existingIds = integrations.map(i => i.id);
-        const batch = writeBatch(firestore);
-        let writes = 0;
-
-        for (const id in requiredIntegrations) {
-            if (!existingIds.includes(id)) {
-                const docRef = doc(firestore, 'integrations', id);
-                batch.set(docRef, { id, ...requiredIntegrations[id] }, { merge: true });
-                writes++;
-            }
-        }
-        if (writes > 0) {
-            batch.commit().catch(err => console.error("Error creating default integrations:", err));
-        }
-    }, [isIntegrationsLoading, integrations, firestore]);
-
+        checkAndCreateIntegrations();
+    }, [isIntegrationsLoading, firestore]);
+    
     const handleStatusChange = async (integration: Integration, checked: boolean) => {
         if (!firestore) return;
         const newStatus = checked ? 'active' : 'inactive';
@@ -345,7 +345,7 @@ export default function IntegrationsPage() {
           updatedAt: new Date().toISOString(),
         };
         const docRef = doc(firestore, 'integrations', id);
-        setDocumentNonBlocking(docRef, newIntegrationData);
+        setDocumentNonBlocking(docRef, newIntegrationData, { merge: true });
 
         toast({ title: "Integración Creada", description: `Se ha creado la integración "${data.name}".` });
         setCreateDialogOpen(false);
