@@ -27,4 +27,5 @@ export type Integration = {
     name: string;
     fields: string; // JSON string for API keys, etc.
     status: 'active' | 'inactive';
+    updatedAt?: string;
 };

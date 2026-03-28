@@ -370,7 +370,7 @@ export default function IntegrationsPage() {
     const { data: modules, isLoading: isModulesLoading } = useCollection<Module>(modulesQuery);
 
     useEffect(() => {
-      if (!isIntegrationsLoading && integrations && firestore) {
+      if (!isIntegrationsLoading && firestore) {
           const requiredIntegrations: { [key: string]: Omit<Integration, 'id'> } = {
               'cloudinary': {
                   name: "Cloudinary",
@@ -389,45 +389,47 @@ export default function IntegrationsPage() {
               }
           };
 
+          (integrations || []).forEach(integration => {
+            delete requiredIntegrations[integration.id];
+          });
+
           for (const id in requiredIntegrations) {
-              if (!integrations.some(i => i.id === id)) {
-                   setDocumentNonBlocking(doc(firestore, 'integrations', id), { id, ...requiredIntegrations[id] });
-              }
+            setDocumentNonBlocking(doc(firestore, 'integrations', id), { id, ...requiredIntegrations[id] });
           }
       }
     }, [isIntegrationsLoading, integrations, firestore]);
     
     useEffect(() => {
-      if (!isModulesLoading && firestore && modules) {
+      if (!isModulesLoading && firestore) {
           const requiredModules: { [id: string]: { name: string; description: string } } = {
               'cloudinary': { name: 'Cloudinary', description: 'Almacenamiento y entrega de imágenes y videos.' },
               'chatbot-integrado-con-whatsapp-para-soporte-y-ventas': { name: 'Chatbot IA (Google/OpenAI/Groq)', description: 'Motores de IA para el chatbot (Google, OpenAI, Groq).' },
               'whapi-whatsapp': { name: 'WHAPI (WhatsApp)', description: 'Envío de mensajes de WhatsApp a través de WHAPI.' }
           };
   
-          const existingModuleIds = modules.map(m => m.id);
+          (modules || []).forEach(module => {
+            delete requiredModules[module.id];
+          });
           
           for (const id in requiredModules) {
-              if (!existingModuleIds.includes(id)) {
-                  const moduleData = requiredModules[id];
-                  const newModule: Omit<Module, 'id'> = {
-                      name: moduleData.name,
-                      description: moduleData.description,
-                      status: 'inactive', 
-                      createdAt: new Date().toISOString(),
-                  };
-                  setDocumentNonBlocking(doc(firestore, 'modules', id), newModule);
-              }
+              const moduleData = requiredModules[id];
+              const newModule: Omit<Module, 'id'> = {
+                  name: moduleData.name,
+                  description: moduleData.description,
+                  status: 'inactive', 
+                  createdAt: new Date().toISOString(),
+              };
+              setDocumentNonBlocking(doc(firestore, 'modules', id), newModule);
           }
       }
     }, [isModulesLoading, modules, firestore]);
 
-    const handleStatusChange = async (integration: Integration) => {
-        const newStatus = integration.status === 'active' ? 'inactive' : 'active';
+    const handleStatusChange = async (integration: Integration, checked: boolean) => {
+        const newStatus = checked ? 'active' : 'inactive';
         const result = await updateIntegrationStatus(integration.id, newStatus);
         
         if (result.success) {
-            toast({ title: "Estado Actualizado", description: `La integración "${integration.name}" ahora está ${newStatus === 'active' ? 'activa' : 'inactiva'}.` });
+            toast({ title: "Estado Actualizado", description: `La integración "${integration.name}" ahora está ${newStatus}.` });
         } else {
             toast({ variant: 'destructive', title: 'Error', description: result.error || 'No se pudo actualizar el estado.' });
         }
@@ -568,7 +570,7 @@ export default function IntegrationsPage() {
                                                 </div>
                                                 <Switch
                                                     checked={integration.status === 'active'}
-                                                    onCheckedChange={() => handleStatusChange(integration)}
+                                                    onCheckedChange={(checked) => handleStatusChange(integration, checked)}
                                                 />
                                             </div>
                                             <div className="flex items-center justify-between space-x-4 rounded-md border p-4">
