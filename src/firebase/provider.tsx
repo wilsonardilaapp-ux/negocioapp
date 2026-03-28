@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, ReactNode, useMemo, useState, useEffect } from 'react';
 import { FirebaseApp } from 'firebase/app';
-import { Firestore, doc, getDoc } from 'firebase/firestore';
+import { Firestore, doc, getDoc, enableNetwork } from 'firebase/firestore';
 import { Auth, User, onAuthStateChanged } from 'firebase/auth';
 import { FirebaseErrorListener } from '@/components/FirebaseErrorListener';
 import { useRouter, usePathname } from 'next/navigation';
@@ -59,6 +59,19 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
   
   const router = useRouter();
   const pathname = usePathname();
+
+  useEffect(() => {
+    if (firestore) {
+      // Ensure the network is enabled. It's safe to call this multiple times.
+      enableNetwork(firestore)
+        .then(() => {
+          console.log("Firestore network connection enabled.");
+        })
+        .catch((error) => {
+          console.error("Error enabling Firestore network: ", error);
+        });
+    }
+  }, [firestore]);
 
   useEffect(() => {
     if (!auth || !firestore) { 
