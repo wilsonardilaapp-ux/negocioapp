@@ -302,6 +302,59 @@ export default function IntegrationsPage() {
     const { data: integrations, isLoading: isIntegrationsLoading } = useCollection<Integration>(integrationsQuery);
     const { data: modules, isLoading: isModulesLoading } = useCollection<Module>(modulesQuery);
 
+    useEffect(() => {
+      if (!isIntegrationsLoading && firestore) {
+          const requiredIntegrations: { [key: string]: Omit<Integration, 'id'> } = {
+              'cloudinary': {
+                  name: "Cloudinary",
+                  fields: JSON.stringify({ cloud_name: "", api_key: "", api_secret: "" }),
+                  status: "inactive",
+              },
+              'chatbot-integrado-con-whatsapp-para-soporte-y-ventas': {
+                  name: "Chatbot IA (Google/OpenAI/Groq)",
+                  fields: JSON.stringify({ google: { apiKey: "" }, openai: { apiKey: "" }, groq: { apiKey: "" } }),
+                  status: "inactive",
+              },
+              'whapi-whatsapp': {
+                  name: "WHAPI (WhatsApp)",
+                  fields: JSON.stringify({ apiKey: "", instanceId: "" }),
+                  status: "inactive",
+              }
+          };
+
+          const existingIds = (integrations || []).map(i => i.id);
+          for (const id in requiredIntegrations) {
+              if (!existingIds.includes(id)) {
+                  setDocumentNonBlocking(doc(firestore, 'integrations', id), { id, ...requiredIntegrations[id] });
+              }
+          }
+      }
+    }, [isIntegrationsLoading, integrations, firestore]);
+    
+    useEffect(() => {
+      if (!isModulesLoading && firestore) {
+          const requiredModules: { [id: string]: { name: string; description: string } } = {
+              'cloudinary': { name: 'Cloudinary', description: 'Almacenamiento y entrega de imágenes y videos.' },
+              'chatbot-integrado-con-whatsapp-para-soporte-y-ventas': { name: 'Chatbot IA (Google/OpenAI/Groq)', description: 'Motores de IA para el chatbot (Google, OpenAI, Groq).' },
+              'whapi-whatsapp': { name: 'WHAPI (WhatsApp)', description: 'Envío de mensajes de WhatsApp a través de WHAPI.' }
+          };
+  
+          const existingIds = (modules || []).map(m => m.id);
+          for (const id in requiredModules) {
+              if (!existingIds.includes(id)) {
+                  const moduleData = requiredModules[id];
+                  const newModule: Omit<Module, 'id'> = {
+                      name: moduleData.name,
+                      description: moduleData.description,
+                      status: 'inactive', 
+                      createdAt: new Date().toISOString(),
+                  };
+                  setDocumentNonBlocking(doc(firestore, 'modules', id), newModule);
+              }
+          }
+      }
+    }, [isModulesLoading, modules, firestore]);
+
     const handleStatusChange = async (integration: Integration, checked: boolean) => {
         if (!firestore) return;
         
@@ -332,11 +385,7 @@ export default function IntegrationsPage() {
         if (!editingIntegration || !firestore) return;
         setIsSaving(true);
         try {
-            const dataToUpdate = {
-                fields: JSON.stringify(formData),
-            };
-            
-            const result = await saveIntegration(editingIntegration.id, dataToUpdate);
+            const result = await saveIntegration(editingIntegration.id, { fields: JSON.stringify(formData) });
             if (!result.success) throw new Error(result.error);
             
             toast({ title: "Guardado", description: `"${editingIntegration.name}" actualizado.` });
@@ -394,25 +443,25 @@ export default function IntegrationsPage() {
                                 <div className="flex items-center justify-between border p-4 rounded-md">
                                     <div className="space-y-1">
                                         <p className="text-sm font-medium">Estado del Servicio</p>
-                                        <p className="text-xs text-muted-foreground">{!isModulePresent ? "Requiere activar el módulo" : (integration.status === 'active' ? "Operativo" : "Desactivado")}</p>
+                                        <p className="text-xs text-muted-foreground">{!isModulePresent ? "Activa el módulo primero" : (integration.status === 'active' ? "Operativo" : "Desactivado")}</p>
                                     </div>
                                     <Switch 
                                         checked={integration.status === 'active'} 
                                         onCheckedChange={(c) => handleStatusChange(integration, c)} 
-                                        disabled={!isModulePresent || isSaving} 
+                                        disabled={!isModulePresent} 
                                     />
                                 </div>
                                 <div className="flex items-center justify-between border p-4 rounded-md">
                                     <div className="space-y-1">
                                         <p className="text-sm font-medium">Configuración</p>
-                                        <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                                             {isConfigured ? <><CheckCircle className="h-4 w-4 text-green-500" /> Listo</> : <><XCircle className="h-4 w-4 text-destructive" /> Pendiente</>}
                                         </div>
                                     </div>
                                 </div>
                             </CardContent>
                             <CardFooter>
-                                <Button className="w-full" onClick={() => setEditingIntegration(integration)} disabled={!isModulePresent || isSaving}>
+                                <Button className="w-full" onClick={() => setEditingIntegration(integration)} disabled={!isModulePresent}>
                                     <Plug className="mr-2 h-4 w-4" /> Editar Configuración
                                 </Button>
                             </CardFooter>
