@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
+import { collection, doc, updateDoc, setDoc, getDoc } from 'firebase/firestore';
 import {
   Card,
   CardHeader,
@@ -73,14 +73,13 @@ const CloudinaryForm = ({
   const [fields, setFields] = useState<CloudinaryFields>(() => {
     let parsed: Partial<CloudinaryFields> = {};
     try {
-      const f = integration.fields;
-      parsed = typeof f === 'string' ? JSON.parse(f || '{}') : (f || {});
-    } catch { parsed = {}; }
-    return { 
-      cloud_name: parsed.cloud_name || '', 
-      api_key: parsed.api_key || '', 
-      api_secret: parsed.api_secret || '' 
-    };
+      if (typeof integration.fields === 'string' && integration.fields.trim()) {
+        parsed = JSON.parse(integration.fields);
+      } else if (typeof integration.fields === 'object' && integration.fields !== null) {
+        parsed = integration.fields as Partial<CloudinaryFields>;
+      }
+    } catch (e) { console.error('Cloudinary parse error', e); }
+    return { cloud_name: parsed.cloud_name || '', api_key: parsed.api_key || '', api_secret: parsed.api_secret || '' };
   });
   const [showApiSecret, setShowApiSecret] = useState(false);
 
@@ -94,18 +93,35 @@ const CloudinaryForm = ({
 
   return (
     <div className="space-y-4">
-      <div><Label htmlFor="cloud_name">Cloud Name</Label><Input id="cloud_name" value={fields.cloud_name} onChange={(e) => setFields(prev => ({ ...prev, cloud_name: e.target.value }))} disabled={isSaving} /></div>
-      <div><Label htmlFor="api_key">API Key</Label><Input id="api_key" value={fields.api_key} onChange={(e) => setFields(prev => ({ ...prev, api_key: e.target.value }))} disabled={isSaving} /></div>
+      <div>
+        <Label htmlFor="cloud_name">Cloud Name</Label>
+        <Input id="cloud_name" value={fields.cloud_name} onChange={(e) => setFields(prev => ({ ...prev, cloud_name: e.target.value }))} disabled={isSaving} />
+      </div>
+      <div>
+        <Label htmlFor="api_key">API Key</Label>
+        <Input id="api_key" value={fields.api_key} onChange={(e) => setFields(prev => ({ ...prev, api_key: e.target.value }))} disabled={isSaving} />
+      </div>
       <div className="relative">
         <Label htmlFor="api_secret">API Secret</Label>
-        <Input type={showApiSecret ? 'text' : 'password'} value={fields.api_secret} onChange={(e) => setFields(prev => ({ ...prev, api_secret: e.target.value }))} className="pr-10" disabled={isSaving} />
-        <Button type="button" variant="ghost" size="icon" className="absolute right-1 top-7 h-7 w-7" onClick={() => setShowApiSecret(!showApiSecret)} disabled={isSaving}>
+        <Input
+          id="api_secret"
+          type={showApiSecret ? 'text' : 'password'}
+          value={fields.api_secret}
+          onChange={(e) => setFields(prev => ({ ...prev, api_secret: e.target.value }))}
+          className="pr-10"
+          disabled={isSaving}
+        />
+        <Button type="button" variant="ghost" size="icon" className="absolute right-1 top-7 h-7 w-7"
+          onClick={() => setShowApiSecret(prev => !prev)} disabled={isSaving}>
           {showApiSecret ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
         </Button>
       </div>
       <DialogFooter>
         <Button variant="outline" onClick={onCancel} disabled={isSaving}>Cancelar</Button>
-        <Button onClick={handleSaveClick} disabled={isSaving}>{isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Guardar Cambios</Button>
+        <Button onClick={handleSaveClick} disabled={isSaving}>
+          {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          Guardar Cambios
+        </Button>
       </DialogFooter>
     </div>
   );
@@ -271,7 +287,7 @@ export default function IntegrationsPage() {
   const [editingIntegration, setEditingIntegration] = useState<Integration | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isCreateDialogOpen, setCreateDialogOpen] = useState(false);
-  const [isCreating, setIsCreating] = useState(false); // New state for creation
+  const [isCreating, setIsCreating] = useState(false);
   const didInit = useRef(false);
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<NewIntegrationFormData>({
@@ -282,14 +298,13 @@ export default function IntegrationsPage() {
     () => (!firestore ? null : collection(firestore, 'integrations')),
     [firestore],
   );
-  const { data: integrations, isLoading } = useCollection<Integration>(integrationsQuery);
+  const { data: integrations, isLoading: isIntegrationsLoading } = useCollection<Integration>(integrationsQuery);
 
   useEffect(() => {
-    if (!firestore || isLoading || !Array.isArray(integrations) || didInit.current) return;
+    if (!firestore || isIntegrationsLoading || !Array.isArray(integrations) || didInit.current) return;
     
     const runSafeInit = async () => {
         try {
-            didInit.current = true;
             const existingIds = new Set(integrations.map(i => i.id));
             for (const req of REQUIRED_INTEGRATIONS) {
                 if (!existingIds.has(req.id)) {
@@ -306,22 +321,22 @@ export default function IntegrationsPage() {
                     }
                 }
             }
+            didInit.current = true;
         } catch (e) {
             console.warn("Firestore offline o cargando: reintentando inicialización...");
-            didInit.current = false; // Permitir reintento si falla la conexión
         }
     };
     runSafeInit();
-  }, [firestore, isLoading, integrations]);
+  }, [firestore, isIntegrationsLoading, integrations]);
 
   const handleStatusChange = async (integration: Integration, checked: boolean) => {
     if (!firestore) return;
     const newStatus = checked ? 'active' : 'inactive';
     try {
       await updateDoc(doc(firestore, 'integrations', integration.id), { status: newStatus });
-      toast({ title: 'Estado Actualizado', description: `${integration.name} está ${newStatus === 'active' ? 'activo' : 'inactivo'}.` });
+      toast({ title: 'Estado Actualizado', description: `"${integration.name}" ahora está ${newStatus}.` });
     } catch {
-      toast({ variant: 'destructive', title: 'Error', description: 'No se pudo actualizar el estado.' });
+      toast({ variant: 'destructive', title: 'Error', description: 'Error al actualizar.' });
     }
   };
 
@@ -339,34 +354,37 @@ export default function IntegrationsPage() {
       setIsSaving(false);
     }
   };
-  
+
   const handleCreateIntegration = async (data: NewIntegrationFormData) => {
     if (!firestore) return;
     setIsCreating(true);
     const id = slugify(data.name);
-    const docRef = doc(firestore, 'integrations', id);
     try {
-      await setDoc(docRef, { 
-        id, 
-        name: data.name, 
-        description: data.description || '', 
-        fields: '{}', 
-        status: 'inactive', 
-        updatedAt: new Date().toISOString() 
-      }, { merge: true });
-      
-      toast({ title: 'Integración Creada', description: `Se ha creado la integración "${data.name}".` });
-      setCreateDialogOpen(false);
-      reset();
+        await setDoc(doc(firestore, 'integrations', id), { 
+            id, 
+            name: data.name, 
+            description: data.description || '', 
+            fields: '{}', 
+            status: 'inactive', 
+            updatedAt: new Date().toISOString() 
+        }, { merge: true });
+        
+        toast({ title: 'Integración Creada', description: `Se ha creado "${data.name}".` });
+        setCreateDialogOpen(false);
+        reset();
     } catch (error) {
-      toast({ variant: 'destructive', title: 'Error', description: 'No se pudo crear la integración.' });
+        toast({ variant: 'destructive', title: 'Error', description: 'No se pudo crear la integración.' });
     } finally {
-      setIsCreating(false);
+        setIsCreating(false);
     }
   };
 
-  if (isLoading) {
-    return <div className="flex items-center justify-center h-64"><Loader2 className="h-8 w-8 animate-spin" /></div>;
+  if (isIntegrationsLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
   }
 
   return (
@@ -375,7 +393,7 @@ export default function IntegrationsPage() {
         <CardHeader className="flex flex-row justify-between items-center">
           <div>
             <CardTitle>Gestión de Integraciones</CardTitle>
-            <CardDescription>Conecta y configura servicios de terceros para ampliar funcionalidades.</CardDescription>
+            <CardDescription>Conecta servicios de terceros para ampliar las funcionalidades.</CardDescription>
           </div>
           <Dialog open={isCreateDialogOpen} onOpenChange={setCreateDialogOpen}>
             <DialogTrigger asChild>
@@ -386,12 +404,12 @@ export default function IntegrationsPage() {
               <form onSubmit={handleSubmit(handleCreateIntegration)} className="space-y-4">
                 <div>
                   <Label>Nombre</Label>
-                  <Input {...register('name')} placeholder="Mi Nueva Integración" />
+                  <Input {...register('name')} placeholder="Ej: Mi API Personal" />
                   {errors.name && <p className="text-sm text-destructive mt-1">{errors.name.message}</p>}
                 </div>
                 <div>
                   <Label>Descripción</Label>
-                  <Input {...register('description')} placeholder="¿Qué hace esta integración?" />
+                  <Input {...register('description')} placeholder="¿Para qué sirve?" />
                 </div>
                 <DialogFooter>
                   <Button type="button" variant="outline" onClick={() => setCreateDialogOpen(false)} disabled={isCreating}>Cancelar</Button>
@@ -432,7 +450,7 @@ export default function IntegrationsPage() {
             } else {
               isConfigured = Object.keys(fields).length > 0;
             }
-          } catch { isConfigured = false; }
+          } catch { /* isConfigured permanece false */ }
 
           const isActive = integration.status === 'active';
 
@@ -453,9 +471,15 @@ export default function IntegrationsPage() {
                 <div className="flex items-center justify-between border p-4 rounded-md">
                   <div className="space-y-1">
                     <p className="text-sm font-medium">Estado del Servicio</p>
-                    <p className="text-xs text-muted-foreground">{isActive ? 'Operativo' : 'Desactivado'}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {isActive ? 'Operativo' : 'Desactivado'}
+                    </p>
                   </div>
-                  <Switch checked={isActive} onCheckedChange={(c) => handleStatusChange(integration, c)} />
+                  <Switch
+                    checked={isActive}
+                    onCheckedChange={(c) => handleStatusChange(integration, c)}
+                    disabled={isSaving}
+                  />
                 </div>
                 <div className="flex items-center justify-between border p-4 rounded-md">
                   <div className="space-y-1">
@@ -478,15 +502,27 @@ export default function IntegrationsPage() {
         })}
       </div>
 
-      <Dialog open={!!editingIntegration} onOpenChange={(open) => !isSaving && !open && setEditingIntegration(null)}>
+      <Dialog
+        open={!!editingIntegration}
+        onOpenChange={(open) => !isSaving && !open && setEditingIntegration(null)}
+      >
         {editingIntegration && (
           <DialogContent className="max-w-2xl">
             <DialogHeader><DialogTitle>Configurar {editingIntegration.name}</DialogTitle></DialogHeader>
-            {editingIntegration.id === 'cloudinary' && <CloudinaryForm integration={editingIntegration} onSave={handleSave} onCancel={() => setEditingIntegration(null)} isSaving={isSaving} />}
-            {editingIntegration.id === 'chatbot-integrado-con-whatsapp-para-soporte-y-ventas' && <AIProviderForm integration={editingIntegration} onSave={handleSave} onCancel={() => setEditingIntegration(null)} isSaving={isSaving} />}
-            {editingIntegration.id === 'whapi-whatsapp' && <WhapiForm integration={editingIntegration} onSave={handleSave} onCancel={() => setEditingIntegration(null)} isSaving={isSaving} />}
-            {!REQUIRED_INTEGRATIONS.find(r => r.id === editingIntegration.id) && (
-              <div className="p-4 text-center text-muted-foreground text-sm">Esta integración manual no requiere campos adicionales o usa configuración externa.</div>
+            {editingIntegration.id === 'cloudinary' && (
+              <CloudinaryForm integration={editingIntegration} onSave={handleSave} onCancel={() => setEditingIntegration(null)} isSaving={isSaving} />
+            )}
+            {editingIntegration.id === 'chatbot-integrado-con-whatsapp-para-soporte-y-ventas' && (
+              <AIProviderForm integration={editingIntegration} onSave={handleSave} onCancel={() => setEditingIntegration(null)} isSaving={isSaving} />
+            )}
+            {editingIntegration.id === 'whapi-whatsapp' && (
+              <WhapiForm integration={editingIntegration} onSave={handleSave} onCancel={() => setEditingIntegration(null)} isSaving={isSaving} />
+            )}
+            {/* Fallback for custom integrations without a specific form */}
+            {!['cloudinary', 'chatbot-integrado-con-whatsapp-para-soporte-y-ventas', 'whapi-whatsapp'].includes(editingIntegration.id) && (
+              <div className="p-4 text-center text-muted-foreground text-sm">
+                Esta es una integración personalizada. La configuración avanzada se realiza a través de la API.
+              </div>
             )}
           </DialogContent>
         )}
@@ -494,4 +530,3 @@ export default function IntegrationsPage() {
     </div>
   );
 }
-```
