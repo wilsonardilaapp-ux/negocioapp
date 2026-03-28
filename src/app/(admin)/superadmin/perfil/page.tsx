@@ -131,7 +131,7 @@ const MediaUploader = ({
 const fallbackGlobalConfig: GlobalConfig = {
     id: 'system',
     maintenance: false,
-    logoURL: '', // Estandarizado a camelCase
+    logoURL: '',
     bannerUrl: '',
     faviconUrl: '',
     theme: 'default',
@@ -150,21 +150,14 @@ export default function SuperAdminProfilePage() {
   const globalConfigDocRef = useMemoFirebase(() => !firestore ? null : doc(firestore, 'globalConfig', 'system'), [firestore]);
   const { data: globalConfigData, isLoading: isGlobalConfigLoading } = useDoc<GlobalConfig>(globalConfigDocRef);
   
-  // Consulta para verificar estado de Cloudinary
   const integrationsQuery = useMemoFirebase(() => !firestore ? null : collection(firestore, 'integrations'), [firestore]);
   const { data: integrations } = useCollection<Integration>(integrationsQuery);
 
   const cloudinaryIntegration = integrations?.find(i => i.id === 'cloudinary');
   
-  const isCloudinaryReady = () => {
+  const isCloudinaryActive = () => {
     if (!cloudinaryIntegration) return false;
-    if (cloudinaryIntegration.status !== 'active') return false;
-    try {
-        const fields = typeof cloudinaryIntegration.fields === 'string' 
-            ? JSON.parse(cloudinaryIntegration.fields) 
-            : cloudinaryIntegration.fields;
-        return !!(fields?.cloud_name && fields?.api_key && fields?.api_secret);
-    } catch { return false; }
+    return cloudinaryIntegration.status === 'active';
   };
 
   const { register, handleSubmit, formState: { errors, isSubmitting }, reset } = useForm<z.infer<typeof profileSchema>>({
@@ -196,6 +189,7 @@ export default function SuperAdminProfilePage() {
         role: 'super_admin',
         status: 'active',
         createdAt: profile?.createdAt || new Date().toISOString(),
+        lastLogin: new Date().toISOString(),
     };
     
     setDocumentNonBlocking(userProfileRef, dataToSave, { merge: true });
@@ -217,8 +211,8 @@ export default function SuperAdminProfilePage() {
       const file = event.target.files?.[0];
       if (!file || !user || !firestore) return;
 
-      if (!isCloudinaryReady()) {
-          toast({ variant: 'destructive', title: "Cloudinary no configurado", description: "Configura las API Keys en Integraciones primero." });
+      if (!isCloudinaryActive()) {
+          toast({ variant: 'destructive', title: "Cloudinary Inactivo", description: "Activa la integración de Cloudinary para poder subir archivos." });
           return;
       }
       
@@ -247,8 +241,8 @@ export default function SuperAdminProfilePage() {
   const handleMediaUpload = async (file: File, field: keyof GlobalConfig) => {
     if (!globalConfigDocRef) return;
 
-    if (!isCloudinaryReady()) {
-        toast({ variant: 'destructive', title: "Cloudinary no configurado", description: "Configura las API Keys en Integraciones para poder subir archivos." });
+    if (!isCloudinaryActive()) {
+        toast({ variant: 'destructive', title: "Cloudinary Inactivo", description: "Activa la integración de Cloudinary para poder subir archivos." });
         return;
     }
     
@@ -285,8 +279,8 @@ export default function SuperAdminProfilePage() {
     );
   }
   
-  const globalConfig = { ...fallbackGlobalConfig, ...globalConfigData, logoURL: globalConfigData?.logoURL || fallbackGlobalConfig.logoURL };
-  const cloudinaryReady = isCloudinaryReady();
+  const globalConfig = { ...fallbackGlobalConfig, ...globalConfigData };
+  const cloudinaryActive = isCloudinaryActive();
 
   if (!user || !profile) {
     return <div>No se pudo cargar el perfil.</div>
@@ -306,7 +300,7 @@ export default function SuperAdminProfilePage() {
                 size="icon"
                 className="absolute bottom-0 right-0 rounded-full h-8 w-8 bg-background shadow-sm"
                 onClick={() => fileInputRef.current?.click()}
-                disabled={uploadingField === 'avatar'}
+                disabled={uploadingField === 'avatar' || !cloudinaryActive}
             >
                 {uploadingField === 'avatar' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
             </Button>
@@ -393,18 +387,18 @@ export default function SuperAdminProfilePage() {
                         <CardTitle>Identidad Visual</CardTitle>
                         <CardDescription>Logo, banner y favicon del sistema.</CardDescription>
                     </div>
-                    {!cloudinaryReady && (
+                    {!cloudinaryActive && (
                         <Badge variant="destructive" className="gap-1">
                             <AlertTriangle className="h-3 w-3" />
-                            Cloudinary Off
+                            Cloudinary Inactivo
                         </Badge>
                     )}
                 </div>
               </CardHeader>
               <CardContent className="space-y-6">
-                {!cloudinaryReady && (
+                {!cloudinaryActive && (
                     <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-md text-xs text-destructive mb-4">
-                        <strong>Atención:</strong> Cloudinary no está configurado o está inactivo. No podrás subir nuevas imágenes hasta que ingreses las credenciales en la sección de Integraciones.
+                        <strong>Atención:</strong> La integración de Cloudinary está inactiva. No podrás subir nuevas imágenes hasta que la actives en la sección de Integraciones.
                     </div>
                 )}
                 <MediaUploader
@@ -415,7 +409,7 @@ export default function SuperAdminProfilePage() {
                   dimensions="Recomendado: 400x100px"
                   isUploading={uploadingField === 'logoURL'}
                   aspectRatio="aspect-[4/1]"
-                  disabled={!cloudinaryReady}
+                  disabled={!cloudinaryActive}
                 />
                 <MediaUploader
                   label="Banner Principal"
@@ -425,7 +419,7 @@ export default function SuperAdminProfilePage() {
                   dimensions="Recomendado: 1200x400px"
                   isUploading={uploadingField === 'bannerUrl'}
                   aspectRatio="aspect-[3/1]"
-                  disabled={!cloudinaryReady}
+                  disabled={!cloudinaryActive}
                 />
                 <MediaUploader
                   label="Favicon"
@@ -436,7 +430,7 @@ export default function SuperAdminProfilePage() {
                   isUploading={uploadingField === 'faviconUrl'}
                   aspectRatio="aspect-square"
                   isIcon={true}
-                  disabled={!cloudinaryReady}
+                  disabled={!cloudinaryActive}
                 />
               </CardContent>
             </Card>
