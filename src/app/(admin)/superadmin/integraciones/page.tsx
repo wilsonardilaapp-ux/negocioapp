@@ -493,7 +493,7 @@ export default function IntegrationsPage() {
                     <div>
                         <CardTitle>Gestión de Integraciones</CardTitle>
                         <CardDescription>
-                            Conecta y configura servicios de terceros para ampliar las funcionalidades de la plataforma. Para poder configurar una integración, su módulo asociado debe estar activo en la página "Módulos".
+                            Conecta y configura servicios de terceros para ampliar las funcionalidades de la plataforma.
                         </CardDescription>
                     </div>
                 </CardHeader>
@@ -507,8 +507,6 @@ export default function IntegrationsPage() {
             ) : (
                 <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                     {integrations?.filter(i => ['cloudinary', 'chatbot-integrado-con-whatsapp-para-soporte-y-ventas', 'whapi-whatsapp'].includes(i.id)).map(integration => {
-                         const module = modules?.find(m => m.id === integration.id);
-                         const isModuleActive = !!module;
                          
                          let icon;
                          let description;
@@ -543,7 +541,7 @@ export default function IntegrationsPage() {
                          } catch {}
 
                         return (
-                            <Card key={integration.id} className={!isModuleActive ? 'bg-muted/50' : ''}>
+                            <Card key={integration.id}>
                                 <CardHeader>
                                     <div className="flex justify-between items-start">
                                         <div className="flex items-center gap-4">
@@ -553,47 +551,37 @@ export default function IntegrationsPage() {
                                                 <CardDescription>{description}</CardDescription>
                                             </div>
                                         </div>
-                                        {isModuleActive && (
                                         <Badge variant={integration.status === 'active' ? 'default' : 'secondary'}>
                                             {integration.status === 'active' ? 'Activo' : 'Inactivo'}
                                         </Badge>
-                                        )}
                                     </div>
                                 </CardHeader>
                                 <CardContent className="space-y-4">
-                                    {isModuleActive ? (
-                                        <>
-                                            <div className="flex items-center justify-between space-x-4 rounded-md border p-4">
-                                                <div className="flex-1 space-y-1">
-                                                    <p className="text-sm font-medium leading-none">Estado del Servicio</p>
-                                                    <p className="text-sm text-muted-foreground">{integration.status === 'active' ? "El servicio está operativo." : "El servicio está desactivado."}</p>
-                                                </div>
-                                                <Switch
-                                                    checked={integration.status === 'active'}
-                                                    onCheckedChange={(checked) => handleStatusChange(integration, checked)}
-                                                />
-                                            </div>
-                                            <div className="flex items-center justify-between space-x-4 rounded-md border p-4">
-                                                <div className="flex-1 space-y-1">
-                                                    <p className="text-sm font-medium leading-none">Configuración</p>
-                                                    <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                                                         {isConfigured ? (
-                                                            <><CheckCircle className="h-4 w-4 text-green-500" /><span>Credenciales configuradas.</span></>
-                                                        ) : (
-                                                            <><XCircle className="h-4 w-4 text-destructive" /><span>Requiere configuración.</span></>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </>
-                                    ) : (
-                                        <div className="text-center text-sm text-muted-foreground p-4 border rounded-md">
-                                            Activa el módulo correspondiente para configurar esta integración.
+                                    <div className="flex items-center justify-between space-x-4 rounded-md border p-4">
+                                        <div className="flex-1 space-y-1">
+                                            <p className="text-sm font-medium leading-none">Estado del Servicio</p>
+                                            <p className="text-sm text-muted-foreground">{integration.status === 'active' ? "El servicio está operativo." : "El servicio está desactivado."}</p>
                                         </div>
-                                    )}
+                                        <Switch
+                                            checked={integration.status === 'active'}
+                                            onCheckedChange={(checked) => handleStatusChange(integration, checked)}
+                                        />
+                                    </div>
+                                    <div className="flex items-center justify-between space-x-4 rounded-md border p-4">
+                                        <div className="flex-1 space-y-1">
+                                            <p className="text-sm font-medium leading-none">Configuración</p>
+                                            <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                                                 {isConfigured ? (
+                                                    <><CheckCircle className="h-4 w-4 text-green-500" /><span>Credenciales configuradas.</span></>
+                                                ) : (
+                                                    <><XCircle className="h-4 w-4 text-destructive" /><span>Requiere configuración.</span></>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
                                 </CardContent>
                                 <CardFooter>
-                                    <Button className="w-full" disabled={!isModuleActive} onClick={() => setEditingIntegration(integration)}>
+                                    <Button className="w-full" onClick={() => setEditingIntegration(integration)}>
                                         <Plug className="mr-2 h-4 w-4" />
                                         Editar Configuración
                                     </Button>
@@ -622,3 +610,5 @@ export default function IntegrationsPage() {
         </div>
     );
 }
+
+    
