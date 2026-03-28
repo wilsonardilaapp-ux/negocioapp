@@ -5,4 +5,5 @@ export type Module = {
     status: 'active' | 'inactive';
     createdAt: string;
     limit?: number; // Límite de registros permitidos
+    updatedAt?: string;
 };

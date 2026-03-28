@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useTransition } from 'react';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { collection, doc, updateDoc, setDoc, getDoc } from 'firebase/firestore';
 import {
@@ -43,15 +43,6 @@ import { saveIntegration } from '@/actions/save-integration';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-
-const withTimeout = <T,>(promise: Promise<T>, timeoutMs: number): Promise<T> => {
-  return Promise.race([
-    promise,
-    new Promise<T>((_, reject) =>
-      setTimeout(() => reject(new Error('TIMEOUT')), timeoutMs)
-    ),
-  ]);
-};
 
 // IDs requeridos del sistema — NUNCA sobreescribir si ya existen
 const REQUIRED_INTEGRATIONS: Array<{ id: string; name: string }> = [
@@ -285,9 +276,9 @@ export default function IntegrationsPage() {
   const firestore = useFirestore();
   const { toast } = useToast();
   const [editingIntegration, setEditingIntegration] = useState<Integration | null>(null);
-  const [isSaving, setIsSaving] = useState(false);
+  const [isSaving, startTransition] = useTransition();
   const [isCreateDialogOpen, setCreateDialogOpen] = useState(false);
-  const [isCreating, setIsCreating] = useState(false);
+  const [isCreating, startCreateTransition] = useTransition();
   const didInit = useRef(false);
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<NewIntegrationFormData>({
@@ -340,43 +331,40 @@ export default function IntegrationsPage() {
     }
   };
 
-  const handleSave = async (formData: any) => {
-    if (!editingIntegration || !firestore) return;
-    setIsSaving(true);
-    try {
-      const result = await withTimeout(saveIntegration(editingIntegration.id, { fields: JSON.stringify(formData) }), 15000);
-      if (!result.success) throw new Error(result.error);
-      toast({ title: 'Éxito', description: 'Configuración guardada correctamente.' });
-      setEditingIntegration(null);
-    } catch (e: any) {
-      toast({ variant: 'destructive', title: 'Error', description: e.message || 'Error de red.' });
-    } finally {
-      setIsSaving(false);
-    }
+  const handleSave = (formData: any) => {
+    if (!editingIntegration) return;
+    startTransition(async () => {
+      const result = await saveIntegration(editingIntegration.id, { fields: JSON.stringify(formData) });
+      if (result.success) {
+        toast({ title: 'Éxito', description: 'Configuración guardada correctamente.' });
+        setEditingIntegration(null);
+      } else {
+        toast({ variant: 'destructive', title: 'Error', description: result.error || 'No se pudo guardar la configuración.' });
+      }
+    });
   };
 
-  const handleCreateIntegration = async (data: NewIntegrationFormData) => {
+  const handleCreateIntegration = (data: NewIntegrationFormData) => {
     if (!firestore) return;
-    setIsCreating(true);
-    const id = slugify(data.name);
-    try {
-        await setDoc(doc(firestore, 'integrations', id), { 
-            id, 
-            name: data.name, 
-            description: data.description || '', 
-            fields: '{}', 
-            status: 'inactive', 
-            updatedAt: new Date().toISOString() 
-        }, { merge: true });
-        
-        toast({ title: 'Integración Creada', description: `Se ha creado "${data.name}".` });
-        setCreateDialogOpen(false);
-        reset();
-    } catch (error) {
-        toast({ variant: 'destructive', title: 'Error', description: 'No se pudo crear la integración.' });
-    } finally {
-        setIsCreating(false);
-    }
+    startCreateTransition(async () => {
+        const id = slugify(data.name);
+        try {
+            await setDoc(doc(firestore, 'integrations', id), { 
+                id, 
+                name: data.name, 
+                description: data.description || '', 
+                fields: '{}', 
+                status: 'inactive', 
+                updatedAt: new Date().toISOString() 
+            }, { merge: true });
+            
+            toast({ title: 'Integración Creada', description: `Se ha creado "${data.name}".` });
+            setCreateDialogOpen(false);
+            reset();
+        } catch (error) {
+            toast({ variant: 'destructive', title: 'Error', description: 'No se pudo crear la integración.' });
+        }
+    });
   };
 
   if (isIntegrationsLoading) {
@@ -504,7 +492,13 @@ export default function IntegrationsPage() {
 
       <Dialog
         open={!!editingIntegration}
-        onOpenChange={(open) => !isSaving && !open && setEditingIntegration(null)}
+        onOpenChange={(open) => {
+          if (!isSaving) {
+            if (!open) {
+              setEditingIntegration(null);
+            }
+          }
+        }}
       >
         {editingIntegration && (
           <DialogContent className="max-w-2xl">
