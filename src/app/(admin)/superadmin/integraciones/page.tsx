@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useCollection, useFirestore, useMemoFirebase, setDocumentNonBlocking } from '@/firebase';
-import { collection, doc, getDoc, writeBatch } from 'firebase/firestore';
+import { collection, doc, writeBatch } from 'firebase/firestore';
 import {
   Card,
   CardHeader,
@@ -281,7 +281,8 @@ export default function IntegrationsPage() {
     const { data: modules, isLoading: isModulesLoading } = useCollection<Module>(modulesQuery);
 
     useEffect(() => {
-        if (isIntegrationsLoading || !firestore || didInit.current) return;
+        if (isIntegrationsLoading || !firestore || didInit.current || !integrations) return;
+        
         didInit.current = true;
 
         const checkAndCreateIntegrations = async () => {
@@ -291,17 +292,24 @@ export default function IntegrationsPage() {
               'whapi-whatsapp': { name: "WHAPI (WhatsApp)", fields: '{}', status: "inactive" }
             };
 
+            const existingIds = integrations.map(i => i.id);
+            const batch = writeBatch(firestore);
+            let writesMade = false;
+
             for (const id in requiredIntegrations) {
-                const docRef = doc(firestore, 'integrations', id);
-                const docSnap = await getDoc(docRef);
-                if (!docSnap.exists()) {
-                    await setDocumentNonBlocking(docRef, { id, ...requiredIntegrations[id] });
+                if (!existingIds.includes(id)) {
+                    const docRef = doc(firestore, 'integrations', id);
+                    batch.set(docRef, { id, ...requiredIntegrations[id] });
+                    writesMade = true;
                 }
+            }
+            if (writesMade) {
+                await batch.commit();
             }
         };
 
         checkAndCreateIntegrations();
-    }, [isIntegrationsLoading, firestore]);
+    }, [isIntegrationsLoading, firestore, integrations]);
     
     const handleStatusChange = async (integration: Integration, checked: boolean) => {
         if (!firestore) return;
@@ -352,7 +360,9 @@ export default function IntegrationsPage() {
         reset();
     };
 
-    if (isIntegrationsLoading || isModulesLoading) {
+    const isLoading = isIntegrationsLoading || isModulesLoading;
+
+    if (isLoading && !integrations && !modules) {
         return <div className="flex items-center justify-center h-64"><Loader2 className="h-8 w-8 animate-spin" /></div>;
     }
 

@@ -67,6 +67,7 @@ export default function ModulesPage() {
 
   useEffect(() => {
     if (isLoading || !firestore || didInit.current || !modules) return;
+    
     didInit.current = true;
 
     const requiredModules: { [id: string]: Omit<Module, 'id' | 'createdAt'> } = {
@@ -79,18 +80,19 @@ export default function ModulesPage() {
         'google-analytics': { name: 'Google Analytics', description: 'Integración con Google Analytics', status: 'inactive' },
     };
     
-    const existingIds = modules.map(m => m.id);
     const batch = writeBatch(firestore);
-    let writes = 0;
+    let writesMade = false;
+    const existingIds = modules.map(m => m.id);
 
     for (const id in requiredModules) {
         if (!existingIds.includes(id)) {
             const docRef = doc(firestore, 'modules', id);
-            batch.set(docRef, { ...requiredModules[id], id, createdAt: new Date().toISOString() }, { merge: true });
-            writes++;
+            batch.set(docRef, { ...requiredModules[id], id, createdAt: new Date().toISOString() });
+            writesMade = true;
         }
     }
-    if(writes > 0) {
+
+    if(writesMade) {
         batch.commit().catch(err => console.error("Error creating default modules:", err));
     }
   }, [isLoading, modules, firestore]);
@@ -160,7 +162,7 @@ export default function ModulesPage() {
     handleCloseDialog();
   };
 
-  if (isLoading) {
+  if (isLoading && !modules) {
     return <div className="flex items-center justify-center h-64"><Loader2 className="h-8 w-8 animate-spin" /> Cargando módulos...</div>;
   }
 
