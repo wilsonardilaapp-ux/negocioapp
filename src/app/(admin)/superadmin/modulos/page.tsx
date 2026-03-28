@@ -77,25 +77,30 @@ export default function ModulesPage() {
     resolver: zodResolver(moduleSchema),
   });
   
+  // ✅ FIX DE PERSISTENCIA: Inicialización segura y no destructiva
   useEffect(() => {
     if (!firestore || isLoading || !Array.isArray(modules) || didInit.current) return;
     
     const runSafeInit = async () => {
         didInit.current = true;
-        try {
-            for (const id in REQUIRED_MODULES) {
+        const existingIds = new Set(modules.map(m => m.id));
+
+        for (const id in REQUIRED_MODULES) {
+            if (!existingIds.has(id)) {
                 const docRef = doc(firestore, 'modules', id);
-                const snap = await getDoc(docRef);
-                if (!snap.exists()) {
-                    await setDoc(docRef, { 
-                        id, 
-                        ...REQUIRED_MODULES[id as keyof typeof REQUIRED_MODULES],
-                        createdAt: new Date().toISOString() 
-                    }, { merge: true });
+                try {
+                    const snap = await getDoc(docRef);
+                    if (!snap.exists()) {
+                        await setDoc(docRef, { 
+                            id, 
+                            ...REQUIRED_MODULES[id as keyof typeof REQUIRED_MODULES],
+                            createdAt: new Date().toISOString() 
+                        }, { merge: true });
+                    }
+                } catch (e) {
+                     console.warn(`Firestore no disponible para verificar ${id}, se reintentará.`);
                 }
             }
-        } catch (e) {
-            console.warn("Firestore offline: reintentando módulos luego...");
         }
     };
     runSafeInit();
@@ -121,6 +126,7 @@ export default function ModulesPage() {
     setDialogOpen(false);
   }
 
+  // ✅ FIX DE PERSISTENCIA: Usa `await updateDoc` para garantizar la escritura
   const handleStatusChange = async (module: Module) => {
     if (!firestore) return;
     const newStatus = module.status === 'active' ? 'inactive' : 'active';
