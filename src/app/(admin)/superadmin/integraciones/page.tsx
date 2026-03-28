@@ -151,7 +151,7 @@ const AIProviderForm = ({ integration, onSave, onCancel, isSaving }: { integrati
     const handleTestConnection = async (provider: Provider) => {
         const apiKey = fields[provider]?.apiKey;
         if (!apiKey) {
-            setModalState({ isOpen: true, title: 'API Key Requerida', message: `Introduce una API Key para ${provider}.` });
+            setModalState({ isOpen: true, title: 'API Key Requerida', message: `Por favor, introduce una API Key para ${provider}.` });
             return;
         }
 
@@ -275,14 +275,14 @@ const WhapiForm = ({ integration, onSave, onCancel, isSaving }: { integration: I
                     Guardar Cambios
                 </Button>
             </DialogFooter>
-            <AlertDialog open={modalState.isOpen} onOpenChange={(open) => setModalState(prev => ({...prev, isOpen: open}))}>
+            <AlertDialog open={modalState.isOpen} onOpenChange={(isOpen) => setModalState(prev => ({...prev, isOpen}))}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
                         <AlertDialogTitle>{modalState.title}</AlertDialogTitle>
                         <AlertDialogDescription>{modalState.message}</AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                        <AlertDialogAction onClick={() => setModalState(prev => ({ ...prev, isOpen: false }))}>Cerrar</AlertDialogAction>
+                        <AlertDialogAction onClick={() => setModalState({ isOpen: false, title: '', message: '' })}>Cerrar</AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
@@ -302,8 +302,9 @@ export default function IntegrationsPage() {
     const { data: integrations, isLoading: isIntegrationsLoading } = useCollection<Integration>(integrationsQuery);
     const { data: modules, isLoading: isModulesLoading } = useCollection<Module>(modulesQuery);
 
-    const handleStatusChange = (integration: Integration, checked: boolean) => {
+    const handleStatusChange = async (integration: Integration, checked: boolean) => {
         if (!firestore) return;
+        
         const newStatus = checked ? 'active' : 'inactive';
         
         try {
@@ -317,12 +318,12 @@ export default function IntegrationsPage() {
                 title: "Estado Actualizado", 
                 description: `"${integration.name}" ahora está ${newStatus}.` 
             });
-        } catch (error: any) {
+        } catch (error) {
             console.error("Error al cambiar estado:", error);
             toast({ 
                 variant: 'destructive', 
                 title: 'Error', 
-                description: 'No se pudo actualizar el estado. Por favor, recarga la página.'
+                description: 'No se pudo actualizar el estado.' 
             });
         }
     };
@@ -362,8 +363,7 @@ export default function IntegrationsPage() {
             
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                 {integrations?.filter(i => ['cloudinary', 'chatbot-integrado-con-whatsapp-para-soporte-y-ventas', 'whapi-whatsapp'].includes(i.id)).map(integration => {
-                     const module = modules?.find(m => m.id === integration.id);
-                     const isModuleActive = module?.status === 'active';
+                     const isModulePresent = modules?.some(m => m.id === integration.id);
                      const icon = integration.id === 'cloudinary' ? <Cloud className="h-8 w-8" /> : (integration.id === 'whapi-whatsapp' ? <WhatsAppIcon className="h-8 w-8" /> : <Bot className="h-8 w-8" />);
                      
                      let isConfigured = false;
@@ -378,7 +378,7 @@ export default function IntegrationsPage() {
                      } catch {}
 
                     return (
-                        <Card key={integration.id} className={!isModuleActive ? 'bg-muted/50' : ''}>
+                        <Card key={integration.id} className={!isModulePresent ? 'opacity-60 bg-muted/30' : ''}>
                             <CardHeader>
                                 <div className="flex justify-between items-start">
                                     <div className="flex items-center gap-4">
@@ -394,25 +394,25 @@ export default function IntegrationsPage() {
                                 <div className="flex items-center justify-between border p-4 rounded-md">
                                     <div className="space-y-1">
                                         <p className="text-sm font-medium">Estado del Servicio</p>
-                                        <p className="text-xs text-muted-foreground">{!isModuleActive ? "Activa el módulo primero" : (integration.status === 'active' ? "Operativo" : "Desactivado")}</p>
+                                        <p className="text-xs text-muted-foreground">{!isModulePresent ? "Requiere activar el módulo" : (integration.status === 'active' ? "Operativo" : "Desactivado")}</p>
                                     </div>
                                     <Switch 
                                         checked={integration.status === 'active'} 
                                         onCheckedChange={(c) => handleStatusChange(integration, c)} 
-                                        disabled={isSaving || !isModuleActive}
+                                        disabled={!isModulePresent || isSaving} 
                                     />
                                 </div>
                                 <div className="flex items-center justify-between border p-4 rounded-md">
                                     <div className="space-y-1">
                                         <p className="text-sm font-medium">Configuración</p>
-                                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                        <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
                                             {isConfigured ? <><CheckCircle className="h-4 w-4 text-green-500" /> Listo</> : <><XCircle className="h-4 w-4 text-destructive" /> Pendiente</>}
                                         </div>
                                     </div>
                                 </div>
                             </CardContent>
                             <CardFooter>
-                                <Button className="w-full" onClick={() => setEditingIntegration(integration)} disabled={isSaving || !isModuleActive}>
+                                <Button className="w-full" onClick={() => setEditingIntegration(integration)} disabled={!isModulePresent || isSaving}>
                                     <Plug className="mr-2 h-4 w-4" /> Editar Configuración
                                 </Button>
                             </CardFooter>
