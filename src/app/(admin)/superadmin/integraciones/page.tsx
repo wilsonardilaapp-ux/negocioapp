@@ -53,7 +53,7 @@ const withTimeout = <T,>(promise: Promise<T>, timeoutMs: number): Promise<T> => 
   ]);
 };
 
-// Integraciones que el sistema garantiza que existan
+// IDs requeridos del sistema — NUNCA sobreescribir si ya existen
 const REQUIRED_INTEGRATIONS: Array<{ id: string; name: string }> = [
   { id: 'cloudinary',                                           name: 'Cloudinary' },
   { id: 'chatbot-integrado-con-whatsapp-para-soporte-y-ventas', name: 'Chatbot IA (Google/OpenAI/Groq)' },
@@ -171,7 +171,7 @@ const AIProviderForm = ({
           <CardHeader><CardTitle className="text-lg capitalize">{p === 'google' ? 'Google AI Studio' : p}</CardTitle></CardHeader>
           <CardContent className="space-y-3">
             <Label>API Key</Label>
-            <Input type="password" value={fields[p]?.apiKey} onChange={(e) => {
+            <Input type="password" value={fields[p]?.apiKey || ''} onChange={(e) => {
               setFields(prev => ({ ...prev, [p]: { apiKey: e.target.value } }));
               setTestStatus(prev => ({ ...prev, [p]: 'idle' }));
             }} disabled={isSaving} />
@@ -234,7 +234,7 @@ const WhapiForm = ({
       <div><Label>API Key</Label><Input type="password" value={fields.apiKey} onChange={(e) => setFields(prev => ({ ...prev, apiKey: e.target.value }))} disabled={isSaving} /></div>
       <div><Label>Instance ID</Label><Input value={fields.instanceId} onChange={(e) => setFields(prev => ({ ...prev, instanceId: e.target.value }))} disabled={isSaving} /></div>
       <Button variant="outline" className="w-full" onClick={handleTestConnection} disabled={isSaving || testStatus === 'testing'}>
-        {testStatus === 'testing' && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+        {testStatus === 'testing' && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
         Probar Conexión
       </Button>
       <DialogFooter className="pt-4">
@@ -271,7 +271,7 @@ export default function IntegrationsPage() {
   const [editingIntegration, setEditingIntegration] = useState<Integration | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isCreateDialogOpen, setCreateDialogOpen] = useState(false);
-  const [isCreating, setIsCreating] = useState(false);
+  const [isCreating, setIsCreating] = useState(false); // New state for creation
   const didInit = useRef(false);
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<NewIntegrationFormData>({
@@ -288,24 +288,27 @@ export default function IntegrationsPage() {
     if (!firestore || isLoading || !Array.isArray(integrations) || didInit.current) return;
     
     const runSafeInit = async () => {
-        didInit.current = true;
-        for (const req of REQUIRED_INTEGRATIONS) {
-            const docRef = doc(firestore, 'integrations', req.id);
-            try {
-                const snap = await getDoc(docRef);
-                if (!snap.exists()) {
-                    await setDoc(docRef, { 
-                        id: req.id, 
-                        name: req.name, 
-                        status: 'inactive',
-                        fields: '{}',
-                        updatedAt: new Date().toISOString() 
-                    }, { merge: true });
+        try {
+            didInit.current = true;
+            const existingIds = new Set(integrations.map(i => i.id));
+            for (const req of REQUIRED_INTEGRATIONS) {
+                if (!existingIds.has(req.id)) {
+                    const docRef = doc(firestore, 'integrations', req.id);
+                    const snap = await getDoc(docRef);
+                    if (!snap.exists()) {
+                        await setDoc(docRef, { 
+                            id: req.id, 
+                            name: req.name, 
+                            status: 'inactive',
+                            fields: '{}',
+                            updatedAt: new Date().toISOString() 
+                        }, { merge: true });
+                    }
                 }
-            } catch (e) {
-                console.warn("Firestore offline o cargando: reintentando inicialización...", e);
-                didInit.current = false; // Permite reintentar si falla la conexión
             }
+        } catch (e) {
+            console.warn("Firestore offline o cargando: reintentando inicialización...");
+            didInit.current = false; // Permitir reintento si falla la conexión
         }
     };
     runSafeInit();
@@ -316,9 +319,8 @@ export default function IntegrationsPage() {
     const newStatus = checked ? 'active' : 'inactive';
     try {
       await updateDoc(doc(firestore, 'integrations', integration.id), { status: newStatus });
-      toast({ title: 'Estado Actualizado', description: `"${integration.name}" ahora está ${newStatus === 'active' ? 'activo' : 'inactivo'}.` });
-    } catch (error) {
-      console.error('Error al cambiar estado:', error);
+      toast({ title: 'Estado Actualizado', description: `${integration.name} está ${newStatus === 'active' ? 'activo' : 'inactivo'}.` });
+    } catch {
       toast({ variant: 'destructive', title: 'Error', description: 'No se pudo actualizar el estado.' });
     }
   };
@@ -337,7 +339,7 @@ export default function IntegrationsPage() {
       setIsSaving(false);
     }
   };
-
+  
   const handleCreateIntegration = async (data: NewIntegrationFormData) => {
     if (!firestore) return;
     setIsCreating(true);
@@ -345,12 +347,12 @@ export default function IntegrationsPage() {
     const docRef = doc(firestore, 'integrations', id);
     try {
       await setDoc(docRef, { 
-          id, 
-          name: data.name, 
-          description: data.description || '', 
-          fields: '{}', 
-          status: 'inactive', 
-          updatedAt: new Date().toISOString() 
+        id, 
+        name: data.name, 
+        description: data.description || '', 
+        fields: '{}', 
+        status: 'inactive', 
+        updatedAt: new Date().toISOString() 
       }, { merge: true });
       
       toast({ title: 'Integración Creada', description: `Se ha creado la integración "${data.name}".` });
@@ -375,7 +377,7 @@ export default function IntegrationsPage() {
             <CardTitle>Gestión de Integraciones</CardTitle>
             <CardDescription>Conecta y configura servicios de terceros para ampliar funcionalidades.</CardDescription>
           </div>
-          <Dialog open={isCreateDialogOpen} onOpenChange={(open) => !isCreating && setCreateDialogOpen(open)}>
+          <Dialog open={isCreateDialogOpen} onOpenChange={setCreateDialogOpen}>
             <DialogTrigger asChild>
               <Button><PlusCircle className="mr-2 h-4 w-4" />Crear Integración</Button>
             </DialogTrigger>
@@ -492,3 +494,4 @@ export default function IntegrationsPage() {
     </div>
   );
 }
+```
