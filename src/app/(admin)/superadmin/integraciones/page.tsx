@@ -35,7 +35,6 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
@@ -48,9 +47,6 @@ import { testWhapiConnection } from '@/ai/flows/test-whapi-connection-flow';
 import { saveIntegration } from '@/actions/save-integration';
 import { updateIntegrationStatus } from '@/actions/update-integration-status';
 
-/**
- * Utility to race promises and prevent infinite hangs in SaaS environments.
- */
 const withTimeout = <T,>(promise: Promise<T>, timeoutMs: number): Promise<T> => {
   return Promise.race([
     promise,
@@ -59,8 +55,6 @@ const withTimeout = <T,>(promise: Promise<T>, timeoutMs: number): Promise<T> => 
     ),
   ]);
 };
-
-// --- Form Components ---
 
 const CloudinaryForm = ({ integration, onSave, onCancel, isSaving }: { integration: Integration, onSave: (data: CloudinaryFields) => void, onCancel: () => void, isSaving: boolean }) => {
     const { toast } = useToast();
@@ -288,23 +282,21 @@ export default function IntegrationsPage() {
 
     useEffect(() => {
       if (isIntegrationsLoading || !firestore) return;
-      const bootstrapIntegrations = async () => {
-          const requiredIntegrations = {
-            'cloudinary': { name: "Cloudinary", fields: '{}', status: "inactive" },
-            'chatbot-integrado-con-whatsapp-para-soporte-y-ventas': { name: "Chatbot IA (Google/OpenAI/Groq)", fields: '{}', status: "inactive" },
-            'whapi-whatsapp': { name: "WHAPI (WhatsApp)", fields: '{}', status: "inactive" }
-          };
-          
-          for (const id in requiredIntegrations) {
-            const docRef = doc(firestore, 'integrations', id);
-            const docSnap = await getDoc(docRef);
-            if (!docSnap.exists()) {
-                await setDocumentNonBlocking(docRef, { id, ...requiredIntegrations[id as keyof typeof requiredIntegrations] }, { merge: true });
-            }
-          }
+      const requiredIntegrations = {
+        'cloudinary': { name: "Cloudinary", fields: '{}', status: "inactive" },
+        'chatbot-integrado-con-whatsapp-para-soporte-y-ventas': { name: "Chatbot IA (Google/OpenAI/Groq)", fields: '{}', status: "inactive" },
+        'whapi-whatsapp': { name: "WHAPI (WhatsApp)", fields: '{}', status: "inactive" }
       };
-      bootstrapIntegrations();
-    }, [isIntegrationsLoading, firestore]);
+      
+      const existingIds = (integrations || []).map(i => i.id);
+
+      for (const id in requiredIntegrations) {
+        if (!existingIds.includes(id)) {
+            const docRef = doc(firestore, 'integrations', id);
+            setDocumentNonBlocking(docRef, { id, ...requiredIntegrations[id as keyof typeof requiredIntegrations] }, { merge: true });
+        }
+      }
+    }, [isIntegrationsLoading, firestore, integrations]);
 
     const handleStatusChange = async (integration: Integration, checked: boolean) => {
         if (!firestore) return;
@@ -336,7 +328,7 @@ export default function IntegrationsPage() {
         }
     };
 
-    const handleCreateIntegration = async (data: NewIntegrationFormData) => {
+    const handleCreateIntegration = (data: NewIntegrationFormData) => {
         if (!firestore) return;
         const id = slugify(data.name);
         const newIntegrationData = {
@@ -348,7 +340,7 @@ export default function IntegrationsPage() {
           updatedAt: new Date().toISOString(),
         };
         const docRef = doc(firestore, 'integrations', id);
-        await setDocumentNonBlocking(docRef, newIntegrationData);
+        setDocumentNonBlocking(docRef, newIntegrationData);
 
         toast({ title: "Integración Creada", description: `Se ha creado la integración "${data.name}".` });
         setCreateDialogOpen(false);
@@ -375,7 +367,7 @@ export default function IntegrationsPage() {
                             <DialogHeader><DialogTitle>Crear Nueva Integración</DialogTitle></DialogHeader>
                             <form onSubmit={handleSubmit(handleCreateIntegration)} className="space-y-4">
                                 <div><Label>Nombre</Label><Input {...register('name')} placeholder="Mi Nueva Integración" />{errors.name && <p className="text-sm text-destructive mt-1">{errors.name.message}</p>}</div>
-                                <div><Label>Descripción</Label><Textarea {...register('description')} placeholder="¿Qué hace esta integración?" /></div>
+                                <div><Label>Descripción</Label><Input {...register('description')} placeholder="¿Qué hace esta integración?" /></div>
                                 <DialogFooter>
                                     <Button type="button" variant="outline" onClick={() => setCreateDialogOpen(false)}>Cancelar</Button>
                                     <Button type="submit">Crear</Button>

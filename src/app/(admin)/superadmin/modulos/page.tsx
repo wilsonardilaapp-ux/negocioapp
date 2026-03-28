@@ -46,10 +46,10 @@ const moduleSchema = z.object({
 const slugify = (text: string) => 
   text
     .toLowerCase()
-    .normalize("NFD") // Normaliza los caracteres con tilde (ej: á -> a + ´)
-    .replace(/[\u0300-\u036f]/g, "") // Elimina los diacríticos (acentos)
-    .replace(/\s+/g, '-') // Reemplaza espacios por guiones
-    .replace(/[^a-z0-9-]/g, ''); // Elimina cualquier otro caracter no válido
+    .normalize("NFD") 
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, '-')
+    .replace(/[^a-z0-9-]/g, '');
 
 export default function ModulesPage() {
   const firestore = useFirestore();
@@ -65,39 +65,32 @@ export default function ModulesPage() {
   const { data: modules, isLoading } = useCollection<Module>(modulesQuery);
 
   useEffect(() => {
-    if (!firestore) return;
+    if (isLoading || !firestore) return;
 
-    const bootstrapModules = async () => {
-        const requiredModules: { [id: string]: Omit<Module, 'id' | 'createdAt'> } = {
-            'cloudinary': { name: 'Cloudinary', description: 'Almacenamiento y entrega de imágenes y videos.', status: 'inactive' },
-            'chatbot-integrado-con-whatsapp-para-soporte-y-ventas': { name: 'Chatbot IA (Google/OpenAI/Groq)', description: 'Motores de IA para el chatbot (Google, OpenAI, Groq).', status: 'inactive' },
-            'whapi-whatsapp': { name: 'WHAPI (WhatsApp)', description: 'Envío de mensajes de WhatsApp a través de WHAPI.', status: 'inactive' },
-            'catalogo': { name: 'Catálogo', description: 'Módulo para gestionar el catálogo de productos.', status: 'inactive' },
-            'blog': { name: 'Blog', description: 'Módulo para gestionar el blog', status: 'inactive' },
-            'motor-de-sugerencias-inteligentes': { name: 'Motor de Sugerencias Inteligentes', description: 'Motor para sugerir productos', status: 'inactive' },
-            'google-analytics': { name: 'Google Analytics', description: 'Integración con Google Analytics', status: 'inactive' },
-        };
-        
-         for (const id in requiredModules) {
-            const docRef = doc(firestore, 'modules', id);
-            try {
-                const docSnap = await getDoc(docRef);
-                if (!docSnap.exists()) {
-                    await setDocumentNonBlocking(docRef, { ...requiredModules[id], id, createdAt: new Date().toISOString() });
-                }
-            } catch (e) {
-                console.error("Error bootstrapping module:", id, e);
-            }
-        }
+    const requiredModules: { [id: string]: Omit<Module, 'id' | 'createdAt'> } = {
+        'cloudinary': { name: 'Cloudinary', description: 'Almacenamiento y entrega de imágenes y videos.', status: 'inactive' },
+        'chatbot-integrado-con-whatsapp-para-soporte-y-ventas': { name: 'Chatbot IA (Google/OpenAI/Groq)', description: 'Motores de IA para el chatbot (Google, OpenAI, Groq).', status: 'inactive' },
+        'whapi-whatsapp': { name: 'WHAPI (WhatsApp)', description: 'Envío de mensajes de WhatsApp a través de WHAPI.', status: 'inactive' },
+        'catalogo': { name: 'Catálogo', description: 'Módulo para gestionar el catálogo de productos.', status: 'inactive' },
+        'blog': { name: 'Blog', description: 'Módulo para gestionar el blog', status: 'inactive' },
+        'motor-de-sugerencias-inteligentes': { name: 'Motor de Sugerencias Inteligentes', description: 'Motor para sugerir productos', status: 'inactive' },
+        'google-analytics': { name: 'Google Analytics', description: 'Integración con Google Analytics', status: 'inactive' },
     };
-    bootstrapModules();
-  }, [firestore]);
+    
+    const existingIds = (modules || []).map(m => m.id);
+
+    for (const id in requiredModules) {
+        if (!existingIds.includes(id)) {
+            const docRef = doc(firestore, 'modules', id);
+            setDocumentNonBlocking(docRef, { ...requiredModules[id], id, createdAt: new Date().toISOString() }, { merge: true });
+        }
+    }
+  }, [isLoading, modules, firestore]);
 
   const { register, handleSubmit, reset, setValue, formState: { errors, isSubmitting } } = useForm<z.infer<typeof moduleSchema>>({
     resolver: zodResolver(moduleSchema),
   });
 
-  // Effect to populate form when editingModule changes
   useEffect(() => {
     if (editingModule) {
       setValue('name', editingModule.name);
