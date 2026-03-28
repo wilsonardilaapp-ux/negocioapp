@@ -2,7 +2,7 @@
 "use client";
 
 import { useCollection, useFirestore, updateDocumentNonBlocking, setDocumentNonBlocking, deleteDocumentNonBlocking, useMemoFirebase } from '@/firebase';
-import { collection, doc } from 'firebase/firestore';
+import { collection, doc, getDoc } from 'firebase/firestore';
 import {
   Card,
   CardHeader,
@@ -63,6 +63,35 @@ export default function ModulesPage() {
   }, [firestore]);
 
   const { data: modules, isLoading } = useCollection<Module>(modulesQuery);
+
+  useEffect(() => {
+    if (!firestore) return;
+
+    const bootstrapModules = async () => {
+        const requiredModules: { [id: string]: Omit<Module, 'id' | 'createdAt'> } = {
+            'cloudinary': { name: 'Cloudinary', description: 'Almacenamiento y entrega de imágenes y videos.', status: 'inactive' },
+            'chatbot-integrado-con-whatsapp-para-soporte-y-ventas': { name: 'Chatbot IA (Google/OpenAI/Groq)', description: 'Motores de IA para el chatbot (Google, OpenAI, Groq).', status: 'inactive' },
+            'whapi-whatsapp': { name: 'WHAPI (WhatsApp)', description: 'Envío de mensajes de WhatsApp a través de WHAPI.', status: 'inactive' },
+            'catalogo': { name: 'Catálogo', description: 'Módulo para gestionar el catálogo de productos.', status: 'inactive' },
+            'blog': { name: 'Blog', description: 'Módulo para gestionar el blog', status: 'inactive' },
+            'motor-de-sugerencias-inteligentes': { name: 'Motor de Sugerencias Inteligentes', description: 'Motor para sugerir productos', status: 'inactive' },
+            'google-analytics': { name: 'Google Analytics', description: 'Integración con Google Analytics', status: 'inactive' },
+        };
+        
+         for (const id in requiredModules) {
+            const docRef = doc(firestore, 'modules', id);
+            try {
+                const docSnap = await getDoc(docRef);
+                if (!docSnap.exists()) {
+                    await setDocumentNonBlocking(docRef, { ...requiredModules[id], id, createdAt: new Date().toISOString() });
+                }
+            } catch (e) {
+                console.error("Error bootstrapping module:", id, e);
+            }
+        }
+    };
+    bootstrapModules();
+  }, [firestore]);
 
   const { register, handleSubmit, reset, setValue, formState: { errors, isSubmitting } } = useForm<z.infer<typeof moduleSchema>>({
     resolver: zodResolver(moduleSchema),
@@ -262,5 +291,3 @@ export default function ModulesPage() {
     </div>
   );
 }
-
-    
