@@ -64,6 +64,7 @@ export default function ModulesPage() {
   const { toast } = useToast();
   const [isDialogOpen, setDialogOpen] = useState(false);
   const [editingModule, setEditingModule] = useState<Module | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
   const didInit = useRef(false);
 
   const modulesQuery = useMemoFirebase(() => {
@@ -73,11 +74,10 @@ export default function ModulesPage() {
 
   const { data: modules, isLoading } = useCollection<Module>(modulesQuery);
 
-  const { register, handleSubmit, reset, setValue, formState: { errors, isSubmitting } } = useForm<z.infer<typeof moduleSchema>>({
+  const { register, handleSubmit, reset, setValue, formState: { errors } } = useForm<z.infer<typeof moduleSchema>>({
     resolver: zodResolver(moduleSchema),
   });
   
-  // ✅ FIX DE PERSISTENCIA: Inicialización segura y no destructiva
   useEffect(() => {
     if (!firestore || isLoading || !Array.isArray(modules) || didInit.current) return;
     
@@ -98,7 +98,7 @@ export default function ModulesPage() {
                         }, { merge: true });
                     }
                 } catch (e) {
-                     console.warn(`Firestore no disponible para verificar ${id}, se reintentará.`);
+                     console.warn(`Firestore offline o cargando, reintentando módulos...`);
                 }
             }
         }
@@ -126,7 +126,6 @@ export default function ModulesPage() {
     setDialogOpen(false);
   }
 
-  // ✅ FIX DE PERSISTENCIA: Usa `await updateDoc` para garantizar la escritura
   const handleStatusChange = async (module: Module) => {
     if (!firestore) return;
     const newStatus = module.status === 'active' ? 'inactive' : 'active';
@@ -151,6 +150,7 @@ export default function ModulesPage() {
   const onSubmit = async (data: z.infer<typeof moduleSchema>) => {
     if (!firestore) return;
     
+    setIsSaving(true);
     const moduleId = editingModule?.id || slugify(data.name);
     const moduleRef = doc(firestore, 'modules', moduleId);
     
@@ -172,6 +172,8 @@ export default function ModulesPage() {
         handleCloseDialog();
     } catch (e) {
         toast({ variant: "destructive", title: "Error", description: "No se pudo guardar el módulo."});
+    } finally {
+        setIsSaving(false);
     }
   };
 
@@ -196,7 +198,7 @@ export default function ModulesPage() {
         </CardHeader>
       </Card>
       
-      <Dialog open={isDialogOpen} onOpenChange={(isOpen) => { if (!isOpen) handleCloseDialog() }}>
+      <Dialog open={isDialogOpen} onOpenChange={isDialogOpen && !isSaving ? setDialogOpen : undefined}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
             <DialogTitle>{editingModule ? 'Editar Módulo' : 'Añadir Nuevo Módulo'}</DialogTitle>
@@ -221,8 +223,11 @@ export default function ModulesPage() {
               {errors.limit && <p className="text-sm text-destructive mt-1">{errors.limit.message}</p>}
             </div>
             <DialogFooter>
-              <Button type="button" variant="secondary" onClick={handleCloseDialog}>Cancelar</Button>
-              <Button type="submit" disabled={isSubmitting}>{isSubmitting ? 'Guardando...' : 'Guardar'}</Button>
+              <Button type="button" variant="secondary" onClick={handleCloseDialog} disabled={isSaving}>Cancelar</Button>
+              <Button type="submit" disabled={isSaving}>
+                {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                {isSaving ? 'Guardando...' : 'Guardar'}
+              </Button>
             </DialogFooter>
           </form>
         </DialogContent>
