@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useRef, useEffect, useMemo } from 'react';
-import { useUser, useFirestore, setDocumentNonBlocking, useDoc, useMemoFirebase } from '@/firebase';
-import { doc } from 'firebase/firestore';
+import { useState, useRef, useEffect } from 'react';
+import { useUser, useFirestore, setDocumentNonBlocking, useDoc, useMemoFirebase, useCollection } from '@/firebase';
+import { doc, collection } from 'firebase/firestore';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -16,9 +16,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Camera, Pencil, UploadCloud, Trash2 } from 'lucide-react';
+import { Loader2, Camera, Pencil, UploadCloud, Trash2, AlertTriangle } from 'lucide-react';
 import type { User as UserProfile } from '@/models/user';
 import type { GlobalConfig } from '@/models/global-config';
+import type { Integration } from '@/models/integration';
 import { uploadMedia } from '@/ai/flows/upload-media-flow';
 import { cn } from '@/lib/utils';
 
@@ -54,6 +55,7 @@ const MediaUploader = ({
     isUploading,
     aspectRatio = 'aspect-video',
     isIcon = false,
+    disabled = false,
 }: {
     label: string;
     mediaUrl: string | null | undefined;
@@ -63,6 +65,7 @@ const MediaUploader = ({
     isUploading: boolean;
     aspectRatio?: string;
     isIcon?: boolean;
+    disabled?: boolean;
 }) => {
     const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -77,10 +80,12 @@ const MediaUploader = ({
             <Label>{label}</Label>
             <div
                 className={cn(
-                    "relative w-full border-2 border-dashed rounded-lg flex items-center justify-center text-center p-4 group",
+                    "relative w-full border-2 border-dashed rounded-lg flex items-center justify-center text-center p-4 group transition-colors",
+                    !mediaUrl && !disabled && "hover:border-primary/50 cursor-pointer",
+                    disabled && "opacity-50 cursor-not-allowed bg-muted",
                     mediaUrl && isIcon ? 'h-24' : (!mediaUrl ? 'h-32' : aspectRatio)
                 )}
-                onClick={() => !mediaUrl && fileInputRef.current?.click()}
+                onClick={() => !mediaUrl && !disabled && fileInputRef.current?.click()}
                 >
                 {isUploading ? (
                     <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -88,25 +93,37 @@ const MediaUploader = ({
                     <>
                          {isIcon ? (
                             <div className="relative w-16 h-16 mx-auto">
-                                <Image src={mediaUrl} alt={label} fill sizes="4rem" className="object-contain" />
+                                <Image 
+                                    src={mediaUrl} 
+                                    alt={label} 
+                                    fill 
+                                    unoptimized 
+                                    className="object-contain" 
+                                />
                             </div>
                         ) : (
-                            <Image src={mediaUrl} alt={label} layout="fill" sizes="100%" className="object-contain rounded-md" />
+                            <Image 
+                                src={mediaUrl} 
+                                alt={label} 
+                                fill 
+                                unoptimized 
+                                className="object-contain rounded-md" 
+                            />
                         )}
                         <div className="absolute top-1 right-1 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => fileInputRef.current?.click()}><Pencil className="h-4 w-4" /></Button>
+                            <Button variant="outline" size="icon" className="h-7 w-7 bg-background" onClick={() => fileInputRef.current?.click()}><Pencil className="h-4 w-4" /></Button>
                             <Button variant="destructive" size="icon" className="h-7 w-7" onClick={onRemove}><Trash2 className="h-4 w-4" /></Button>
                         </div>
                     </>
                 ) : (
-                    <div className="cursor-pointer">
-                        <UploadCloud className="h-8 w-8 mx-auto text-muted-foreground" />
+                    <div className="flex flex-col items-center">
+                        <UploadCloud className="h-8 w-8 text-muted-foreground" />
                         <p className="mt-2 text-sm font-semibold">Subir {label}</p>
                         <p className="text-xs text-muted-foreground">{dimensions}</p>
                     </div>
                 )}
             </div>
-            <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept="image/*,.ico" />
+            <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept="image/*,.ico" disabled={disabled} />
         </div>
     );
 };
@@ -114,7 +131,7 @@ const MediaUploader = ({
 const fallbackGlobalConfig: GlobalConfig = {
     id: 'system',
     maintenance: false,
-    logoURL: '',
+    logoURL: '', // Estandarizado a camelCase
     bannerUrl: '',
     faviconUrl: '',
     theme: 'default',
@@ -124,7 +141,7 @@ const fallbackGlobalConfig: GlobalConfig = {
 };
 
 export default function SuperAdminProfilePage() {
-  const { user, isUserLoading, profile } = useUser(); // Use the profile from the context
+  const { user, isUserLoading, profile } = useUser();
   const firestore = useFirestore();
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -132,6 +149,23 @@ export default function SuperAdminProfilePage() {
 
   const globalConfigDocRef = useMemoFirebase(() => !firestore ? null : doc(firestore, 'globalConfig', 'system'), [firestore]);
   const { data: globalConfigData, isLoading: isGlobalConfigLoading } = useDoc<GlobalConfig>(globalConfigDocRef);
+  
+  // Consulta para verificar estado de Cloudinary
+  const integrationsQuery = useMemoFirebase(() => !firestore ? null : collection(firestore, 'integrations'), [firestore]);
+  const { data: integrations } = useCollection<Integration>(integrationsQuery);
+
+  const cloudinaryIntegration = integrations?.find(i => i.id === 'cloudinary');
+  
+  const isCloudinaryReady = () => {
+    if (!cloudinaryIntegration) return false;
+    if (cloudinaryIntegration.status !== 'active') return false;
+    try {
+        const fields = typeof cloudinaryIntegration.fields === 'string' 
+            ? JSON.parse(cloudinaryIntegration.fields) 
+            : cloudinaryIntegration.fields;
+        return !!(fields?.cloud_name && fields?.api_key && fields?.api_secret);
+    } catch { return false; }
+  };
 
   const { register, handleSubmit, formState: { errors, isSubmitting }, reset } = useForm<z.infer<typeof profileSchema>>({
     resolver: zodResolver(profileSchema),
@@ -165,38 +199,30 @@ export default function SuperAdminProfilePage() {
     };
     
     setDocumentNonBlocking(userProfileRef, dataToSave, { merge: true });
-
-    toast({
-      title: 'Perfil Actualizado',
-      description: 'Tu información ha sido guardada con éxito.',
-    });
+    toast({ title: 'Perfil Actualizado', description: 'Tu información ha sido guardada.' });
   };
   
   const onPasswordSubmit = async (data: z.infer<typeof passwordSchema>) => {
-      if (!user) {
-          toast({ variant: 'destructive', title: 'Error', description: 'Debes iniciar sesión para cambiar la contraseña.' });
-          return;
-      }
+      if (!user) return;
       try {
           await updatePassword(user, data.newPassword);
-          toast({ title: 'Contraseña actualizada', description: 'Tu contraseña ha sido cambiada con éxito.' });
+          toast({ title: 'Contraseña actualizada' });
           resetPasswordForm();
       } catch (error: any) {
-          toast({
-              variant: 'destructive',
-              title: 'Error al cambiar contraseña',
-              description: 'Esta operación es sensible y requiere un inicio de sesión reciente. Por favor, vuelve a iniciar sesión e inténtalo de nuevo.',
-          });
+          toast({ variant: 'destructive', title: 'Error', description: 'Reautenticación requerida.' });
       }
   };
   
   const handleAvatarChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
       const file = event.target.files?.[0];
       if (!file || !user || !firestore) return;
+
+      if (!isCloudinaryReady()) {
+          toast({ variant: 'destructive', title: "Cloudinary no configurado", description: "Configura las API Keys en Integraciones primero." });
+          return;
+      }
       
       setUploadingField('avatar');
-      toast({ title: "Subiendo imagen...", description: "Por favor, espera." });
-
       try {
           const reader = new FileReader();
           reader.readAsDataURL(file);
@@ -209,51 +235,39 @@ export default function SuperAdminProfilePage() {
                       setDocumentNonBlocking(userProfileRef, { photoURL: result.secure_url }, { merge: true });
                       toast({ title: 'Avatar actualizado!' });
                       resolve(result);
-                  } catch(e) {
-                      reject(e);
-                  }
+                  } catch(e) { reject(e); }
               };
               reader.onerror = reject;
           });
       } catch (error: any) {
-          const errorMessage = error.message === 'TIMEOUT' 
-              ? "La subida tardó demasiado. Revisa tu conexión."
-              : error.message || "Ocurrió un error desconocido.";
-          toast({ variant: 'destructive', title: 'Error al subir', description: errorMessage });
-      } finally {
-          setUploadingField(null);
-      }
+          toast({ variant: 'destructive', title: 'Error al subir', description: error.message });
+      } finally { setUploadingField(null); }
   };
 
   const handleMediaUpload = async (file: File, field: keyof GlobalConfig) => {
     if (!globalConfigDocRef) return;
+
+    if (!isCloudinaryReady()) {
+        toast({ variant: 'destructive', title: "Cloudinary no configurado", description: "Configura las API Keys en Integraciones para poder subir archivos." });
+        return;
+    }
     
     setUploadingField(field);
-    toast({ title: "Subiendo imagen...", description: "Esto puede tardar un momento." });
-
     try {
-        const readFileAsDataURL = (fileToRead: File): Promise<string> => {
-            return new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onloadend = () => resolve(reader.result as string);
-                reader.onerror = reject;
-                reader.readAsDataURL(fileToRead);
-            });
-        };
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        const mediaDataUri = await new Promise<string>((resolve, reject) => {
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.onerror = reject;
+        });
 
-        const mediaDataUri = await readFileAsDataURL(file);
         const result = await withTimeout(uploadMedia({ mediaDataUri }), 15000);
         await setDocumentNonBlocking(globalConfigDocRef, { [field]: result.secure_url }, { merge: true });
-        toast({ title: "Imagen actualizada", description: `La imagen de ${field} ha sido guardada.` });
+        toast({ title: "Imagen actualizada", description: `La imagen se ha guardado correctamente.` });
 
     } catch (error: any) {
-        const errorMessage = error.message === 'TIMEOUT'
-            ? "La subida tardó demasiado. Revisa tu conexión."
-            : error.message || "Ocurrió un error desconocido.";
-        toast({ variant: 'destructive', title: "Error al subir", description: errorMessage });
-    } finally {
-        setUploadingField(null);
-    }
+        toast({ variant: 'destructive', title: "Error al subir", description: error.message });
+    } finally { setUploadingField(null); }
   };
 
   const handleRemoveMedia = async (field: keyof GlobalConfig) => {
@@ -271,10 +285,11 @@ export default function SuperAdminProfilePage() {
     );
   }
   
-  const globalConfig = globalConfigData ?? fallbackGlobalConfig;
+  const globalConfig = { ...fallbackGlobalConfig, ...globalConfigData, logoURL: globalConfigData?.logoURL || fallbackGlobalConfig.logoURL };
+  const cloudinaryReady = isCloudinaryReady();
 
   if (!user || !profile) {
-    return <div>No se pudo cargar el perfil del usuario o la configuración global.</div>
+    return <div>No se pudo cargar el perfil.</div>
   }
 
   return (
@@ -282,16 +297,14 @@ export default function SuperAdminProfilePage() {
       <Card>
         <CardContent className="p-6 flex flex-col md:flex-row items-center gap-6">
           <div className="relative group">
-            <Avatar className="h-24 w-24">
+            <Avatar className="h-24 w-24 border">
               <AvatarImage src={profile.photoURL || user.photoURL || undefined} alt={profile.name} />
-              <AvatarFallback className="text-3xl">
-                {profile.name?.charAt(0) || 'S'}
-              </AvatarFallback>
+              <AvatarFallback className="text-3xl">{profile.name?.charAt(0) || 'S'}</AvatarFallback>
             </Avatar>
             <Button
                 variant="outline"
                 size="icon"
-                className="absolute bottom-0 right-0 rounded-full h-8 w-8 group-hover:bg-primary group-hover:text-primary-foreground"
+                className="absolute bottom-0 right-0 rounded-full h-8 w-8 bg-background shadow-sm"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={uploadingField === 'avatar'}
             >
@@ -314,28 +327,26 @@ export default function SuperAdminProfilePage() {
           <Card>
             <CardHeader>
                 <CardTitle>Información Personal</CardTitle>
-                <CardDescription>Actualiza tus datos personales.</CardDescription>
+                <CardDescription>Actualiza tus datos personales de acceso.</CardDescription>
             </CardHeader>
              <form onSubmit={handleSubmit(onProfileSubmit)}>
                 <CardContent className="space-y-4">
-                    <div>
+                    <div className="grid gap-2">
                         <Label htmlFor="name">Nombre Completo</Label>
                         <Input id="name" {...register('name')} />
-                        {errors.name && <p className="text-sm text-destructive mt-1">{errors.name.message}</p>}
+                        {errors.name && <p className="text-xs text-destructive">{errors.name.message}</p>}
                     </div>
-                    <div>
+                    <div className="grid gap-2">
                         <Label htmlFor="title">Cargo / Título</Label>
-                        <Input id="title" placeholder="Ej: Administrador" {...register('title')} />
-                        {errors.title && <p className="text-sm text-destructive mt-1">{errors.title.message}</p>}
+                        <Input id="title" placeholder="Ej: CEO" {...register('title')} />
                     </div>
-                     <div>
+                     <div className="grid gap-2">
                         <Label htmlFor="phone">Teléfono</Label>
-                        <Input id="phone" placeholder="Ej: +57 300 123 4567" {...register('phone')} />
-                        {errors.phone && <p className="text-sm text-destructive mt-1">{errors.phone.message}</p>}
+                        <Input id="phone" placeholder="+57..." {...register('phone')} />
                     </div>
-                     <div>
-                        <Label htmlFor="email">Correo Electrónico</Label>
-                        <Input id="email" value={user.email || ''} readOnly disabled />
+                     <div className="grid gap-2">
+                        <Label htmlFor="email">Email (No editable)</Label>
+                        <Input id="email" value={user.email || ''} readOnly disabled className="bg-muted" />
                     </div>
                 </CardContent>
                  <div className="p-6 pt-0">
@@ -346,27 +357,25 @@ export default function SuperAdminProfilePage() {
                 </div>
             </form>
           </Card>
+
           <div className="space-y-6">
             <Card>
                 <CardHeader>
                     <CardTitle>Seguridad</CardTitle>
-                    <CardDescription>Gestiona la seguridad de tu cuenta.</CardDescription>
+                    <CardDescription>Cambia tu contraseña de acceso.</CardDescription>
                 </CardHeader>
                 <form onSubmit={handleSubmitPassword(onPasswordSubmit)}>
                     <CardContent className="space-y-4">
-                        <div>
+                        <div className="grid gap-2">
                             <Label htmlFor="newPassword">Nueva Contraseña</Label>
                             <Input id="newPassword" type="password" {...registerPassword('newPassword')} />
-                            {passwordErrors.newPassword && <p className="text-sm text-destructive mt-1">{passwordErrors.newPassword.message}</p>}
+                            {passwordErrors.newPassword && <p className="text-xs text-destructive">{passwordErrors.newPassword.message}</p>}
                         </div>
-                        <div>
+                        <div className="grid gap-2">
                             <Label htmlFor="confirmPassword">Confirmar Contraseña</Label>
                             <Input id="confirmPassword" type="password" {...registerPassword('confirmPassword')} />
-                            {passwordErrors.confirmPassword && <p className="text-sm text-destructive mt-1">{passwordErrors.confirmPassword.message}</p>}
+                            {passwordErrors.confirmPassword && <p className="text-xs text-destructive">{passwordErrors.confirmPassword.message}</p>}
                         </div>
-                        <p className="text-xs text-muted-foreground">
-                            Último acceso: {user.metadata.lastSignInTime ? new Date(user.metadata.lastSignInTime).toLocaleString() : 'N/A'}
-                        </p>
                     </CardContent>
                     <div className="p-6 pt-0">
                         <Button type="submit" variant="outline" disabled={isChangingPassword}>
@@ -379,10 +388,25 @@ export default function SuperAdminProfilePage() {
             
             <Card>
               <CardHeader>
-                <CardTitle>Identidad Visual de la Plataforma</CardTitle>
-                <CardDescription>Gestiona el logo y banner que se usarán en la aplicación.</CardDescription>
+                <div className="flex items-center justify-between">
+                    <div>
+                        <CardTitle>Identidad Visual</CardTitle>
+                        <CardDescription>Logo, banner y favicon del sistema.</CardDescription>
+                    </div>
+                    {!cloudinaryReady && (
+                        <Badge variant="destructive" className="gap-1">
+                            <AlertTriangle className="h-3 w-3" />
+                            Cloudinary Off
+                        </Badge>
+                    )}
+                </div>
               </CardHeader>
               <CardContent className="space-y-6">
+                {!cloudinaryReady && (
+                    <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-md text-xs text-destructive mb-4">
+                        <strong>Atención:</strong> Cloudinary no está configurado o está inactivo. No podrás subir nuevas imágenes hasta que ingreses las credenciales en la sección de Integraciones.
+                    </div>
+                )}
                 <MediaUploader
                   label="Logo de la Aplicación"
                   mediaUrl={globalConfig.logoURL}
@@ -391,6 +415,7 @@ export default function SuperAdminProfilePage() {
                   dimensions="Recomendado: 400x100px"
                   isUploading={uploadingField === 'logoURL'}
                   aspectRatio="aspect-[4/1]"
+                  disabled={!cloudinaryReady}
                 />
                 <MediaUploader
                   label="Banner Principal"
@@ -400,16 +425,18 @@ export default function SuperAdminProfilePage() {
                   dimensions="Recomendado: 1200x400px"
                   isUploading={uploadingField === 'bannerUrl'}
                   aspectRatio="aspect-[3/1]"
+                  disabled={!cloudinaryReady}
                 />
                 <MediaUploader
                   label="Favicon"
                   mediaUrl={globalConfig.faviconUrl}
                   onUpload={(file) => handleMediaUpload(file, 'faviconUrl')}
                   onRemove={() => handleRemoveMedia('faviconUrl')}
-                  dimensions="Cuadrado: 32x32 o 64x64"
+                  dimensions="32x32 o 64x64 (.ico / .png)"
                   isUploading={uploadingField === 'faviconUrl'}
                   aspectRatio="aspect-square"
                   isIcon={true}
+                  disabled={!cloudinaryReady}
                 />
               </CardContent>
             </Card>
