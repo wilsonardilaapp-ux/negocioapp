@@ -1,9 +1,8 @@
-
 'use client';
 
-import { useState, useEffect, useRef, useTransition } from 'react';
+import { useState, useEffect, useTransition } from 'react';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
+import { collection, doc, updateDoc } from 'firebase/firestore';
 import {
   Card,
   CardHeader,
@@ -43,23 +42,13 @@ const moduleSchema = z.object({
   ),
 });
 
-const REQUIRED_MODULES: { [id: string]: Omit<Module, 'id' | 'createdAt'> } = {
-    'cloudinary': { name: 'Cloudinary', description: 'Almacenamiento y entrega de imágenes y videos.', status: 'inactive' },
-    'chatbot-integrado-con-whatsapp-para-soporte-y-ventas': { name: 'Chatbot IA (Google/OpenAI/Groq)', description: 'Motores de IA para el chatbot (Google, OpenAI, Groq).', status: 'inactive' },
-    'whapi-whatsapp': { name: 'WHAPI (WhatsApp)', description: 'Envío de mensajes de WhatsApp a través de WHAPI.', status: 'inactive' },
-    'catalogo': { name: 'Catálogo', description: 'Módulo para gestionar el catálogo de productos.', status: 'inactive' },
-    'blog': { name: 'Blog', description: 'Módulo para gestionar el blog', status: 'inactive' },
-    'motor-de-sugerencias-inteligentes': { name: 'Motor de Sugerencias Inteligentes', description: 'Motor para sugerir productos', status: 'inactive' },
-    'google-analytics': { name: 'Google Analytics', description: 'Integración con Google Analytics', status: 'inactive' },
-};
 
 export default function ModulesPage() {
   const firestore = useFirestore();
   const { toast } = useToast();
   const [isDialogOpen, setDialogOpen] = useState(false);
   const [editingModule, setEditingModule] = useState<Module | null>(null);
-  const didInit = useRef(false);
-  const [isPending, startTransition] = useTransition();
+  const [isSaving, startTransition] = useTransition();
 
   const modulesQuery = useMemoFirebase(() => {
       if (!firestore) return null;
@@ -71,31 +60,6 @@ export default function ModulesPage() {
   const { register, handleSubmit, reset, setValue, formState: { errors } } = useForm<z.infer<typeof moduleSchema>>({
       resolver: zodResolver(moduleSchema),
   });
-  
-  useEffect(() => {
-      if (!firestore || isLoading || !Array.isArray(modules) || didInit.current) return;
-      
-      const initialize = async () => {
-          didInit.current = true;
-          for (const id in REQUIRED_MODULES) {
-              const docRef = doc(firestore, 'modules', id);
-              try {
-                  const snap = await getDoc(docRef);
-                  if (!snap.exists()) {
-                      await setDoc(docRef, { 
-                          id, 
-                          ...REQUIRED_MODULES[id as keyof typeof REQUIRED_MODULES],
-                          createdAt: new Date().toISOString() 
-                      }, { merge: true });
-                  }
-              } catch (e) {
-                  console.warn(`Firestore offline o cargando, reintentando módulos...`);
-                  didInit.current = false;
-              }
-          }
-      };
-      initialize();
-  }, [firestore, isLoading, modules]);
   
   useEffect(() => {
       if (editingModule) {
@@ -113,7 +77,7 @@ export default function ModulesPage() {
   }
   
   const handleOpenChange = (open: boolean) => {
-      if (isPending) return;
+      if (isSaving) return;
       setDialogOpen(open);
       if (!open) {
           setEditingModule(null);
@@ -203,10 +167,10 @@ export default function ModulesPage() {
                           {errors.limit && <p className="text-sm text-destructive mt-1">{errors.limit.message}</p>}
                       </div>
                       <DialogFooter>
-                          <Button type="button" variant="secondary" onClick={() => handleOpenChange(false)} disabled={isPending}>Cancelar</Button>
-                          <Button type="submit" disabled={isPending}>
-                              {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                              {isPending ? 'Guardando...' : 'Guardar'}
+                          <Button type="button" variant="secondary" onClick={() => handleOpenChange(false)} disabled={isSaving}>Cancelar</Button>
+                          <Button type="submit" disabled={isSaving}>
+                              {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                              {isSaving ? 'Guardando...' : 'Guardar'}
                           </Button>
                       </DialogFooter>
                   </form>
@@ -267,7 +231,7 @@ export default function ModulesPage() {
                           </div>
                           <h3 className="text-xl font-semibold">No hay módulos creados</h3>
                           <p className="text-muted-foreground max-w-sm">
-                              Crea tu primer módulo para empezar a gestionar las funcionalidades de la plataforma.
+                              Los módulos se crearán automáticamente durante el registro de un nuevo usuario.
                           </p>
                       </CardContent>
                   </Card>

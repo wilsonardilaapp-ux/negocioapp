@@ -319,6 +319,23 @@ export default function RegisterPage() {
           batch.set(modRef, { ...mod, id: modId }, { merge: true });
       });
       
+      const REQUIRED_INTEGRATIONS: Array<{ id: string; name: string }> = [
+        { id: 'cloudinary', name: 'Cloudinary' },
+        { id: 'chatbot-integrado-con-whatsapp-para-soporte-y-ventas', name: 'Chatbot IA (Google/OpenAI/Groq)' },
+        { id: 'whapi-whatsapp', name: 'WHAPI (WhatsApp)' },
+      ];
+
+      REQUIRED_INTEGRATIONS.forEach(int => {
+          const intRef = doc(firestore, 'integrations', int.id);
+          batch.set(intRef, {
+              id: int.id,
+              name: int.name,
+              fields: '{}',
+              status: 'inactive',
+              updatedAt: new Date().toISOString(),
+          }, { merge: true });
+      });
+
       const productLimitServiceRef = doc(firestore, 'systemServices', 'product_limit');
       const productLimitData: SystemService = { id: 'product_limit', name: 'Limite de Productos', status: 'active', limit: 10, lastUpdate: new Date().toISOString() };
       batch.set(productLimitServiceRef, productLimitData, { merge: true });
@@ -423,7 +440,6 @@ export default function RegisterPage() {
   }
 
   // If Firebase is checking the auth state, show a loading screen.
-  // The provider will handle the redirection if a user is already logged in.
   if (isUserLoading) {
     return <LoadingScreen />;
   }

@@ -51,12 +51,6 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
-const REQUIRED_INTEGRATIONS: Array<{ id: string; name: string }> = [
-  { id: 'cloudinary', name: 'Cloudinary' },
-  { id: 'chatbot-integrado-con-whatsapp-para-soporte-y-ventas', name: 'Chatbot IA (Google/OpenAI/Groq)' },
-  { id: 'whapi-whatsapp', name: 'WHAPI (WhatsApp)' },
-];
-
 const CloudinaryForm = ({
   integration, onSave, onCancel, isSaving,
 }: {
@@ -275,7 +269,6 @@ export default function IntegrationsPage() {
   const { toast } = useToast();
   const [editingIntegration, setEditingIntegration] = useState<Integration | null>(null);
   const [isCreateDialogOpen, setCreateDialogOpen] = useState(false);
-  const didInit = useRef(false);
 
   const [isCreating, startCreateTransition] = useTransition();
   const [isSaving, startSavingTransition] = useTransition();
@@ -296,25 +289,6 @@ export default function IntegrationsPage() {
     [firestore]
   );
   const { data: modules, isLoading: areModulesLoading } = useCollection<Module>(modulesQuery);
-
-  useEffect(() => {
-    if (!firestore || isIntegrationsLoading || !Array.isArray(integrations) || didInit.current) return;
-    
-    const runSafeInit = async () => {
-        try {
-            const existingIds = new Set(integrations.map(i => i.id));
-            for (const req of REQUIRED_INTEGRATIONS) {
-                if (!existingIds.has(req.id)) {
-                    await createIntegration({ name: req.name, description: '' });
-                }
-            }
-            didInit.current = true;
-        } catch (e) {
-            console.warn("Error en la inicialización de integraciones requeridas:", e);
-        }
-    };
-    runSafeInit();
-  }, [firestore, isIntegrationsLoading, integrations]);
 
   const handleStatusChange = (integration: Integration, checked: boolean) => {
     startStatusTransition(async () => {
