@@ -356,6 +356,15 @@ const WhapiForm = ({ integration, onSave, onCancel, isSaving }: { integration: I
     );
 };
 
+const withTimeout = (promise: Promise<any>, timeoutMs: number) => {
+    return Promise.race([
+        promise,
+        new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('TIMEOUT')), timeoutMs)
+        )
+    ]);
+};
+
 
 export default function IntegrationsPage() {
     const firestore = useFirestore();
@@ -434,19 +443,54 @@ export default function IntegrationsPage() {
             toast({ variant: 'destructive', title: 'Error', description: 'No se pudo guardar la configuración.' });
             return;
         }
+
         setIsSaving(true);
+
         try {
-            const updatedData = { ...editingIntegration, fields: JSON.stringify(formData) };
-            await setDocumentNonBlocking(doc(firestore, 'integrations', editingIntegration.id), updatedData, { merge: true });
-            toast({ title: "Configuración Guardada", description: `La integración "${editingIntegration.name}" ha sido actualizada.` });
+            const updatedData = { 
+                ...editingIntegration, 
+                fields: JSON.stringify(formData),
+            };
+
+            await withTimeout(
+                setDocumentNonBlocking(
+                    doc(firestore, 'integrations', editingIntegration.id), 
+                    updatedData, 
+                    { merge: true }
+                ),
+                8000 // 8 segundos
+            );
+
+            toast({ 
+                title: "Configuración Guardada", 
+                description: `La integración "${editingIntegration.name}" ha sido actualizada.` 
+            });
+            
             setEditingIntegration(null); 
-        } catch (error) {
+
+        } catch (error: any) {
             console.error("Error al guardar la integración:", error);
-            toast({ variant: 'destructive', title: 'Error al Guardar', description: 'No se pudo guardar la configuración. Inténtalo de nuevo.' });
+            
+            let errorMessage = 'No se pudo guardar la configuración.';
+            
+            if (error.message === 'TIMEOUT') {
+                errorMessage = 'La base de datos no responde. Comprueba tu conexión a internet.';
+            } else if (error.code === 'unavailable' || error.message.includes('offline')) {
+                errorMessage = 'Estás sin conexión. Los cambios se guardarán cuando recuperes el internet.';
+                setEditingIntegration(null); 
+            }
+
+            toast({ 
+                variant: 'destructive', 
+                title: 'Error de Sincronización', 
+                description: errorMessage 
+            });
+            
         } finally {
             setIsSaving(false);
         }
     };
+
 
     const initialLoading = isIntegrationsLoading || isModulesLoading;
 
@@ -584,3 +628,5 @@ export default function IntegrationsPage() {
         </div>
     );
 }
+
+    
