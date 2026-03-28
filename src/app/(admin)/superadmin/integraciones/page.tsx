@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useCollection, useFirestore, useMemoFirebase, setDocumentNonBlocking } from '@/firebase';
-import { collection, doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
+import { collection, doc, updateDoc, setDoc } from 'firebase/firestore';
 import {
   Card,
   CardHeader,
@@ -34,7 +34,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Plug, Cloud, CheckCircle, XCircle, Loader2, Eye, EyeOff, Bot } from 'lucide-react';
+import { PlusCircle, Cloud, CheckCircle, XCircle, Loader2, Eye, EyeOff, Bot } from 'lucide-react';
 import { WhatsAppIcon } from '@/components/icons';
 import type { Integration, CloudinaryFields, AIProviderFields, WhapiFields } from '@/models/integration';
 import { testApiKey } from '@/ai/flows/test-api-key-flow';
@@ -53,7 +53,6 @@ const withTimeout = <T,>(promise: Promise<T>, timeoutMs: number): Promise<T> => 
   ]);
 };
 
-// Integraciones que el sistema garantiza que existan
 const REQUIRED_INTEGRATIONS: Array<{ id: string; name: string }> = [
   { id: 'cloudinary',                                           name: 'Cloudinary' },
   { id: 'chatbot-integrado-con-whatsapp-para-soporte-y-ventas', name: 'Chatbot IA (Google/OpenAI/Groq)' },
@@ -130,11 +129,20 @@ const CloudinaryForm = ({
 // ─── Formulario AI Provider ──────────────────────────────────────────────────
 type Provider = 'google' | 'openai' | 'groq';
 type TestStatus = 'idle' | 'testing' | 'success' | 'error';
-const AIProviderForm = ({ integration, onSave, onCancel, isSaving }: any) => {
+type ModalState = { isOpen: boolean; title: string; message: string };
+
+const AIProviderForm = ({
+  integration, onSave, onCancel, isSaving,
+}: {
+  integration: Integration;
+  onSave: (data: AIProviderFields) => void;
+  onCancel: () => void;
+  isSaving: boolean;
+}) => {
   const [fields, setFields] = useState<AIProviderFields>(() => {
     let parsed: any = {};
     try {
-      parsed = typeof integration.fields === 'string' && integration.fields.trim() ? JSON.parse(integration.fields) : (integration.fields || {});
+      parsed = typeof integration.fields === 'string' ? JSON.parse(integration.fields) : (integration.fields || {});
     } catch { parsed = {}; }
     return {
       google: { apiKey: parsed?.google?.apiKey || '' },
@@ -157,7 +165,7 @@ const AIProviderForm = ({ integration, onSave, onCancel, isSaving }: any) => {
 
   return (
     <div className="space-y-6">
-      {(['google', 'openai', 'groq'] as Provider[]).map((p) => (
+      {(['google', 'openai', 'groq'] as const).map((p) => (
         <Card key={p}>
           <CardHeader><CardTitle className="text-lg capitalize">{p}</CardTitle></CardHeader>
           <CardContent className="space-y-3">
@@ -187,7 +195,7 @@ const AIProviderForm = ({ integration, onSave, onCancel, isSaving }: any) => {
 const WhapiForm = ({ integration, onSave, onCancel, isSaving }: any) => {
   const [fields, setFields] = useState<WhapiFields>(() => {
     let parsed: any = {};
-    try { parsed = typeof integration.fields === 'string' && integration.fields.trim() ? JSON.parse(integration.fields) : (integration.fields || {}); } catch { parsed = {}; }
+    try { parsed = typeof integration.fields === 'string' ? JSON.parse(integration.fields) : (integration.fields || {}); } catch { parsed = {}; }
     return { apiKey: parsed?.apiKey || '', instanceId: parsed?.instanceId || '' };
   });
 
@@ -226,11 +234,11 @@ export default function IntegrationsPage() {
     () => (!firestore ? null : collection(firestore, 'integrations')),
     [firestore],
   );
-  const { data: integrations, isLoading: isIntegrationsLoading } = useCollection<Integration>(integrationsQuery);
+  const { data: integrations, isLoading } = useCollection<Integration>(integrationsQuery);
 
-  // ✅ CORRECCIÓN PERSISTENCIA: Inicialización NO destructiva
+  // ✅ BLINDAJE DE PERSISTENCIA
   useEffect(() => {
-    if (!firestore || isIntegrationsLoading || !Array.isArray(integrations) || didInit.current) return;
+    if (!firestore || isLoading || !Array.isArray(integrations) || didInit.current) return;
     
     didInit.current = true;
     const existingIds = new Set(integrations.map(i => i.id));
@@ -238,21 +246,21 @@ export default function IntegrationsPage() {
     
     if (missing.length > 0) {
         missing.forEach(async ({ id, name }) => {
-            const docRef = doc(firestore, 'integrations', id);
             try {
-                // Usa setDoc con merge:true para evitar sobreescribir si ya existe pero el snapshot inicial vino vacío
+                const docRef = doc(firestore, 'integrations', id);
                 await setDoc(docRef, { 
                     id, 
                     name, 
-                    status: 'inactive', // Siempre empieza inactivo
+                    status: 'inactive',
+                    fields: '{}',
                     updatedAt: new Date().toISOString() 
                 }, { merge: true });
             } catch (e) {
-                console.error(`Error inicializando ${id}:`, e);
+                console.error(`Error recuperando ${id}:`, e);
             }
         });
     }
-  }, [firestore, isIntegrationsLoading, integrations]);
+  }, [firestore, isLoading, integrations]);
 
   const handleStatusChange = async (integration: Integration, checked: boolean) => {
     if (!firestore) return;
@@ -261,7 +269,7 @@ export default function IntegrationsPage() {
       await updateDoc(doc(firestore, 'integrations', integration.id), { status: newStatus });
       toast({ title: 'Estado Actualizado', description: `${integration.name} está ${newStatus}.` });
     } catch {
-      toast({ variant: 'destructive', title: 'Error', description: 'No se pudo actualizar.' });
+      toast({ variant: 'destructive', title: 'Error', description: 'No se pudo actualizar el estado.' });
     }
   };
 
@@ -269,9 +277,9 @@ export default function IntegrationsPage() {
     if (!editingIntegration || !firestore) return;
     setIsSaving(true);
     try {
-      const result = await withTimeout(saveIntegration(editingIntegration.id, { fields: JSON.stringify(formData) }), 10000);
+      const result = await withTimeout(saveIntegration(editingIntegration.id, { fields: JSON.stringify(formData) }), 15000);
       if (!result.success) throw new Error(result.error);
-      toast({ title: 'Éxito', description: 'Configuración guardada.' });
+      toast({ title: 'Éxito', description: 'Configuración guardada correctamente.' });
       setEditingIntegration(null);
     } catch (e: any) {
       toast({ variant: 'destructive', title: 'Error', description: e.message || 'Error de red.' });
@@ -296,7 +304,7 @@ export default function IntegrationsPage() {
     }
   };
 
-  if (isIntegrationsLoading) {
+  if (isLoading) {
     return <div className="flex items-center justify-center h-64"><Loader2 className="h-8 w-8 animate-spin" /></div>;
   }
 
@@ -315,9 +323,9 @@ export default function IntegrationsPage() {
             <DialogContent>
               <DialogHeader><DialogTitle>Nuevo Módulo</DialogTitle></DialogHeader>
               <form onSubmit={handleSubmit(handleCreateIntegration)} className="space-y-4">
-                <div><Label>Nombre</Label><Input {...register('name')} /></div>
+                <div><Label>Nombre</Label><Input {...register('name')} />{errors.name && <p className="text-xs text-destructive">{errors.name.message}</p>}</div>
                 <div><Label>Descripción</Label><Input {...register('description')} /></div>
-                <DialogFooter><Button type="submit">Crear</Button></DialogFooter>
+                <DialogFooter><Button type="submit">Crear Integración</Button></DialogFooter>
               </form>
             </DialogContent>
           </Dialog>

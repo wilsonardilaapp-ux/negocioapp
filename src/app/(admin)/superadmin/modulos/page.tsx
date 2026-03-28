@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useCollection, useFirestore, useMemoFirebase, deleteDocumentNonBlocking } from '@/firebase';
@@ -76,25 +75,33 @@ export default function ModulesPage() {
   const { data: modules, isLoading } = useCollection<Module>(modulesQuery);
 
   useEffect(() => {
-    if (!firestore || isLoading || didInit.current) return;
+    // ✅ FIX DEFINITIVO: Espera a que la carga termine y que `modules` sea un array
+    if (!firestore || isLoading || !Array.isArray(modules) || didInit.current) return;
+    
     didInit.current = true;
 
     const initializeRequiredModules = async () => {
+        const existingIds = new Set(modules.map(m => m.id));
+
         for (const id in REQUIRED_MODULES) {
-            const docRef = doc(firestore, 'modules', id);
-            try {
-                const snap = await getDoc(docRef);
-                if (!snap.exists()) {
-                    await setDoc(docRef, { ...REQUIRED_MODULES[id], id, createdAt: new Date().toISOString() });
+            if (!existingIds.has(id)) {
+                const docRef = doc(firestore, 'modules', id);
+                try {
+                    // Usa { merge: true } para no sobrescribir status si ya existía
+                    await setDoc(docRef, { 
+                        id, 
+                        ...REQUIRED_MODULES[id],
+                        createdAt: new Date().toISOString() 
+                    }, { merge: true });
+                } catch (e) {
+                    console.error(`Error inicializando módulo ${id}:`, e);
                 }
-            } catch (e) {
-                console.error(`Error inicializando módulo ${id}:`, e);
             }
         }
     };
     
     initializeRequiredModules();
-  }, [firestore, isLoading]);
+  }, [firestore, isLoading, modules]);
 
   const { register, handleSubmit, reset, setValue, formState: { errors, isSubmitting } } = useForm<z.infer<typeof moduleSchema>>({
     resolver: zodResolver(moduleSchema),
@@ -120,6 +127,7 @@ export default function ModulesPage() {
     setDialogOpen(false);
   }
 
+  // ✅ FIX: Usa `await updateDoc` para garantizar la escritura
   const handleStatusChange = async (module: Module) => {
     if (!firestore) return;
     const newStatus = module.status === 'active' ? 'inactive' : 'active';
@@ -165,7 +173,7 @@ export default function ModulesPage() {
     handleCloseDialog();
   };
 
-  if (isLoading && !modules) {
+  if (isLoading) {
     return <div className="flex items-center justify-center h-64"><Loader2 className="h-8 w-8 animate-spin" /> Cargando módulos...</div>;
   }
 
