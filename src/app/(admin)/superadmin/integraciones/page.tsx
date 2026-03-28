@@ -1,8 +1,11 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useCollection, useFirestore, useMemoFirebase, setDocumentNonBlocking } from '@/firebase';
+import { useCollection, useFirestore, useMemoFirebase, setDocumentNonBlocking, addDocumentNonBlocking } from '@/firebase';
 import { collection, doc, getDoc } from 'firebase/firestore';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import {
   Card,
   CardHeader,
@@ -18,6 +21,7 @@ import {
   DialogTitle,
   DialogDescription,
   DialogFooter,
+  DialogTrigger,
 } from '@/components/ui/dialog';
 import {
   AlertDialog,
@@ -31,10 +35,11 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
-import { Plug, Cloud, CheckCircle, XCircle, Loader2, Eye, EyeOff, Bot } from 'lucide-react';
+import { PlusCircle, Plug, Cloud, CheckCircle, XCircle, Loader2, Eye, EyeOff, Bot } from 'lucide-react';
 import { WhatsAppIcon } from '@/components/icons';
 import type { Integration, CloudinaryFields, AIProviderFields, WhapiFields } from '@/models/integration';
 import type { Module } from '@/models/module';
@@ -43,7 +48,7 @@ import { testWhapiConnection } from '@/ai/flows/test-whapi-connection-flow';
 import { saveIntegration } from '@/actions/save-integration';
 
 /**
- * Utilidad de Carrera de Promesas para evitar bloqueos infinitos en SaaS
+ * Utility to race promises and prevent infinite hangs in SaaS environments.
  */
 const withTimeout = <T,>(promise: Promise<T>, timeoutMs: number): Promise<T> => {
   return Promise.race([
@@ -53,6 +58,8 @@ const withTimeout = <T,>(promise: Promise<T>, timeoutMs: number): Promise<T> => 
     ),
   ]);
 };
+
+// --- Form Components ---
 
 const CloudinaryForm = ({ integration, onSave, onCancel, isSaving }: { integration: Integration, onSave: (data: CloudinaryFields) => void, onCancel: () => void, isSaving: boolean }) => {
     const { toast } = useToast();
@@ -255,71 +262,67 @@ const WhapiForm = ({ integration, onSave, onCancel, isSaving }: { integration: I
     );
 };
 
+const slugify = (text: string) => text.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]+/g, '');
+
+const newIntegrationSchema = z.object({
+  name: z.string().min(3, "El nombre debe tener al menos 3 caracteres."),
+  description: z.string().optional(),
+});
+type NewIntegrationFormData = z.infer<typeof newIntegrationSchema>;
+
 export default function IntegrationsPage() {
     const firestore = useFirestore();
     const { toast } = useToast();
     const [editingIntegration, setEditingIntegration] = useState<Integration | null>(null);
     const [isSaving, setIsSaving] = useState(false);
+    const [isCreateDialogOpen, setCreateDialogOpen] = useState(false);
     
+    const { register, handleSubmit, reset } = useForm<NewIntegrationFormData>({ resolver: zodResolver(newIntegrationSchema) });
+
     const integrationsQuery = useMemoFirebase(() => !firestore ? null : collection(firestore, 'integrations'), [firestore]);
     const modulesQuery = useMemoFirebase(() => !firestore ? null : collection(firestore, 'modules'), [firestore]);
 
     const { data: integrations, isLoading: isIntegrationsLoading } = useCollection<Integration>(integrationsQuery);
     const { data: modules, isLoading: isModulesLoading } = useCollection<Module>(modulesQuery);
-    
+
     useEffect(() => {
-        if (!firestore) return;
-
-        const bootstrapIntegrations = async () => {
-            const requiredIntegrations: { [key: string]: Omit<Integration, 'id' | 'updatedAt'> } = {
-                'cloudinary': { name: "Cloudinary", fields: JSON.stringify({ cloud_name: "", api_key: "", api_secret: "" }), status: "inactive" },
-                'chatbot-integrado-con-whatsapp-para-soporte-y-ventas': { name: "Chatbot IA (Google/OpenAI/Groq)", fields: JSON.stringify({ google: { apiKey: "" }, openai: { apiKey: "" }, groq: { apiKey: "" } }), status: "inactive" },
-                'whapi-whatsapp': { name: "WHAPI (WhatsApp)", fields: JSON.stringify({ apiKey: "", instanceId: "" }), status: "inactive" }
-            };
-
-            for (const id in requiredIntegrations) {
-                const docRef = doc(firestore, 'integrations', id);
-                try {
-                    const docSnap = await getDoc(docRef);
-                    if (!docSnap.exists()) {
-                        await setDocumentNonBlocking(docRef, { ...requiredIntegrations[id], id, updatedAt: new Date().toISOString() });
-                    }
-                } catch (e) {
-                    console.error("Error bootstrapping integration:", id, e);
-                }
+      if (!firestore) return;
+      const bootstrap = async (collectionName: string, defaults: Record<string, Omit<Integration | Module, 'id'>>) => {
+        for (const id in defaults) {
+          const docRef = doc(firestore, collectionName, id);
+          try {
+            const docSnap = await getDoc(docRef);
+            if (!docSnap.exists()) {
+              await setDocumentNonBlocking(docRef, { id, ...defaults[id] });
             }
-        };
-        
-        bootstrapIntegrations();
+          } catch(e) { console.error(`Error bootstrapping ${collectionName}:`, e); }
+        }
+      };
+
+      const requiredIntegrations = {
+        'cloudinary': { name: "Cloudinary", fields: '{}', status: "inactive" },
+        'chatbot-integrado-con-whatsapp-para-soporte-y-ventas': { name: "Chatbot IA (Google/OpenAI/Groq)", fields: '{}', status: "inactive" },
+        'whapi-whatsapp': { name: "WHAPI (WhatsApp)", fields: '{}', status: "inactive" }
+      };
+      bootstrap('integrations', requiredIntegrations);
+
     }, [firestore]);
 
-    const handleStatusChange = (integration: Integration, checked: boolean) => {
+    const handleStatusChange = async (integration: Integration, checked: boolean) => {
         if (!firestore) return;
         const newStatus = checked ? 'active' : 'inactive';
+        const docRef = doc(firestore, 'integrations', integration.id);
         
         try {
-            setDocumentNonBlocking(
-                doc(firestore, 'integrations', integration.id),
-                { status: newStatus, updatedAt: new Date().toISOString() },
-                { merge: true }
-            );
-            
-            toast({
-                title: "Estado Actualizado",
-                description: `La integración "${integration.name}" ahora está ${newStatus}.`,
-            });
+            await setDocumentNonBlocking(docRef, { status: newStatus }, { merge: true });
+            toast({ title: "Estado Actualizado", description: `"${integration.name}" ahora está ${newStatus}.` });
         } catch (error) {
-            console.error("Error al cambiar estado:", error);
-            toast({
-                variant: 'destructive',
-                title: 'Error',
-                description: 'No se pudo actualizar el estado.',
-            });
+            toast({ variant: 'destructive', title: 'Error', description: 'No se pudo actualizar el estado.' });
         }
     };
-
+    
     const handleSave = async (formData: any) => {
-        if (!editingIntegration) return;
+        if (!editingIntegration || !firestore) return;
         setIsSaving(true);
         try {
             const result = await withTimeout(saveIntegration(editingIntegration.id, { fields: JSON.stringify(formData) }), 10000);
@@ -327,28 +330,60 @@ export default function IntegrationsPage() {
             toast({ title: "Guardado", description: `"${editingIntegration.name}" actualizado.` });
             setEditingIntegration(null);
         } catch (error: any) {
-            const msg = error.message === 'TIMEOUT' ? 'Tiempo de espera agotado.' : error.message;
-            toast({ variant: 'destructive', title: 'Error', description: msg });
+            const msg = error.message === 'TIMEOUT' ? 'El servidor no responde. Reintenta.' : 'Fallo al guardar.';
+            toast({ variant: 'destructive', title: 'Error de Red', description: msg });
         } finally {
             setIsSaving(false);
         }
     };
 
+    const handleCreateIntegration = async (data: NewIntegrationFormData) => {
+        if (!firestore) return;
+        const id = slugify(data.name);
+        const newIntegrationData = {
+          id,
+          name: data.name,
+          description: data.description || '',
+          fields: '{}',
+          status: 'inactive',
+          updatedAt: new Date().toISOString(),
+        };
+        await addDocumentNonBlocking(collection(firestore, 'integrations'), newIntegrationData);
+        toast({ title: "Integración Creada", description: `Se ha creado la integración "${data.name}".` });
+        setCreateDialogOpen(false);
+        reset();
+    };
+
     if (isIntegrationsLoading || isModulesLoading) {
-        return <div className="flex items-center justify-center h-64"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>;
+        return <div className="flex items-center justify-center h-64"><Loader2 className="h-8 w-8 animate-spin" /></div>;
     }
 
     return (
         <div className="flex flex-col gap-6">
             <Card>
-                <CardHeader>
-                    <CardTitle>Gestión de Integraciones</CardTitle>
-                    <CardDescription>Conecta y configura servicios de terceros para ampliar las funcionalidades.</CardDescription>
+                <CardHeader className="flex flex-row justify-between items-center">
+                    <div>
+                        <CardTitle>Gestión de Integraciones</CardTitle>
+                        <CardDescription>Conecta y configura servicios de terceros para ampliar las funcionalidades.</CardDescription>
+                    </div>
+                    <Dialog open={isCreateDialogOpen} onOpenChange={setCreateDialogOpen}>
+                        <DialogTrigger asChild>
+                            <Button><PlusCircle className="mr-2 h-4 w-4" />Crear Integración</Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                            <DialogHeader><DialogTitle>Crear Nueva Integración</DialogTitle></DialogHeader>
+                            <form onSubmit={handleSubmit(handleCreateIntegration)} className="space-y-4">
+                                <div><Label>Nombre</Label><Input {...register('name')} placeholder="Mi Nueva Integración" /></div>
+                                <div><Label>Descripción</Label><Textarea {...register('description')} placeholder="¿Qué hace esta integración?" /></div>
+                                <DialogFooter><Button type="submit">Crear</Button></DialogFooter>
+                            </form>
+                        </DialogContent>
+                    </Dialog>
                 </CardHeader>
             </Card>
             
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                {integrations?.filter(i => ['cloudinary', 'chatbot-integrado-con-whatsapp-para-soporte-y-ventas', 'whapi-whatsapp'].includes(i.id)).map(integration => {
+                {integrations?.map(integration => {
                      const isModuleActive = modules?.some(m => m.id === integration.id && m.status === 'active');
                      const icon = integration.id === 'cloudinary' ? <Cloud className="h-8 w-8" /> : (integration.id === 'whapi-whatsapp' ? <WhatsAppIcon className="h-8 w-8" /> : <Bot className="h-8 w-8" />);
                      
