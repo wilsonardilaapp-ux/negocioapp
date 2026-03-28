@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { useCollection, useFirestore, useMemoFirebase, setDocumentNonBlocking } from '@/firebase';
 import { collection, doc } from 'firebase/firestore';
 import {
   Card,
@@ -391,9 +391,7 @@ export default function IntegrationsPage() {
 
           for (const id in requiredIntegrations) {
               if (!integrations.some(i => i.id === id)) {
-                  // This is a client-side update, it might be better as a server action
-                  // but for now, this ensures the documents exist.
-                   doc(firestore, 'integrations', id).set({ id, ...requiredIntegrations[id] });
+                   setDocumentNonBlocking(doc(firestore, 'integrations', id), { id, ...requiredIntegrations[id] });
               }
           }
       }
@@ -418,7 +416,7 @@ export default function IntegrationsPage() {
                       status: 'inactive', 
                       createdAt: new Date().toISOString(),
                   };
-                  doc(firestore, 'modules', id).set(newModule);
+                  setDocumentNonBlocking(doc(firestore, 'modules', id), newModule);
               }
           }
       }
@@ -446,7 +444,6 @@ export default function IntegrationsPage() {
         try {
             const dataToUpdate = {
                 fields: JSON.stringify(formData),
-                updatedAt: new Date().toISOString(),
             };
             
             const result = await saveIntegration(editingIntegration.id, dataToUpdate);
