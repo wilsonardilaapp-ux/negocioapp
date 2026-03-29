@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useMemo } from 'react';
+import Link from 'next/link';
 import type { LandingPageData, NavLink } from '@/models/landing-page';
 import { Button } from '@/components/ui/button';
 import { MessageCircle, Phone, Mail, Clock, MapPin, Youtube, Linkedin, ArrowUp, Star } from 'lucide-react';
@@ -346,7 +347,7 @@ export default function LandingPageContent({ data, businessId, logoUrl }: Landin
                      <h4 className="font-bold text-lg mb-3" style={{color: footer.visuals.darkMode ? '#FFFFFF' : '#000000'}}>Legal</h4>
                      <ul className="space-y-2 text-sm">
                         {footer.legalLinks.privacyPolicyUrl && <li><a href={footer.legalLinks.privacyPolicyUrl} className="hover:underline">Política de Privacidad</a></li>}
-                        {footer.legalLinks.termsAndConditionsUrl && <li><a href={footer.legalLinks.termsAndConditionsUrl} className="hover:underline">Términos y Condiciones</a></li>}
+                        {footer.legalLinks.termsAndConditionsUrl && <li><Link href="/terminos-y-condiciones" className="hover:underline">Términos y Condiciones</Link></li>}
                      </ul>
                 </div>
             </div>
