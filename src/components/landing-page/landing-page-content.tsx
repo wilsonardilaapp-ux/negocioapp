@@ -324,6 +324,15 @@ export default function LandingPageContent({ data, businessId, logoUrl }: Landin
                             </li>
                         );
                     }
+                    if (lowerCaseText.includes('servicios')) {
+                      return (
+                          <li key={link.id}>
+                              <Link href="/servicios" target="_blank" rel="noopener noreferrer" className="hover:underline">
+                                  {link.text}
+                              </Link>
+                          </li>
+                      );
+                    }
                     return (
                         <li key={link.id}>
                             <a href={link.url} className="hover:underline">
