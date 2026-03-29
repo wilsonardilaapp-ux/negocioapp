@@ -1,8 +1,9 @@
+
 'use client';
 
 import { useState, useEffect, useRef, useTransition } from 'react';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection } from 'firebase/firestore';
+import { collection, doc, deleteDoc } from 'firebase/firestore';
 import {
   Card,
   CardHeader,
@@ -21,12 +22,14 @@ import {
 } from "@/components/ui/dialog";
 import {
   AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
   AlertDialogContent,
-  AlertDialogHeader,
-  AlertDialogTitle,
   AlertDialogDescription,
   AlertDialogFooter,
-  AlertDialogAction,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -34,13 +37,13 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Plug, Cloud, CheckCircle, XCircle, Loader2, Eye, EyeOff, Bot } from 'lucide-react';
+import { PlusCircle, Plug, Cloud, CheckCircle, XCircle, Loader2, Eye, EyeOff, Bot, Trash2 } from 'lucide-react';
 import { WhatsAppIcon } from '@/components/icons';
 import type { Integration, CloudinaryFields, AIProviderFields, WhapiFields } from '@/models/integration';
 import type { Module } from '@/models/module';
 import { testApiKey } from '@/ai/flows/test-api-key-flow';
 import { testWhapiConnection } from '@/ai/flows/test-whapi-connection-flow';
-import { createIntegration, saveIntegrationFields, updateIntegrationStatus } from '@/actions/integrations';
+import { createIntegration, saveIntegrationFields, updateIntegrationStatus, deleteIntegration } from '@/actions/integrations';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -279,6 +282,7 @@ export default function IntegrationsPage() {
   const [isCreating, startCreateTransition] = useTransition();
   const [isSaving, startSavingTransition] = useTransition();
   const [isUpdatingStatus, startStatusTransition] = useTransition();
+  const [isDeleting, startDeleteTransition] = useTransition();
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<NewIntegrationFormData>({
     resolver: zodResolver(newIntegrationSchema),
@@ -314,6 +318,17 @@ export default function IntegrationsPage() {
     checkAndCreateIntegrations();
 
   }, [isIntegrationsLoading, integrations, firestore]);
+  
+  const handleDeleteIntegration = (integration: Integration) => {
+    startDeleteTransition(async () => {
+        const result = await deleteIntegration(integration.id);
+        if (result.success) {
+            toast({ title: 'Integración Eliminada', description: `Se ha eliminado "${integration.name}".` });
+        } else {
+            toast({ variant: 'destructive', title: 'Error', description: result.error || 'No se pudo eliminar la integración.' });
+        }
+    });
+  };
 
   const handleStatusChange = (integration: Integration, checked: boolean) => {
     startStatusTransition(async () => {
@@ -360,7 +375,7 @@ export default function IntegrationsPage() {
       }
   }
 
-  const anyTransitionActive = isCreating || isSaving || isUpdatingStatus;
+  const anyTransitionActive = isCreating || isSaving || isUpdatingStatus || isDeleting;
 
   const isLoading = isIntegrationsLoading || areModulesLoading;
 
@@ -491,19 +506,41 @@ export default function IntegrationsPage() {
                   </div>
                 </div>
               </CardContent>
-              <CardFooter>
+              <CardFooter className="grid grid-cols-2 gap-2">
                  <TooltipProvider>
                       <Tooltip>
                           <TooltipTrigger asChild>
                               <div className="w-full">
                                   <Button className="w-full" onClick={() => setEditingIntegration(integration)} disabled={isControlDisabled}>
-                                      <Plug className="mr-2 h-4 w-4" /> Editar Configuración
+                                      <Plug className="mr-2 h-4 w-4" /> Editar Config.
                                   </Button>
                               </div>
                           </TooltipTrigger>
                            {tooltipMessage && <TooltipContent><p>{tooltipMessage}</p></TooltipContent>}
                       </Tooltip>
                   </TooltipProvider>
+                  <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                            <Button variant="destructive" className="w-full" disabled={isControlDisabled}>
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Eliminar
+                            </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                            <AlertDialogHeader>
+                                <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                    Esta acción no se puede deshacer. Se eliminará permanentemente la integración "{integration.name}".
+                                </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => handleDeleteIntegration(integration)} className="bg-destructive hover:bg-destructive/90">
+                                    {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Sí, eliminar'}
+                                </AlertDialogAction>
+                            </AlertDialogFooter>
+                        </AlertDialogContent>
+                    </AlertDialog>
               </CardFooter>
             </Card>
           );

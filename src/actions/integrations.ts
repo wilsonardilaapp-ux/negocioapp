@@ -75,3 +75,19 @@ export async function updateIntegrationStatus(integrationId: string, status: 'ac
         return { success: false, error: error.message || 'An unknown server error occurred.' };
     }
 }
+
+export async function deleteIntegration(integrationId: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    const firestore = await getAdminFirestore();
+    const docRef = firestore.collection('integrations').doc(integrationId);
+    
+    await docRef.delete();
+    
+    revalidatePath('/superadmin/integraciones');
+    
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error deleting integration:", error);
+    return { success: false, error: error.message || 'An unknown server error occurred.' };
+  }
+}
