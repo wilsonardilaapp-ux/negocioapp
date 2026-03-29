@@ -347,7 +347,7 @@ export default function LandingPageContent({ data, businessId, logoUrl }: Landin
                      <h4 className="font-bold text-lg mb-3" style={{color: footer.visuals.darkMode ? '#FFFFFF' : '#000000'}}>Legal</h4>
                      <ul className="space-y-2 text-sm">
                         {footer.legalLinks.privacyPolicyUrl && <li><a href={footer.legalLinks.privacyPolicyUrl} className="hover:underline">Política de Privacidad</a></li>}
-                        {footer.legalLinks.termsAndConditionsUrl && <li><Link href="/terminos-y-condiciones" className="hover:underline">Términos y Condiciones</Link></li>}
+                        {footer.legalLinks.termsAndConditionsUrl && <li><Link href="/terminos-y-condiciones" target="_blank" rel="noopener noreferrer" className="hover:underline">Términos y Condiciones</Link></li>}
                      </ul>
                 </div>
             </div>
