@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useMemo } from 'react';
@@ -312,9 +313,25 @@ export default function LandingPageContent({ data, businessId, logoUrl }: Landin
             <div className="space-y-4">
               <h4 className="font-bold text-lg" style={{color: footer.visuals.darkMode ? '#FFFFFF' : '#000000'}}>Enlaces Rápidos</h4>
               <ul className="space-y-2">
-                {footer.quickLinks.map(link => (
-                  <li key={link.id}><a href={link.url} className="hover:underline">{link.text}</a></li>
-                ))}
+                {footer.quickLinks.map(link => {
+                    const lowerCaseText = link.text.toLowerCase();
+                    if (lowerCaseText.includes('sobre nosotros')) {
+                        return (
+                            <li key={link.id}>
+                                <Link href="/sobre-nosotros" target="_blank" rel="noopener noreferrer" className="hover:underline">
+                                    {link.text}
+                                </Link>
+                            </li>
+                        );
+                    }
+                    return (
+                        <li key={link.id}>
+                            <a href={link.url} className="hover:underline">
+                                {link.text}
+                            </a>
+                        </li>
+                    );
+                })}
               </ul>
             </div>
 
