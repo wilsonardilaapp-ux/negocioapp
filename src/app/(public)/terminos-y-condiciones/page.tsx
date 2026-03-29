@@ -1,27 +1,37 @@
-'use client';
+import { initializeApp, getApps, getApp } from "firebase/app";
+import { getFirestore, doc, getDoc } from "firebase/firestore";
+import { firebaseConfig } from "@/firebase/config";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import Footer from "@/components/layout/footer";
 import Header from "@/components/layout/header";
-import { useDoc, useFirestore, useMemoFirebase } from "@/firebase";
-import { doc } from "firebase/firestore";
 import type { LandingPageData } from "@/models/landing-page";
 
-// Fake data fetching hook to satisfy Header component props
-const useHeaderData = () => {
-    const firestore = useFirestore();
-    const mainBusinessId = 'main'; // Placeholder
-    
-    const landingPageDocRef = useMemoFirebase(() => {
-        if (!firestore || !mainBusinessId) return null;
-        return doc(firestore, 'businesses', mainBusinessId, 'landingPages', 'main');
-    }, [firestore, mainBusinessId]);
+// Initialize Firebase for server-side fetching
+const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
+const db = getFirestore(app);
 
-    const { data: landingData } = useDoc<LandingPageData>(landingPageDocRef);
-    return { businessId: mainBusinessId, navigation: landingData?.navigation ?? null };
+// Data fetching function for header
+async function getHeaderData(): Promise<{ businessId: string | null, navigation: LandingPageData['navigation'] | null }> {
+    try {
+        const configSnap = await getDoc(doc(db, "globalConfig", "system"));
+        const mainBusinessId = configSnap.exists() ? configSnap.data().mainBusinessId : null;
+
+        if (!mainBusinessId) {
+            return { businessId: null, navigation: null };
+        }
+
+        const landingSnap = await getDoc(doc(db, "businesses", mainBusinessId, "landingPages", "main"));
+        const navigation = landingSnap.exists() ? (landingSnap.data() as LandingPageData).navigation : null;
+        
+        return { businessId: mainBusinessId, navigation };
+    } catch (error) {
+        console.error("Error fetching header data:", error);
+        return { businessId: null, navigation: null };
+    }
 }
 
-export default function TermsAndConditionsPage() {
-    const { businessId, navigation } = useHeaderData();
+export default async function TermsAndConditionsPage() {
+    const { businessId, navigation } = await getHeaderData();
 
     return (
         <div className="w-full bg-background">
