@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, ReactNode, useMemo, useState, useEffect } from 'react';
 import { FirebaseApp } from 'firebase/app';
-import { Firestore, doc, getDoc, enableNetwork } from 'firebase/firestore';
+import { Firestore, doc, enableNetwork, onSnapshot, Unsubscribe } from 'firebase/firestore';
 import { Auth, User, onAuthStateChanged } from 'firebase/auth';
 import { FirebaseErrorListener } from '@/components/FirebaseErrorListener';
 import { useRouter, usePathname } from 'next/navigation';
@@ -62,7 +62,6 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
 
   useEffect(() => {
     if (firestore) {
-      // Ensure the network is enabled. It's safe to call this multiple times.
       enableNetwork(firestore)
         .then(() => {
           console.log("Firestore network connection enabled.");
@@ -79,51 +78,67 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
       return;
     }
 
-    const unsubscribe = onAuthStateChanged(
+    let profileUnsubscribe: Unsubscribe | undefined;
+
+    const authUnsubscribe = onAuthStateChanged(
       auth,
-      async (currentUser) => {
-        let profile: UserProfile | null = null;
-        
-        if (currentUser) {
-            try {
-                const userDocRef = doc(firestore, 'users', currentUser.uid);
-                const userDocSnap = await getDoc(userDocRef);
-                if (userDocSnap.exists()) {
-                    profile = userDocSnap.data() as UserProfile;
-                } else if (SUPER_ADMIN_EMAILS.includes(currentUser.email || '')) {
-                   profile = {
-                     id: currentUser.uid,
-                     name: currentUser.displayName || 'Super Admin',
-                     email: currentUser.email!,
-                     role: 'super_admin',
-                     status: 'active',
-                     createdAt: new Date().toISOString(),
-                     lastLogin: new Date().toISOString(),
-                   };
-                }
-            } catch (error) {
-                console.error("Profile fetch failed, using fallback. Error:", error);
-                 if (SUPER_ADMIN_EMAILS.includes(currentUser.email || '')) {
-                    profile = {
-                        id: currentUser.uid,
-                        name: currentUser.displayName || 'Super Admin',
-                        email: currentUser.email!,
-                        role: 'super_admin',
-                        status: 'active',
-                        createdAt: new Date().toISOString(),
-                        lastLogin: new Date().toISOString(),
-                    };
-                }
-            }
+      (currentUser) => {
+        // First, clean up any previous profile listener
+        if (profileUnsubscribe) {
+            profileUnsubscribe();
+            profileUnsubscribe = undefined;
         }
-        setUserAuthState({ user: currentUser, profile, isUserLoading: false, userError: null });
+
+        if (currentUser) {
+            const userDocRef = doc(firestore, 'users', currentUser.uid);
+
+            // Set up a real-time listener for the user's profile document
+            profileUnsubscribe = onSnapshot(
+                userDocRef,
+                (userDocSnap) => {
+                    let profile: UserProfile | null = null;
+                    if (userDocSnap.exists()) {
+                        profile = userDocSnap.data() as UserProfile;
+                    } else if (SUPER_ADMIN_EMAILS.includes(currentUser.email || '')) {
+                        // Fallback for super admin if profile doc doesn't exist for some reason
+                        profile = {
+                            id: currentUser.uid,
+                            name: currentUser.displayName || 'Super Admin',
+                            email: currentUser.email!,
+                            role: 'super_admin',
+                            status: 'active',
+                            createdAt: new Date().toISOString(),
+                            lastLogin: new Date().toISOString(),
+                        };
+                    }
+                    // Update state with the current user and their real-time profile
+                    setUserAuthState({ user: currentUser, profile, isUserLoading: false, userError: null });
+                },
+                (error) => {
+                    console.error("FirebaseProvider: Profile onSnapshot error:", error);
+                    setUserAuthState({ user: currentUser, profile: null, isUserLoading: false, userError: error });
+                }
+            );
+
+        } else {
+            // User is logged out
+            setUserAuthState({ user: null, profile: null, isUserLoading: false, userError: null });
+        }
       },
       (error) => {
         console.error("FirebaseProvider: onAuthStateChanged error:", error);
+        if (profileUnsubscribe) profileUnsubscribe();
         setUserAuthState({ user: null, profile: null, isUserLoading: false, userError: error });
       }
     );
-    return () => unsubscribe();
+
+    // Cleanup function for the main useEffect
+    return () => {
+        authUnsubscribe();
+        if (profileUnsubscribe) {
+            profileUnsubscribe();
+        }
+    };
   }, [auth, firestore]);
 
   useEffect(() => {
