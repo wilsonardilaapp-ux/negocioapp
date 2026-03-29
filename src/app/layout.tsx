@@ -11,7 +11,7 @@ const ptSans = PT_Sans({
 });
 
 export const metadata: Metadata = {
-  title: 'Negocio V03 Platform',
+  title: 'Zentry Platform',
   description: 'Plataforma para la gestión de productos de salud y bienestar.',
   icons: [{ rel: 'icon', url: '/favicon.ico' }],
 };
