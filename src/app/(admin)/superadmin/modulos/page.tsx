@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useTransition } from 'react';
-import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { useCollection, useFirestore, useMemoFirebase, deleteDocumentNonBlocking } from '@/firebase';
 import { collection, doc, updateDoc } from 'firebase/firestore';
 import {
   Card,
@@ -9,6 +9,7 @@ import {
   CardTitle,
   CardDescription,
   CardContent,
+  CardFooter,
 } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
@@ -31,6 +32,17 @@ import {
   DialogFooter,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { saveModule } from '@/actions/modules';
 
 const moduleSchema = z.object({
@@ -137,11 +149,9 @@ export default function ModulesPage() {
   
   const handleDelete = (module: Module) => {
       if (!firestore) return;
-      if (confirm(`¿Estás seguro de que quieres eliminar el módulo "${module.name}"?`)) {
-          const moduleDocRef = doc(firestore, 'modules', module.id);
-          updateDoc(moduleDocRef, { name: `_deleted_${Date.now()}`, status: 'inactive' });
-          toast({ title: "Módulo eliminado (simulado)", description: `El módulo "${module.name}" ha sido marcado para eliminar.`, variant: 'destructive' });
-      }
+      const moduleDocRef = doc(firestore, 'modules', module.id);
+      deleteDocumentNonBlocking(moduleDocRef);
+      toast({ title: "Módulo eliminado", description: `El módulo "${module.name}" ha sido eliminado.`, variant: 'destructive' });
   }
   
   const onSubmit = (data: z.infer<typeof moduleSchema>) => {
@@ -260,6 +270,28 @@ export default function ModulesPage() {
                                   </div>
                               </div>
                           </CardContent>
+                          <CardFooter>
+                              <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                      <Button variant="destructive" size="sm" className="w-full">
+                                          <Trash2 className="mr-2 h-4 w-4" />
+                                          Eliminar Módulo
+                                      </Button>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                      <AlertDialogHeader>
+                                          <AlertDialogTitle>¿Estás realmente seguro?</AlertDialogTitle>
+                                          <AlertDialogDescription>
+                                              Esta acción eliminará permanentemente el módulo "{module.name}" y no se puede deshacer.
+                                          </AlertDialogDescription>
+                                      </AlertDialogHeader>
+                                      <AlertDialogFooter>
+                                          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                          <AlertDialogAction onClick={() => handleDelete(module)} className="bg-destructive hover:bg-destructive/90">Sí, eliminar</AlertDialogAction>
+                                      </AlertDialogFooter>
+                                  </AlertDialogContent>
+                              </AlertDialog>
+                          </CardFooter>
                       </Card>
                   ))
               ) : (
