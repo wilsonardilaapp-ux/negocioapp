@@ -1,5 +1,5 @@
 
-"use client";
+'use client';
 
 import type { ReactNode } from "react";
 import Link from "next/link";
@@ -32,6 +32,7 @@ import type { Business } from "@/models/business";
 import { uploadMedia } from "@/ai/flows/upload-media-flow";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
+import { NotificationBell } from "@/components/layout/NotificationBell";
 
 const LoadingScreen = () => (
     <div className="flex justify-center items-center h-screen">
@@ -162,7 +163,8 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           <div className="md:hidden">
             <SidebarTrigger />
           </div>
-          <div className="ml-auto">
+          <div className="ml-auto flex items-center gap-2">
+            <NotificationBell />
           </div>
         </header>
         <main className="flex-1 p-4 md:p-6">{children}</main>

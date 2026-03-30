@@ -129,6 +129,17 @@ service cloud.firestore {
         allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
       }
 
+      // Notification Rules
+      match /notifications/{notificationId} {
+        allow read, update: if isBusinessMember(businessId); // Client can read and mark as read
+        allow create, delete: if isSuperAdmin(); // Only superadmin can create/delete
+      }
+      match /contactMessages/{messageId} {
+        // Allow clients to reply (create), and superadmin to do everything
+        allow create: if isBusinessMember(businessId);
+        allow read, update, delete: if isSuperAdmin();
+      }
+
       // Contabilidad
       match /asientos/{asientoId} {
         allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
