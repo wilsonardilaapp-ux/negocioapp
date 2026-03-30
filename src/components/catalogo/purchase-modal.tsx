@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -148,7 +147,7 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, b
                 paymentMethod: paymentMethodText,
                 orderDate: new Date().toISOString(),
                 orderStatus: 'Pendiente',
-                packagingCost: item.packagingCost,
+                packagingCost: item.packagingCost ?? 0,
                 tipoEntrega: tipoEntrega,
             };
     
