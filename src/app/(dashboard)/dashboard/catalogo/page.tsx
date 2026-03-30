@@ -1,10 +1,9 @@
-
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
-import { PlusCircle, ShoppingBag, Edit, Trash2, Printer, FileDown, Info, Frown } from 'lucide-react';
+import { PlusCircle, ShoppingBag, Edit, Trash2, Printer, FileDown, Info, Frown, Loader2 } from 'lucide-react';
 import type { Product } from '@/models/product';
 import ProductForm from '@/components/catalogo/product-form';
 import CatalogHeaderForm from '@/components/catalogo/catalog-header-form';
@@ -24,12 +23,14 @@ import {
 } from "@/components/ui/alert-dialog";
 import type { LandingHeaderConfigData } from '@/models/landing-page';
 import { v4 as uuidv4 } from 'uuid';
-import { useDoc, useFirestore, useUser, useMemoFirebase, setDocumentNonBlocking, deleteDocumentNonBlocking, useCollection } from '@/firebase';
-import { doc, collection, writeBatch, query, where, getDoc } from 'firebase/firestore';
+import { useUser, useFirestore, setDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase';
+import { doc, collection, getDocs, getDoc } from 'firebase/firestore';
 import type { SystemService } from '@/models/system-service';
 import type { Module } from '@/models/module';
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import type { Business } from '@/models/business';
+import { useToast } from '@/hooks/use-toast';
+
 
 const initialHeaderConfig: LandingHeaderConfigData = {
     banner: {
@@ -62,114 +63,131 @@ export default function CatalogoPage() {
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [editingProduct, setEditingProduct] = useState<Product | null>(null);
     const [productToDelete, setProductToDelete] = useState<Product | null>(null);
-    const [catalogModule, setCatalogModule] = useState<Module | null>(null);
-    const [isModuleLoading, setIsModuleLoading] = useState(true);
     
+    const [pageData, setPageData] = useState<{
+        products: Product[];
+        headerConfig: LandingHeaderConfigData;
+        productLimit: number;
+        catalogModule: Module | null;
+    }>({
+        products: [],
+        headerConfig: initialHeaderConfig,
+        productLimit: 10,
+        catalogModule: null,
+    });
+    const [isLoading, setIsLoading] = useState(true);
+    const [moduleInactive, setModuleInactive] = useState(false);
+
     const { user, isUserLoading } = useUser();
     const firestore = useFirestore();
+    const { toast } = useToast();
 
-    // Lógica para verificar el módulo de catálogo con retrocompatibilidad
     useEffect(() => {
-        if (!firestore) return;
-        
-        const checkModule = async () => {
-            setIsModuleLoading(true);
-            try {
-                const primaryDocRef = doc(firestore, 'modules', 'catalogo');
-                const primarySnap = await getDoc(primaryDocRef);
+        if (isUserLoading || !user || !firestore) {
+            return;
+        }
 
-                if (primarySnap.exists()) {
-                    setCatalogModule({ ...primarySnap.data(), id: primarySnap.id } as Module);
+        const fetchData = async () => {
+            setIsLoading(true);
+            try {
+                // 1. Fetch Module status first
+                const primaryModuleRef = doc(firestore, 'modules', 'catalogo');
+                let fetchedCatalogModule: Module | null = null;
+                const primaryModuleSnap = await getDoc(primaryModuleRef);
+                 if (primaryModuleSnap.exists()) {
+                    fetchedCatalogModule = { ...primaryModuleSnap.data(), id: primaryModuleSnap.id } as Module;
                 } else {
-                    const fallbackDocRef = doc(firestore, 'modules', 'catalogo-de-productos');
-                    const fallbackSnap = await getDoc(fallbackDocRef);
-                    if (fallbackSnap.exists()) {
-                        setCatalogModule({ ...fallbackSnap.data(), id: fallbackSnap.id } as Module);
-                    } else {
-                        setCatalogModule(null);
+                    const fallbackModuleRef = doc(firestore, 'modules', 'catalogo-de-productos');
+                    const fallbackModuleSnap = await getDoc(fallbackModuleRef);
+                    if (fallbackModuleSnap.exists()) {
+                        fetchedCatalogModule = { ...fallbackModuleSnap.data(), id: fallbackModuleSnap.id } as Module;
                     }
                 }
-            } catch (error) {
-                console.error("Error fetching catalog module:", error);
-                setCatalogModule(null);
+
+                if (!fetchedCatalogModule || fetchedCatalogModule.status === 'inactive') {
+                    setModuleInactive(true);
+                    setIsLoading(false);
+                    return;
+                }
+                setModuleInactive(false);
+
+                // 2. Fetch all other data concurrently after module check
+                const productLimitServiceRef = doc(firestore, 'systemServices', 'product_limit');
+                const businessRef = doc(firestore, 'businesses', user.uid);
+                const productsRef = collection(firestore, 'businesses', user.uid, 'products');
+                const headerConfigRef = doc(firestore, 'businesses', user.uid, 'landingConfig', 'header');
+
+                const [
+                    productLimitSnap,
+                    businessSnap,
+                    productsSnap,
+                    headerConfigSnap
+                ] = await Promise.all([
+                    getDoc(productLimitServiceRef),
+                    getDoc(businessRef),
+                    getDocs(productsRef),
+                    getDoc(headerConfigRef),
+                ]);
+
+                const fetchedBusiness = businessSnap.exists() ? businessSnap.data() as Business : null;
+                const fetchedProducts = productsSnap.docs.map(d => ({ ...d.data(), id: d.id })) as Product[];
+                
+                const savedConf = headerConfigSnap.exists() ? headerConfigSnap.data() as LandingHeaderConfigData : null;
+                const carouselItems = (savedConf?.carouselItems && Array.isArray(savedConf.carouselItems) && savedConf.carouselItems.length > 0)
+                    ? savedConf.carouselItems
+                    : initialHeaderConfig.carouselItems;
+                const carouselWithIds = carouselItems.map(item => item && item.id ? item : { ...item, id: uuidv4() });
+                
+                const mergedConfigData = {
+                    ...initialHeaderConfig,
+                    ...(savedConf || {}),
+                    banner: { ...initialHeaderConfig.banner, ...(savedConf?.banner || {}) },
+                    businessInfo: { ...initialHeaderConfig.businessInfo, ...(savedConf?.businessInfo || {}) },
+                    socialLinks: { ...initialHeaderConfig.socialLinks, ...(savedConf?.socialLinks || {}) },
+                    carouselItems: carouselWithIds,
+                };
+
+                const fetchedProductLimitService = productLimitSnap.exists() ? productLimitSnap.data() as SystemService : null;
+
+                let limit = 10; // Default limit
+                if (fetchedBusiness?.productLimit && fetchedBusiness.productLimit !== 0) {
+                    limit = fetchedBusiness.productLimit;
+                } else if (fetchedProductLimitService?.status === 'active' && fetchedProductLimitService.limit > 0) {
+                    limit = fetchedProductLimitService.limit;
+                }
+                
+                setPageData({
+                    products: fetchedProducts,
+                    headerConfig: mergedConfigData,
+                    productLimit: limit,
+                    catalogModule: fetchedCatalogModule,
+                });
+
+            } catch (e: any) {
+                console.error("Error fetching catalog page data:", e);
+                toast({ variant: "destructive", title: "Error", description: "No se pudieron cargar los datos del catálogo." });
             } finally {
-                setIsModuleLoading(false);
+                setIsLoading(false);
             }
         };
 
-        checkModule();
-    }, [firestore]);
+        fetchData();
+    }, [user, firestore, isUserLoading, toast]);
 
-    const productLimitServiceQuery = useMemoFirebase(() => {
-        if (!firestore) return null;
-        return doc(firestore, 'systemServices', 'product_limit');
-    }, [firestore]);
-    
-    const { data: productLimitService, isLoading: isServicesLoading } = useDoc<SystemService>(productLimitServiceQuery);
-
-    const businessDocRef = useMemoFirebase(() => {
-        if (!firestore || !user) return null;
-        return doc(firestore, 'businesses', user.uid);
-    }, [firestore, user]);
-    const { data: business, isLoading: isBusinessLoading } = useDoc<Business>(businessDocRef);
-
-    const productsQuery = useMemoFirebase(() => {
-        if (!firestore || !user) return null;
-        return collection(firestore, 'businesses', user.uid, 'products');
-    }, [firestore, user]);
-    const { data: products, isLoading: isProductsLoading } = useCollection<Product>(productsQuery);
-
-    const headerConfigDocRef = useMemoFirebase(() => {
-        if (!firestore || !user) return null; 
-        return doc(firestore, 'businesses', user.uid, 'landingConfig', 'header');
-    }, [firestore, user]);
-    
-    const { data: headerConfig, isLoading: isConfigLoading } = useDoc<LandingHeaderConfigData>(headerConfigDocRef);
-
-    const mergedConfig = useMemo(() => {
-        const savedConf = headerConfig;
-    
-        // Ensure carouselItems is always an array, providing a default if it's missing or not an array.
-        const carouselItems = (savedConf?.carouselItems && Array.isArray(savedConf.carouselItems) && savedConf.carouselItems.length > 0)
-            ? savedConf.carouselItems
-            : initialHeaderConfig.carouselItems;
-    
-        // Ensure each item has a unique ID.
-        const carouselWithIds = carouselItems.map(item => item && item.id ? item : { ...item, id: uuidv4() });
-    
-        return {
-            ...initialHeaderConfig,
-            ...(savedConf || {}),
-            banner: { ...initialHeaderConfig.banner, ...(savedConf?.banner || {}) },
-            businessInfo: { ...initialHeaderConfig.businessInfo, ...(savedConf?.businessInfo || {}) },
-            socialLinks: { ...initialHeaderConfig.socialLinks, ...(savedConf?.socialLinks || {}) },
-            carouselItems: carouselWithIds,
-        };
-    }, [headerConfig]);
-
-    const productLimit = useMemo(() => {
-        if (business?.productLimit && business.productLimit !== 0) {
-            return business.productLimit;
-        }
-        if (productLimitService?.status === 'active' && productLimitService.limit > 0) {
-            return productLimitService.limit;
-        }
-        return 10; // Default limit
-    }, [business, productLimitService]);
 
     const canCreateProduct = useMemo(() => {
-        const productCount = products?.length ?? 0;
+        const productCount = pageData.products.length;
         
-        if (productLimit === -1) {
+        if (pageData.productLimit === -1) {
              return { allowed: true, reason: '' };
         }
         
-        if (productCount >= productLimit) {
-            return { allowed: false, reason: `Has alcanzado el límite de ${productLimit} productos.` };
+        if (productCount >= pageData.productLimit) {
+            return { allowed: false, reason: `Has alcanzado el límite de ${pageData.productLimit} productos.` };
         }
 
         return { allowed: true, reason: '' };
-    }, [productLimit, products]);
+    }, [pageData.productLimit, pageData.products]);
     
     const updatePublicCatalog = (productsToSave: Product[], configToSave: LandingHeaderConfigData) => {
         if (!firestore || !user) return;
@@ -199,25 +217,25 @@ export default function CatalogoPage() {
             setDocumentNonBlocking(newProductRef, dataToSave);
         }
         
-        const currentProducts = products || [];
         let updatedProductList;
         if (editingProduct) {
-            updatedProductList = currentProducts.map(p => p.id === updatedProductId ? { ...dataToSave, id: updatedProductId } : p);
+            updatedProductList = pageData.products.map(p => p.id === updatedProductId ? { ...dataToSave, id: updatedProductId } : p);
         } else {
-            updatedProductList = [...currentProducts, { ...dataToSave, id: updatedProductId }];
+            updatedProductList = [...pageData.products, { ...dataToSave, id: updatedProductId }];
         }
-        
-        updatePublicCatalog(updatedProductList, mergedConfig);
+        setPageData(prev => ({ ...prev, products: updatedProductList }));
+        updatePublicCatalog(updatedProductList, pageData.headerConfig);
 
         setIsFormOpen(false);
         setEditingProduct(null);
     };
     
     const handleSaveHeader = (config: LandingHeaderConfigData) => {
-        if (headerConfigDocRef) {
-            setDocumentNonBlocking(headerConfigDocRef, config, { merge: true });
-            updatePublicCatalog(products || [], config);
-        }
+        if (!firestore || !user) return;
+        const headerConfigDocRef = doc(firestore, 'businesses', user.uid, 'landingConfig', 'header');
+        setDocumentNonBlocking(headerConfigDocRef, config, { merge: true });
+        setPageData(prev => ({...prev, headerConfig: config}));
+        updatePublicCatalog(pageData.products, config);
     };
 
     const handleEdit = (product: Product) => {
@@ -230,8 +248,9 @@ export default function CatalogoPage() {
         const productDocRef = doc(firestore, 'businesses', user.uid, 'products', productToDelete.id);
         await deleteDocumentNonBlocking(productDocRef);
 
-        const updatedProductList = (products || []).filter(p => p.id !== productToDelete.id);
-        updatePublicCatalog(updatedProductList, mergedConfig);
+        const updatedProductList = pageData.products.filter(p => p.id !== productToDelete.id);
+        setPageData(prev => ({...prev, products: updatedProductList}));
+        updatePublicCatalog(updatedProductList, pageData.headerConfig);
         
         setProductToDelete(null);
     };
@@ -246,13 +265,11 @@ export default function CatalogoPage() {
         window.open(url, '_blank');
     };
     
-    const isLoading = isUserLoading || isConfigLoading || isProductsLoading || isServicesLoading || isModuleLoading || isBusinessLoading;
-
     if (isLoading) {
-        return <div>Cargando tu catálogo...</div>
+        return <div className="flex items-center justify-center h-64"><Loader2 className="h-8 w-8 animate-spin" /> Cargando tu catálogo...</div>
     }
 
-    if (!catalogModule || catalogModule.status === 'inactive') {
+    if (moduleInactive) {
         return (
             <Card>
                 <CardHeader>
@@ -278,7 +295,7 @@ export default function CatalogoPage() {
 
     return (
         <div className="flex flex-col gap-6">
-            <CatalogHeaderForm data={mergedConfig} setData={handleSaveHeader} />
+            <CatalogHeaderForm data={pageData.headerConfig} setData={handleSaveHeader} />
             
             <CatalogQRGenerator />
 
@@ -307,7 +324,6 @@ export default function CatalogoPage() {
                                     <TooltipProvider>
                                         <Tooltip>
                                             <TooltipTrigger asChild>
-                                                {/* The div is necessary for Tooltip to work on a disabled button */}
                                                 <div>{addProductButton}</div>
                                             </TooltipTrigger>
                                             <TooltipContent>
@@ -328,6 +344,7 @@ export default function CatalogoPage() {
                                     product={editingProduct} 
                                     onSave={handleSaveProduct} 
                                     onCancel={() => setIsFormOpen(false)}
+                                    imageLimit={pageData.productLimit}
                                 />
                             </DialogContent>
                         </Dialog>
@@ -337,15 +354,15 @@ export default function CatalogoPage() {
                     <div className="flex items-center gap-2 rounded-lg border bg-secondary/50 p-3 text-sm">
                         <Info className="h-5 w-5 text-muted-foreground" />
                         <p className="text-muted-foreground">
-                            Límite de productos: <span className="font-bold">{products?.length ?? 0} / {productLimit === -1 ? '∞' : productLimit}</span>.
+                            Límite de productos: <span className="font-bold">{pageData.products.length} / {pageData.productLimit === -1 ? '∞' : pageData.productLimit}</span>.
                         </p>
                     </div>
                 </CardContent>
             </Card>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                {products && products.length > 0 ? (
-                    products.map(product => (
+                {pageData.products && pageData.products.length > 0 ? (
+                    pageData.products.map(product => (
                         <ProductCard key={product.id} product={product}>
                             <div className="flex gap-2">
                                 <Button variant="outline" size="sm" className="w-full" onClick={() => handleEdit(product)}>
@@ -393,5 +410,3 @@ export default function CatalogoPage() {
         </div>
     );
 }
-
-    
