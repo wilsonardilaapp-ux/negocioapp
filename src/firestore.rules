@@ -128,16 +128,11 @@ service cloud.firestore {
       match /kardexMovimientos/{movimientoId} {
         allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
       }
-
+      
       // Notification Rules
       match /notifications/{notificationId} {
-        allow read, update: if isBusinessMember(businessId); // Client can read and mark as read
-        allow create, delete: if isSuperAdmin(); // Only superadmin can create/delete
-      }
-      match /contactMessages/{messageId} {
-        // Allow clients to reply (create), and superadmin to do everything
-        allow create: if isBusinessMember(businessId);
-        allow read, update, delete: if isSuperAdmin();
+        allow read, update: if isBusinessMember(businessId);
+        allow create, delete: if isSuperAdmin();
       }
 
       // Contabilidad
@@ -191,6 +186,18 @@ service cloud.firestore {
     match /integrations/{integrationId} {
       allow read: if request.auth != null;
       allow write: if isSuperAdmin();
+    }
+    
+    // NEW: Messages from contact forms and client replies
+    match /contactMessages/{messageId} {
+      allow read, update, delete: if isSuperAdmin();
+      // Allow unauthenticated (for webform) and authenticated (for client reply) to create.
+      allow create: if true;
+
+      // Replies by superadmin to a public user's message
+      match /replies/{replyId} {
+        allow read, create: if isSuperAdmin();
+      }
     }
     
     // Default deny all other paths. This is a security best practice.

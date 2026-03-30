@@ -32,7 +32,7 @@ const allNavItems = [
   { href: "/dashboard/catalogo", icon: ShoppingCart, label: "Catálogo", moduleId: 'catalogo' },
   { href: "/dashboard/share", icon: Share2, label: "Compartir Menú" },
   { href: "/dashboard/blog", icon: FileText, label: "Blog", moduleId: 'blog' },
-  { href: "/dashboard/mensajes", icon: Mail, label: "Mensajes" },
+  { href: "/dashboard/messages", icon: Mail, label: "Mensajes" },
   { href: "/dashboard/pedidos", icon: ShoppingBag, label: "Pedidos" },
   { href: "/dashboard/empaque", icon: Package, label: "Empaque" },
   { href: "/dashboard/pagos", icon: CreditCard, label: "Pagos" },

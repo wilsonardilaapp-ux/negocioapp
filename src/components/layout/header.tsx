@@ -13,7 +13,7 @@ const getLinkUrl = (link: NavLink, currentBusinessId: string | null | undefined)
   const text = link.text.toLowerCase();
   if (text.includes('blog')) return '/blog';
   if (text.includes('catálogo')) return currentBusinessId ? `/catalog/${currentBusinessId}` : '#';
-  if (text.includes('contacto')) return '/contact';
+  if (text.includes('contacto')) return '/contacto';
   if (text.includes('inicio')) return currentBusinessId ? `/landing/${currentBusinessId}` : '/';
   return '#';
 };
