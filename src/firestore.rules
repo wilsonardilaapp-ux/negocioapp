@@ -138,7 +138,8 @@ service cloud.firestore {
       // Notification Rules
       match /notifications/{notificationId} {
         allow read, update: if isBusinessMember(businessId);
-        allow create, delete: if isSuperAdmin();
+        allow create: if isSuperAdmin();
+        allow delete: if isBusinessMember(businessId);
       }
 
       // Contabilidad
