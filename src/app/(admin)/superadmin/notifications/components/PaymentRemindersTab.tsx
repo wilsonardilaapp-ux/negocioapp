@@ -1,6 +1,6 @@
 
 'use client';
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { useAllSubscriptions, type ClientWithSubscription } from '../../subscriptions/hooks/useAllSubscriptions';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
@@ -464,7 +464,8 @@ export default function PaymentRemindersTab() {
     // State for scheduled reminders
     const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
     const [editingSchedule, setEditingSchedule] = useState<ScheduledReminder | null>(null);
-    const [processingIds, setProcessingIds] = useState<Set<string>>(new Set());
+    const processingIdsRef = useRef<Set<string>>(new Set());
+
 
     const scheduledRemindersQuery = useMemoFirebase(() => {
         if (!firestore) return null;
@@ -495,7 +496,10 @@ export default function PaymentRemindersTab() {
     };
 
     const handleDeleteScheduledReminder = async (reminderId: string, clientId: string) => {
-        if (!firestore) return;
+        if (!firestore || !clientId) {
+            toast({ variant: 'destructive', title: 'Error', description: 'No se pudo determinar el cliente del recordatorio.' });
+            return;
+        }
         try {
             const reminderRef = doc(firestore, `businesses/${clientId}/reminders`, reminderId);
             await deleteDocumentNonBlocking(reminderRef);
@@ -512,14 +516,14 @@ export default function PaymentRemindersTab() {
         const now = new Date();
         const pending = scheduledReminders.filter(r => 
             r.status === 'pending' && 
-            !processingIds.has(r.id) &&
+            !processingIdsRef.current.has(r.id) &&
             safeToDate(r.scheduledDate) <= now
         );
 
         if (pending.length > 0) {
             const sendReminders = async () => {
                 const idsToProcess = new Set(pending.map(p => p.id));
-                setProcessingIds(prev => new Set([...prev, ...idsToProcess]));
+                idsToProcess.forEach(id => processingIdsRef.current.add(id));
 
                 const batch = writeBatch(firestore);
                 for (const reminder of pending) {
@@ -551,7 +555,7 @@ export default function PaymentRemindersTab() {
             };
             sendReminders();
         }
-    }, [scheduledReminders, firestore, clients, toast, processingIds]);
+    }, [scheduledReminders, firestore, clients, toast]);
 
     return (
         <div className="space-y-6">
