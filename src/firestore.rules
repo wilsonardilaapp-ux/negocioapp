@@ -137,9 +137,9 @@ service cloud.firestore {
                                                                                                                                                                                                                                              
                                                                                                                                                                                                                                                    // Notification Rules
                                                                                                                                                                                                                                                          match /notifications/{notificationId} {
-                                                                                                                                                                                                                                                                  allow read, update: if isBusinessMember(businessId);
+                                                                                                                                                                                                                                                                  allow read, update: if isBusinessMember(businessId) || isSuperAdmin();
                                                                                                                                                                                                                                                                           allow create: if isSuperAdmin();
-                                                                                                                                                                                                                                                                                  allow delete: if isBusinessMember(businessId);
+                                                                                                                                                                                                                                                                                  allow delete: if isBusinessMember(businessId) || isSuperAdmin();
                                                                                                                                                                                                                                                          }
 
                                                                                                                                                                                                                                                                // Contabilidad
@@ -213,3 +213,5 @@ service cloud.firestore {
                                                                                                                                       }
     }
 }
+
+    
