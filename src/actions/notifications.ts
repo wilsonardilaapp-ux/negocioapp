@@ -2,7 +2,6 @@
 'use server';
 
 import { getAdminFirestore } from '@/firebase/server-init';
-import { Timestamp } from 'firebase-admin/firestore';
 import type { AdminNotification } from '@/models/notification';
 
 interface SendNotificationArgs {
@@ -21,7 +20,6 @@ export async function sendAdminNotification({ recipients, subject, body }: SendN
 
   try {
     recipients.forEach(userId => {
-      // Correct admin SDK syntax to create a new document reference with an auto-generated ID
       const notificationRef = db.collection(`businesses/${userId}/notifications`).doc();
       
       const newNotification: Omit<AdminNotification, 'id'> = {
@@ -29,7 +27,7 @@ export async function sendAdminNotification({ recipients, subject, body }: SendN
         subject,
         body,
         read: false,
-        createdAt: Timestamp.now(),
+        createdAt: new Date().toISOString(),
         type: 'general',
       };
       batch.set(notificationRef, newNotification);

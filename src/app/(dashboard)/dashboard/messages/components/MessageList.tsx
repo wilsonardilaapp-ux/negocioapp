@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -17,6 +18,7 @@ import type { AdminNotification, ContactMessage } from '@/models/notification';
 import type { Business } from '@/models/business';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 
 interface MessageListProps {
@@ -98,6 +100,12 @@ export default function MessageList({ notifications, isLoading }: MessageListPro
     }
   };
   
+  const formatDate = (dateValue: Timestamp | string | undefined) => {
+    if (!dateValue) return '';
+    const date = typeof dateValue === 'string' ? new Date(dateValue) : (dateValue as Timestamp).toDate();
+    return date;
+  };
+  
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-48">
@@ -137,24 +145,26 @@ export default function MessageList({ notifications, isLoading }: MessageListPro
           <p className="text-muted-foreground max-w-sm">No hay mensajes en la vista actual.</p>
         </div>
       ) : (
-        <ul className="divide-y">
-            {filteredNotifications.map(notification => (
-              <li key={notification.id} onClick={() => handleSelectNotification(notification)} className="p-4 hover:bg-muted/50 cursor-pointer flex items-start gap-4 transition-colors">
-                {!notification.read && <div className="h-2.5 w-2.5 rounded-full bg-primary mt-2 shrink-0"></div>}
-                <div className={cn("flex-shrink-0 p-2 bg-secondary rounded-full", notification.read && "ml-[14px]")}><Mail className="h-4 w-4 text-muted-foreground" /></div>
-                <div className="flex-1 overflow-hidden">
-                  <div className="flex justify-between items-start">
-                    <p className="font-semibold truncate">{notification.subject}</p>
-                    <Badge variant={notification.type === 'payment_reminder' ? 'destructive' : 'secondary'} className="capitalize">{notification.type.replace('_', ' ')}</Badge>
-                  </div>
-                  <p className="text-sm text-muted-foreground truncate">{notification.body.replace(/<[^>]*>/g, '')}</p>
-                </div>
-                <div className="text-xs text-muted-foreground text-right w-28 shrink-0">
-                  {formatDistanceToNow((notification.createdAt as Timestamp).toDate(), { addSuffix: true, locale: es })}
-                </div>
-              </li>
-            ))}
-          </ul>
+        <ScrollArea className="h-[calc(100vh-250px)]">
+            <ul className="divide-y">
+                {filteredNotifications.map(notification => (
+                  <li key={notification.id} onClick={() => handleSelectNotification(notification)} className="p-4 hover:bg-muted/50 cursor-pointer flex items-start gap-4 transition-colors">
+                    {!notification.read && <div className="h-2.5 w-2.5 rounded-full bg-primary mt-2 shrink-0"></div>}
+                    <div className={cn("flex-shrink-0 p-2 bg-secondary rounded-full", notification.read && "ml-[14px]")}><Mail className="h-4 w-4 text-muted-foreground" /></div>
+                    <div className="flex-1 overflow-hidden">
+                      <div className="flex justify-between items-start">
+                        <p className="font-semibold truncate">{notification.subject}</p>
+                        <Badge variant={notification.type === 'payment_reminder' ? 'destructive' : 'secondary'} className="capitalize">{notification.type.replace('_', ' ')}</Badge>
+                      </div>
+                      <p className="text-sm text-muted-foreground truncate">{notification.body.replace(/<[^>]*>/g, '')}</p>
+                    </div>
+                    <div className="text-xs text-muted-foreground text-right w-28 shrink-0">
+                      {formatDistanceToNow(formatDate(notification.createdAt), { addSuffix: true, locale: es })}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+        </ScrollArea>
       )}
       
       {/* Details Dialog */}
@@ -163,7 +173,7 @@ export default function MessageList({ notifications, isLoading }: MessageListPro
           <DialogHeader>
             <DialogTitle>{selectedNotification?.subject}</DialogTitle>
             <DialogDescription>
-              Enviado el {selectedNotification?.createdAt && format((selectedNotification.createdAt as Timestamp).toDate(), 'PPP p', { locale: es })}
+              Enviado el {selectedNotification?.createdAt && format(formatDate(selectedNotification.createdAt), 'PPP p', { locale: es })}
             </DialogDescription>
           </DialogHeader>
           <div className="py-4 prose prose-sm max-w-none prose-p:text-card-foreground prose-strong:text-card-foreground prose-headings:text-card-foreground" dangerouslySetInnerHTML={{ __html: selectedNotification?.body || ''}} />

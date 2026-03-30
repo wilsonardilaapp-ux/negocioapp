@@ -13,7 +13,7 @@ const ptSans = PT_Sans({
 export const metadata: Metadata = {
   title: 'Zentry Platform',
   description: 'Plataforma para la gestión de productos de salud y bienestar.',
-  icons: [{ rel: 'icon', url: '/favicon.ico' }],
+  icons: [{ rel: 'icon', url: '/favicon.svg' }],
 };
 
 export default function RootLayout({
