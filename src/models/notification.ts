@@ -1,3 +1,4 @@
+
 import type { Timestamp } from 'firebase/firestore';
 
 export type NotificationType = 'general' | 'payment_reminder' | 'promotion' | 'alert';
@@ -41,3 +42,13 @@ export interface PaymentReminder {
     sentAt: Timestamp | string;
     channel: 'panel' | 'whatsapp';
 }
+
+export interface ScheduledReminder {
+  id: string;
+  clientId: string;
+  clientName: string;
+  scheduledDate: Timestamp | string;
+  channel: "panel" | "whatsapp" | "both";
+  message: string;
+  status: "pending" | "sent" | "failed";
+  createdAt

@@ -27,6 +27,10 @@ service cloud.firestore {
       allow read: if true;
     }
 
+    match /{path=**}/scheduledReminders/{reminderId} {
+      allow read, write, delete: if isSuperAdmin();
+    }
+
     // Publicly readable collections
     match /blog_posts/{postId} {
       allow get, list: if true;
