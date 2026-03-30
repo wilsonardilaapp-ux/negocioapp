@@ -516,7 +516,9 @@ export default function PaymentRemindersTab() {
 
     const sortedReminders = useMemo(() => {
         if (!localReminders) return [];
-        return [...localReminders].sort((a, b) => safeToDate(b.createdAt).getTime() - safeToDate(a.createdAt).getTime());
+        // CORRECTED: Filter out invalid reminders that might cause errors.
+        const validReminders = localReminders.filter(r => r && r.id && r.clientId && r.createdAt);
+        return [...validReminders].sort((a, b) => safeToDate(b.createdAt).getTime() - safeToDate(a.createdAt).getTime());
     }, [localReminders]);
 
     const manualPaymentClients = useMemo(() => {
