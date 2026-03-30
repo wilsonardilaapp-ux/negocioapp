@@ -76,6 +76,7 @@ export default function InboxTab() {
         if (!selectedMessage || !firestore) return;
         setIsReplying(true);
         try {
+            // Step 1 & 2: Save reply internally and mark as replied
             if (selectedMessage.source === 'client_reply' && selectedMessage.userId) {
                 await sendAdminNotification({
                     recipients: [selectedMessage.userId],
@@ -94,9 +95,20 @@ export default function InboxTab() {
             const msgRef = doc(firestore, 'contactMessages', selectedMessage.id);
             await updateDocumentNonBlocking(msgRef, { replied: true });
 
-            toast({ title: "Respuesta enviada", description: "Tu mensaje ha sido enviado." });
+            // Step 3: Open WhatsApp if a number is available
+            if (selectedMessage.whatsapp && selectedMessage.whatsapp.trim() !== '') {
+                const whatsappNumber = selectedMessage.whatsapp.replace(/\D/g, ''); // Clean number
+                const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(replyBody)}`;
+                window.open(whatsappUrl, '_blank');
+                toast({ title: "Respuesta guardada y WhatsApp abierto", description: "Tu mensaje se ha preparado en WhatsApp." });
+            } else {
+                toast({ title: "Respuesta enviada", description: "Tu mensaje ha sido guardado en el sistema." });
+            }
+
+            // Step 4: Clean up UI
             setReplyModalOpen(false);
             setSelectedMessage(null);
+
         } catch (error: any) {
             toast({ variant: 'destructive', title: "Error al enviar", description: error.message });
         } finally {
