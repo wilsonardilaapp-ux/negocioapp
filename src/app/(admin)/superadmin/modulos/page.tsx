@@ -54,7 +54,7 @@ const moduleSchema = z.object({
   ),
 });
 
-const DEFAULT_MODULES: Omit<Module, 'id' | 'status' | 'createdAt'>[] = [
+const DEFAULT_MODULES: { name: string; description: string; limit: number; }[] = [
     { name: 'Catálogo', description: 'Módulo para gestionar el catálogo de productos.', limit: 50 },
     { name: 'Blog', description: 'Módulo para gestionar el blog', limit: 10 },
     { name: 'Chatbot Integrado con WhatsApp', description: 'Asistente IA para WhatsApp y Web', limit: -1 },
