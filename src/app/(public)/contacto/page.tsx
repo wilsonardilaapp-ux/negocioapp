@@ -20,14 +20,46 @@ import { TikTokIcon, WhatsAppIcon } from '@/components/icons';
 import Footer from '@/components/layout/footer';
 
 
+// List of country codes
+const countryCodes = [
+    { code: "+57", name: "Colombia" },
+    { code: "+52", name: "Mexico" },
+    { code: "+54", name: "Argentina" },
+    { code: "+56", name: "Chile" },
+    { code: "+51", name: "Peru" },
+    { code: "+1", name: "United States" },
+    { code: "+34", name: "Spain" },
+    { code: "+593", name: "Ecuador" },
+    { code: "+58", name: "Venezuela" },
+];
+
 // Schema for the contact form
 const contactSchema = z.object({
   name: z.string().min(3, "Tu nombre es requerido."),
   email: z.string().email("Por favor, introduce un correo válido."),
+  countryCode: z.string().optional(),
   whatsapp: z.string().optional(),
   company: z.string().optional(),
   subject: z.enum(["Soporte técnico", "Información de planes", "Facturación", "Alianzas", "Otro"], { required_error: "Debes seleccionar un asunto." }),
   body: z.string().min(20, "Tu mensaje debe tener al menos 20 caracteres."),
+}).refine(data => {
+    // If whatsapp number is provided, country code must also be provided.
+    if (data.whatsapp && !data.countryCode) {
+        return false;
+    }
+    return true;
+}, {
+    message: "Por favor, selecciona un código de país.",
+    path: ["countryCode"],
+}).refine(data => {
+    // If country code is provided, whatsapp number must also be provided.
+    if (data.countryCode && !data.whatsapp) {
+        return false;
+    }
+    return true;
+}, {
+    message: "Por favor, introduce un número.",
+    path: ["whatsapp"],
 });
 
 type ContactFormData = z.infer<typeof contactSchema>;
@@ -48,10 +80,12 @@ export default function ContactoPage() {
     }
 
     try {
+      const fullWhatsapp = data.countryCode && data.whatsapp ? `${data.countryCode}${data.whatsapp.replace(/\s/g, '')}` : undefined;
+
       const submissionData: Omit<ContactMessage, 'id'> = {
         name: data.name,
         email: data.email,
-        whatsapp: data.whatsapp,
+        whatsapp: fullWhatsapp,
         subject: data.subject,
         body: data.body,
         read: false,
@@ -59,6 +93,11 @@ export default function ContactoPage() {
         createdAt: new Date().toISOString(),
         source: 'webform',
       };
+      
+      // The 'company' field is optional and was missing in the previous logic
+      if (data.company) {
+        (submissionData as any).company = data.company;
+      }
 
       const messagesCollection = collection(firestore, 'contactMessages');
       await addDocumentNonBlocking(messagesCollection, submissionData);
@@ -134,8 +173,26 @@ export default function ContactoPage() {
                   </div>
                   <div className="grid sm:grid-cols-2 gap-6">
                      <div className="space-y-2">
-                      <Label htmlFor="whatsapp">WhatsApp/Teléfono</Label>
-                      <Input id="whatsapp" {...register('whatsapp')} />
+                        <Label>WhatsApp/Teléfono</Label>
+                        <div className="flex gap-2">
+                          <Controller
+                            name="countryCode"
+                            control={control}
+                            render={({ field }) => (
+                              <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                <SelectTrigger className="w-[140px]">
+                                  <SelectValue placeholder="País" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {countryCodes.map(c => <SelectItem key={c.code} value={c.code}>{c.code} ({c.name})</SelectItem>)}
+                                </SelectContent>
+                              </Select>
+                            )}
+                          />
+                          <Input id="whatsapp" {...register('whatsapp')} placeholder="300 123 4567" className="flex-1" />
+                        </div>
+                        {errors.countryCode && <p className="text-sm text-destructive">{errors.countryCode.message}</p>}
+                        {errors.whatsapp && <p className="text-sm text-destructive">{errors.whatsapp.message}</p>}
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="company">Empresa</Label>
@@ -242,4 +299,3 @@ export default function ContactoPage() {
     </div>
   );
 }
-    
