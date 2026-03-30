@@ -42,6 +42,7 @@ import type { SubscriptionPlan } from "@/models/subscription-plan";
 const changePlanSchema = z.object({
   plan: z.string().min(1, { message: 'Debes seleccionar un plan.' }),
   status: z.enum(["active", "canceled", "past_due", "trialing"]),
+  paymentMethod: z.string().optional(),
   currentPeriodEnd: z.date().nullable(),
 });
 
@@ -73,6 +74,7 @@ export function ChangePlanModal({ client, allPlans, isOpen, onClose }: ChangePla
       reset({
         plan: client.subscription?.plan || "free",
         status: client.subscription?.status || "canceled",
+        paymentMethod: client.subscription?.paymentMethod || 'stripe',
         currentPeriodEnd: client.subscription?.currentPeriodEnd
           ? client.subscription.currentPeriodEnd.toDate()
           : null,
@@ -90,6 +92,7 @@ export function ChangePlanModal({ client, allPlans, isOpen, onClose }: ChangePla
       const dataToUpdate: Partial<ClientWithSubscription['subscription']> = {
         plan: data.plan,
         status: data.status,
+        paymentMethod: data.paymentMethod,
         currentPeriodEnd: data.currentPeriodEnd
           ? Timestamp.fromDate(data.currentPeriodEnd)
           : null,
@@ -168,6 +171,29 @@ export function ChangePlanModal({ client, allPlans, isOpen, onClose }: ChangePla
               />
             </div>
           </div>
+           <div>
+              <Label htmlFor="paymentMethod">Forma de Pago</Label>
+              <Controller
+                name="paymentMethod"
+                control={control}
+                render={({ field }) => (
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <SelectTrigger id="paymentMethod">
+                      <SelectValue placeholder="Selecciona un método" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="stripe">Stripe (Automático)</SelectItem>
+                      <SelectItem value="nequi">Nequi (Manual)</SelectItem>
+                      <SelectItem value="bancolombia">Bancolombia (Manual)</SelectItem>
+                      <SelectItem value="daviplata">Daviplata (Manual)</SelectItem>
+                      <SelectItem value="bre-b">BRE-B (Manual)</SelectItem>
+                      <SelectItem value="pago_contra_entrega">Contra Entrega (Manual)</SelectItem>
+                      <SelectItem value="manual">Otro Manual</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+            </div>
           <div>
             <Label htmlFor="currentPeriodEnd">Fecha de Vencimiento</Label>
             <Controller

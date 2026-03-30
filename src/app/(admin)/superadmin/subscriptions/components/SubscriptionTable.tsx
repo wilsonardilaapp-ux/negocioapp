@@ -120,6 +120,7 @@ export function SubscriptionTable({ clients, isLoading, allPlans }: Subscription
               <TableHead>Nombre del Negocio</TableHead>
               <TableHead>Email</TableHead>
               <TableHead>Plan</TableHead>
+              <TableHead>Forma de Pago</TableHead>
               <TableHead>Estado</TableHead>
               <TableHead>Vencimiento</TableHead>
               <TableHead className="text-right">Acciones</TableHead>
@@ -133,6 +134,7 @@ export function SubscriptionTable({ clients, isLoading, allPlans }: Subscription
                     : false;
                 
                 const planDetails = allPlans.find(p => p.id === client.subscription?.plan);
+                const paymentMethod = client.subscription?.paymentMethod || 'stripe';
 
                 return (
                   <TableRow key={client.userId}>
@@ -142,6 +144,9 @@ export function SubscriptionTable({ clients, isLoading, allPlans }: Subscription
                       <Badge variant={getPlanVariant(client.subscription?.plan)}>
                         {planDetails?.name || client.subscription?.plan || "N/A"}
                       </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className="capitalize">{paymentMethod.replace('_', ' ')}</Badge>
                     </TableCell>
                     <TableCell>
                       <Badge variant={getStatusVariant(client.subscription?.status)}>
@@ -173,7 +178,7 @@ export function SubscriptionTable({ clients, isLoading, allPlans }: Subscription
             })
             ) : (
               <TableRow>
-                <TableCell colSpan={6} className="h-24 text-center">
+                <TableCell colSpan={7} className="h-24 text-center">
                   <div className="flex flex-col items-center justify-center gap-2">
                     <UserX className="h-8 w-8 text-muted-foreground" />
                     <p className="font-semibold">No se encontraron clientes.</p>

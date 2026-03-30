@@ -18,6 +18,7 @@ export interface Subscription {
   status: 'active' | 'canceled' | 'past_due' | 'trialing';
   stripeCustomerId: string | null;
   stripeSubscriptionId: string | null;
+  paymentMethod?: string;
   currentPeriodEnd: Timestamp | null;
   createdAt: Timestamp;
   updatedAt: Timestamp;
