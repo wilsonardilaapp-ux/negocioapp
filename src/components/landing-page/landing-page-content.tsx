@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useMemo } from 'react';
@@ -27,7 +26,7 @@ const getLinkUrl = (link: NavLink, currentBusinessId: string | undefined): strin
   const text = link.text.toLowerCase();
   if (text.includes('blog')) return '/blog';
   if (text.includes('catálogo')) return currentBusinessId ? `/catalog/${currentBusinessId}` : '#';
-  if (text.includes('contacto')) return '/contact';
+  if (text.includes('contacto')) return '/contacto';
   if (text.includes('inicio')) return currentBusinessId ? `/landing/${currentBusinessId}` : '/';
   return '#';
 };
@@ -318,7 +317,7 @@ export default function LandingPageContent({ data, businessId, logoUrl }: Landin
                     if (lowerCaseText.includes('sobre nosotros')) {
                         return (
                             <li key={link.id}>
-                                <Link href="/sobre-nosotros" target="_blank" rel="noopener noreferrer" className="hover:underline">
+                                <Link href="/sobre-nosotros" className="hover:underline">
                                     {link.text}
                                 </Link>
                             </li>
@@ -327,11 +326,20 @@ export default function LandingPageContent({ data, businessId, logoUrl }: Landin
                     if (lowerCaseText.includes('servicios')) {
                       return (
                           <li key={link.id}>
-                              <Link href="/servicios" target="_blank" rel="noopener noreferrer" className="hover:underline">
+                              <Link href="/servicios" className="hover:underline">
                                   {link.text}
                               </Link>
                           </li>
                       );
+                    }
+                     if (lowerCaseText.includes('contacto')) {
+                        return (
+                            <li key={link.id}>
+                                <Link href="/contacto" className="hover:underline">
+                                    {link.text}
+                                </Link>
+                            </li>
+                        );
                     }
                     return (
                         <li key={link.id}>
@@ -372,8 +380,8 @@ export default function LandingPageContent({ data, businessId, logoUrl }: Landin
                 <div>
                      <h4 className="font-bold text-lg mb-3" style={{color: footer.visuals.darkMode ? '#FFFFFF' : '#000000'}}>Legal</h4>
                      <ul className="space-y-2 text-sm">
-                        {footer.legalLinks.privacyPolicyUrl && <li><Link href="/politica-de-privacidad" target="_blank" rel="noopener noreferrer" className="hover:underline">Política de Privacidad</Link></li>}
-                        {footer.legalLinks.termsAndConditionsUrl && <li><Link href="/terminos-y-condiciones" target="_blank" rel="noopener noreferrer" className="hover:underline">Términos y Condiciones</Link></li>}
+                        {footer.legalLinks.privacyPolicyUrl && <li><Link href="/politica-de-privacidad" className="hover:underline">Política de Privacidad</Link></li>}
+                        {footer.legalLinks.termsAndConditionsUrl && <li><Link href="/terminos-y-condiciones" className="hover:underline">Términos y Condiciones</Link></li>}
                      </ul>
                 </div>
             </div>
@@ -396,3 +404,5 @@ export default function LandingPageContent({ data, businessId, logoUrl }: Landin
     </div>
   );
 }
+
+    
