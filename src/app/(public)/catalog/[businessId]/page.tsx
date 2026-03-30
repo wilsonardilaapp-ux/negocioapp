@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useMemo, useState, useEffect, useRef } from 'react';
@@ -484,98 +483,79 @@ export default function CatalogPage() {
     const pageRef = useRef<HTMLDivElement>(null);
     
     const [resolvedBusinessId, setResolvedBusinessId] = useState<string | null>(null);
-    const [isLoadingBusinessId, setIsLoadingBusinessId] = useState(true);
+    const [catalogModule, setCatalogModule] = useState<Module | null>(null);
     const [resolutionError, setResolutionError] = useState<string | null>(null);
-    
+
     const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
     const [isPurchaseModalOpen, setIsPurchaseModalOpen] = useState(false);
     const [cart, setCart] = useState<CartItem[]>([]);
-    const [catalogModule, setCatalogModule] = useState<Module | null>(null);
-    const [isModuleLoading, setIsModuleLoading] = useState(true);
 
     const showPrintButton = searchParams.get('print') === 'true';
     const showDownloadButton = searchParams.get('download') === 'true';
-    
-    // Effect to resolve slug to businessId
-    useEffect(() => {
-        if (!firestore || !slug) {
-            setIsLoadingBusinessId(false);
-            return;
-        };
 
-        const resolveSlug = async () => {
-            setIsLoadingBusinessId(true);
+    // Combined useEffect for sequential data fetching to avoid race conditions
+    useEffect(() => {
+        if (!firestore || !slug) return;
+
+        const initializePage = async () => {
             setResolutionError(null);
+            
+            // --- Step 1: Resolve Business ID from Slug ---
+            let businessId: string | null = null;
             try {
-                // This query is less strict to avoid index errors.
                 const shareConfigQuery = query(
                     collectionGroup(firestore, 'shareConfig'), 
-                    where('slug', '==', slug)
+                    where('slug', '==', slug),
+                    limit(1) // Optimization: we only need one match
                 );
-
                 const querySnapshot = await getDocs(shareConfigQuery);
-                
-                // Use non-strict equality to handle both boolean and string "true"
-                const customSlugDoc = querySnapshot.docs.find(doc => doc.data().useCustomSlug == true);
+                const customSlugDoc = querySnapshot.docs.find(doc => doc.data().useCustomSlug === true);
 
                 if (customSlugDoc) {
-                    const businessId = customSlugDoc.ref.parent.parent?.id;
-                    if (businessId) {
-                        setResolvedBusinessId(businessId);
+                    const foundId = customSlugDoc.ref.parent.parent?.id;
+                    if (foundId) {
+                        businessId = foundId;
                     } else {
-                         throw new Error("ID de negocio no encontrado en la ruta del slug.");
+                         throw new Error("ID de negocio no encontrado en la ruta del slug personalizado.");
                     }
                 } else {
-                    // If no custom slug is found, assume the slug IS the businessId
-                    setResolvedBusinessId(slug);
+                    // If no custom slug, assume the slug IS the businessId
+                    businessId = slug;
                 }
+                setResolvedBusinessId(businessId);
             } catch (e: any) {
                 console.error("Error resolviendo el slug del catálogo:", e);
-                if (e.message && e.message.includes("requires a COLLECTION_GROUP_ASC index")) {
-                    setResolutionError("Se requiere un índice de base de datos. Por favor, revisa la consola del navegador (F12) para encontrar un enlace que te permitirá crear el índice necesario en Firestore. El error es: 'The query requires a COLLECTION_GROUP_ASC index'.");
-                } else {
-                    setResolutionError("No se pudo encontrar el negocio para este catálogo. Error: " + e.message);
-                }
-            } finally {
-                setIsLoadingBusinessId(false);
+                setResolutionError(`No se pudo encontrar el negocio para este catálogo. Error: ${e.message}`);
+                return; // Stop execution if we can't find the business
             }
-        };
 
-        resolveSlug();
-    }, [firestore, slug]);
-
-
-    // Lógica para verificar el módulo de catálogo con retrocompatibilidad
-    useEffect(() => {
-        if (!firestore) return;
-        
-        const checkModule = async () => {
-            setIsModuleLoading(true);
-            try {
-                const primaryDocRef = doc(firestore, 'modules', 'catalogo');
-                const primarySnap = await getDoc(primaryDocRef);
-
-                if (primarySnap.exists() && primarySnap.data().status === 'active') {
-                    setCatalogModule({ ...primarySnap.data(), id: primarySnap.id } as Module);
-                } else {
-                    const fallbackDocRef = doc(firestore, 'modules', 'catalogo-de-productos');
-                    const fallbackSnap = await getDoc(fallbackDocRef);
-                    if (fallbackSnap.exists() && fallbackSnap.data().status === 'active') {
-                        setCatalogModule({ ...fallbackSnap.data(), id: fallbackSnap.id } as Module);
+            // --- Step 2: Check if Catalog Module is Active ---
+            if (businessId) { // Proceed only if we have a businessId
+                try {
+                    const primaryDocRef = doc(firestore, 'modules', 'catalogo');
+                    const primarySnap = await getDoc(primaryDocRef);
+    
+                    if (primarySnap.exists() && primarySnap.data().status === 'active') {
+                        setCatalogModule({ ...primarySnap.data(), id: primarySnap.id } as Module);
                     } else {
-                        setCatalogModule(null);
+                        // Fallback check for older module ID
+                        const fallbackDocRef = doc(firestore, 'modules', 'catalogo-de-productos');
+                        const fallbackSnap = await getDoc(fallbackDocRef);
+                        if (fallbackSnap.exists() && fallbackSnap.data().status === 'active') {
+                            setCatalogModule({ ...fallbackSnap.data(), id: fallbackSnap.id } as Module);
+                        } else {
+                            setCatalogModule(null); // Module is not active
+                        }
                     }
+                } catch (error) {
+                    console.error("Error fetching catalog module:", error);
+                    setCatalogModule(null);
                 }
-            } catch (error) {
-                console.error("Error fetching catalog module:", error);
-                setCatalogModule(null);
-            } finally {
-                setIsModuleLoading(false);
             }
         };
 
-        checkModule();
-    }, [firestore]);
+        initializePage();
+    }, [firestore, slug]);
 
 
     const publicDataRef = useMemoFirebase(() => {
@@ -597,7 +577,7 @@ export default function CatalogPage() {
     const { data: paymentSettings, isLoading: isPaymentSettingsLoading } = useDoc<PaymentSettings>(paymentSettingsRef);
     const { data: landingPageData, isLoading: isLandingDataLoading } = useDoc<LandingPageData>(landingPageDocRef);
     
-    const isLoading = isPublicDataLoading || isModuleLoading || isPaymentSettingsLoading || isLandingDataLoading || isLoadingBusinessId;
+    const isLoading = isPublicDataLoading || isPaymentSettingsLoading || isLandingDataLoading;
 
     useEffect(() => {
         if (showPrintButton) {
@@ -606,8 +586,6 @@ export default function CatalogPage() {
     }, [showPrintButton, selectedProduct, cart]);
 
     const handleAddToCart = (itemsToAdd: CartItem[]) => {
-        // A simple implementation: replace cart with new items.
-        // A more complex one would check for existing items and update quantity.
         setCart(itemsToAdd);
         setIsPurchaseModalOpen(true);
     };
@@ -615,7 +593,6 @@ export default function CatalogPage() {
     const handleRemoveFromCart = (productId: string) => {
         const updatedCart = cart.filter(item => item.id !== productId);
         setCart(updatedCart);
-        // If cart becomes empty, close the modal
         if (updatedCart.length === 0) {
             setIsPurchaseModalOpen(false);
         }
