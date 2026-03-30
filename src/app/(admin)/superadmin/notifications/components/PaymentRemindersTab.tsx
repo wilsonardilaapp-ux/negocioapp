@@ -12,7 +12,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { useUser, useFirestore, useMemoFirebase, useCollection, addDocumentNonBlocking, updateDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase';
-import { doc, collection, collectionGroup, query, where, Timestamp, writeBatch, orderBy } from 'firebase/firestore';
+import { doc, collection, collectionGroup, query, Timestamp, writeBatch, orderBy } from 'firebase/firestore';
 import { sendAdminNotification } from '@/actions/notifications';
 import { format, differenceInDays } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -491,8 +491,7 @@ export default function PaymentRemindersTab() {
                     let message = reminder.message;
                     message = message.replace('{nombre}', client.name);
                     message = message.replace('{plan}', client.subscription?.plan || 'N/A');
-                    // Add more variable replacements here as needed
-
+                    
                     if (reminder.channel === 'panel' || reminder.channel === 'both') {
                         await sendAdminNotification({
                             recipients: [reminder.clientId],
@@ -506,7 +505,7 @@ export default function PaymentRemindersTab() {
                     }
                     
                     const reminderRef = doc(firestore, `businesses/${reminder.clientId}/reminders`, reminder.id);
-                    batch.update(reminderRef, { status: 'sent', sentAt: new Date().toISOString() });
+                    batch.set(reminderRef, { status: 'sent', sentAt: new Date().toISOString() }, { merge: true });
                 }
                 
                 await batch.commit();
@@ -588,4 +587,5 @@ export default function PaymentRemindersTab() {
         </div>
     );
 }
+
 
