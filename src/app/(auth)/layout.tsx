@@ -2,6 +2,17 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { Logo } from "@/components/icons";
+import { Suspense } from "react";
+import { Loader2 } from "lucide-react";
+
+const LoadingScreen = () => (
+    <div className="flex justify-center items-center h-[50vh]">
+      <div className="text-center flex flex-col items-center gap-2">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <p className="text-muted-foreground">Cargando...</p>
+      </div>
+    </div>
+);
 
 export default function AuthLayout({ children }: { children: ReactNode }) {
   return (
@@ -13,10 +24,10 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
                 <span className="text-2xl font-bold font-headline">Zentry</span>
             </Link>
         </div>
-        {children}
+        <Suspense fallback={<LoadingScreen />}>
+          {children}
+        </Suspense>
        </div>
     </main>
   );
 }
-
-    
