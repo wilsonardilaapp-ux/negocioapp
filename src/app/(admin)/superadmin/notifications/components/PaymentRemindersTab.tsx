@@ -12,7 +12,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { useUser, useFirestore, useMemoFirebase, useCollection, addDocumentNonBlocking, updateDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase';
-import { doc, collection, collectionGroup, writeBatch, setDoc, type Timestamp } from 'firebase/firestore';
+import { doc, collection, collectionGroup, writeBatch, setDoc, orderBy } from 'firebase/firestore';
 import { sendAdminNotification } from '@/actions/notifications';
 import { format, differenceInDays } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -30,7 +30,7 @@ import { Calendar } from '@/components/ui/calendar';
 
 
 // --- Helper Function ---
-const safeToDate = (dateValue: string | { toDate: () => Date } | Timestamp | undefined): Date => {
+const safeToDate = (dateValue: string | undefined): Date => {
   // Return a future date for any invalid input to prevent accidental processing
   const futureDate = new Date('9999-12-31');
   if (!dateValue) return futureDate;
@@ -39,9 +39,7 @@ const safeToDate = (dateValue: string | { toDate: () => Date } | Timestamp | und
     const date = new Date(dateValue);
     return isNaN(date.getTime()) ? futureDate : date;
   }
-  if (typeof (dateValue as any).toDate === 'function') {
-    return (dateValue as any).toDate();
-  }
+  
   return futureDate; // Fallback
 };
 
@@ -52,6 +50,7 @@ const scheduledReminderSchema = z.object({
   clientId: z.string().min(1, 'Debes seleccionar un cliente.'),
   reminders: z.array(z.object({
     scheduledDate: z.date({ required_error: 'La fecha es obligatoria.' }),
+    scheduledTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, { message: 'Formato de hora inválido (HH:mm).' }),
     channel: z.enum(['panel', 'whatsapp', 'both']),
     message: z.string().min(10, 'El mensaje debe tener al menos 10 caracteres.'),
   })).min(1, 'Debes agregar al menos un recordatorio.'),
@@ -80,10 +79,12 @@ const ScheduleReminderModal = ({
       clientId: existingSchedule?.clientId || '',
       reminders: existingSchedule ? [{
         scheduledDate: safeToDate(existingSchedule.scheduledDate),
+        scheduledTime: format(safeToDate(existingSchedule.scheduledDate), 'HH:mm'),
         channel: existingSchedule.channel,
         message: existingSchedule.message,
       }] : [{
         scheduledDate: new Date(),
+        scheduledTime: '09:00',
         channel: 'panel',
         message: 'Hola {nombre}, este es un recordatorio de pago para tu plan {plan}. El monto es de {monto} con fecha límite {fecha_limite}.',
       }]
@@ -94,10 +95,12 @@ const ScheduleReminderModal = ({
 
   useEffect(() => {
     if (existingSchedule) {
+        const date = safeToDate(existingSchedule.scheduledDate);
         reset({
             clientId: existingSchedule.clientId,
             reminders: [{
-                scheduledDate: safeToDate(existingSchedule.scheduledDate),
+                scheduledDate: date,
+                scheduledTime: format(date, 'HH:mm'),
                 channel: existingSchedule.channel,
                 message: existingSchedule.message,
             }]
@@ -107,6 +110,7 @@ const ScheduleReminderModal = ({
              clientId: '',
              reminders: [{
                 scheduledDate: new Date(),
+                scheduledTime: '09:00',
                 channel: 'panel',
                 message: 'Hola {nombre}, este es un recordatorio de pago para tu plan {plan}. El monto es de {monto} con fecha límite {fecha_limite}.',
             }]
@@ -131,10 +135,14 @@ const ScheduleReminderModal = ({
             const reminderId = existingSchedule?.id || doc(collection(firestore, `businesses/${data.clientId}/reminders`)).id;
             const reminderRef = doc(firestore, `businesses/${data.clientId}/reminders`, reminderId);
             
+            const [hours, minutes] = reminder.scheduledTime.split(':').map(Number);
+            const combinedDate = new Date(reminder.scheduledDate);
+            combinedDate.setHours(hours, minutes, 0, 0);
+
             const reminderData: Omit<ScheduledReminder, 'id'> = {
                 clientId: data.clientId,
                 clientName: client.name,
-                scheduledDate: reminder.scheduledDate.toISOString(),
+                scheduledDate: combinedDate.toISOString(),
                 channel: reminder.channel,
                 message: reminder.message,
                 status: 'pending',
@@ -188,24 +196,31 @@ const ScheduleReminderModal = ({
                                 </Button>
                             )}
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                <div>
-                                    <Label>Fecha de Envío</Label>
-                                    <Controller
-                                        name={`reminders.${index}.scheduledDate`}
-                                        control={control}
-                                        render={({ field }) => (
-                                            <Popover>
-                                                <PopoverTrigger asChild>
-                                                    <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !field.value && "text-muted-foreground")}>
-                                                        <CalendarIcon className="mr-2 h-4 w-4" />
-                                                        {field.value ? format(field.value, 'PPP', { locale: es }) : <span>Seleccionar fecha</span>}
-                                                    </Button>
-                                                </PopoverTrigger>
-                                                <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus /></PopoverContent>
-                                            </Popover>
-                                        )}
-                                    />
-                                    {errors.reminders?.[index]?.scheduledDate && <p className="text-sm text-destructive">{errors.reminders?.[index]?.scheduledDate?.message}</p>}
+                               <div className="grid grid-cols-2 gap-2">
+                                    <div>
+                                        <Label>Fecha de Envío</Label>
+                                        <Controller
+                                            name={`reminders.${index}.scheduledDate`}
+                                            control={control}
+                                            render={({ field }) => (
+                                                <Popover>
+                                                    <PopoverTrigger asChild>
+                                                        <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !field.value && "text-muted-foreground")}>
+                                                            <CalendarIcon className="mr-2 h-4 w-4" />
+                                                            {field.value ? format(field.value, 'PPP', { locale: es }) : <span>Seleccionar fecha</span>}
+                                                        </Button>
+                                                    </PopoverTrigger>
+                                                    <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus /></PopoverContent>
+                                                </Popover>
+                                            )}
+                                        />
+                                        {errors.reminders?.[index]?.scheduledDate && <p className="text-sm text-destructive">{errors.reminders?.[index]?.scheduledDate?.message}</p>}
+                                    </div>
+                                     <div>
+                                        <Label>Hora (24h)</Label>
+                                        <Input type="time" {...register(`reminders.${index}.scheduledTime`)} />
+                                        {errors.reminders?.[index]?.scheduledTime && <p className="text-sm text-destructive">{errors.reminders?.[index]?.scheduledTime?.message}</p>}
+                                    </div>
                                 </div>
                                 <div>
                                     <Label>Canal de Envío</Label>
@@ -236,7 +251,7 @@ const ScheduleReminderModal = ({
                 </div>
 
                 {!existingSchedule && (
-                     <Button type="button" variant="outline" size="sm" onClick={() => append({ scheduledDate: new Date(), channel: 'panel', message: '' })}>
+                     <Button type="button" variant="outline" size="sm" onClick={() => append({ scheduledDate: new Date(), scheduledTime: '09:00', channel: 'panel', message: '' })}>
                         <PlusCircle className="mr-2 h-4 w-4" /> Agregar Recordatorio
                     </Button>
                 )}
@@ -356,7 +371,7 @@ function ReminderModal({ isOpen, onClose, client }: { isOpen: boolean, onClose: 
     const { data: paymentConfig } = useDoc<GlobalPaymentConfig>(paymentConfigRef);
 
     const [amount, setAmount] = useState(0); 
-    const [dueDate, setDueDate] = useState(client.subscription?.currentPeriodEnd ? (client.subscription.currentPeriodEnd as unknown as Timestamp).toDate().toISOString().split('T')[0] : '');
+    const [dueDate, setDueDate] = useState(client.subscription?.currentPeriodEnd ? safeToDate(client.subscription.currentPeriodEnd.toDate().toISOString()).toISOString().split('T')[0] : '');
     const [suspensionDate, setSuspensionDate] = useState('');
     const [message, setMessage] = useState('');
 
@@ -563,7 +578,7 @@ export default function PaymentRemindersTab() {
                                     <TableRow><TableCell colSpan={5} className="h-24 text-center"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></TableCell></TableRow>
                                 ) : manualPaymentClients.length > 0 ? (
                                     manualPaymentClients.map(client => {
-                                        const dueDate = client.subscription?.currentPeriodEnd ? (client.subscription.currentPeriodEnd as unknown as Timestamp).toDate() : null;
+                                        const dueDate = client.subscription?.currentPeriodEnd ? safeToDate(client.subscription.currentPeriodEnd.toDate().toISOString()) : null;
                                         const { status, days, variant } = getStatus(dueDate);
                                         return (
                                         <TableRow key={client.userId}>
