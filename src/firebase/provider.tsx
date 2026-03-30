@@ -24,6 +24,7 @@ interface UserAuthState {
 
 export interface FirebaseContextState {
   areServicesAvailable: boolean;
+  isNetworkEnabled: boolean;
   firebaseApp: FirebaseApp | null;
   firestore: Firestore | null;
   auth: Auth | null;
@@ -56,6 +57,7 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
     isUserLoading: true,
     userError: null,
   });
+  const [isNetworkEnabled, setIsNetworkEnabled] = useState(false);
   
   const router = useRouter();
   const pathname = usePathname();
@@ -65,6 +67,7 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
       enableNetwork(firestore)
         .then(() => {
           console.log("Firestore network connection enabled.");
+          setIsNetworkEnabled(true);
         })
         .catch((error) => {
           console.error("Error enabling Firestore network: ", error);
@@ -170,6 +173,7 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
     const servicesAvailable = !!(firebaseApp && firestore && auth);
     return {
       areServicesAvailable: servicesAvailable,
+      isNetworkEnabled,
       firebaseApp: servicesAvailable ? firebaseApp : null,
       firestore: servicesAvailable ? firestore : null,
       auth: servicesAvailable ? auth : null,
@@ -178,7 +182,7 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
       isUserLoading: userAuthState.isUserLoading,
       userError: userAuthState.userError,
     };
-  }, [firebaseApp, firestore, auth, userAuthState]);
+  }, [firebaseApp, firestore, auth, userAuthState, isNetworkEnabled]);
 
   return (
     <FirebaseContext.Provider value={contextValue}>

@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState, useEffect, useRef } from 'react';
-import { useFirestore } from '@/firebase';
+import { useFirebase } from '@/firebase';
 import { doc, getDoc, collectionGroup, query, where, getDocs, limit } from 'firebase/firestore';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
@@ -477,7 +477,7 @@ const ActionButtons = ({ pageRef }: { pageRef: React.RefObject<HTMLDivElement> }
 
 // Main Component
 export default function CatalogPage() {
-    const firestore = useFirestore();
+    const { firestore, isNetworkEnabled } = useFirebase();
     const params = useParams();
     const searchParams = useSearchParams();
     const slug = params.businessId as string;
@@ -507,7 +507,7 @@ export default function CatalogPage() {
     const showDownloadButton = searchParams.get('download') === 'true';
     
     useEffect(() => {
-        if (!firestore || !slug) {
+        if (!firestore || !slug || !isNetworkEnabled) {
             setIsLoading(false);
             return;
         }
@@ -516,6 +516,7 @@ export default function CatalogPage() {
             setIsLoading(true);
             setError(null);
             
+            let businessId: string | null = null;
             try {
                 // Step 1: Resolve businessId from slug
                 const shareConfigQuery = query(
@@ -526,7 +527,7 @@ export default function CatalogPage() {
                 const querySnapshot = await getDocs(shareConfigQuery);
                 const customSlugDoc = querySnapshot.docs.find(doc => doc.data().useCustomSlug === true);
                 
-                const businessId = customSlugDoc ? customSlugDoc.ref.parent.parent?.id : slug;
+                businessId = customSlugDoc ? customSlugDoc.ref.parent.parent?.id : slug;
                 
                 if (!businessId) {
                     throw new Error("No se pudo determinar el ID del negocio a partir del alias proporcionado.");
@@ -579,7 +580,7 @@ export default function CatalogPage() {
         };
 
         initializePage();
-    }, [firestore, slug]);
+    }, [firestore, slug, isNetworkEnabled]);
 
 
     useEffect(() => {
