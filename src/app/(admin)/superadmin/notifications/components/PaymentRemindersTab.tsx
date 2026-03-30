@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { useDoc, useFirestore, useMemoFirebase, useCollection, addDocumentNonBlocking, updateDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase';
+import { useUser, useFirestore, useMemoFirebase, useCollection, addDocumentNonBlocking, updateDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase';
 import { doc, collection, collectionGroup, query, where, Timestamp, writeBatch } from 'firebase/firestore';
 import { sendAdminNotification } from '@/actions/notifications';
 import { format, differenceInDays } from 'date-fns';
@@ -62,7 +62,7 @@ const ScheduleReminderModal = ({
     defaultValues: {
       clientId: existingSchedule?.clientId || '',
       reminders: existingSchedule ? [{
-        scheduledDate: new Date(typeof existingSchedule.scheduledDate === 'string' ? existingSchedule.scheduledDate : existingSchedule.scheduledDate.toDate()),
+        scheduledDate: new Date(existingSchedule.scheduledDate),
         channel: existingSchedule.channel,
         message: existingSchedule.message,
       }] : [{
@@ -80,7 +80,7 @@ const ScheduleReminderModal = ({
         reset({
             clientId: existingSchedule.clientId,
             reminders: [{
-                scheduledDate: new Date(typeof existingSchedule.scheduledDate === 'string' ? existingSchedule.scheduledDate : existingSchedule.scheduledDate.toDate()),
+                scheduledDate: new Date(existingSchedule.scheduledDate),
                 channel: existingSchedule.channel,
                 message: existingSchedule.message,
             }]
@@ -118,11 +118,11 @@ const ScheduleReminderModal = ({
             const reminderData: Omit<ScheduledReminder, 'id'> = {
                 clientId: data.clientId,
                 clientName: client.name,
-                scheduledDate: Timestamp.fromDate(reminder.scheduledDate),
+                scheduledDate: reminder.scheduledDate.toISOString(),
                 channel: reminder.channel,
                 message: reminder.message,
                 status: 'pending',
-                createdAt: existingSchedule?.createdAt || Timestamp.now(),
+                createdAt: existingSchedule?.createdAt || new Date().toISOString(),
                 sentAt: null,
             };
             batch.set(reminderRef, reminderData);
@@ -275,7 +275,7 @@ const ScheduledRemindersTable = ({
                                 reminders.map(r => (
                                     <TableRow key={r.id}>
                                         <TableCell>{r.clientName}</TableCell>
-                                        <TableCell>{format(new Date(typeof r.scheduledDate === 'string' ? r.scheduledDate : r.scheduledDate.toDate()), 'dd/MM/yyyy HH:mm')}</TableCell>
+                                        <TableCell>{format(new Date(r.scheduledDate), 'dd/MM/yyyy HH:mm')}</TableCell>
                                         <TableCell><Badge variant="outline" className="capitalize">{r.channel}</Badge></TableCell>
                                         <TableCell><Badge variant={r.status === 'sent' ? 'default' : 'secondary'} className="capitalize">{r.status}</Badge></TableCell>
                                         <TableCell className="text-right">
@@ -470,7 +470,7 @@ export default function PaymentRemindersTab() {
         const now = new Date();
         const pending = scheduledReminders.filter(r => 
             r.status === 'pending' && 
-            new Date(typeof r.scheduledDate === 'string' ? r.scheduledDate : r.scheduledDate.toDate()) <= now
+            new Date(r.scheduledDate) <= now
         );
 
         if (pending.length > 0) {
@@ -498,7 +498,7 @@ export default function PaymentRemindersTab() {
                     }
                     
                     const reminderRef = doc(firestore, `scheduledReminders/${reminder.clientId}/reminders`, reminder.id);
-                    batch.update(reminderRef, { status: 'sent', sentAt: Timestamp.now() });
+                    batch.update(reminderRef, { status: 'sent', sentAt: new Date().toISOString() });
                 }
                 
                 await batch.commit();
@@ -579,66 +579,4 @@ export default function PaymentRemindersTab() {
             />
         </div>
     );
-}
-
-```
-</content>
-  </change>
-  <change>
-    <file>/src/models/notification.ts</file>
-    <content><![CDATA[
-import type { Timestamp } from 'firebase/firestore';
-
-export type NotificationType = 'general' | 'payment_reminder' | 'promotion' | 'alert';
-
-export interface AdminNotification {
-  id: string;
-  fromSuperAdmin: boolean;
-  subject: string;
-  body: string;
-  read: boolean;
-  createdAt: Timestamp | string;
-  type: NotificationType;
-}
-
-export interface ContactMessage {
-    id: string;
-    name: string;
-    email: string;
-    whatsapp?: string;
-    subject: string;
-    body: string;
-    read: boolean;
-    replied: boolean;
-    createdAt: Timestamp | string;
-    source: 'webform' | 'client_reply';
-    userId?: string;
-}
-
-export interface ContactMessageReply {
-    id: string;
-    body: string;
-    sentAt: Timestamp | string;
-    from: 'superadmin' | 'user';
-}
-
-export interface PaymentReminder {
-    id: string;
-    userId: string;
-    amount: number;
-    dueDate: Timestamp | string;
-    sentAt: Timestamp | string;
-    channel: 'panel' | 'whatsapp';
-}
-
-export interface ScheduledReminder {
-  id: string;
-  clientId: string;
-  clientName: string;
-  scheduledDate: Timestamp | string;
-  channel: "panel" | "whatsapp" | "both";
-  message: string;
-  status: "pending" | "sent" | "failed";
-  createdAt: Timestamp | string;
-  sentAt: Timestamp | string | null;
 }

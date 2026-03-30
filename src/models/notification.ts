@@ -9,7 +9,7 @@ export interface AdminNotification {
   subject: string;
   body: string;
   read: boolean;
-  createdAt: Timestamp | string;
+  createdAt: string;
   type: NotificationType;
 }
 
@@ -22,7 +22,7 @@ export interface ContactMessage {
     body: string;
     read: boolean;
     replied: boolean;
-    createdAt: Timestamp | string;
+    createdAt: string;
     source: 'webform' | 'client_reply';
     userId?: string;
 }
@@ -30,7 +30,7 @@ export interface ContactMessage {
 export interface ContactMessageReply {
     id: string;
     body: string;
-    sentAt: Timestamp | string;
+    sentAt: string;
     from: 'superadmin' | 'user';
 }
 
@@ -38,8 +38,8 @@ export interface PaymentReminder {
     id: string;
     userId: string;
     amount: number;
-    dueDate: Timestamp | string;
-    sentAt: Timestamp | string;
+    dueDate: string;
+    sentAt: string;
     channel: 'panel' | 'whatsapp';
 }
 
@@ -47,10 +47,10 @@ export interface ScheduledReminder {
   id: string;
   clientId: string;
   clientName: string;
-  scheduledDate: Timestamp | string;
+  scheduledDate: string;
   channel: "panel" | "whatsapp" | "both";
   message: string;
   status: "pending" | "sent" | "failed";
-  createdAt: Timestamp | string;
-  sentAt: Timestamp | string | null;
+  createdAt: string;
+  sentAt: string | null;
 }
