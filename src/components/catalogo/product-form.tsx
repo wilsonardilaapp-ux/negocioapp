@@ -234,7 +234,7 @@ export default function ProductForm({ product, onSave, onCancel, imageLimit }: P
                 </div>
               </DialogContent>
             </Dialog>
-          );
+        );
     };
 
     const MediaPreview = ({ item, alt }: { item: MediaItem, alt: string }) => {
@@ -403,7 +403,7 @@ export default function ProductForm({ product, onSave, onCancel, imageLimit }: P
                 <Button type="submit">Guardar Producto</Button>
             </div>
         </form>
-        <Lightbox />
+        <Lightbox isArrowNavigation={true} />
         </>
     );
 }
