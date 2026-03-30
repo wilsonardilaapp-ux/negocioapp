@@ -25,13 +25,15 @@ import { format } from "date-fns";
 import type { ClientWithSubscription } from "../hooks/useAllSubscriptions";
 import { ChangePlanModal } from "./ChangePlanModal";
 import { cn } from "@/lib/utils";
+import type { SubscriptionPlan } from "@/models/subscription-plan";
 
 interface SubscriptionTableProps {
   clients: ClientWithSubscription[];
   isLoading: boolean;
+  allPlans: SubscriptionPlan[];
 }
 
-export function SubscriptionTable({ clients, isLoading }: SubscriptionTableProps) {
+export function SubscriptionTable({ clients, isLoading, allPlans }: SubscriptionTableProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [planFilter, setPlanFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -49,6 +51,8 @@ export function SubscriptionTable({ clients, isLoading }: SubscriptionTableProps
   }, [clients, searchTerm, planFilter, statusFilter]);
 
   const getPlanVariant = (plan: string | null | undefined) => {
+    const planDetails = allPlans.find(p => p.id === plan);
+    if (planDetails?.isMostPopular) return "default";
     switch (plan) {
       case "pro": return "default";
       case "enterprise": return "destructive"; // You can define a gold/yellow variant
@@ -90,9 +94,9 @@ export function SubscriptionTable({ clients, isLoading }: SubscriptionTableProps
             </SelectTrigger>
             <SelectContent>
                 <SelectItem value="all">Todos los Planes</SelectItem>
-                <SelectItem value="free">Free</SelectItem>
-                <SelectItem value="pro">Pro</SelectItem>
-                <SelectItem value="enterprise">Enterprise</SelectItem>
+                {allPlans.map(plan => (
+                  <SelectItem key={plan.id} value={plan.id}>{plan.name}</SelectItem>
+                ))}
             </SelectContent>
         </Select>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
@@ -127,6 +131,8 @@ export function SubscriptionTable({ clients, isLoading }: SubscriptionTableProps
                 const isExpired = client.subscription?.currentPeriodEnd 
                     ? client.subscription.currentPeriodEnd.toDate() < new Date() 
                     : false;
+                
+                const planDetails = allPlans.find(p => p.id === client.subscription?.plan);
 
                 return (
                   <TableRow key={client.userId}>
@@ -134,7 +140,7 @@ export function SubscriptionTable({ clients, isLoading }: SubscriptionTableProps
                     <TableCell>{client.email}</TableCell>
                     <TableCell>
                       <Badge variant={getPlanVariant(client.subscription?.plan)}>
-                        {client.subscription?.plan || "Free"}
+                        {planDetails?.name || client.subscription?.plan || "N/A"}
                       </Badge>
                     </TableCell>
                     <TableCell>
@@ -182,6 +188,7 @@ export function SubscriptionTable({ clients, isLoading }: SubscriptionTableProps
 
       <ChangePlanModal 
         client={editingClient}
+        allPlans={allPlans}
         isOpen={!!editingClient}
         onClose={() => setEditingClient(null)}
       />

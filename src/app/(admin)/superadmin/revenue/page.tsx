@@ -1,15 +1,26 @@
+
 'use client';
 
-import { DollarSign, Users, UserPlus, UserMinus, TrendingUp } from 'lucide-react';
+import { DollarSign, Users, UserPlus, UserMinus } from 'lucide-react';
 import { useRevenueMetrics } from './hooks/useRevenueMetrics';
 import { MetricCard } from './components/MetricCard';
 import { PlanDistributionChart } from './components/PlanDistributionChart';
 import { GrowthChart } from './components/GrowthChart';
 import { RecentActivityTable } from './components/RecentActivityTable';
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { collection } from 'firebase/firestore';
+import type { SubscriptionPlan } from '@/models/subscription-plan';
 
 export default function RevenuePage() {
-  const { metrics, isLoading, error } = useRevenueMetrics();
+  const firestore = useFirestore();
+  const { data: allPlans, isLoading: arePlansLoading } = useCollection<SubscriptionPlan>(
+    useMemoFirebase(() => (firestore ? collection(firestore, 'plans') : null), [firestore])
+  );
+  
+  const { metrics, isLoading: areMetricsLoading, error } = useRevenueMetrics(allPlans);
+
+  const isLoading = areMetricsLoading || arePlansLoading;
 
   if (error) {
     return (
@@ -63,7 +74,7 @@ export default function RevenuePage() {
                 <GrowthChart data={metrics?.monthlyHistory || []} isLoading={isLoading} />
             </div>
              <div className="lg:col-span-3">
-                <PlanDistributionChart data={metrics?.planDistribution || { free: 0, pro: 0, enterprise: 0 }} isLoading={isLoading} />
+                <PlanDistributionChart data={metrics?.planDistribution || {}} isLoading={isLoading} />
             </div>
         </div>
         <div>

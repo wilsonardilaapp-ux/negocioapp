@@ -14,7 +14,7 @@ export interface SubscriptionPlan {
 }
 
 export interface Subscription {
-  plan: 'free' | 'pro' | 'enterprise';
+  plan: string;
   status: 'active' | 'canceled' | 'past_due' | 'trialing';
   stripeCustomerId: string | null;
   stripeSubscriptionId: string | null;

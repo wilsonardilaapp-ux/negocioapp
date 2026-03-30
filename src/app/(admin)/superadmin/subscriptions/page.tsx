@@ -12,17 +12,36 @@ import {
 import { Users, Crown, Star, Award, AlertCircle } from "lucide-react";
 import { useAllSubscriptions } from "./hooks/useAllSubscriptions";
 import { SubscriptionTable } from "./components/SubscriptionTable";
+import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
+import { collection } from 'firebase/firestore';
+import type { SubscriptionPlan } from '@/models/subscription-plan';
 
 export default function SubscriptionsPage() {
-  const { clients, isLoading, error } = useAllSubscriptions();
+  const { clients, isLoading: areClientsLoading, error } = useAllSubscriptions();
+  const firestore = useFirestore();
+
+  const { data: allPlans, isLoading: arePlansLoading } = useCollection<SubscriptionPlan>(
+    useMemoFirebase(() => (firestore ? collection(firestore, 'plans') : null), [firestore])
+  );
+
+  const isLoading = areClientsLoading || arePlansLoading;
 
   const summary = useMemo(() => {
-    return {
+    const counts: Record<string, number> = {
       total: clients.length,
-      free: clients.filter(c => (c.subscription?.plan || 'free') === 'free').length,
-      pro: clients.filter(c => c.subscription?.plan === 'pro').length,
-      enterprise: clients.filter(c => c.subscription?.plan === 'enterprise').length,
+      free: 0,
+      pro: 0,
+      enterprise: 0,
     };
+    clients.forEach(client => {
+        const planId = client.subscription?.plan || 'free';
+        if (planId in counts) {
+            counts[planId]++;
+        } else {
+             // Optionally handle new plans if you want to see them in summary
+        }
+    });
+    return counts;
   }, [clients]);
 
   return (
@@ -88,7 +107,7 @@ export default function SubscriptionsPage() {
                     <p className="text-sm">{error.message}</p>
                  </div>
             ) : (
-                 <SubscriptionTable clients={clients} isLoading={isLoading} />
+                 <SubscriptionTable clients={clients} allPlans={allPlans || []} isLoading={isLoading} />
             )}
         </CardContent>
       </Card>

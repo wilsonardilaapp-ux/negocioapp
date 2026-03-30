@@ -37,9 +37,10 @@ import { useFirestore, setDocumentNonBlocking } from "@/firebase";
 import { doc, Timestamp } from "firebase/firestore";
 import type { ClientWithSubscription } from "../hooks/useAllSubscriptions";
 import { format } from "date-fns";
+import type { SubscriptionPlan } from "@/models/subscription-plan";
 
 const changePlanSchema = z.object({
-  plan: z.enum(["free", "pro", "enterprise"]),
+  plan: z.string().min(1, { message: 'Debes seleccionar un plan.' }),
   status: z.enum(["active", "canceled", "past_due", "trialing"]),
   currentPeriodEnd: z.date().nullable(),
 });
@@ -48,11 +49,12 @@ type ChangePlanFormData = z.infer<typeof changePlanSchema>;
 
 interface ChangePlanModalProps {
   client: ClientWithSubscription | null;
+  allPlans: SubscriptionPlan[];
   isOpen: boolean;
   onClose: () => void;
 }
 
-export function ChangePlanModal({ client, isOpen, onClose }: ChangePlanModalProps) {
+export function ChangePlanModal({ client, allPlans, isOpen, onClose }: ChangePlanModalProps) {
   const firestore = useFirestore();
   const { toast } = useToast();
   const [isSaving, setIsSaving] = useState(false);
@@ -137,9 +139,9 @@ export function ChangePlanModal({ client, isOpen, onClose }: ChangePlanModalProp
                       <SelectValue placeholder="Selecciona un plan" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="free">Free</SelectItem>
-                      <SelectItem value="pro">Pro</SelectItem>
-                      <SelectItem value="enterprise">Enterprise</SelectItem>
+                      {allPlans.map((plan) => (
+                        <SelectItem key={plan.id} value={plan.id}>{plan.name}</SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 )}

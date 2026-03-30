@@ -1,14 +1,10 @@
+
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
-import { useAllSubscriptions, type ClientWithSubscription } from '../../subscriptions/hooks/useAllSubscriptions';
+import { useState, useEffect } from 'react';
+import { useAllSubscriptions } from '../../subscriptions/hooks/useAllSubscriptions';
 import { Timestamp } from 'firebase/firestore';
-
-const PLAN_PRICES = {
-  free: 0,
-  pro: 29,
-  enterprise: 99,
-} as const;
+import type { SubscriptionPlan } from '@/models/subscription-plan';
 
 export type RevenueMetrics = {
   mrr: number;
@@ -17,11 +13,7 @@ export type RevenueMetrics = {
   clientsGrowth: number;
   newClientsThisMonth: number;
   cancelationsThisMonth: number;
-  planDistribution: {
-    free: number;
-    pro: number;
-    enterprise: number;
-  };
+  planDistribution: Record<string, number>;
   monthlyHistory: {
     month: string;
     mrr: number;
@@ -32,19 +24,19 @@ export type RevenueMetrics = {
     name: string;
     email: string;
     action: 'nueva_suscripcion' | 'cambio_plan' | 'cancelacion' | 'pago_vencido';
-    plan: 'free' | 'pro' | 'enterprise';
+    plan: string;
     date: Timestamp;
   }[];
 };
 
-export function useRevenueMetrics() {
+export function useRevenueMetrics(allPlans: SubscriptionPlan[] | null) {
   const { clients, isLoading: areClientsLoading, error: clientsError } = useAllSubscriptions();
   const [metrics, setMetrics] = useState<RevenueMetrics | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (areClientsLoading) {
+    if (areClientsLoading || !allPlans) {
       setIsLoading(true);
       return;
     }
@@ -58,28 +50,28 @@ export function useRevenueMetrics() {
         try {
             const now = new Date();
             const startOfThisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-            const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-            const startOfTwoMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 2, 1);
 
-            // --- Current Metrics ---
             const activeSubscriptions = clients.filter(c => c.subscription?.status === 'active');
+            
             const mrr = activeSubscriptions.reduce((acc, client) => {
-                const plan = client.subscription?.plan || 'free';
-                return acc + PLAN_PRICES[plan];
+                const planId = client.subscription?.plan || 'free';
+                const planDetails = allPlans.find(p => p.id === planId);
+                return acc + (planDetails?.price || 0);
             }, 0);
             
             const totalActiveClients = activeSubscriptions.length;
 
-            // --- Growth Metrics ---
             const activeSubsLastMonth = clients.filter(c => {
                 const sub = c.subscription;
                 if (!sub) return false;
                 const createdAt = sub.createdAt.toDate();
                 return createdAt < startOfThisMonth && sub.status === 'active';
             });
+
             const mrrLastMonth = activeSubsLastMonth.reduce((acc, client) => {
-                const plan = client.subscription?.plan || 'free';
-                return acc + PLAN_PRICES[plan];
+                const planId = client.subscription?.plan || 'free';
+                const planDetails = allPlans.find(p => p.id === planId);
+                return acc + (planDetails?.price || 0);
             }, 0);
             const mrrGrowth = mrrLastMonth > 0 ? ((mrr - mrrLastMonth) / mrrLastMonth) * 100 : mrr > 0 ? 100 : 0;
             
@@ -87,19 +79,20 @@ export function useRevenueMetrics() {
             const clientsGrowth = totalActiveClientsLastMonth > 0 ? ((totalActiveClients - totalActiveClientsLastMonth) / totalActiveClientsLastMonth) * 100 : totalActiveClients > 0 ? 100 : 0;
 
             const newClientsThisMonth = clients.filter(c => c.subscription && c.subscription.createdAt.toDate() >= startOfThisMonth).length;
+            
             const cancelationsThisMonth = clients.filter(c => {
                 const sub = c.subscription;
                 return sub?.status === 'canceled' && sub.updatedAt.toDate() >= startOfThisMonth;
             }).length;
 
-            // --- Plan Distribution ---
-            const planDistribution = clients.reduce((acc, client) => {
-                const plan = client.subscription?.plan || 'free';
-                acc[plan] = (acc[plan] || 0) + 1;
+            const planDistribution = activeSubscriptions.reduce((acc, client) => {
+                const planId = client.subscription?.plan || 'free';
+                const planDetails = allPlans.find(p => p.id === planId);
+                const planName = planDetails?.name || 'Desconocido';
+                acc[planName] = (acc[planName] || 0) + 1;
                 return acc;
-            }, { free: 0, pro: 0, enterprise: 0 });
-
-            // --- Monthly History (last 6 months) ---
+            }, {} as Record<string, number>);
+            
             const monthNames = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
             const monthlyHistory: { month: string, mrr: number, newClients: number }[] = [];
 
@@ -124,12 +117,15 @@ export function useRevenueMetrics() {
                         // Active at end of month
                         return createdAt <= endOfMonth && (sub.status === 'active' || (sub.status === 'canceled' && sub.updatedAt.toDate() > endOfMonth));
                     })
-                    .reduce((acc, client) => acc + PLAN_PRICES[client.subscription!.plan], 0);
+                    .reduce((acc, client) => {
+                         const planId = client.subscription!.plan;
+                         const planDetails = allPlans.find(p => p.id === planId);
+                         return acc + (planDetails?.price || 0);
+                    }, 0);
 
                 monthlyHistory.push({ month: monthName, mrr: mrrForMonth, newClients: newClientsInMonth });
             }
 
-            // --- Recent Activity ---
             const recentActivity = clients
                 .filter(c => c.subscription)
                 .map(c => {
@@ -143,12 +139,14 @@ export function useRevenueMetrics() {
                         action = 'pago_vencido';
                     }
                     
+                    const planDetails = allPlans.find(p => p.id === sub.plan);
+                    
                     return {
                         userId: c.userId,
                         name: c.name,
                         email: c.email,
                         action,
-                        plan: sub.plan,
+                        plan: planDetails?.name || sub.plan,
                         date: sub.updatedAt
                     };
                 })
@@ -172,7 +170,7 @@ export function useRevenueMetrics() {
             setIsLoading(false);
         }
     }
-  }, [clients, areClientsLoading, clientsError]);
+  }, [clients, areClientsLoading, clientsError, allPlans]);
 
   return { metrics, isLoading, error };
 }
