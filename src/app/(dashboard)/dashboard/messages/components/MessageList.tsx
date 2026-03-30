@@ -3,17 +3,19 @@
 
 import { useState, useMemo } from 'react';
 import { useUser, useFirestore, updateDocumentNonBlocking, useDoc, addDocumentNonBlocking } from '@/firebase';
-import { doc, collection, type Timestamp } from 'firebase/firestore';
+import { doc, collection, type Timestamp, writeBatch } from 'firebase/firestore';
 import { format, formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
 
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Mail, Loader2, Inbox, Search, Send } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Mail, Loader2, Inbox, Search, Send, Trash2 } from 'lucide-react';
 import type { AdminNotification, ContactMessage } from '@/models/notification';
 import type { Business } from '@/models/business';
 import { cn } from '@/lib/utils';
@@ -37,6 +39,8 @@ export default function MessageList({ notifications, isLoading }: MessageListPro
   const [isReplyOpen, setReplyOpen] = useState(false);
   const [replyBody, setReplyBody] = useState('');
   const [isSending, setIsSending] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const businessDocRef = useMemo(() => user ? doc(firestore, 'businesses', user.uid) : null, [user, firestore]);
   const { data: business } = useDoc<Business>(businessDocRef);
@@ -59,6 +63,50 @@ export default function MessageList({ notifications, isLoading }: MessageListPro
     });
   }, [notifications, filter, searchTerm]);
 
+  const selectedCount = selectedIds.length;
+  const isAllSelected = selectedCount === filteredNotifications.length && filteredNotifications.length > 0;
+  const checkboxState = isAllSelected ? true : (selectedCount > 0 ? 'indeterminate' : false);
+
+  const handleToggleSelectAll = () => {
+    if (isAllSelected) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(filteredNotifications.map(n => n.id));
+    }
+  };
+  
+  const handleToggleSelectOne = (id: string) => {
+    setSelectedIds(prev =>
+      prev.includes(id) ? prev.filter(selectedId => selectedId !== id) : [...prev, id]
+    );
+  };
+
+  const handleDeleteSelected = async () => {
+    if (!user || !firestore || selectedCount === 0) return;
+    setIsDeleting(true);
+    try {
+      const batch = writeBatch(firestore);
+      selectedIds.forEach(id => {
+        const docRef = doc(firestore, `businesses/${user.uid}/notifications`, id);
+        batch.delete(docRef);
+      });
+      await batch.commit();
+      toast({
+        title: "Mensajes eliminados",
+        description: `${selectedCount} mensajes han sido eliminados.`,
+      });
+      setSelectedIds([]);
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Error al eliminar",
+        description: "No se pudieron eliminar los mensajes seleccionados.",
+      });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   const handleSelectNotification = (notification: AdminNotification) => {
     setSelectedNotification(notification);
     if (!notification.read && user && firestore) {
@@ -69,11 +117,9 @@ export default function MessageList({ notifications, isLoading }: MessageListPro
 
   const handleSendReply = async () => {
     if (!replyBody.trim() || !selectedNotification || !user || !profile || !firestore) return;
-
     setIsSending(true);
     try {
         const contactMessagesRef = collection(firestore, 'contactMessages');
-        
         const newReply: Omit<ContactMessage, 'id'> = {
             name: profile.name || user.email!,
             email: user.email!,
@@ -86,13 +132,10 @@ export default function MessageList({ notifications, isLoading }: MessageListPro
             source: 'client_reply',
             userId: user.uid,
         };
-
         await addDocumentNonBlocking(contactMessagesRef, newReply);
-
         toast({ title: "Respuesta enviada", description: "El superadministrador ha recibido tu mensaje." });
         setReplyOpen(false);
         setReplyBody('');
-
     } catch (error: any) {
         toast({ variant: 'destructive', title: "Error al enviar", description: error.message });
     } finally {
@@ -118,23 +161,49 @@ export default function MessageList({ notifications, isLoading }: MessageListPro
     <>
       <div className="p-4 border-b">
         <div className="flex flex-col sm:flex-row gap-4">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input 
-                placeholder="Buscar por asunto o contenido..." 
-                className="pl-10"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
-          <div className="flex items-center gap-2">
-            <Button variant={filter === 'all' ? 'default' : 'outline'} onClick={() => setFilter('all')}>Todos</Button>
-            <Button variant={filter === 'unread' ? 'default' : 'outline'} onClick={() => setFilter('unread')} className="relative">
-              No Leídos
-              {unreadCount > 0 && <Badge className="absolute -top-2 -right-2 h-4 w-4 justify-center p-0">{unreadCount}</Badge>}
-            </Button>
-            <Button variant={filter === 'payment_reminder' ? 'default' : 'outline'} onClick={() => setFilter('payment_reminder')}>Recordatorios</Button>
-          </div>
+            <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input placeholder="Buscar por asunto o contenido..." className="pl-10" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+            </div>
+            <div className="flex items-center gap-2">
+                <Button variant={filter === 'all' ? 'default' : 'outline'} onClick={() => setFilter('all')}>Todos</Button>
+                <Button variant={filter === 'unread' ? 'default' : 'outline'} onClick={() => setFilter('unread')} className="relative">
+                No Leídos
+                {unreadCount > 0 && <Badge className="absolute -top-2 -right-2 h-4 w-4 justify-center p-0">{unreadCount}</Badge>}
+                </Button>
+                <Button variant={filter === 'payment_reminder' ? 'default' : 'outline'} onClick={() => setFilter('payment_reminder')}>Recordatorios</Button>
+            </div>
+        </div>
+        <div className="flex items-center gap-4 mt-4 h-10">
+            <div className="flex items-center gap-2">
+                <Checkbox id="select-all-messages" checked={checkboxState} onCheckedChange={handleToggleSelectAll} />
+                <Label htmlFor="select-all-messages" className="text-sm font-medium">Seleccionar Visibles</Label>
+            </div>
+            {selectedCount > 0 && (
+                <div className="flex items-center gap-4 border-l pl-4">
+                <span className="text-sm text-muted-foreground">{selectedCount} seleccionado(s)</span>
+                <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                    <Button variant="destructive" size="sm">
+                        <Trash2 className="mr-2 h-4 w-4" /> Eliminar seleccionados
+                    </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+                        <AlertDialogDescription>Esta acción eliminará permanentemente {selectedCount} mensaje(s). No se puede deshacer.</AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleDeleteSelected} disabled={isDeleting} className="bg-destructive hover:bg-destructive/80">
+                        {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                        Sí, eliminar
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
+                </div>
+            )}
         </div>
       </div>
       
@@ -145,24 +214,35 @@ export default function MessageList({ notifications, isLoading }: MessageListPro
           <p className="text-muted-foreground max-w-sm">No hay mensajes en la vista actual.</p>
         </div>
       ) : (
-        <ScrollArea className="h-[calc(100vh-250px)]">
+        <ScrollArea className="h-[calc(100vh-310px)]">
             <ul className="divide-y">
-                {filteredNotifications.map(notification => (
-                  <li key={notification.id} onClick={() => handleSelectNotification(notification)} className="p-4 hover:bg-muted/50 cursor-pointer flex items-start gap-4 transition-colors">
-                    {!notification.read && <div className="h-2.5 w-2.5 rounded-full bg-primary mt-2 shrink-0"></div>}
-                    <div className={cn("flex-shrink-0 p-2 bg-secondary rounded-full", notification.read && "ml-[14px]")}><Mail className="h-4 w-4 text-muted-foreground" /></div>
-                    <div className="flex-1 overflow-hidden">
+                {filteredNotifications.map(notification => {
+                  const isSelected = selectedIds.includes(notification.id);
+                  return (
+                  <li key={notification.id} data-state={isSelected ? 'selected' : 'unselected'} className="group/item flex items-start gap-2 transition-colors hover:bg-muted/50 data-[state=selected]:bg-primary/5">
+                    <label htmlFor={`select-${notification.id}`} className="p-4 flex items-center cursor-pointer">
+                        <Checkbox 
+                            id={`select-${notification.id}`}
+                            checked={isSelected}
+                            onCheckedChange={() => handleToggleSelectOne(notification.id)}
+                            className="shrink-0"
+                        />
+                    </label>
+                    <div 
+                        className="flex-1 cursor-pointer py-4 pr-4"
+                        onClick={() => handleSelectNotification(notification)}
+                    >
                       <div className="flex justify-between items-start">
                         <p className="font-semibold truncate">{notification.subject}</p>
                         <Badge variant={notification.type === 'payment_reminder' ? 'destructive' : 'secondary'} className="capitalize">{notification.type.replace('_', ' ')}</Badge>
                       </div>
                       <p className="text-sm text-muted-foreground truncate">{notification.body.replace(/<[^>]*>/g, '')}</p>
-                    </div>
-                    <div className="text-xs text-muted-foreground text-right w-28 shrink-0">
-                      {formatDistanceToNow(formatDate(notification.createdAt), { addSuffix: true, locale: es })}
+                       <div className="text-xs text-muted-foreground text-right mt-1">
+                        {formatDistanceToNow(formatDate(notification.createdAt), { addSuffix: true, locale: es })}
+                      </div>
                     </div>
                   </li>
-                ))}
+                )})}
               </ul>
         </ScrollArea>
       )}
