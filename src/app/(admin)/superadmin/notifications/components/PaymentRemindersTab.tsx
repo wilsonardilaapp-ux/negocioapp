@@ -515,7 +515,9 @@ export default function PaymentRemindersTab() {
     
     useEffect(() => {
         if (scheduledReminders) {
-            setLocalReminders(scheduledReminders);
+            // Filter out reminders that might not have a client ID, which could be test data.
+            const validReminders = scheduledReminders.filter(r => r && r.clientId);
+            setLocalReminders(validReminders);
         }
     }, [scheduledReminders]);
 
@@ -527,6 +529,7 @@ export default function PaymentRemindersTab() {
     }, [localReminders]);
 
     const manualPaymentClients = useMemo(() => {
+        if (!clients) return [];
         return clients.filter(c => c.subscription && !c.subscription.stripeSubscriptionId);
     }, [clients]);
 
