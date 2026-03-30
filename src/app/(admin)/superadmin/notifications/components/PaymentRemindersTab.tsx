@@ -1,4 +1,3 @@
-
 'use client';
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { useAllSubscriptions, type ClientWithSubscription } from '../../subscriptions/hooks/useAllSubscriptions';
@@ -27,9 +26,18 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { cn } from '@/lib/utils';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Calendar } from '@/components/ui/calendar';
+import type { SubscriptionPlan } from '@/models/subscription-plan';
 
 
-// --- Helper Function ---
+// --- Helper Functions ---
+const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('es-CO', {
+        style: 'currency',
+        currency: 'COP',
+        minimumFractionDigits: 0,
+    }).format(value);
+};
+
 const safeToDate = (dateValue: string | undefined): Date => {
   const futureDate = new Date('9999-12-31');
   if (!dateValue) return futureDate;
@@ -376,14 +384,6 @@ const ScheduledRemindersTable = ({
 // --- Original Components (Manual Reminder) ---
 type ReminderStatus = 'Al día' | 'Por vencer' | 'Vencido';
 
-const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('es-CO', {
-        style: 'currency',
-        currency: 'COP',
-        minimumFractionDigits: 0,
-    }).format(value);
-};
-
 const getStatus = (dueDate: Date | null): { status: ReminderStatus; days: number; variant: 'default' | 'secondary' | 'destructive' } => {
     if (!dueDate) return { status: 'Al día', days: 999, variant: 'default' };
     const today = new Date();
@@ -489,6 +489,11 @@ export default function PaymentRemindersTab() {
     const firestore = useFirestore();
     const { toast } = useToast();
 
+    // NEW: Fetch all subscription plans to get the price and name
+    const { data: allPlans, isLoading: arePlansLoading } = useCollection<SubscriptionPlan>(
+        useMemoFirebase(() => (firestore ? collection(firestore, 'plans') : null), [firestore])
+    );
+
     // State for manual reminders
     const [selectedClient, setSelectedClient] = useState<ClientWithSubscription | null>(null);
     const [isManualModalOpen, setIsManualModalOpen] = useState(false);
@@ -516,7 +521,7 @@ export default function PaymentRemindersTab() {
 
     const sortedReminders = useMemo(() => {
         if (!localReminders) return [];
-        // CORRECTED: Filter out invalid reminders that might cause errors.
+        // Filter out invalid reminders that might cause errors.
         const validReminders = localReminders.filter(r => r && r.id && r.clientId && r.createdAt);
         return [...validReminders].sort((a, b) => safeToDate(b.createdAt).getTime() - safeToDate(a.createdAt).getTime());
     }, [localReminders]);
@@ -554,10 +559,11 @@ export default function PaymentRemindersTab() {
 
     // --- Auto-sending logic ---
     useEffect(() => {
-        if (!localReminders || !firestore || !clients || clients.length === 0) return;
+        if (!localReminders || !firestore || !clients || clients.length === 0 || arePlansLoading || !allPlans) return;
   
         const now = new Date();
         const remindersToSend = localReminders.filter(r => 
+            r.clientId &&
             r.status === 'pending' && 
             !processingIdsRef.current.has(r.id) &&
             safeToDate(r.scheduledDate) <= now
@@ -576,9 +582,19 @@ export default function PaymentRemindersTab() {
                         const client = clients.find(c => c.userId === reminder.clientId);
                         if (!client) throw new Error(`Cliente ${reminder.clientId} no encontrado.`);
   
+                        const planId = client.subscription?.plan || 'free';
+                        const planDetails = allPlans.find(p => p.id === planId);
+                        const monto = planDetails?.price || 0;
+
+                        const fechaLimite = client.subscription?.currentPeriodEnd
+                            ? format(client.subscription.currentPeriodEnd.toDate(), 'dd/MM/yyyy', { locale: es })
+                            : 'N/A';
+                        
                         let message = reminder.message
-                            .replace('{nombre}', client.name)
-                            .replace('{plan}', client.subscription?.plan || 'N/A');
+                            .replace(/{nombre}/g, client.name)
+                            .replace(/{plan}/g, planDetails?.name || 'N/A')
+                            .replace(/{monto}/g, formatCurrency(monto))
+                            .replace(/{fecha_limite}/g, fechaLimite);
   
                         if (reminder.channel === 'panel' || reminder.channel === 'both') {
                             const result = await sendAdminNotification({
@@ -598,10 +614,9 @@ export default function PaymentRemindersTab() {
                               console.warn(`Recordatorio ${reminder.id} para ${client.name} no enviado a WhatsApp por falta de número.`);
                             }
                         }
-                        return reminder; // Return the reminder on success
+                        return reminder;
                     } catch (error) {
                         console.error(`Error enviando recordatorio ${reminder.id}:`, error);
-                        // Attach reminder ID to the error for identification
                         (error as any).reminderId = reminder.id;
                         throw error;
                     }
@@ -651,7 +666,9 @@ export default function PaymentRemindersTab() {
                 idsToProcess.forEach(id => processingIdsRef.current.delete(id));
             });
         }
-      }, [localReminders, firestore, clients, toast]);
+      }, [localReminders, firestore, clients, toast, allPlans, arePlansLoading]);
+
+    const isLoading = areClientsLoading || areScheduledRemindersLoading || arePlansLoading;
 
     return (
         <div className="space-y-6">
@@ -704,7 +721,7 @@ export default function PaymentRemindersTab() {
 
             <ScheduledRemindersTable 
                 reminders={sortedReminders}
-                isLoading={areScheduledRemindersLoading}
+                isLoading={isLoading}
                 onEdit={handleOpenScheduleModal}
                 onDelete={handleDeleteScheduledReminder}
             />
