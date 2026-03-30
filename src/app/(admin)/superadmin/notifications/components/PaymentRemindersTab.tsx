@@ -16,6 +16,7 @@ import { sendAdminNotification } from '@/actions/notifications';
 import { format, differenceInDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 import type { GlobalPaymentConfig } from '@/models/global-payment-config';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 
 type ReminderStatus = 'Al día' | 'Por vencer' | 'Vencido';
 
