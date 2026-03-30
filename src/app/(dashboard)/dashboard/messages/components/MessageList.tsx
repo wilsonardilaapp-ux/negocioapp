@@ -84,26 +84,38 @@ export default function MessageList({ notifications, isLoading }: MessageListPro
   const handleDeleteSelected = async () => {
     if (!user || !firestore || selectedCount === 0) return;
     setIsDeleting(true);
+    let deletedCount = 0;
     try {
-      const batch = writeBatch(firestore);
-      selectedIds.forEach(id => {
-        const docRef = doc(firestore, `businesses/${user.uid}/notifications`, id);
-        batch.delete(docRef);
-      });
-      await batch.commit();
-      toast({
-        title: "Mensajes eliminados",
-        description: `${selectedCount} mensajes han sido eliminados.`,
-      });
-      setSelectedIds([]);
+        const BATCH_SIZE = 500; // Límite de Firestore
+        const chunks: string[][] = [];
+        for (let i = 0; i < selectedIds.length; i += BATCH_SIZE) {
+            chunks.push(selectedIds.slice(i, i + BATCH_SIZE));
+        }
+
+        for (const chunk of chunks) {
+            const batch = writeBatch(firestore);
+            chunk.forEach(id => {
+                const docRef = doc(firestore, `businesses/${user.uid}/notifications`, id);
+                batch.delete(docRef);
+            });
+            await batch.commit();
+            deletedCount += chunk.length;
+        }
+
+        toast({
+            title: "Mensajes eliminados",
+            description: `${deletedCount} mensajes han sido eliminados.`,
+        });
+        setSelectedIds([]);
+
     } catch (error: any) {
-      toast({
-        variant: "destructive",
-        title: "Error al eliminar",
-        description: "No se pudieron eliminar los mensajes seleccionados.",
-      });
+        toast({
+            variant: "destructive",
+            title: "Error al eliminar",
+            description: `Se eliminaron ${deletedCount} de ${selectedCount} mensajes. Inténtalo de nuevo. Error: ${error.message}`,
+        });
     } finally {
-      setIsDeleting(false);
+        setIsDeleting(false);
     }
   };
 
@@ -184,7 +196,7 @@ export default function MessageList({ notifications, isLoading }: MessageListPro
                 <span className="text-sm text-muted-foreground">{selectedCount} seleccionado(s)</span>
                 <AlertDialog>
                     <AlertDialogTrigger asChild>
-                    <Button variant="destructive" size="sm">
+                    <Button variant="destructive" size="sm" disabled={isDeleting}>
                         <Trash2 className="mr-2 h-4 w-4" /> Eliminar seleccionados
                     </Button>
                     </AlertDialogTrigger>
