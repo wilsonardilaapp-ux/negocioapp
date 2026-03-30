@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState, useEffect, useRef } from 'react';
-import { useDoc, useFirestore, useMemoFirebase } from '@/firebase';
+import { useFirestore } from '@/firebase';
 import { doc, getDoc, collectionGroup, query, where, getDocs, limit } from 'firebase/firestore';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
@@ -104,7 +104,7 @@ const CatalogHeader = ({ config }: { config: LandingHeaderConfigData | null }) =
                                     {item.mediaType === 'image' ? (
                                         <Image src={item.mediaUrl} alt={item.slogan || 'Carousel image'} fill sizes="100vw" className="object-cover" />
                                     ) : (
-                                        <video src={item.mediaUrl} autoPlay loop muted controls className="w-full h-full object-cover"/>
+                                        <video src={item.mediaUrl} autoPlay loop muted controls={false} className="w-full h-full object-cover"/>
                                     )}
                                     {item.slogan && (
                                         <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
@@ -475,6 +475,7 @@ const ActionButtons = ({ pageRef }: { pageRef: React.RefObject<HTMLDivElement> }
     );
 };
 
+// Main Component
 export default function CatalogPage() {
     const firestore = useFirestore();
     const params = useParams();
@@ -482,9 +483,21 @@ export default function CatalogPage() {
     const slug = params.businessId as string;
     const pageRef = useRef<HTMLDivElement>(null);
     
-    const [resolvedBusinessId, setResolvedBusinessId] = useState<string | null>(null);
-    const [catalogModule, setCatalogModule] = useState<Module | null>(null);
-    const [resolutionError, setResolutionError] = useState<string | null>(null);
+    const [pageData, setPageData] = useState<{
+        resolvedBusinessId: string | null;
+        publicData: { products: Product[], headerConfig: LandingHeaderConfigData } | null;
+        paymentSettings: PaymentSettings | null;
+        landingPageData: LandingPageData | null;
+        catalogModule: Module | null;
+    }>({
+        resolvedBusinessId: null,
+        publicData: null,
+        paymentSettings: null,
+        landingPageData: null,
+        catalogModule: null,
+    });
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
 
     const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
     const [isPurchaseModalOpen, setIsPurchaseModalOpen] = useState(false);
@@ -492,14 +505,19 @@ export default function CatalogPage() {
 
     const showPrintButton = searchParams.get('print') === 'true';
     const showDownloadButton = searchParams.get('download') === 'true';
-
+    
     useEffect(() => {
-        if (!firestore || !slug) return;
+        if (!firestore || !slug) {
+            setIsLoading(false);
+            return;
+        }
 
         const initializePage = async () => {
-            setResolutionError(null);
-            let businessId: string | null = null;
+            setIsLoading(true);
+            setError(null);
+            
             try {
+                // Step 1: Resolve businessId from slug
                 const shareConfigQuery = query(
                     collectionGroup(firestore, 'shareConfig'), 
                     where('slug', '==', slug),
@@ -507,69 +525,62 @@ export default function CatalogPage() {
                 );
                 const querySnapshot = await getDocs(shareConfigQuery);
                 const customSlugDoc = querySnapshot.docs.find(doc => doc.data().useCustomSlug === true);
-
-                if (customSlugDoc) {
-                    businessId = customSlugDoc.ref.parent.parent?.id ?? null;
-                } else {
-                    businessId = slug;
-                }
-
-                if (!businessId) {
-                    throw new Error("No se pudo determinar el ID del negocio.");
-                }
-                setResolvedBusinessId(businessId);
                 
-                // Now check for module, sequentially
-                const primaryDocRef = doc(firestore, 'modules', 'catalogo');
-                const primarySnap = await getDoc(primaryDocRef);
+                const businessId = customSlugDoc ? customSlugDoc.ref.parent.parent?.id : slug;
+                
+                if (!businessId) {
+                    throw new Error("No se pudo determinar el ID del negocio a partir del alias proporcionado.");
+                }
 
-                if (primarySnap.exists() && primarySnap.data().status === 'active') {
-                    setCatalogModule({ ...primarySnap.data(), id: primarySnap.id } as Module);
+                // Step 2: Check for catalog module
+                const primaryModuleRef = doc(firestore, 'modules', 'catalogo');
+                const primaryModuleSnap = await getDoc(primaryModuleRef);
+                let fetchedCatalogModule: Module | null = null;
+                
+                if (primaryModuleSnap.exists() && primaryModuleSnap.data().status === 'active') {
+                    fetchedCatalogModule = { ...primaryModuleSnap.data(), id: primaryModuleSnap.id } as Module;
                 } else {
-                    const fallbackDocRef = doc(firestore, 'modules', 'catalogo-de-productos');
-                    const fallbackSnap = await getDoc(fallbackDocRef);
-                    if (fallbackSnap.exists() && fallbackSnap.data().status === 'active') {
-                        setCatalogModule({ ...fallbackSnap.data(), id: fallbackSnap.id } as Module);
-                    } else {
-                        setCatalogModule(null);
+                    const fallbackModuleRef = doc(firestore, 'modules', 'catalogo-de-productos');
+                    const fallbackModuleSnap = await getDoc(fallbackModuleRef);
+                    if (fallbackModuleSnap.exists() && fallbackModuleSnap.data().status === 'active') {
+                        fetchedCatalogModule = { ...fallbackModuleSnap.data(), id: fallbackModuleSnap.id } as Module;
                     }
                 }
+                
+                if (!fetchedCatalogModule) {
+                     throw new Error("El módulo de catálogo no se encuentra o está inactivo.");
+                }
+
+                // Step 3: Fetch all remaining data sequentially
+                const publicDataRef = doc(firestore, `businesses/${businessId}/publicData`, 'catalog');
+                const paymentSettingsRef = doc(firestore, 'paymentSettings', businessId);
+                const landingPageRef = doc(firestore, `businesses/${businessId}/landingPages`, 'main');
+                
+                const [publicDataSnap, paymentSettingsSnap, landingPageSnap] = await Promise.all([
+                    getDoc(publicDataRef),
+                    getDoc(paymentSettingsRef),
+                    getDoc(landingPageRef),
+                ]);
+
+                setPageData({
+                    resolvedBusinessId: businessId,
+                    publicData: publicDataSnap.exists() ? publicDataSnap.data() as { products: Product[], headerConfig: LandingHeaderConfigData } : null,
+                    paymentSettings: paymentSettingsSnap.exists() ? paymentSettingsSnap.data() as PaymentSettings : null,
+                    landingPageData: landingPageSnap.exists() ? landingPageSnap.data() as LandingPageData : null,
+                    catalogModule: fetchedCatalogModule,
+                });
+
             } catch (e: any) {
                 console.error("Error inicializando la página del catálogo:", e);
-                setResolutionError(`No se pudo encontrar el negocio para este catálogo. Error: ${e.message}`);
+                setError(`No se pudo encontrar el negocio para este catálogo. Error: ${e.message}`);
+            } finally {
+                setIsLoading(false);
             }
         };
 
         initializePage();
     }, [firestore, slug]);
 
-
-    // Data-fetching hooks that depend on resolvedBusinessId
-    const { data: publicData, isLoading: isPublicDataLoading } = useDoc<{ products: Product[], headerConfig: LandingHeaderConfigData }>(
-        useMemoFirebase(() => 
-            (firestore && resolvedBusinessId) 
-            ? doc(firestore, `businesses/${resolvedBusinessId}/publicData`, 'catalog') 
-            : null, 
-        [firestore, resolvedBusinessId])
-    );
-    
-    const { data: paymentSettings, isLoading: isPaymentSettingsLoading } = useDoc<PaymentSettings>(
-        useMemoFirebase(() => 
-            (firestore && resolvedBusinessId && !isPublicDataLoading) // Chain loading
-            ? doc(firestore, 'paymentSettings', resolvedBusinessId) 
-            : null, 
-        [firestore, resolvedBusinessId, isPublicDataLoading])
-    );
-
-    const { data: landingPageData, isLoading: isLandingDataLoading } = useDoc<LandingPageData>(
-        useMemoFirebase(() => 
-            (firestore && resolvedBusinessId && !isPaymentSettingsLoading) // Chain loading
-            ? doc(firestore, `businesses/${resolvedBusinessId}/landingPages`, 'main') 
-            : null,
-        [firestore, resolvedBusinessId, isPaymentSettingsLoading])
-    );
-    
-    const isLoading = isPublicDataLoading || isPaymentSettingsLoading || isLandingDataLoading;
 
     useEffect(() => {
         if (showPrintButton) {
@@ -590,7 +601,7 @@ export default function CatalogPage() {
         }
     };
     
-    if (!resolvedBusinessId && !resolutionError && !isLoading) {
+    if (isLoading) {
         return (
             <div className="flex h-screen w-full items-center justify-center bg-background">
                 <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -598,17 +609,17 @@ export default function CatalogPage() {
         );
     }
     
-    if (resolutionError) {
-        return (
+    if (error) {
+       return (
            <div className="flex flex-col h-screen w-full items-center justify-center bg-background text-center p-4">
                <PackageSearch className="h-16 w-16 text-muted-foreground mb-4" />
                <h1 className="text-2xl font-bold">Catálogo no encontrado</h1>
-               <p className="text-muted-foreground mt-2 max-w-md">{resolutionError}</p>
+               <p className="text-muted-foreground mt-2 max-w-md">{error}</p>
            </div>
        );
     }
-    
-    if (!catalogModule) {
+
+    if (!pageData.catalogModule) {
         return (
             <div className="flex flex-col h-screen w-full items-center justify-center bg-background text-center p-4">
                 <Settings className="h-16 w-16 text-muted-foreground mb-4" />
@@ -620,8 +631,8 @@ export default function CatalogPage() {
         );
     }
     
-    const products = publicData?.products || [];
-    const headerConfig = publicData?.headerConfig || null;
+    const products = pageData.publicData?.products || [];
+    const headerConfig = pageData.publicData?.headerConfig || null;
     const isCatalogEmpty = !products || products.length === 0;
     
     const handleOpenModal = (product: Product) => {
@@ -636,21 +647,17 @@ export default function CatalogPage() {
     
     return (
         <div id="catalog-page-root" ref={pageRef} className="bg-muted/40">
-            <PublicNav navigation={landingPageData?.navigation} businessId={resolvedBusinessId ?? undefined} />
+            <PublicNav navigation={pageData.landingPageData?.navigation} businessId={pageData.resolvedBusinessId ?? undefined} />
             {headerConfig ? (
                 <CatalogHeader config={headerConfig} />
             ) : (
                 <div className="bg-card shadow-md p-4 text-center">
-                     <h1 className="text-2xl font-bold font-headline">Catálogo de Negocio V03</h1>
+                     <h1 className="text-2xl font-bold font-headline">Catálogo de Productos</h1>
                 </div>
             )}
             
             <main className="container mx-auto py-8 pb-10 md:pb-16 lg:pb-20">
-                {isLoading ? (
-                     <div className="flex h-64 w-full items-center justify-center">
-                        <Loader2 className="h-10 w-10 animate-spin text-primary" />
-                    </div>
-                ) : isCatalogEmpty ? (
+                {isCatalogEmpty ? (
                     <Card className="sm:col-span-2 md:col-span-3 lg:col-span-4">
                         <CardContent className="h-[400px] flex flex-col items-center justify-center text-center gap-4">
                             <div className="p-4 bg-secondary rounded-full">
@@ -676,22 +683,22 @@ export default function CatalogPage() {
                 isOpen={!!selectedProduct} 
                 onOpenChange={handleModalChange} 
                 businessPhone={headerConfig?.businessInfo.phone || ''}
-                businessId={resolvedBusinessId}
-                paymentSettings={paymentSettings ?? null}
+                businessId={pageData.resolvedBusinessId}
+                paymentSettings={pageData.paymentSettings ?? null}
                 onAddToCart={handleAddToCart}
             />
 
             {(showPrintButton || showDownloadButton) && <ActionButtons pageRef={pageRef} />}
             
-            {resolvedBusinessId && (
+            {pageData.resolvedBusinessId && (
                  <PurchaseModal
                     isOpen={isPurchaseModalOpen}
                     onOpenChange={setIsPurchaseModalOpen}
                     cartItems={cart}
                     onRemoveItem={handleRemoveFromCart}
-                    businessId={resolvedBusinessId}
+                    businessId={pageData.resolvedBusinessId}
                     businessInfo={headerConfig?.businessInfo ?? null}
-                    paymentSettings={paymentSettings}
+                    paymentSettings={pageData.paymentSettings}
                 />
             )}
 
