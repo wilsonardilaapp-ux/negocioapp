@@ -26,7 +26,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription } from '@/components/ui/alert-dialog';
 
 
 // --- Scheduled Reminder Components ---
@@ -435,11 +435,17 @@ export default function PaymentRemindersTab() {
 
     const scheduledRemindersQuery = useMemoFirebase(() => {
         if (!firestore) return null;
-        return query(collectionGroup(firestore, 'reminders'), orderBy('scheduledDate', 'desc'));
+        // Remove orderBy to prevent needing a composite index for the collectionGroup query
+        return collectionGroup(firestore, 'reminders');
     }, [firestore]);
     
     const { data: scheduledReminders, isLoading: areScheduledRemindersLoading } = useCollection<ScheduledReminder>(scheduledRemindersQuery);
     
+    const sortedReminders = useMemo(() => {
+        if (!scheduledReminders) return [];
+        return [...scheduledReminders].sort((a, b) => new Date(b.scheduledDate).getTime() - new Date(a.scheduledDate).getTime());
+    }, [scheduledReminders]);
+
     const manualPaymentClients = useMemo(() => {
         return clients.filter(c => c.subscription && !c.subscription.stripeSubscriptionId);
     }, [clients]);
@@ -458,9 +464,13 @@ export default function PaymentRemindersTab() {
 
     const handleDeleteScheduledReminder = async (reminderId: string, clientId: string) => {
         if (!firestore) return;
-        const reminderRef = doc(firestore, `scheduledReminders/${clientId}/reminders`, reminderId);
-        await deleteDocumentNonBlocking(reminderRef);
-        toast({ title: 'Recordatorio programado eliminado.' });
+        try {
+            const reminderRef = doc(firestore, `scheduledReminders/${clientId}/reminders`, reminderId);
+            await deleteDocumentNonBlocking(reminderRef);
+            toast({ title: 'Recordatorio programado eliminado.' });
+        } catch(error: any) {
+            toast({ variant: 'destructive', title: 'Error al eliminar', description: 'No se pudo eliminar el recordatorio.' });
+        }
     };
 
     // --- Auto-sending logic ---
@@ -557,7 +567,7 @@ export default function PaymentRemindersTab() {
             </Card>
 
             <ScheduledRemindersTable 
-                reminders={scheduledReminders || []}
+                reminders={sortedReminders}
                 isLoading={areScheduledRemindersLoading}
                 onEdit={handleOpenScheduleModal}
                 onDelete={handleDeleteScheduledReminder}
@@ -580,3 +590,4 @@ export default function PaymentRemindersTab() {
         </div>
     );
 }
+
