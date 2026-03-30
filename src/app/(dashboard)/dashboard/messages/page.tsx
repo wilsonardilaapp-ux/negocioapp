@@ -2,7 +2,7 @@
 
 import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query, orderBy } from 'firebase/firestore';
-import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import type { AdminNotification } from '@/models/notification';
 import MessageList from './components/MessageList';
 
@@ -27,7 +27,11 @@ export default function MessagesPage() {
                     </CardDescription>
                 </CardHeader>
             </Card>
-            <MessageList notifications={notifications || []} isLoading={isLoading} />
+            <Card>
+                <CardContent className="p-0">
+                    <MessageList notifications={notifications || []} isLoading={isLoading} />
+                </CardContent>
+            </Card>
         </div>
     );
 }
