@@ -33,7 +33,7 @@ export default function SendNotificationTab() {
     const businessesQuery = useMemoFirebase(() => !firestore ? null : collection(firestore, 'businesses'), [firestore]);
     const { data: businesses, isLoading: areBusinessesLoading } = useCollection<Business>(businessesQuery);
     
-    const { control, handleSubmit, setValue, getValues, watch, reset, formState: { errors, isSubmitting } } = useForm<NotificationFormData>({
+    const { register, control, handleSubmit, setValue, getValues, watch, reset, formState: { errors, isSubmitting } } = useForm<NotificationFormData>({
         resolver: zodResolver(notificationSchema),
         defaultValues: {
             recipients: [],
