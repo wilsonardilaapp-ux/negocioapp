@@ -12,7 +12,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { useUser, useFirestore, useMemoFirebase, useCollection, addDocumentNonBlocking, updateDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase';
-import { doc, collection, collectionGroup, writeBatch, orderBy, type Timestamp } from 'firebase/firestore';
+import { doc, collection, collectionGroup, writeBatch, setDoc, type Timestamp } from 'firebase/firestore';
 import { sendAdminNotification } from '@/actions/notifications';
 import { format, differenceInDays } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -26,6 +26,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { Calendar } from '@/components/ui/calendar';
 
 
 // --- Helper Function ---
@@ -137,7 +138,7 @@ const ScheduleReminderModal = ({
                 channel: reminder.channel,
                 message: reminder.message,
                 status: 'pending',
-                createdAt: existingSchedule?.createdAt || new Date().toISOString(),
+                createdAt: (existingSchedule?.createdAt ? new Date(existingSchedule.createdAt) : new Date()).toISOString(),
                 sentAt: null,
             };
             batch.set(reminderRef, reminderData, { merge: true });
@@ -355,7 +356,7 @@ function ReminderModal({ isOpen, onClose, client }: { isOpen: boolean, onClose: 
     const { data: paymentConfig } = useDoc<GlobalPaymentConfig>(paymentConfigRef);
 
     const [amount, setAmount] = useState(0); 
-    const [dueDate, setDueDate] = useState(client.subscription?.currentPeriodEnd ? client.subscription.currentPeriodEnd.toDate().toISOString().split('T')[0] : '');
+    const [dueDate, setDueDate] = useState(client.subscription?.currentPeriodEnd ? (client.subscription.currentPeriodEnd as unknown as Timestamp).toDate().toISOString().split('T')[0] : '');
     const [suspensionDate, setSuspensionDate] = useState('');
     const [message, setMessage] = useState('');
 
@@ -452,13 +453,11 @@ export default function PaymentRemindersTab() {
 
     const scheduledRemindersQuery = useMemoFirebase(() => {
         if (!firestore) return null;
-        // This query now runs without ordering to avoid index requirements.
         return collectionGroup(firestore, 'reminders');
     }, [firestore]);
     
     const { data: scheduledReminders, isLoading: areScheduledRemindersLoading } = useCollection<ScheduledReminder>(scheduledRemindersQuery);
     
-    // Sort on the client side
     const sortedReminders = useMemo(() => {
         if (!scheduledReminders) return [];
         return [...scheduledReminders].sort((a, b) => safeToDate(b.createdAt).getTime() - safeToDate(a.createdAt).getTime());
@@ -564,7 +563,7 @@ export default function PaymentRemindersTab() {
                                     <TableRow><TableCell colSpan={5} className="h-24 text-center"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></TableCell></TableRow>
                                 ) : manualPaymentClients.length > 0 ? (
                                     manualPaymentClients.map(client => {
-                                        const dueDate = client.subscription?.currentPeriodEnd ? client.subscription.currentPeriodEnd.toDate() : null;
+                                        const dueDate = client.subscription?.currentPeriodEnd ? (client.subscription.currentPeriodEnd as unknown as Timestamp).toDate() : null;
                                         const { status, days, variant } = getStatus(dueDate);
                                         return (
                                         <TableRow key={client.userId}>
