@@ -367,7 +367,7 @@ export default function RegisterPage() {
       batch.set(coffeeOfferRef, coffeeOfferData);
 
       // Lógica de suscripción
-      const planId = searchParams.get('plan') as 'pro' | 'enterprise' | null;
+      const planId = searchParams.get('plan') as 'free' | 'pro' | 'enterprise' | null;
       const subscriptionDocRef = doc(firestore, 'businesses', newUser.uid, 'subscription', 'current');
       
       if (planId && planId !== 'free') {
