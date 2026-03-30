@@ -147,7 +147,7 @@ export default function MessageList({ notifications, isLoading }: MessageListPro
                     <p className="font-semibold truncate">{notification.subject}</p>
                     <Badge variant={notification.type === 'payment_reminder' ? 'destructive' : 'secondary'} className="capitalize">{notification.type.replace('_', ' ')}</Badge>
                   </div>
-                  <p className="text-sm text-muted-foreground truncate">{notification.body}</p>
+                  <p className="text-sm text-muted-foreground truncate">{notification.body.replace(/<[^>]*>/g, '')}</p>
                 </div>
                 <div className="text-xs text-muted-foreground text-right w-28 shrink-0">
                   {formatDistanceToNow((notification.createdAt as Timestamp).toDate(), { addSuffix: true, locale: es })}
