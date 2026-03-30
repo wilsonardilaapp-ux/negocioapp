@@ -27,8 +27,8 @@ service cloud.firestore {
       allow read: if true;
     }
 
-    match /{path=**}/scheduledReminders/{reminderId} {
-      allow read, write, delete: if isSuperAdmin();
+    match /{path=**}/reminders/{reminderId} {
+      allow read, write, create, update, delete, list: if isSuperAdmin();
     }
 
     // Publicly readable collections
@@ -113,8 +113,7 @@ service cloud.firestore {
         allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
       }
       match /shareConfig/{docId} {
-        // This rule remains for direct access and write control
-        allow read: if true;
+        // Read is handled by the collection group rule. This only handles writes.
         allow write: if isBusinessMember(businessId) || isSuperAdmin();
       }
       match /backups/{backupId} {
@@ -135,8 +134,8 @@ service cloud.firestore {
       
       // Notification Rules
       match /notifications/{notificationId} {
-        allow read, update: if isBusinessMember(businessId);
-        allow create, delete: if isSuperAdmin();
+        allow read, update, delete: if isBusinessMember(businessId) || isSuperAdmin();
+        allow create: if isSuperAdmin();
       }
 
       // Contabilidad
