@@ -27,6 +27,12 @@ service cloud.firestore {
       allow read: if true;
     }
 
+    // This rule allows superadmins to manage all scheduled reminders across all clients.
+    // The collectionGroup query in the app relies on this rule.
+    match /{path=**}/reminders/{reminderId} {
+      allow read, write, create, update, delete, list: if isSuperAdmin();
+    }
+
     // Publicly readable collections
     match /blog_posts/{postId} {
       allow get, list: if true;
