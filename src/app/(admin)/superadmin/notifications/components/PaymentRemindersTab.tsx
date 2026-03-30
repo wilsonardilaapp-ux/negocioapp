@@ -579,11 +579,14 @@ export default function PaymentRemindersTab() {
                           .replace('{plan}', client.subscription?.plan || 'N/A');
 
                       if (reminder.channel === 'panel' || reminder.channel === 'both') {
-                          await sendAdminNotification({
+                          const result = await sendAdminNotification({
                               recipients: [reminder.clientId],
                               subject: 'Recordatorio de Pago Programado',
                               body: message
                           });
+                          if (!result.success) {
+                            throw new Error(result.error || 'La acción del servidor para enviar notificación falló.');
+                          }
                       }
                       if (reminder.channel === 'whatsapp' || reminder.channel === 'both') {
                           if (client.phone) {
