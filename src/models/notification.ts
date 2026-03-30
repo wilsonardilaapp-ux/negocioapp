@@ -51,4 +51,6 @@ export interface ScheduledReminder {
   channel: "panel" | "whatsapp" | "both";
   message: string;
   status: "pending" | "sent" | "failed";
-  createdAt
+  createdAt: Timestamp | string;
+  sentAt: Timestamp | string | null;
+}
