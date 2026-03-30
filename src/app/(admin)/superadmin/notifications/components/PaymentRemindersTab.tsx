@@ -1,3 +1,4 @@
+
 'use client';
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { useAllSubscriptions, type ClientWithSubscription } from '../../subscriptions/hooks/useAllSubscriptions';
@@ -10,7 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { useUser, useFirestore, useMemoFirebase, useCollection, addDocumentNonBlocking, updateDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase';
+import { useUser, useFirestore, useMemoFirebase, useCollection, useDoc, addDocumentNonBlocking, updateDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase';
 import { doc, collection, collectionGroup, writeBatch, setDoc, orderBy, type Timestamp } from 'firebase/firestore';
 import { sendAdminNotification } from '@/actions/notifications';
 import { format, differenceInDays } from 'date-fns';
@@ -747,3 +748,5 @@ export default function PaymentRemindersTab() {
         </div>
     );
 }
+
+    
