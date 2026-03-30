@@ -12,7 +12,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { useUser, useFirestore, useMemoFirebase, useCollection, addDocumentNonBlocking, updateDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase';
-import { doc, collection, collectionGroup, writeBatch, setDoc, orderBy } from 'firebase/firestore';
+import { doc, collection, collectionGroup, writeBatch, setDoc, orderBy, type Timestamp } from 'firebase/firestore';
 import { sendAdminNotification } from '@/actions/notifications';
 import { format, differenceInDays } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -63,11 +63,13 @@ const ScheduleReminderModal = ({
   onClose,
   clients,
   existingSchedule,
+  onDelete,
 }: {
   isOpen: boolean;
   onClose: () => void;
   clients: ClientWithSubscription[];
   existingSchedule?: ScheduledReminder | null;
+  onDelete: (reminderId: string, clientId: string) => Promise<void>;
 }) => {
   const { toast } = useToast();
   const firestore = useFirestore();
@@ -164,6 +166,12 @@ const ScheduleReminderModal = ({
         toast({ variant: 'destructive', title: 'Error', description: error.message });
     }
   };
+  
+    const handleDelete = async () => {
+        if (!existingSchedule) return;
+        await onDelete(existingSchedule.id, existingSchedule.clientId);
+        onClose();
+    };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -257,7 +265,32 @@ const ScheduleReminderModal = ({
                 )}
                
                 <DialogFooter>
-                    <Button type="button" variant="ghost" onClick={onClose}>Cancelar</Button>
+                    {existingSchedule && (
+                         <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                               <Button type="button" variant="destructive" className="mr-auto">
+                                  Cancelar Notificación
+                               </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>¿Confirmar cancelación?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Esta acción eliminará permanentemente la notificación programada. No se puede deshacer.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cerrar</AlertDialogCancel>
+                                <AlertDialogAction onClick={handleDelete} className="bg-destructive hover:bg-destructive/90">
+                                  Sí, cancelar notificación
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                    )}
+                    <Button type="button" variant="ghost" onClick={onClose}>
+                        {existingSchedule ? 'Cerrar' : 'Cancelar'}
+                    </Button>
                     <Button type="submit" disabled={isSubmitting}>
                         {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
                         Guardar Programación
@@ -524,6 +557,8 @@ export default function PaymentRemindersTab() {
             const sendReminders = async () => {
                 const idsToProcess = new Set(pending.map(p => p.id));
                 idsToProcess.forEach(id => processingIdsRef.current.add(id));
+                
+                toast({ title: `Enviando ${idsToProcess.size} recordatorio(s) automáticos...` });
 
                 const batch = writeBatch(firestore);
                 for (const reminder of pending) {
@@ -551,7 +586,6 @@ export default function PaymentRemindersTab() {
                 }
                 
                 await batch.commit();
-                toast({ title: `Se enviaron ${pending.length} recordatorio(s) automáticos.` });
             };
             sendReminders();
         }
@@ -626,7 +660,9 @@ export default function PaymentRemindersTab() {
                 onClose={() => setIsScheduleModalOpen(false)}
                 clients={manualPaymentClients}
                 existingSchedule={editingSchedule}
+                onDelete={handleDeleteScheduledReminder}
             />
         </div>
     );
 }
+
