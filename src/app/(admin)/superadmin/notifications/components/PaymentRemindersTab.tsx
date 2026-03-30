@@ -24,9 +24,8 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription } from '@/components/ui/alert-dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 
 
 // --- Scheduled Reminder Components ---
@@ -112,8 +111,8 @@ const ScheduleReminderModal = ({
         
         data.reminders.forEach(reminder => {
             // For editing, we reuse the ID. For new, we generate one.
-            const reminderId = existingSchedule?.id || doc(collection(firestore, `scheduledReminders/${data.clientId}/reminders`)).id;
-            const reminderRef = doc(firestore, `scheduledReminders/${data.clientId}/reminders`, reminderId);
+            const reminderId = existingSchedule?.id || doc(collection(firestore, `businesses/${data.clientId}/reminders`)).id;
+            const reminderRef = doc(firestore, `businesses/${data.clientId}/reminders`, reminderId);
             
             const reminderData: Omit<ScheduledReminder, 'id'> = {
                 clientId: data.clientId,
@@ -435,7 +434,6 @@ export default function PaymentRemindersTab() {
 
     const scheduledRemindersQuery = useMemoFirebase(() => {
         if (!firestore) return null;
-        // Remove orderBy to prevent needing a composite index for the collectionGroup query
         return collectionGroup(firestore, 'reminders');
     }, [firestore]);
     
@@ -465,7 +463,7 @@ export default function PaymentRemindersTab() {
     const handleDeleteScheduledReminder = async (reminderId: string, clientId: string) => {
         if (!firestore) return;
         try {
-            const reminderRef = doc(firestore, `scheduledReminders/${clientId}/reminders`, reminderId);
+            const reminderRef = doc(firestore, `businesses/${clientId}/reminders`, reminderId);
             await deleteDocumentNonBlocking(reminderRef);
             toast({ title: 'Recordatorio programado eliminado.' });
         } catch(error: any) {
@@ -507,7 +505,7 @@ export default function PaymentRemindersTab() {
                         window.open(whatsappUrl, `_blank_wa_${reminder.id}`);
                     }
                     
-                    const reminderRef = doc(firestore, `scheduledReminders/${reminder.clientId}/reminders`, reminder.id);
+                    const reminderRef = doc(firestore, `businesses/${reminder.clientId}/reminders`, reminder.id);
                     batch.update(reminderRef, { status: 'sent', sentAt: new Date().toISOString() });
                 }
                 
