@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useMemo, useState, useEffect, useRef } from 'react';
@@ -508,6 +509,10 @@ export default function CatalogPage() {
     
     useEffect(() => {
         if (!firestore || !slug || !isNetworkEnabled) {
+            if(!isNetworkEnabled && slug) {
+                // If the network is not enabled yet, don't set an error, just wait.
+                return;
+            }
             setIsLoading(false);
             return;
         }
@@ -527,7 +532,7 @@ export default function CatalogPage() {
                 const querySnapshot = await getDocs(shareConfigQuery);
                 const customSlugDoc = querySnapshot.docs.find(doc => doc.data().useCustomSlug === true);
                 
-                businessId = customSlugDoc ? customSlugDoc.ref.parent.parent?.id : slug;
+                businessId = customSlugDoc ? (customSlugDoc.ref.parent.parent?.id ?? null) : slug;
                 
                 if (!businessId) {
                     throw new Error("No se pudo determinar el ID del negocio a partir del alias proporcionado.");
