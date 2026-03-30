@@ -31,7 +31,6 @@ import { Calendar } from '@/components/ui/calendar';
 
 // --- Helper Function ---
 const safeToDate = (dateValue: string | undefined): Date => {
-  // Return a future date for any invalid input to prevent accidental processing
   const futureDate = new Date('9999-12-31');
   if (!dateValue) return futureDate;
   
@@ -40,7 +39,7 @@ const safeToDate = (dateValue: string | undefined): Date => {
     return isNaN(date.getTime()) ? futureDate : date;
   }
   
-  return futureDate; // Fallback
+  return futureDate;
 };
 
 
@@ -311,7 +310,7 @@ const ScheduledRemindersTable = ({
 } : {
     reminders: ScheduledReminder[],
     onEdit: (reminder: ScheduledReminder) => void,
-    onDelete: (reminderId: string, clientId: string) => void,
+    onDelete: (reminderId: string, clientId: string) => Promise<void>,
     isLoading: boolean,
 }) => {
     return (
@@ -507,10 +506,18 @@ export default function PaymentRemindersTab() {
     
     const { data: scheduledReminders, isLoading: areScheduledRemindersLoading } = useCollection<ScheduledReminder>(scheduledRemindersQuery);
     
-    const sortedReminders = useMemo(() => {
-        if (!scheduledReminders) return [];
-        return [...scheduledReminders].sort((a, b) => safeToDate(b.createdAt).getTime() - safeToDate(a.createdAt).getTime());
+    const [localReminders, setLocalReminders] = useState<ScheduledReminder[]>([]);
+    
+    useEffect(() => {
+        if (scheduledReminders) {
+            setLocalReminders(scheduledReminders);
+        }
     }, [scheduledReminders]);
+
+    const sortedReminders = useMemo(() => {
+        if (!localReminders) return [];
+        return [...localReminders].sort((a, b) => safeToDate(b.createdAt).getTime() - safeToDate(a.createdAt).getTime());
+    }, [localReminders]);
 
     const manualPaymentClients = useMemo(() => {
         return clients.filter(c => c.subscription && !c.subscription.stripeSubscriptionId);
@@ -536,6 +543,7 @@ export default function PaymentRemindersTab() {
         try {
             const reminderRef = doc(firestore, `businesses/${clientId}/reminders`, reminderId);
             await deleteDocumentNonBlocking(reminderRef);
+            setLocalReminders(prev => prev.filter(r => r.id !== reminderId));
             toast({ title: 'Recordatorio programado eliminado.' });
         } catch(error: any) {
             toast({ variant: 'destructive', title: 'Error al eliminar', description: 'No se pudo eliminar el recordatorio.' });
@@ -544,10 +552,10 @@ export default function PaymentRemindersTab() {
 
     // --- Auto-sending logic ---
     useEffect(() => {
-        if (!scheduledReminders || !firestore || !clients) return;
+        if (!localReminders || !firestore || !clients) return;
 
         const now = new Date();
-        const pending = scheduledReminders.filter(r => 
+        const pending = localReminders.filter(r => 
             r.status === 'pending' && 
             !processingIdsRef.current.has(r.id) &&
             safeToDate(r.scheduledDate) <= now
@@ -589,7 +597,7 @@ export default function PaymentRemindersTab() {
             };
             sendReminders();
         }
-    }, [scheduledReminders, firestore, clients, toast]);
+    }, [localReminders, firestore, clients, toast]);
 
     return (
         <div className="space-y-6">
@@ -665,4 +673,3 @@ export default function PaymentRemindersTab() {
         </div>
     );
 }
-
