@@ -1,5 +1,4 @@
-
-"use client";
+'use client';
 
 import { useState, useEffect, useMemo } from 'react';
 import { useForm, Controller } from 'react-hook-form';
@@ -10,13 +9,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import RichTextEditor from '@/components/editor/RichTextEditor';
 import type { Product } from '@/models/product';
-import { UploadCloud, X, Loader2, Pencil } from 'lucide-react';
+import { UploadCloud, X, Loader2, Pencil, ChevronLeft, ChevronRight } from 'lucide-react';
 import Image from 'next/image';
 import { uploadMedia } from '@/ai/flows/upload-media-flow';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { ScrollArea } from '../ui/scroll-area';
 
 const productSchema = z.object({
     name: z.string().min(3, "El nombre es requerido."),
@@ -153,47 +152,90 @@ export default function ProductForm({ product, onSave, onCancel, imageLimit }: P
     };
 
     const mainMediaItem = mediaItems[0];
-    const thumbnailItems = mediaItems.slice(1);
-    const remainingCount = Math.max(0, mediaItems.length - 4);
     const canUploadMore = mediaItems.length < imageLimit;
 
-    const Lightbox = () => (
-        <Dialog open={isLightboxOpen} onOpenChange={setIsLightboxOpen}>
-          <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col p-4 sm:p-6">
-            <DialogHeader>
-              <DialogTitle>Galería de Imágenes</DialogTitle>
-            </DialogHeader>
-            <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4 overflow-hidden">
-              <div className="md:col-span-2 relative bg-muted rounded-md flex items-center justify-center">
-                {mediaItems[selectedLightboxIndex] && (
-                    <Image
-                        src={mediaItems[selectedLightboxIndex]!.url}
-                        alt={`Imagen ${selectedLightboxIndex + 1}`}
-                        fill
-                        className="object-contain"
-                    />
-                )}
-              </div>
-              <ScrollArea className="md:col-span-1 h-full">
-                <div className="grid grid-cols-3 md:grid-cols-2 gap-2 pr-4">
-                  {mediaItems.map((item, index) => item && (
-                    <button
-                      key={item.url}
-                      onClick={() => setSelectedLightboxIndex(index)}
-                      className={cn(
-                        "relative aspect-square rounded-md overflow-hidden ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring transition-all",
-                        selectedLightboxIndex === index ? "ring-2 ring-primary" : "opacity-70 hover:opacity-100"
-                      )}
-                    >
-                      <Image src={item.url} alt={`Thumbnail ${index + 1}`} fill sizes="6rem" className="object-cover" />
-                    </button>
-                  ))}
+    const Lightbox = ({ isArrowNavigation = true }: { isArrowNavigation?: boolean }) => {
+        const goToNext = () => {
+            setSelectedLightboxIndex((prevIndex) => (prevIndex + 1) % mediaItems.length);
+        };
+    
+        const goToPrevious = () => {
+            setSelectedLightboxIndex((prevIndex) => (prevIndex - 1 + mediaItems.length) % mediaItems.length);
+        };
+    
+        useEffect(() => {
+            const handleKeyDown = (event: KeyboardEvent) => {
+                if (!isLightboxOpen) return;
+                if (event.key === 'ArrowRight') goToNext();
+                if (event.key === 'ArrowLeft') goToPrevious();
+            };
+    
+            document.addEventListener('keydown', handleKeyDown);
+            return () => document.removeEventListener('keydown', handleKeyDown);
+        }, [isLightboxOpen, goToNext, goToPrevious]);
+
+        return (
+            <Dialog open={isLightboxOpen} onOpenChange={setIsLightboxOpen}>
+              <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col p-4 sm:p-6">
+                <DialogHeader>
+                  <DialogTitle>Galería de Imágenes</DialogTitle>
+                </DialogHeader>
+                <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4 overflow-hidden relative">
+                  <div className="md:col-span-2 relative bg-muted rounded-md flex items-center justify-center">
+                    {mediaItems[selectedLightboxIndex] && (
+                        <Image
+                            src={mediaItems[selectedLightboxIndex]!.url}
+                            alt={`Imagen ${selectedLightboxIndex + 1}`}
+                            fill
+                            className="object-contain"
+                        />
+                    )}
+                     {isArrowNavigation && mediaItems.length > 1 && (
+                        <>
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={goToPrevious}
+                                aria-label="Imagen anterior"
+                                className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-black/50 text-white hover:bg-black/75 h-10 w-10 z-10"
+                            >
+                                <ChevronLeft className="h-6 w-6" />
+                            </Button>
+                             <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={goToNext}
+                                aria-label="Siguiente imagen"
+                                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-black/50 text-white hover:bg-black/75 h-10 w-10 z-10"
+                            >
+                                <ChevronRight className="h-6 w-6" />
+                            </Button>
+                        </>
+                    )}
+                  </div>
+                  {!isArrowNavigation && (
+                      <ScrollArea className="md:col-span-1 h-full">
+                        <div className="grid grid-cols-3 md:grid-cols-2 gap-2 pr-4">
+                          {mediaItems.map((item, index) => item && (
+                            <button
+                              key={item.url}
+                              onClick={() => setSelectedLightboxIndex(index)}
+                              className={cn(
+                                "relative aspect-square rounded-md overflow-hidden ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring transition-all",
+                                selectedLightboxIndex === index ? "ring-2 ring-primary" : "opacity-70 hover:opacity-100"
+                              )}
+                            >
+                              <Image src={item.url} alt={`Thumbnail ${index + 1}`} fill sizes="6rem" className="object-cover" />
+                            </button>
+                          ))}
+                        </div>
+                      </ScrollArea>
+                  )}
                 </div>
-              </ScrollArea>
-            </div>
-          </DialogContent>
-        </Dialog>
-      );
+              </DialogContent>
+            </Dialog>
+          );
+    };
 
     const MediaPreview = ({ item, alt }: { item: MediaItem, alt: string }) => {
         if (item.type === 'video') {
@@ -211,14 +253,10 @@ export default function ProductForm({ product, onSave, onCancel, imageLimit }: P
                     <Label>Imágenes/Videos del Producto (hasta {imageLimit})</Label>
                     <div className="flex gap-4">
                         <div className="flex flex-col gap-2 w-20 shrink-0">
-                            {/* Render up to 4 thumbnail slots */}
                             {Array.from({ length: 4 }).map((_, thumbIndex) => {
-                                // The main image is at mediaItems[0], so thumbnails start from mediaItems[1].
-                                // The first thumbnail slot corresponds to mediaItems[1].
                                 const mediaIndex = thumbIndex + 1;
-
-                                // Special logic for the last thumbnail slot (index 3)
-                                if (thumbIndex === 3 && remainingCount > 0) {
+                                
+                                if (thumbIndex === 3 && mediaItems.length > 5) {
                                     return (
                                         <div key="more" className="relative aspect-square w-20">
                                             <button
@@ -226,7 +264,7 @@ export default function ProductForm({ product, onSave, onCancel, imageLimit }: P
                                                 onClick={() => openLightbox(mediaIndex)}
                                                 className="flex flex-col items-center justify-center w-full h-full border-2 border-dashed rounded-md bg-muted hover:bg-muted/80 text-muted-foreground"
                                             >
-                                                <span className="text-xl font-bold">+{remainingCount}</span>
+                                                <span className="text-xl font-bold">+{mediaItems.length - 4}</span>
                                             </button>
                                         </div>
                                     );
