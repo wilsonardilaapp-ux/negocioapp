@@ -183,6 +183,7 @@ export function ChangePlanModal({ client, allPlans, isOpen, onClose }: ChangePla
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="stripe">Stripe (Automático)</SelectItem>
+                      <SelectItem value="hotmart">Hotmart</SelectItem>
                       <SelectItem value="nequi">Nequi (Manual)</SelectItem>
                       <SelectItem value="bancolombia">Bancolombia (Manual)</SelectItem>
                       <SelectItem value="daviplata">Daviplata (Manual)</SelectItem>
