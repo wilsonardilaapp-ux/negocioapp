@@ -15,10 +15,10 @@ export async function sendAdminNotification({ recipients, subject, body }: SendN
     return { success: false, error: 'Faltan destinatarios, asunto o cuerpo del mensaje.' };
   }
 
-  const db = await getAdminFirestore();
-  const batch = db.batch();
-
   try {
+    const db = await getAdminFirestore();
+    const batch = db.batch();
+
     recipients.forEach(userId => {
       const notificationRef = db.collection(`businesses/${userId}/notifications`).doc();
       
@@ -37,7 +37,11 @@ export async function sendAdminNotification({ recipients, subject, body }: SendN
     return { success: true };
 
   } catch (error: any) {
-    console.error('Error sending batch notifications:', error);
+    console.error('Error enviando notificaciones en lote:', error);
+    // Devuelve un error específico si las credenciales fallan.
+    if (error.message.includes('credential')) {
+      return { success: false, error: 'Error de credenciales del servidor. Revisa la configuración .env.' };
+    }
     return { success: false, error: `No se pudieron enviar las notificaciones: ${error.message}` };
   }
 }

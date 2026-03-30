@@ -552,99 +552,104 @@ export default function PaymentRemindersTab() {
 
     // --- Auto-sending logic ---
     useEffect(() => {
-      if (!localReminders || !firestore || !clients || clients.length === 0) return;
-
-      const now = new Date();
-      const remindersToSend = localReminders.filter(r => 
-          r.status === 'pending' && 
-          !processingIdsRef.current.has(r.id) &&
-          safeToDate(r.scheduledDate) <= now
-      );
-
-      if (remindersToSend.length > 0) {
-          
-          const idsToProcess = new Set(remindersToSend.map(r => r.id));
-          idsToProcess.forEach(id => processingIdsRef.current.add(id));
-
-          const sendAndProcess = async () => {
-              toast({ title: `Procesando ${idsToProcess.size} recordatorio(s) automáticos...` });
-
-              const sendPromises = remindersToSend.map(async (reminder) => {
-                  try {
-                      const client = clients.find(c => c.userId === reminder.clientId);
-                      if (!client) throw new Error(`Cliente ${reminder.clientId} no encontrado.`);
-
-                      let message = reminder.message
-                          .replace('{nombre}', client.name)
-                          .replace('{plan}', client.subscription?.plan || 'N/A');
-
-                      if (reminder.channel === 'panel' || reminder.channel === 'both') {
-                          const result = await sendAdminNotification({
-                              recipients: [reminder.clientId],
-                              subject: 'Recordatorio de Pago Programado',
-                              body: message
-                          });
-                          if (!result.success) {
-                            throw new Error(result.error || 'La acción del servidor para enviar notificación falló.');
-                          }
-                      }
-                      if (reminder.channel === 'whatsapp' || reminder.channel === 'both') {
-                          if (client.phone) {
-                            const whatsappUrl = `https://wa.me/${client.phone.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`;
-                            window.open(whatsappUrl, `_blank_wa_${reminder.id}`);
-                          } else {
-                            console.warn(`Recordatorio ${reminder.id} para ${client.name} no enviado a WhatsApp por falta de número.`);
-                          }
-                      }
-                      return { status: 'fulfilled', value: reminder };
-                  } catch (error) {
-                      console.error(`Error enviando recordatorio ${reminder.id}:`, error);
-                      return { status: 'rejected', reason: error, value: reminder };
-                  }
-              });
-
-              const results = await Promise.allSettled(sendPromises);
-
-              const successfulReminders = results
-                  .filter((res): res is PromiseFulfilledResult<ScheduledReminder> => res.status === 'fulfilled')
-                  .map(res => res.value);
-                  
-              const failedReminders = results
-                  .filter((res): res is PromiseRejectedResult & { value: ScheduledReminder } => res.status === 'rejected');
-
-              if (failedReminders.length > 0) {
-                  toast({
-                      variant: "destructive",
-                      title: "Error en envíos",
-                      description: `${failedReminders.length} recordatorio(s) no pudieron ser enviados.`
-                  });
-                  failedReminders.forEach(res => {
-                      processingIdsRef.current.delete(res.value.id);
-                  });
-              }
-
-              if (successfulReminders.length > 0) {
-                  const batch = writeBatch(firestore);
-                  successfulReminders.forEach(reminder => {
-                      const reminderRef = doc(firestore, `businesses/${reminder.clientId}/reminders`, reminder.id);
-                      batch.set(reminderRef, { status: 'sent', sentAt: new Date().toISOString() }, { merge: true });
-                  });
-                  await batch.commit();
-                  toast({ title: "Envío completado", description: `${successfulReminders.length} recordatorio(s) enviados.` });
-              }
-          };
-
-          sendAndProcess().catch(err => {
-              console.error("Error crítico en el proceso de envío:", err);
-              toast({
-                  variant: "destructive",
-                  title: "Error Inesperado",
-                  description: "Ocurrió un error al procesar los envíos. Los reintentaremos más tarde."
-              });
-              idsToProcess.forEach(id => processingIdsRef.current.delete(id));
-          });
-      }
-    }, [localReminders, firestore, clients, toast]);
+        if (!localReminders || !firestore || !clients || clients.length === 0) return;
+  
+        const now = new Date();
+        const remindersToSend = localReminders.filter(r => 
+            r.status === 'pending' && 
+            !processingIdsRef.current.has(r.id) &&
+            safeToDate(r.scheduledDate) <= now
+        );
+  
+        if (remindersToSend.length > 0) {
+            
+            const idsToProcess = new Set(remindersToSend.map(r => r.id));
+            idsToProcess.forEach(id => processingIdsRef.current.add(id));
+  
+            const sendAndProcess = async () => {
+                toast({ title: `Procesando ${idsToProcess.size} recordatorio(s) automáticos...` });
+  
+                const sendPromises = remindersToSend.map(async (reminder) => {
+                    try {
+                        const client = clients.find(c => c.userId === reminder.clientId);
+                        if (!client) throw new Error(`Cliente ${reminder.clientId} no encontrado.`);
+  
+                        let message = reminder.message
+                            .replace('{nombre}', client.name)
+                            .replace('{plan}', client.subscription?.plan || 'N/A');
+  
+                        if (reminder.channel === 'panel' || reminder.channel === 'both') {
+                            const result = await sendAdminNotification({
+                                recipients: [reminder.clientId],
+                                subject: 'Recordatorio de Pago Programado',
+                                body: message
+                            });
+                             if (!result.success) {
+                                throw new Error(result.error || 'La acción del servidor para enviar notificación falló.');
+                            }
+                        }
+                        if (reminder.channel === 'whatsapp' || reminder.channel === 'both') {
+                            if (client.phone) {
+                              const whatsappUrl = `https://wa.me/${client.phone.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`;
+                              window.open(whatsappUrl, `_blank_wa_${reminder.id}`);
+                            } else {
+                              console.warn(`Recordatorio ${reminder.id} para ${client.name} no enviado a WhatsApp por falta de número.`);
+                            }
+                        }
+                        return reminder; // Return the reminder on success
+                    } catch (error) {
+                        console.error(`Error enviando recordatorio ${reminder.id}:`, error);
+                        // Attach reminder ID to the error for identification
+                        (error as any).reminderId = reminder.id;
+                        throw error;
+                    }
+                });
+  
+                const results = await Promise.allSettled(sendPromises);
+  
+                const successfulReminders = results
+                    .filter((res): res is PromiseFulfilledResult<ScheduledReminder> => res.status === 'fulfilled')
+                    .map(res => res.value);
+                    
+                const failedReminders = results
+                    .filter((res): res is PromiseRejectedResult => res.status === 'rejected');
+  
+                if (failedReminders.length > 0) {
+                    toast({
+                        variant: "destructive",
+                        title: `Error en ${failedReminders.length} envío(s)`,
+                        description: "Algunos recordatorios no se pudieron enviar. Permanecerán como pendientes."
+                    });
+                    failedReminders.forEach(res => {
+                        const reminderId = (res.reason as any)?.reminderId;
+                        if (reminderId) {
+                            processingIdsRef.current.delete(reminderId);
+                        }
+                    });
+                }
+  
+                if (successfulReminders.length > 0) {
+                    const batch = writeBatch(firestore);
+                    successfulReminders.forEach(reminder => {
+                        const reminderRef = doc(firestore, `businesses/${reminder.clientId}/reminders`, reminder.id);
+                        batch.set(reminderRef, { status: 'sent', sentAt: new Date().toISOString() }, { merge: true });
+                    });
+                    await batch.commit();
+                    toast({ title: "Envío completado", description: `${successfulReminders.length} recordatorio(s) enviados.` });
+                }
+            };
+  
+            sendAndProcess().catch(err => {
+                console.error("Error crítico en el proceso de envío:", err);
+                toast({
+                    variant: "destructive",
+                    title: "Error Inesperado",
+                    description: "Ocurrió un error al procesar los envíos. Los reintentaremos más tarde."
+                });
+                idsToProcess.forEach(id => processingIdsRef.current.delete(id));
+            });
+        }
+      }, [localReminders, firestore, clients, toast]);
 
     return (
         <div className="space-y-6">
