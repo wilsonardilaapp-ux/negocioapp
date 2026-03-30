@@ -16,10 +16,21 @@ export interface ContactMessage {
     id: string;
     name: string;
     email: string;
+    whatsapp?: string;
     subject: string;
     body: string;
     read: boolean;
+    replied: boolean;
     createdAt: Timestamp | string;
+    source: 'webform' | 'client_reply';
+    userId?: string;
+}
+
+export interface ContactMessageReply {
+    id: string;
+    body: string;
+    sentAt: Timestamp | string;
+    from: 'superadmin' | 'user';
 }
 
 export interface PaymentReminder {
