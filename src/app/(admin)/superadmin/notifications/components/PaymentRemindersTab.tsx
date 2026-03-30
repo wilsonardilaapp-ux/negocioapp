@@ -28,6 +28,26 @@ import { cn } from '@/lib/utils';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 
 
+// --- Helper Function ---
+/**
+ * Safely converts a Firestore Timestamp or an ISO string into a Date object.
+ * @param dateValue The value to convert, which can be a string or a Firestore Timestamp-like object.
+ * @returns A valid Date object, or a default date (epoch) if the input is invalid.
+ */
+const safeToDate = (dateValue: string | { toDate: () => Date } | Timestamp): Date => {
+  if (!dateValue) return new Date(0); // Return epoch for invalid input to avoid crashes
+  if (typeof dateValue === 'string') {
+    const date = new Date(dateValue);
+    return isNaN(date.getTime()) ? new Date(0) : date;
+  }
+  // Check for Firestore Timestamp-like object (both client and admin SDK)
+  if (typeof (dateValue as any).toDate === 'function') {
+    return (dateValue as any).toDate();
+  }
+  return new Date(0); // Fallback
+};
+
+
 // --- Scheduled Reminder Components ---
 
 const scheduledReminderSchema = z.object({
@@ -61,7 +81,7 @@ const ScheduleReminderModal = ({
     defaultValues: {
       clientId: existingSchedule?.clientId || '',
       reminders: existingSchedule ? [{
-        scheduledDate: new Date(existingSchedule.scheduledDate),
+        scheduledDate: safeToDate(existingSchedule.scheduledDate),
         channel: existingSchedule.channel,
         message: existingSchedule.message,
       }] : [{
@@ -79,7 +99,7 @@ const ScheduleReminderModal = ({
         reset({
             clientId: existingSchedule.clientId,
             reminders: [{
-                scheduledDate: new Date(existingSchedule.scheduledDate),
+                scheduledDate: safeToDate(existingSchedule.scheduledDate),
                 channel: existingSchedule.channel,
                 message: existingSchedule.message,
             }]
@@ -110,7 +130,6 @@ const ScheduleReminderModal = ({
         const batch = writeBatch(firestore);
         
         data.reminders.forEach(reminder => {
-            // For editing, we reuse the ID. For new, we generate one.
             const reminderId = existingSchedule?.id || doc(collection(firestore, `businesses/${data.clientId}/reminders`)).id;
             const reminderRef = doc(firestore, `businesses/${data.clientId}/reminders`, reminderId);
             
@@ -124,7 +143,7 @@ const ScheduleReminderModal = ({
                 createdAt: existingSchedule?.createdAt || new Date().toISOString(),
                 sentAt: null,
             };
-            batch.set(reminderRef, reminderData);
+            batch.set(reminderRef, reminderData, { merge: true });
         });
 
         await batch.commit();
@@ -274,7 +293,7 @@ const ScheduledRemindersTable = ({
                                 reminders.map(r => (
                                     <TableRow key={r.id}>
                                         <TableCell>{r.clientName}</TableCell>
-                                        <TableCell>{format(new Date(r.scheduledDate), 'dd/MM/yyyy HH:mm')}</TableCell>
+                                        <TableCell>{format(safeToDate(r.scheduledDate), 'dd/MM/yyyy HH:mm')}</TableCell>
                                         <TableCell><Badge variant="outline" className="capitalize">{r.channel}</Badge></TableCell>
                                         <TableCell><Badge variant={r.status === 'sent' ? 'default' : 'secondary'} className="capitalize">{r.status}</Badge></TableCell>
                                         <TableCell className="text-right">
@@ -434,14 +453,16 @@ export default function PaymentRemindersTab() {
 
     const scheduledRemindersQuery = useMemoFirebase(() => {
         if (!firestore) return null;
+        // This query now runs without ordering to avoid index requirements.
         return collectionGroup(firestore, 'reminders');
     }, [firestore]);
     
     const { data: scheduledReminders, isLoading: areScheduledRemindersLoading } = useCollection<ScheduledReminder>(scheduledRemindersQuery);
     
+    // Sort on the client side
     const sortedReminders = useMemo(() => {
         if (!scheduledReminders) return [];
-        return [...scheduledReminders].sort((a, b) => new Date(b.scheduledDate).getTime() - new Date(a.scheduledDate).getTime());
+        return [...scheduledReminders].sort((a, b) => safeToDate(b.createdAt).getTime() - safeToDate(a.createdAt).getTime());
     }, [scheduledReminders]);
 
     const manualPaymentClients = useMemo(() => {
@@ -478,7 +499,7 @@ export default function PaymentRemindersTab() {
         const now = new Date();
         const pending = scheduledReminders.filter(r => 
             r.status === 'pending' && 
-            new Date(r.scheduledDate) <= now
+            safeToDate(r.scheduledDate) <= now
         );
 
         if (pending.length > 0) {
@@ -587,5 +608,6 @@ export default function PaymentRemindersTab() {
         </div>
     );
 }
+
 
 
