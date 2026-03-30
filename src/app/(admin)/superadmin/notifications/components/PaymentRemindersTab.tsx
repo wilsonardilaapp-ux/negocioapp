@@ -12,7 +12,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { useUser, useFirestore, useMemoFirebase, useCollection, addDocumentNonBlocking, updateDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase';
-import { doc, collection, collectionGroup, query, Timestamp, writeBatch, orderBy } from 'firebase/firestore';
+import { doc, collection, collectionGroup, writeBatch, orderBy, type Timestamp } from 'firebase/firestore';
 import { sendAdminNotification } from '@/actions/notifications';
 import { format, differenceInDays } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -29,22 +29,19 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 
 
 // --- Helper Function ---
-/**
- * Safely converts a Firestore Timestamp or an ISO string into a Date object.
- * @param dateValue The value to convert, which can be a string or a Firestore Timestamp-like object.
- * @returns A valid Date object, or a default date (epoch) if the input is invalid.
- */
-const safeToDate = (dateValue: string | { toDate: () => Date } | Timestamp): Date => {
-  if (!dateValue) return new Date(0); // Return epoch for invalid input to avoid crashes
+const safeToDate = (dateValue: string | { toDate: () => Date } | Timestamp | undefined): Date => {
+  // Return a future date for any invalid input to prevent accidental processing
+  const futureDate = new Date('9999-12-31');
+  if (!dateValue) return futureDate;
+  
   if (typeof dateValue === 'string') {
     const date = new Date(dateValue);
-    return isNaN(date.getTime()) ? new Date(0) : date;
+    return isNaN(date.getTime()) ? futureDate : date;
   }
-  // Check for Firestore Timestamp-like object (both client and admin SDK)
   if (typeof (dateValue as any).toDate === 'function') {
     return (dateValue as any).toDate();
   }
-  return new Date(0); // Fallback
+  return futureDate; // Fallback
 };
 
 
@@ -358,7 +355,7 @@ function ReminderModal({ isOpen, onClose, client }: { isOpen: boolean, onClose: 
     const { data: paymentConfig } = useDoc<GlobalPaymentConfig>(paymentConfigRef);
 
     const [amount, setAmount] = useState(0); 
-    const [dueDate, setDueDate] = useState(client.subscription?.currentPeriodEnd?.toDate().toISOString().split('T')[0] || '');
+    const [dueDate, setDueDate] = useState(client.subscription?.currentPeriodEnd ? client.subscription.currentPeriodEnd.toDate().toISOString().split('T')[0] : '');
     const [suspensionDate, setSuspensionDate] = useState('');
     const [message, setMessage] = useState('');
 
@@ -388,6 +385,7 @@ El equipo de Zentry`
     }, [client, paymentConfig, amount, dueDate, suspensionDate]);
     
     const sendToPanel = async () => {
+        if (!client.userId) return;
         await sendAdminNotification({
             recipients: [client.userId],
             subject: `Recordatorio de Pago - Plan ${client.subscription?.plan?.toUpperCase()}`,
@@ -450,6 +448,7 @@ export default function PaymentRemindersTab() {
     // State for scheduled reminders
     const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
     const [editingSchedule, setEditingSchedule] = useState<ScheduledReminder | null>(null);
+    const [processingIds, setProcessingIds] = useState<Set<string>>(new Set());
 
     const scheduledRemindersQuery = useMemoFirebase(() => {
         if (!firestore) return null;
@@ -499,11 +498,15 @@ export default function PaymentRemindersTab() {
         const now = new Date();
         const pending = scheduledReminders.filter(r => 
             r.status === 'pending' && 
+            !processingIds.has(r.id) &&
             safeToDate(r.scheduledDate) <= now
         );
 
         if (pending.length > 0) {
             const sendReminders = async () => {
+                const idsToProcess = new Set(pending.map(p => p.id));
+                setProcessingIds(prev => new Set([...prev, ...idsToProcess]));
+
                 const batch = writeBatch(firestore);
                 for (const reminder of pending) {
                     const client = clients.find(c => c.userId === reminder.clientId);
@@ -534,7 +537,7 @@ export default function PaymentRemindersTab() {
             };
             sendReminders();
         }
-    }, [scheduledReminders, firestore, clients, toast]);
+    }, [scheduledReminders, firestore, clients, toast, processingIds]);
 
     return (
         <div className="space-y-6">
@@ -561,12 +564,13 @@ export default function PaymentRemindersTab() {
                                     <TableRow><TableCell colSpan={5} className="h-24 text-center"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></TableCell></TableRow>
                                 ) : manualPaymentClients.length > 0 ? (
                                     manualPaymentClients.map(client => {
-                                        const { status, days, variant } = getStatus(client.subscription?.currentPeriodEnd?.toDate() ?? null);
+                                        const dueDate = client.subscription?.currentPeriodEnd ? client.subscription.currentPeriodEnd.toDate() : null;
+                                        const { status, days, variant } = getStatus(dueDate);
                                         return (
                                         <TableRow key={client.userId}>
                                             <TableCell>{client.name}</TableCell>
                                             <TableCell><Badge variant="outline" className="capitalize">{client.subscription?.plan}</Badge></TableCell>
-                                            <TableCell>{client.subscription?.currentPeriodEnd ? format(client.subscription.currentPeriodEnd.toDate(), 'dd/MM/yyyy') : 'N/A'}</TableCell>
+                                            <TableCell>{dueDate ? format(dueDate, 'dd/MM/yyyy') : 'N/A'}</TableCell>
                                             <TableCell><Badge variant={variant}>{status} {days < 999 && days >= 0 ? `(${days} días)`: ''}</Badge></TableCell>
                                             <TableCell className="text-right">
                                                 <Button variant="outline" size="sm" onClick={() => handleOpenModal(client)}>
@@ -608,6 +612,3 @@ export default function PaymentRemindersTab() {
         </div>
     );
 }
-
-
-
