@@ -5,10 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Checkbox } from '@/components/ui/checkbox';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { useCollection, useFirestore, useMemoFirebase, updateDocumentNonBlocking, addDocumentNonBlocking } from '@/firebase';
-import { collection, query, orderBy, doc, Timestamp } from 'firebase/firestore';
+import { collection, query, orderBy, doc, type Timestamp, writeBatch } from 'firebase/firestore';
 import type { ContactMessage } from '@/models/notification';
-import { Loader2, Inbox, Search, Mail, Phone, MessageSquare, CornerDownRight, X, Send } from 'lucide-react';
+import { Loader2, Inbox, Search, Mail, Phone, MessageSquare, CornerDownRight, X, Send, Trash2 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
@@ -20,6 +22,17 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
@@ -36,6 +49,10 @@ export default function InboxTab() {
     const [selectedMessage, setSelectedMessage] = useState<ContactMessage | null>(null);
     const [isReplyModalOpen, setReplyModalOpen] = useState(false);
     const [isReplying, setIsReplying] = useState(false);
+
+    // NEW state for bulk selection
+    const [selectedIds, setSelectedIds] = useState<string[]>([]);
+    const [isDeleting, setIsDeleting] = useState(false);
 
     const messagesQuery = useMemoFirebase(() => {
         if (!firestore) return null;
@@ -63,6 +80,68 @@ export default function InboxTab() {
     }, [messages, filter, searchTerm]);
 
     const unreadCount = useMemo(() => messages?.filter(m => !m.read).length || 0, [messages]);
+    
+    // NEW bulk selection logic
+    const selectedCount = selectedIds.length;
+    const isAllSelected = selectedCount > 0 && selectedCount === filteredMessages.length;
+    const isSomeSelected = selectedCount > 0 && !isAllSelected;
+
+    const handleToggleSelectAll = () => {
+        if (isAllSelected) {
+            setSelectedIds([]);
+        } else {
+            setSelectedIds(filteredMessages.map(m => m.id));
+        }
+    };
+    
+    const handleToggleSelectOne = (id: string) => {
+        setSelectedIds(prev =>
+            prev.includes(id) ? prev.filter(selectedId => selectedId !== id) : [...prev, id]
+        );
+    };
+
+    const chunkArray = <T,>(array: T[], size: number): T[][] => {
+        const chunks: T[][] = [];
+        for (let i = 0; i < array.length; i += size) {
+          chunks.push(array.slice(i, i + size));
+        }
+        return chunks;
+    };
+
+    const handleDeleteSelected = async () => {
+        if (!firestore || selectedCount === 0) return;
+        
+        setIsDeleting(true);
+        let deletedCount = 0;
+        try {
+            const BATCH_SIZE = 500;
+            const chunks = chunkArray([...selectedIds], BATCH_SIZE);
+
+            for (const chunk of chunks) {
+                const batch = writeBatch(firestore);
+                chunk.forEach(id => {
+                    batch.delete(doc(firestore, 'contactMessages', id));
+                });
+                await batch.commit();
+                deletedCount += chunk.length;
+            }
+
+            toast({
+                title: "Mensajes eliminados",
+                description: `${deletedCount} mensajes han sido eliminados con éxito.`,
+            });
+            setSelectedIds([]);
+
+        } catch (error: any) {
+            toast({
+                variant: 'destructive',
+                title: "Error al eliminar",
+                description: `Se eliminaron ${deletedCount} de ${selectedCount}. Error: ${error.message}`,
+            });
+        } finally {
+            setIsDeleting(false);
+        }
+    };
 
     const handleSelectMessage = (msg: ContactMessage) => {
         setSelectedMessage(msg);
@@ -76,7 +155,6 @@ export default function InboxTab() {
         if (!selectedMessage || !firestore) return;
         setIsReplying(true);
         try {
-            // Step 1 & 2: Save reply internally and mark as replied
             if (selectedMessage.source === 'client_reply' && selectedMessage.userId) {
                 await sendAdminNotification({
                     recipients: [selectedMessage.userId],
@@ -95,9 +173,8 @@ export default function InboxTab() {
             const msgRef = doc(firestore, 'contactMessages', selectedMessage.id);
             await updateDocumentNonBlocking(msgRef, { replied: true });
 
-            // Step 3: Open WhatsApp if a number is available
             if (selectedMessage.whatsapp && selectedMessage.whatsapp.trim() !== '') {
-                const whatsappNumber = selectedMessage.whatsapp.replace(/\D/g, ''); // Clean number
+                const whatsappNumber = selectedMessage.whatsapp.replace(/\D/g, '');
                 const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(replyBody)}`;
                 window.open(whatsappUrl, '_blank');
                 toast({ title: "Respuesta guardada y WhatsApp abierto", description: "Tu mensaje se ha preparado en WhatsApp." });
@@ -105,7 +182,6 @@ export default function InboxTab() {
                 toast({ title: "Respuesta enviada", description: "Tu mensaje ha sido guardado en el sistema." });
             }
 
-            // Step 4: Clean up UI
             setReplyModalOpen(false);
             setSelectedMessage(null);
 
@@ -166,31 +242,78 @@ export default function InboxTab() {
                     </div>
                 </div>
 
-                <div className="border rounded-md">
+                {/* NEW BULK ACTION BAR */}
+                <div className="border rounded-t-md p-2 flex items-center gap-4 h-14">
+                    <Checkbox
+                        id="select-all-inbox"
+                        checked={isAllSelected || isSomeSelected}
+                        onCheckedChange={handleToggleSelectAll}
+                        aria-label="Seleccionar todo"
+                    />
+                    {selectedCount > 0 ? (
+                        <>
+                            <span className="text-sm text-muted-foreground">{selectedCount} seleccionado(s)</span>
+                             <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                    <Button variant="destructive" size="sm" disabled={isDeleting}>
+                                        <Trash2 className="mr-2 h-4 w-4"/>
+                                        {isDeleting ? 'Eliminando...' : 'Eliminar'}
+                                    </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                        <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+                                        <AlertDialogDescription>Esta acción eliminará {selectedCount} mensaje(s) permanentemente.</AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                        <AlertDialogAction onClick={handleDeleteSelected} disabled={isDeleting} className="bg-destructive hover:bg-destructive/80">
+                                            {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}
+                                            Sí, eliminar
+                                        </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                </AlertDialogContent>
+                            </AlertDialog>
+                        </>
+                    ) : null}
+                </div>
+                
+                <div className="border border-t-0 rounded-b-md">
                     {filteredMessages.length > 0 ? (
-                        <ul className="divide-y">
+                        <ScrollArea className="h-[calc(100vh-420px)]">
+                          <ul className="divide-y">
                             {filteredMessages.map(msg => (
-                                <li key={msg.id} onClick={() => handleSelectMessage(msg)} className="p-4 hover:bg-muted/50 cursor-pointer flex items-start gap-4 transition-colors">
-                                    {!msg.read && <div className="h-2.5 w-2.5 rounded-full bg-primary mt-2 shrink-0"></div>}
-                                    <Avatar className={cn(msg.read && "ml-[14px]")}><AvatarFallback>{msg.name.charAt(0).toUpperCase()}</AvatarFallback></Avatar>
-                                    <div className="flex-1 overflow-hidden">
-                                        <div className="flex justify-between items-start">
-                                            <div>
-                                                <p className="font-semibold truncate">{msg.name}</p>
-                                                <p className="text-sm text-muted-foreground truncate">{msg.email}</p>
-                                            </div>
-                                             <Badge variant={msg.source === 'client_reply' ? 'default' : 'secondary'}>{msg.source === 'client_reply' ? 'Respuesta Cliente' : 'Formulario Web'}</Badge>
-                                        </div>
-                                        <p className="font-medium mt-1 truncate">{msg.subject}</p>
-                                        <p className="text-sm text-muted-foreground truncate">{msg.body}</p>
-                                    </div>
-                                    <div className="text-xs text-muted-foreground text-right w-24 shrink-0">
-                                        {msg.replied && <CornerDownRight className="h-4 w-4 ml-auto mb-1 text-green-600"/>}
-                                        {formatDistanceToNow(new Date(typeof msg.createdAt === 'string' ? msg.createdAt : (msg.createdAt as Timestamp).toDate()), { addSuffix: true, locale: es })}
+                                <li key={msg.id} data-state={selectedIds.includes(msg.id) ? 'selected' : 'unselected'} className="flex items-start gap-2 transition-colors hover:bg-muted/50 data-[state=selected]:bg-primary/5">
+                                    <label htmlFor={`select-${msg.id}`} className="p-4 flex items-center cursor-pointer">
+                                        <Checkbox
+                                            id={`select-${msg.id}`}
+                                            checked={selectedIds.includes(msg.id)}
+                                            onCheckedChange={() => handleToggleSelectOne(msg.id)}
+                                        />
+                                    </label>
+                                    <div
+                                        className="flex-1 cursor-pointer py-4 pr-4"
+                                        onClick={() => handleSelectMessage(msg)}
+                                    >
+                                      <div className="flex justify-between items-start">
+                                          <div>
+                                              <p className="font-semibold truncate">{msg.name}</p>
+                                              <p className="text-sm text-muted-foreground truncate">{msg.email}</p>
+                                          </div>
+                                           <Badge variant={msg.source === 'client_reply' ? 'default' : 'secondary'}>{msg.source === 'client_reply' ? 'Respuesta Cliente' : 'Formulario Web'}</Badge>
+                                      </div>
+                                      <p className="font-medium mt-1 truncate">{msg.subject}</p>
+                                      <p className="text-sm text-muted-foreground truncate">{msg.body}</p>
+                                      <div className="text-xs text-muted-foreground text-right mt-1 flex items-center justify-end gap-2">
+                                        {!msg.read && <div className="h-2 w-2 rounded-full bg-primary shrink-0"></div>}
+                                        {msg.replied && <CornerDownRight className="h-4 w-4 text-green-600"/>}
+                                        <span>{formatDistanceToNow(new Date(typeof msg.createdAt === 'string' ? msg.createdAt : (msg.createdAt as Timestamp).toDate()), { addSuffix: true, locale: es })}</span>
+                                      </div>
                                     </div>
                                 </li>
                             ))}
-                        </ul>
+                          </ul>
+                        </ScrollArea>
                     ) : (
                         <div className="text-center p-12 text-muted-foreground">
                             <Inbox className="mx-auto h-12 w-12" />
