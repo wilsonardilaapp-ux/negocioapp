@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -60,7 +61,7 @@ export function useUser() {
     const unsubscribe = onSnapshot(userDocRef, (docSnap) => {
         if (docSnap.exists()) {
             setProfile(docSnap.data() as UserProfile);
-        } else if (SUPER_ADMIN_EMAILS.includes(authState.user?.email || '')) {
+        } else if (authState.user && SUPER_ADMIN_EMAILS.includes(authState.user.email || '')) {
             // Create a virtual profile for super admin if it doesn't exist
             setProfile({
                 id: authState.user.uid,
