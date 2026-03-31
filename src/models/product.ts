@@ -10,4 +10,5 @@ export type Product = {
     rating: number; // Calificación promedio (ej. 4.5)
     ratingCount: number; // Número de valoraciones
     packagingCost?: number;
+    imageSize?: number;
 };

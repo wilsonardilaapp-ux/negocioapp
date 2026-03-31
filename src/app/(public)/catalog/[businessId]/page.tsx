@@ -344,12 +344,18 @@ const ProductViewModal = ({ product, isOpen, onOpenChange, businessPhone, busine
     return (
         <>
             <Dialog open={isOpen} onOpenChange={onOpenChange}>
-                <DialogContent className="max-w-4xl p-0 flex flex-col max-h-[90vh]">
-                    <div className="grid grid-cols-1 md:grid-cols-2 overflow-y-auto">
+                <DialogContent className="sm:max-w-6xl p-0 flex flex-col max-h-[90vh]">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 overflow-y-auto">
                         {/* Galería de Imágenes (columna izquierda) */}
-                         <div className="p-4 md:p-6 flex flex-row gap-4">
-                            {/* Miniaturas */}
-                            <div className="flex flex-col gap-2 overflow-y-auto pr-2 -mr-2">
+                        <div className="p-4 md:p-6" style={{ width: '800px', height: '800px' }}>
+                            <div className="relative aspect-square w-full rounded-lg overflow-hidden mb-4">
+                                {isVideo(mainImage) ? (
+                                    <video src={mainImage} autoPlay loop muted controls className="object-contain w-full h-full" />
+                                 ) : (
+                                    <Image src={mainImage} alt={product.name} fill sizes="(max-width: 768px) 90vw, 40vw" className="object-contain"/>
+                                 )}
+                            </div>
+                            <div className="flex flex-row gap-2 justify-center">
                                 {product.images.map((img, index) => {
                                     const isThumbVideo = isVideo(img);
                                     return (
@@ -357,7 +363,7 @@ const ProductViewModal = ({ product, isOpen, onOpenChange, businessPhone, busine
                                             key={index} 
                                             onClick={() => setMainImage(img)} 
                                             className={cn(
-                                                "relative aspect-square w-16 sm:w-20 shrink-0 rounded-md overflow-hidden ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring transition-all",
+                                                "relative aspect-square w-16 h-16 sm:w-20 sm:h-20 shrink-0 rounded-md overflow-hidden ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring transition-all",
                                                 mainImage === img ? "ring-2 ring-primary opacity-100" : "opacity-70 hover:opacity-100"
                                             )}
                                         >
@@ -369,14 +375,6 @@ const ProductViewModal = ({ product, isOpen, onOpenChange, businessPhone, busine
                                         </button>
                                     );
                                 })}
-                            </div>
-                            {/* Imagen Principal */}
-                            <div className="relative aspect-square w-full rounded-lg overflow-hidden flex-1">
-                                 {isVideo(mainImage) ? (
-                                    <video src={mainImage} autoPlay loop muted controls className="object-cover w-full h-full" />
-                                 ) : (
-                                    <Image src={mainImage} alt={product.name} fill sizes="(max-width: 768px) 90vw, 40vw" className="object-cover"/>
-                                 )}
                             </div>
                         </div>
                         {/* Detalles del Producto (columna derecha) */}

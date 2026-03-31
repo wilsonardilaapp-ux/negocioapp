@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
@@ -198,6 +199,7 @@ export default function ProductForm({ product, onSave, onCancel, imageLimit }: P
             rating: product?.rating || 0,
             ratingCount: product?.ratingCount || 0,
             packagingCost: data.packagingCost ?? 0,
+            imageSize: IMAGE_SIZE,
         };
         onSave(productData);
     };
@@ -253,11 +255,6 @@ export default function ProductForm({ product, onSave, onCancel, imageLimit }: P
         if (mainImage?.url === removedItem?.url) {
             setMainImage(newMediaItems[0] || null);
         }
-    };
-
-    const openLightbox = (index: number) => {
-        setSelectedLightboxIndex(index);
-        setIsLightboxOpen(true);
     };
 
     return (
