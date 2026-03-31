@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -75,7 +74,7 @@ export default function CatalogoPage() {
         products: [],
         headerConfig: initialHeaderConfig,
         productLimit: 10,
-        imageLimit: 5,
+        imageLimit: 18,
         catalogModule: null,
     });
     const [isLoading, setIsLoading] = useState(true);
@@ -129,7 +128,7 @@ export default function CatalogoPage() {
                     headerConfigSnap
                 ] = await Promise.all([
                     getDoc(productLimitServiceRef),
-                    getDoc(imageLimitSnap),
+                    getDoc(imageLimitServiceRef),
                     getDoc(businessRef),
                     getDocs(productsRef),
                     getDoc(headerConfigRef),
@@ -163,7 +162,7 @@ export default function CatalogoPage() {
                     productLimitValue = fetchedProductLimitService.limit;
                 }
                 
-                let imageLimitValue = 5;
+                let imageLimitValue = 18;
                 if (fetchedBusiness?.imageLimit && fetchedBusiness.imageLimit > 0) {
                     imageLimitValue = fetchedBusiness.imageLimit;
                 } else if (fetchedImageLimitService?.status === 'active' && fetchedImageLimitService.limit > 0) {
