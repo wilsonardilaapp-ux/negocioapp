@@ -2,216 +2,276 @@
 rules_version = '2';
 
 service cloud.firestore {
-    match /databases/{database}/documents {
-        
-            function isSuperAdmin() {
-                    // Efficiently check if the user exists and has the 'super_admin' role.
-                          let userDocPath = /databases/$(database)/documents/users/$(request.auth.uid);
-                                return request.auth != null && exists(userDocPath) && get(userDocPath).data.role == 'super_admin';
-            }
-              
-                  function isBusinessMember(businessId) {
-                          // A more robust check for business membership.
-                                // First, check for direct ownership which is most common and doesn't require a 'get'.
-                                      // Then, check for staff membership safely using 'exists'.
-                                            let userDocPath = /databases/$(database)/documents/users/$(request.auth.uid);
-                                                  return request.auth != null && (
-                                                            request.auth.uid == businessId ||
-                                                                    (exists(userDocPath) && get(userDocPath).data.businessId == businessId)
-                                                  );
-                  }
-                      
-                          // NEW: Allow public read access to the 'shareConfig' collection group.
-                              // This is necessary for resolving custom catalog slugs.
-                                  match /{path=**}/shareConfig/{docId} {
-                                          allow read: if true;
-                                  }
+  match /databases/{database}/documents {
 
-                                      // This rule allows superadmins to manage all scheduled reminders across all clients.
-                                          // The collectionGroup query in the app relies on this rule.
-                                              match /{path=**}/reminders/{reminderId} {
-                                                      allow read, write, create, update, delete, list: if isSuperAdmin();
-                                              }
-
-                                                  // Publicly readable collections
-                                                      match /blog_posts/{postId} {
-                                                              allow get, list: if true;
-                                                                    allow create: if request.auth != null && 
-                                                                                        (request.resource.data.businessId == request.auth.uid || isSuperAdmin());
-                                                                                              allow update, delete: if request.auth != null && (
-                                                                                                        resource.data.businessId == request.auth.uid || isSuperAdmin()
-                                                                                              );
-                                                      }
-                                                          match /plans/{planId} {
-                                                                  allow read: if true;
-                                                                        allow write: if isSuperAdmin();
-                                                          }
-                                                              match /globalConfig/{document=**} {
-                                                                      allow read: if true;
-                                                                            allow write: if isSuperAdmin();
-                                                              }
-                                                                  match /settings/{document=**} {
-                                                                          allow read: if true;
-                                                                                allow write: if isSuperAdmin();
-                                                                  }
-                                                                      match /landing_configs/{docId} {
-                                                                              allow read: if true;
-                                                                                    allow write: if isSuperAdmin();
-                                                                      }
-
-                                                                          // User-specific data
-                                                                              match /users/{userId} {
-                                                                                      allow get, update: if request.auth != null && request.auth.uid == userId;
-                                                                                            allow list: if request.auth != null;
-                                                                                                  allow create, delete, write: if isSuperAdmin();
-                                                                              }
-                                                                                  match /paymentSettings/{userId} {
-                                                                                          allow read, write: if request.auth.uid == userId;
-                                                                                  }
-
-                                                                                      // Business-related data
-                                                                                          match /businesses/{businessId} {
-                                                                                                  allow get: if true;
-                                                                                                        allow list: if request.auth != null;
-                                                                                                              allow write: if isSuperAdmin();
-                                                                                                                    allow create, update, delete: if isBusinessMember(businessId);
-
-                                                                                                                          // Publicly readable subcollections
-                                                                                                                                match /publicData/{docId=**} {
-                                                                                                                                          allow read: if true;
-                                                                                                                                                  allow write: if isBusinessMember(businessId) || isSuperAdmin();
-                                                                                                                                }
-                                                                                                                                      match /landingPages/{pageId} {
-                                                                                                                                                allow read: if true;
-                                                                                                                                                        allow write: if isBusinessMember(businessId) || isSuperAdmin();
-                                                                                                                                      }
-                                                                                                                                             match /landingConfig/{docId=**} {
-                                                                                                                                                      allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
-                                                                                                                                             }
-
-                                                                                                                                                   // Private subcollections
-                                                                                                                                                         match /products/{productId} {
-                                                                                                                                                                  allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
-                                                                                                                                                         }
-                                                                                                                                                               match /orders/{orderId} {
-                                                                                                                                                                        allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
-                                                                                                                                                               }
-                                                                                                                                                                     match /contactForms/{formId} {
-                                                                                                                                                                              allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
-                                                                                                                                                                     }
-                                                                                                                                                                           match /contactSubmissions/{submissionId} {
-                                                                                                                                                                                    allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
-                                                                                                                                                                           }
-                                                                                                                                                                                 match /suggestionRules/{ruleId} {
-                                                                                                                                                                                          allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
-                                                                                                                                                                                 }
-                                                                                                                                                                                       match /printers/{printerId} {
-                                                                                                                                                                                                allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
-                                                                                                                                                                                       }
-                                                                                                                                                                                             match /invoiceSettings/{docId} {
-                                                                                                                                                                                                       allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
-                                                                                                                                                                                             }
-                                                                                                                                                                                                   match /subscription/{docId} {
-                                                                                                                                                                                                            allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
-                                                                                                                                                                                                   }
-                                                                                                                                                                                                         match /shareConfig/{docId} {
-                                                                                                                                                                                                                  // This rule remains for direct access and write control
-                                                                                                                                                                                                                          allow read: if true;
-                                                                                                                                                                                                                                  allow write: if isBusinessMember(businessId) || isSuperAdmin();
-                                                                                                                                                                                                         }
-                                                                                                                                                                                                               match /backups/{backupId} {
-                                                                                                                                                                                                                        allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
-                                                                                                                                                                                                               }
-                                                                                                                                                                                                                     match /backupSchedules/{scheduleId} {
-                                                                                                                                                                                                                              allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
-                                                                                                                                                                                                                     }
-                                                                                                                                                                                                                           match /kardexConfig/{docId} {
-                                                                                                                                                                                                                                    allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
-                                                                                                                                                                                                                           }
-                                                                                                                                                                                                                                 match /kardexItems/{itemId} {
-                                                                                                                                                                                                                                          allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
-                                                                                                                                                                                                                                 }
-                                                                                                                                                                                                                                       match /kardexMovimientos/{movimientoId} {
-                                                                                                                                                                                                                                                allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
-                                                                                                                                                                                                                                       }
-                                                                                                                                                                                                                                             
-                                                                                                                                                                                                                                                   // Notification Rules
-                                                                                                                                                                                                                                                         match /notifications/{notificationId} {
-                                                                                                                                                                                                                                                                  allow read, update: if isBusinessMember(businessId) || isSuperAdmin();
-                                                                                                                                                                                                                                                                          allow create: if isSuperAdmin();
-                                                                                                                                                                                                                                                                                  allow delete: if isBusinessMember(businessId) || isSuperAdmin();
-                                                                                                                                                                                                                                                         }
-
-                                                                                                                                                                                                                                                               // Contabilidad
-                                                                                                                                                                                                                                                                     match /asientos/{asientoId} {
-                                                                                                                                                                                                                                                                              allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
-                                                                                                                                                                                                                                                                     }
-                                                                                                                                                                                                                                                                           match /cuentas/{cuentaId} {
-                                                                                                                                                                                                                                                                                    allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
-                                                                                                                                                                                                                                                                           }
-                                                                                                                                                                                                                                                                                 match /activosFijos/{activoId} {
-                                                                                                                                                                                                                                                                                          allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
-                                                                                                                                                                                                                                                                                 }
-                                                                                                                                                                                                                                                                                       match /impuestos/{impuestoId} {
-                                                                                                                                                                                                                                                                                                allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
-                                                                                                                                                                                                                                                                                       }
-                                                                                                                                                                                                                                                                                             match /declaracionesImpuestos/{declaracionId} {
-                                                                                                                                                                                                                                                                                                      allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
-                                                                                                                                                                                                                                                                                             }
-                                                                                                                                                                                                                                                                                                   
-                                                                                                                                                                                                                                                                                                         // Chatbot specific rules
-                                                                                                                                                                                                                                                                                                               match /chatbotConfig/main {
-                                                                                                                                                                                                                                                                                                                        allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
-                                                                                                                                                                                                                                                                                                                                match /knowledgeBase/{documentId} {
-                                                                                                                                                                                                                                                                                                                                              allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
-                                                                                                                                                                                                                                                                                                                                }
-                                                                                                                                                                                                                                                                                                               }
-                                                                                                                                                                                                                                                                                                                     match /chatConversations/{conversationId} {
-                                                                                                                                                                                                                                                                                                                                allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
-                                                                                                                                                                                                                                                                                                                                          match /messages/{messageId} {
-                                                                                                                                                                                                                                                                                                                                                          allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
-                                                                                                                                                                                                                                                                                                                                          }
-                                                                                                                                                                                                                                                                                                                     }
-                                                                                                                                                                                                                                                                                                                           match /services/{serviceId} {
-                                                                                                                                                                                                                                                                                                                                    allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
-                                                                                                                                                                                                                                                                                                                           }
-                                                                                                                                                                                                                                                                                                                                 match /modules/{moduleId} {
-                                                                                                                                                                                                                                                                                                                                          allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
-                                                                                                                                                                                                                                                                                                                                 }
-                                                                                          }
-                                                                                              
-                                                                                                  // System-level collections
-                                                                                                      match /modules/{moduleId} {
-                                                                                                              allow read: if true;
-                                                                                                                    allow write: if isSuperAdmin();
-                                                                                                      }
-                                                                                                          match /systemServices/{serviceId} { 
-                                                                                                                  // Any authenticated user can read system services (e.g., to check limits).
-                                                                                                                        allow read: if request.auth != null;
-                                                                                                                              allow write: if isSuperAdmin();
-                                                                                                          }
-                                                                                                              match /integrations/{integrationId} {
-                                                                                                                      allow read: if request.auth != null;
-                                                                                                                            allow write: if isSuperAdmin();
-                                                                                                              }
-                                                                                                                  
-                                                                                                                      // NEW: Messages from contact forms and client replies
-                                                                                                                          match /contactMessages/{messageId} {
-                                                                                                                                  allow read, update, delete: if isSuperAdmin();
-                                                                                                                                        // Allow unauthenticated (for webform) and authenticated (for client reply) to create.
-                                                                                                                                              allow create: if true;
-
-                                                                                                                                                    // Replies by superadmin to a public user's message
-                                                                                                                                                          match /replies/{replyId} {
-                                                                                                                                                                    allow read, create: if isSuperAdmin();
-                                                                                                                                                          }
-                                                                                                                          }
-                                                                                                                              
-                                                                                                                                  // Default deny all other paths. This is a security best practice.
-                                                                                                                                      match /{document=**} { 
-                                                                                                                                              allow read, write: if false; 
-                                                                                                                                      }
+    // Cached user document path
+    function userDocPath() {
+      return /databases/$(database)/documents/users/$(request.auth.uid);
     }
-}
 
-  
+    function userExists() {
+      return request.auth != null && exists(userDocPath());
+    }
+
+    function userData() {
+      return get(userDocPath()).data;
+    }
+
+    function isSuperAdmin() {
+      return userExists() && userData().role == 'super_admin';
+    }
+
+    function isBusinessMember(businessId) {
+      return userExists() && (
+        request.auth.uid == businessId ||
+        userData().businessId == businessId
+      );
+    }
+
+    // This rule is necessary for resolving custom catalog slugs publicly.
+    match /{path=**}/shareConfig/{docId} {
+      allow read: if true;
+    }
+
+    // Collection group for reminders
+    match /{path=**}/reminders/{reminderId} {
+      allow read, create, update, delete, list: if isSuperAdmin();
+    }
+
+    // Public blog posts
+    match /blog_posts/{postId} {
+      allow get, list: if true;
+
+      allow create: if request.auth != null && (
+        request.resource.data.businessId == request.auth.uid ||
+        isSuperAdmin()
+      );
+
+      allow update, delete: if request.auth != null && (
+        resource.data.businessId == request.auth.uid ||
+        isSuperAdmin()
+      );
+    }
+
+    match /plans/{planId} {
+      allow read: if true;
+      allow write: if isSuperAdmin();
+    }
+
+    match /globalConfig/{document=**} {
+      allow read: if true;
+      allow write: if isSuperAdmin();
+    }
+
+    match /settings/{document=**} {
+      allow read: if true;
+      allow write: if isSuperAdmin();
+    }
+
+    match /landing_configs/{docId} {
+      allow read: if true;
+      allow write: if isSuperAdmin();
+    }
+
+    // Users
+    match /users/{userId} {
+      allow get: if request.auth != null && (
+        request.auth.uid == userId || isSuperAdmin()
+      );
+
+      allow update: if request.auth != null && (
+        request.auth.uid == userId || isSuperAdmin()
+      )
+      // Prevent normal users from escalating privileges
+      && request.resource.data.role == resource.data.role
+      && request.resource.data.businessId == resource.data.businessId;
+
+      allow list: if isSuperAdmin();
+      allow create, delete: if isSuperAdmin();
+    }
+
+    match /paymentSettings/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Businesses
+    match /businesses/{businessId} {
+      allow get: if true;
+      allow list: if request.auth != null;
+
+      allow create, update, delete: if isBusinessMember(businessId) || isSuperAdmin();
+
+      // Public data
+      match /publicData/{docId=**} {
+        allow read: if true;
+        allow write: if isBusinessMember(businessId) || isSuperAdmin();
+      }
+
+      match /landingPages/{pageId} {
+        allow read: if true;
+        allow write: if isBusinessMember(businessId) || isSuperAdmin();
+      }
+
+      match /landingConfig/{docId=**} {
+        allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
+      }
+
+      // Private business resources
+      match /products/{productId} {
+        allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
+      }
+
+      match /orders/{orderId} {
+        allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
+      }
+
+      match /contactForms/{formId} {
+        allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
+      }
+
+      match /contactSubmissions/{submissionId} {
+        allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
+      }
+
+      match /suggestionRules/{ruleId} {
+        allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
+      }
+
+      match /printers/{printerId} {
+        allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
+      }
+
+      match /invoiceSettings/{docId} {
+        allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
+      }
+
+      match /subscription/{docId} {
+        allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
+      }
+
+      match /shareConfig/{docId} {
+        // Read is handled by the collection group rule above.
+        // This rule only handles writes.
+        allow write: if isBusinessMember(businessId) || isSuperAdmin();
+      }
+
+      match /backups/{backupId} {
+        allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
+      }
+
+      match /backupSchedules/{scheduleId} {
+        allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
+      }
+
+      match /kardexConfig/{docId} {
+        allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
+      }
+
+      match /kardexItems/{itemId} {
+        allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
+      }
+
+      match /kardexMovimientos/{movimientoId} {
+        allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
+      }
+
+      // Notifications
+      match /notifications/{notificationId} {
+        allow read, update, delete: if isBusinessMember(businessId) || isSuperAdmin();
+        allow create: if isSuperAdmin();
+      }
+
+      // Accounting
+      match /asientos/{asientoId} {
+        allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
+      }
+
+      match /cuentas/{cuentaId} {
+        allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
+      }
+
+      match /activosFijos/{activoId} {
+        allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
+      }
+
+      match /impuestos/{impuestoId} {
+        allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
+      }
+
+      match /declaracionesImpuestos/{declaracionId} {
+        allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
+      }
+
+      // Chatbot
+      match /chatbotConfig/main {
+        allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
+
+        match /knowledgeBase/{documentId} {
+          allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
+        }
+      }
+
+      match /chatConversations/{conversationId} {
+        allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
+
+        match /messages/{messageId} {
+          allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
+        }
+      }
+
+      match /services/{serviceId} {
+        allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
+      }
+
+      match /modules/{moduleId} {
+        allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
+      }
+    }
+
+    // System collections
+    match /modules/{moduleId} {
+      allow read: if true;
+      allow write: if isSuperAdmin();
+    }
+
+    match /systemServices/{serviceId} {
+      allow read: if request.auth != null;
+      allow write: if isSuperAdmin();
+    }
+
+    match /integrations/{integrationId} {
+      allow read: if request.auth != null;
+      allow write: if isSuperAdmin();
+    }
+
+    // Contact form messages
+    match /contactMessages/{messageId} {
+      allow read, update, delete: if isSuperAdmin();
+
+      allow create: if
+        request.resource.data.keys().hasOnly([
+          'name',
+          'email',
+          'message',
+          'createdAt'
+        ])
+        && request.resource.data.name is string
+        && request.resource.data.email is string
+        && request.resource.data.message is string
+        && request.resource.data.name.size() > 0
+        && request.resource.data.name.size() <= 100
+        && request.resource.data.email.size() <= 150
+        && request.resource.data.message.size() > 0
+        && request.resource.data.message.size() <= 2000;
+
+      match /replies/{replyId} {
+        allow read, create: if isSuperAdmin();
+      }
+    }
+
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
