@@ -128,7 +128,7 @@ export default function CatalogoPage() {
                     headerConfigSnap
                 ] = await Promise.all([
                     getDoc(productLimitServiceRef),
-                    getDoc(imageLimitServiceRef),
+                    getDoc(imageLimitSnap),
                     getDoc(businessRef),
                     getDocs(productsRef),
                     getDoc(headerConfigRef),
@@ -424,4 +424,3 @@ export default function CatalogoPage() {
         </div>
     );
 }
-    

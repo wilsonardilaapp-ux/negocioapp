@@ -160,6 +160,14 @@ const Lightbox = ({
 };
 
 
+const MediaPreview = ({ item, alt }: { item: MediaItem, alt: string }) => {
+    if (item.type === 'video') {
+        return <video src={item.url} className="rounded-md object-cover w-full h-full" autoPlay loop muted />;
+    }
+    return <Image src={item.url} alt={alt} fill sizes="10rem" className="rounded-md object-cover" />;
+};
+
+
 export default function ProductForm({ product, onSave, onCancel, imageLimit }: ProductFormProps) {
     const { register, handleSubmit, control, reset, formState: { errors } } = useForm<z.infer<typeof productSchema>>({
         resolver: zodResolver(productSchema),
@@ -254,15 +262,6 @@ export default function ProductForm({ product, onSave, onCancel, imageLimit }: P
     };
 
     const mainMediaItem = mediaItems[0];
-    const thumbnailItems = mediaItems.slice(1);
-    const canUploadMore = mediaItems.length < imageLimit;
-
-    const MediaPreview = ({ item, alt }: { item: MediaItem, alt: string }) => {
-        if (item.type === 'video') {
-            return <video src={item.url} className="rounded-md object-cover w-full h-full" autoPlay loop muted />;
-        }
-        return <Image src={item.url} alt={alt} fill sizes="10rem" className="rounded-md object-cover" />;
-    };
 
     return (
         <>
@@ -272,11 +271,12 @@ export default function ProductForm({ product, onSave, onCancel, imageLimit }: P
                  <div className="space-y-2">
                     <Label>Imágenes/Videos del Producto (hasta {imageLimit})</Label>
                     <div className="flex gap-4">
+                        {/* Thumbnails column */}
                         <div className="flex flex-col gap-2 w-20 shrink-0">
                            {Array.from({ length: 4 }).map((_, i) => {
-                               const itemIndex = i + 1;
+                               const itemIndex = i + 1; // Thumbnails start from the 2nd image
                                const currentItem = mediaItems[itemIndex];
-                               const remainingCount = mediaItems.length - 4;
+                               const remainingCount = mediaItems.length > 4 ? mediaItems.length - 4 : 0;
 
                                if (i === 3 && remainingCount > 0) {
                                    return (
@@ -299,15 +299,15 @@ export default function ProductForm({ product, onSave, onCancel, imageLimit }: P
                                         <div className="flex items-center justify-center w-full h-full border-2 border-dashed rounded-md bg-muted"><Loader2 className="h-6 w-6 animate-spin" /></div>
                                     ) : currentItem ? (
                                         <div className="group relative w-full h-full">
-                                            <button type="button" onClick={() => openLightbox(itemIndex)} className="w-full h-full">
+                                            <button type="button" onClick={() => {}} className="w-full h-full cursor-default">
                                                 <MediaPreview item={currentItem} alt={`Producto ${itemIndex + 1}`} />
                                             </button>
                                             <Button type="button" variant="destructive" size="icon" className="absolute top-0.5 right-0.5 h-5 w-5 opacity-0 group-hover:opacity-100" onClick={() => removeMedia(itemIndex)}><X className="h-3 w-3" /></Button>
                                         </div>
-                                    ) : canUploadMore ? (
+                                    ) : mediaItems.length < imageLimit ? (
                                         <label className="flex flex-col items-center justify-center w-full h-full border-2 border-dashed rounded-md cursor-pointer hover:bg-muted p-2">
                                             <UploadCloud className="h-5 w-5 text-muted-foreground" />
-                                            <Input type="file" className="hidden" onChange={(e) => e.target.files && handleMediaUpload(e.target.files[0], itemIndex)} accept="image/*,video/*" />
+                                            <Input type="file" className="hidden" onChange={(e) => e.target.files && handleMediaUpload(e.target.files[0], mediaItems.length)} accept="image/*,video/*" />
                                         </label>
                                     ) : (
                                         <div className="flex items-center justify-center w-full h-full border-2 border-dashed rounded-md bg-muted/30" />
@@ -317,6 +317,7 @@ export default function ProductForm({ product, onSave, onCancel, imageLimit }: P
                            })}
                         </div>
                         
+                        {/* Main Image */}
                         <div className="flex-1 relative aspect-square w-full">
                              {isUploading === 0 ? (
                                 <div className="flex items-center justify-center w-full h-full border-2 border-dashed rounded-md bg-muted">
@@ -324,7 +325,7 @@ export default function ProductForm({ product, onSave, onCancel, imageLimit }: P
                                 </div>
                             ) : mainMediaItem ? (
                                 <div className="group relative w-full h-full">
-                                    <button type="button" onClick={() => openLightbox(0)} className="w-full h-full">
+                                    <button type="button" onClick={() => {}} className="w-full h-full cursor-default">
                                         <MediaPreview item={mainMediaItem} alt="Producto Principal" />
                                     </button>
                                     <Button
@@ -338,7 +339,7 @@ export default function ProductForm({ product, onSave, onCancel, imageLimit }: P
                                     </Button>
                                 </div>
                             ) : (
-                                <label className={cn("flex flex-col items-center justify-center w-full h-full border-2 border-dashed rounded-md cursor-pointer hover:bg-muted p-4", !canUploadMore && "cursor-not-allowed opacity-50")}>
+                                <label className={cn("flex flex-col items-center justify-center w-full h-full border-2 border-dashed rounded-md cursor-pointer hover:bg-muted p-4", isLimitReached && "cursor-not-allowed opacity-50")}>
                                     <UploadCloud className="h-8 w-8 text-muted-foreground" />
                                     <span className="text-sm text-center font-semibold text-muted-foreground mt-2">Imagen/Video Principal</span>
                                     <span className="text-xs text-center text-muted-foreground mt-1">1500 × 1500 pixeles</span>
@@ -347,7 +348,7 @@ export default function ProductForm({ product, onSave, onCancel, imageLimit }: P
                                         className="hidden" 
                                         onChange={(e) => e.target.files && handleMediaUpload(e.target.files[0], 0)} 
                                         accept="image/*,video/*"
-                                        disabled={!canUploadMore}
+                                        disabled={isLimitReached}
                                     />
                                 </label>
                             )}
@@ -423,4 +424,3 @@ export default function ProductForm({ product, onSave, onCancel, imageLimit }: P
         </>
     );
 }
-    
