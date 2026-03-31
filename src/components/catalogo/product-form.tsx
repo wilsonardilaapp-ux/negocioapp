@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import RichTextEditor from '@/components/editor/RichTextEditor';
 import type { Product } from '@/models/product';
-import { UploadCloud, X, Loader2, ChevronLeft, ChevronRight, Plus, Pencil } from 'lucide-react';
+import { UploadCloud, X, Loader2, ChevronLeft, ChevronRight, Plus, Pencil, Trash2 } from 'lucide-react';
 import Image from 'next/image';
 import { uploadMedia } from '@/ai/flows/upload-media-flow';
 import { useToast } from '@/hooks/use-toast';
@@ -62,18 +62,17 @@ const MediaPreview = ({ item, alt }: { item: MediaItem, alt: string }) => {
     return <Image src={item.url} alt={alt} fill sizes="10rem" className="rounded-md object-cover" />;
 };
 
+// Lightbox component is defined outside to prevent re-creation on re-renders
 const Lightbox = ({
     isOpen,
     onOpenChange,
     items,
     startIndex = 0,
-    isArrowNavigation = false,
 }: {
     isOpen: boolean;
     onOpenChange: (open: boolean) => void;
     items: MediaItem[];
     startIndex?: number;
-    isArrowNavigation?: boolean;
 }) => {
     const [currentIndex, setCurrentIndex] = useState(startIndex);
 
@@ -93,7 +92,7 @@ const Lightbox = ({
     
     useEffect(() => {
         const handleKeyDown = (event: KeyboardEvent) => {
-            if (!isOpen || !isArrowNavigation) return;
+            if (!isOpen) return;
             if (event.key === 'ArrowRight') goToNext();
             if (event.key === 'ArrowLeft') goToPrevious();
             if (event.key === 'Escape') onOpenChange(false);
@@ -101,67 +100,49 @@ const Lightbox = ({
 
         document.addEventListener('keydown', handleKeyDown);
         return () => document.removeEventListener('keydown', handleKeyDown);
-    }, [isOpen, isArrowNavigation, goToNext, goToPrevious, onOpenChange]);
+    }, [isOpen, goToNext, goToPrevious, onOpenChange]);
 
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
-          <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col p-4 sm:p-6">
+          <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col p-4 sm:p-6 bg-background">
             <DialogHeader>
-              <DialogTitle>Galería de Imágenes</DialogTitle>
+              <DialogTitle>Galería</DialogTitle>
               <DialogDescription>
-                Navega por todas las imágenes del producto.
+                Imágenes y videos del producto.
               </DialogDescription>
             </DialogHeader>
-            <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4 overflow-hidden relative">
-              <div className="md:col-span-2 relative bg-muted rounded-md flex items-center justify-center">
-                {items[currentIndex] && (
-                    <Image
-                        src={items[currentIndex]!.url}
-                        alt={`Imagen ${currentIndex + 1}`}
-                        fill
-                        className="object-contain"
-                    />
-                )}
-                 {isArrowNavigation && items.length > 1 && (
-                    <>
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={goToPrevious}
-                            aria-label="Imagen anterior"
-                            className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-black/50 text-white hover:bg-black/75 h-10 w-10 z-10"
-                        >
-                            <ChevronLeft className="h-6 w-6" />
-                        </Button>
-                         <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={goToNext}
-                            aria-label="Siguiente imagen"
-                            className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-black/50 text-white hover:bg-black/75 h-10 w-10 z-10"
-                        >
-                            <ChevronRight className="h-6 w-6" />
-                        </Button>
-                    </>
-                )}
-              </div>
-              {!isArrowNavigation && (
-                  <ScrollArea className="md:col-span-1 h-full">
-                    <div className="grid grid-cols-3 md:grid-cols-2 gap-2 pr-4">
-                      {items.map((item, index) => item && (
-                        <button
-                          key={item.url}
-                          onClick={() => setCurrentIndex(index)}
-                          className={cn(
-                            "relative aspect-square rounded-md overflow-hidden ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring transition-all",
-                            currentIndex === index ? "ring-2 ring-primary" : "opacity-70 hover:opacity-100"
-                          )}
-                        >
-                          <Image src={item.url} alt={`Thumbnail ${index + 1}`} fill sizes="6rem" className="object-cover" />
-                        </button>
-                      ))}
-                    </div>
-                  </ScrollArea>
+            <div className="flex-1 relative flex items-center justify-center">
+              {items[currentIndex] && (
+                <div className="relative w-full h-full max-h-[70vh]">
+                  <Image
+                      src={items[currentIndex]!.url}
+                      alt={`Imagen ${currentIndex + 1}`}
+                      fill
+                      className="object-contain"
+                  />
+                </div>
+              )}
+              {items.length > 1 && (
+                  <>
+                      <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={goToPrevious}
+                          aria-label="Imagen anterior"
+                          className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-black/50 text-white hover:bg-black/75 h-10 w-10 z-10"
+                      >
+                          <ChevronLeft className="h-6 w-6" />
+                      </Button>
+                       <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={goToNext}
+                          aria-label="Siguiente imagen"
+                          className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-black/50 text-white hover:bg-black/75 h-10 w-10 z-10"
+                      >
+                          <ChevronRight className="h-6 w-6" />
+                      </Button>
+                  </>
               )}
             </div>
           </DialogContent>
@@ -341,7 +322,14 @@ export default function ProductForm({ product, onSave, onCancel, imageLimit }: P
                                                 <div className="flex items-center justify-center w-full h-full border-2 border-dashed rounded-md bg-muted"><Loader2 className="h-6 w-6 animate-spin" /></div>
                                             ) : currentItem ? (
                                                 <div className="group relative w-full h-full">
-                                                    <button type="button" onClick={() => setMainImage(currentItem)} className={cn("w-full h-full rounded-md ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring", mainImage?.url === currentItem.url && "ring-2 ring-primary")}>
+                                                    <button 
+                                                        type="button" 
+                                                        onClick={() => setMainImage(currentItem)} 
+                                                        className={cn(
+                                                            "w-full h-full rounded-md ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring", 
+                                                            mainImage?.url === currentItem.url && "ring-2 ring-primary"
+                                                        )}
+                                                    >
                                                         <MediaPreview item={currentItem} alt={`Producto ${i + 1}`} />
                                                     </button>
                                                     <Button type="button" variant="destructive" size="icon" className="absolute -top-1 -right-1 h-5 w-5 opacity-0 group-hover:opacity-100 rounded-full" onClick={() => removeMedia(i)}><X className="h-3 w-3" /></Button>
@@ -366,7 +354,7 @@ export default function ProductForm({ product, onSave, onCancel, imageLimit }: P
                     <div>
                         <Label htmlFor="category">Categoría</Label>
                         <Input id="category" {...register("category")} placeholder="Ej: Bebidas Calientes" />
-                        {errors.category && <p className="text-sm text-destructive">{errors.category.message}</p>}
+                        {errors.category && <p className="text-sm text-destructive mt-1">{errors.category.message}</p>}
                     </div>
                     <div>
                         <Label>Descripción (Contenido Adicional)</Label>
@@ -425,7 +413,6 @@ export default function ProductForm({ product, onSave, onCancel, imageLimit }: P
             onOpenChange={setIsLightboxOpen}
             items={mediaItems}
             startIndex={selectedLightboxIndex}
-            isArrowNavigation={true}
         />
         </>
     );
