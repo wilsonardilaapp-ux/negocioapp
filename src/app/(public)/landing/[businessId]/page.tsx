@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useMemo } from 'react';
@@ -10,6 +9,8 @@ import type { LandingPageData } from '@/models/landing-page';
 import LandingPageContent from '@/components/landing-page/landing-page-content';
 import { ChatbotWidget } from '@/components/chatbot/chatbot-widget';
 import type { Module } from '@/models/module';
+
+export const dynamic = 'force-dynamic';
 
 export default function BusinessLandingPage() {
     const firestore = useFirestore();

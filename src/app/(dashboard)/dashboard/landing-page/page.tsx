@@ -7,10 +7,11 @@ import { Save, Loader2 } from 'lucide-react';
 import type { LandingPageData } from '@/models/landing-page';
 import EditorLandingForm from '@/components/landing-page/editor-landing-form';
 import EditorLandingPreview from '@/components/landing-page/editor-landing-preview';
-import { useUser, useFirestore, useMemoFirebase, setDocumentNonBlocking } from '@/firebase';
+import { useUser, useFirestore, useMemoFirebase } from '@/firebase';
 import { doc, getDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { v4 as uuidv4 } from 'uuid';
+import { saveBusinessLanding } from '@/actions/save-business-landing';
 
 const initialLandingData: LandingPageData = {
   hero: {
@@ -90,22 +91,26 @@ export default function LandingPageBuilder() {
   }, [docRef, toast]);
 
 
-  const handleSave = () => {
-    if (!docRef || !data) return;
+  const handleSave = async () => {
+    if (!docRef || !data || !user?.uid) return;
     setIsSaving(true);
     
-    const dataToSave = JSON.parse(JSON.stringify(data));
-
-    if (!dataToSave.hero.imageUrl || dataToSave.hero.imageUrl.trim() === '') {
-      delete dataToSave.hero.imageUrl;
+    try {
+        const result = await saveBusinessLanding(user.uid, data);
+        if (result.success) {
+            toast({ title: "Guardado", description: "Cambios aplicados con éxito." });
+        } else {
+            throw new Error(result.error || 'Error desconocido en el servidor.');
+        }
+    } catch(error: any) {
+        toast({
+            variant: "destructive",
+            title: "Error al Guardar",
+            description: error.message || "No se pudieron guardar los cambios."
+        });
+    } finally {
+        setIsSaving(false);
     }
-    
-    setDocumentNonBlocking(docRef, dataToSave, { merge: true });
-    
-    setTimeout(() => {
-      setIsSaving(false);
-      toast({ title: "Guardado", description: "Cambios aplicados." });
-    }, 1000);
   };
   
   if (isFetching) {
