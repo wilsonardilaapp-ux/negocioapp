@@ -43,18 +43,20 @@ export function useDocOnce<T = DocumentData>(
     let isMounted = true;
 
     const fetchData = async (): Promise<void> => {
+      // Declaramos la promesa fuera del try para que sea accesible en el finally/closure
+      let currentPromise: Promise<DocumentSnapshot<DocumentData>> | undefined;
+
       try {
         setIsLoading(true);
 
-        // Si ya hay una petición para este mismo path, la reutilizamos
-        let fetchPromise = pendingRequests.get(path);
+        currentPromise = pendingRequests.get(path);
         
-        if (!fetchPromise) {
-          fetchPromise = getDoc(docRef);
-          pendingRequests.set(path, fetchPromise);
+        if (!currentPromise) {
+          currentPromise = getDoc(docRef);
+          pendingRequests.set(path, currentPromise);
         }
 
-        const snapshot = await fetchPromise;
+        const snapshot = await currentPromise;
 
         if (!isMounted) return;
 
@@ -67,8 +69,6 @@ export function useDocOnce<T = DocumentData>(
       } catch (err) {
         if (!isMounted) return;
         
-        // Manejo específico: Si el error es de Target ID, lo ignoramos visualmente 
-        // porque la otra petición (la exitosa) llenará el estado.
         const fireError = err as FirestoreError;
         if (fireError.message?.includes('Target ID already exists')) {
           return; 
@@ -80,9 +80,10 @@ export function useDocOnce<T = DocumentData>(
       } finally {
         if (isMounted) {
           setIsLoading(false);
-          // Limpiamos el mapa después de un breve delay para permitir que el remount de React use la cache
+          // Usamos la referencia capturada localmente para la limpieza
+          const finishedPromise = currentPromise;
           setTimeout(() => {
-            if (pendingRequests.get(path) === fetchPromise) {
+            if (finishedPromise && pendingRequests.get(path) === finishedPromise) {
               pendingRequests.delete(path);
             }
           }, 100);
