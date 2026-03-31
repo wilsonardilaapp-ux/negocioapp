@@ -57,7 +57,7 @@ export default function ServicesPage() {
         const newImageLimitService: SystemService = {
           id: 'limite-de-imagenes-por-producto',
           name: 'Límite de Imágenes por Producto',
-          limit: 5,
+          limit: 18,
           status: 'active',
           lastUpdate: new Date().toISOString(),
         };
