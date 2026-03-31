@@ -2,7 +2,7 @@
 
 import React, { useMemo } from 'react';
 import { useFirestore, useMemoFirebase } from '@/firebase';
-import { useDocOnce } from '@/firebase/hooks/use-doc-once';
+import { useLandingDoc } from '@/firebase/hooks/use-landing-doc';
 import { doc } from 'firebase/firestore';
 import { useParams } from 'next/navigation';
 import { Loader2, Frown } from 'lucide-react';
@@ -28,8 +28,8 @@ export default function BusinessLandingPage() {
         return doc(firestore, 'modules', 'chatbot-integrado-con-whatsapp-para-soporte-y-ventas');
     }, [firestore]);
 
-    const { data: landingData, isLoading: isLandingLoading, error } = useDocOnce<LandingPageData>(landingPageDocRef);
-    const { data: chatbotModule, isLoading: isModuleLoading } = useDocOnce<Module>(chatbotModuleRef);
+    const { data: landingData, isLoading: isLandingLoading, error } = useLandingDoc<LandingPageData>(landingPageDocRef);
+    const { data: chatbotModule, isLoading: isModuleLoading } = useLandingDoc<Module>(chatbotModuleRef);
 
     const isLoading = isLandingLoading || isModuleLoading;
 
@@ -77,12 +77,14 @@ export default function BusinessLandingPage() {
     
     if (!finalData) {
         return (
-            <div className="flex h-screen w-full flex-col items-center justify-center bg-background text-center px-4">
-                <Frown className="h-16 w-16 text-muted-foreground mb-4" />
-                <h1 className="text-2xl font-bold">Página no Encontrada</h1>
-                <p className="text-muted-foreground mt-2 max-w-md">
-                    La configuración de la landing page para este negocio no existe o no se pudo cargar.
-                </p>
+             <div className="flex h-screen w-full flex-col items-center justify-center bg-gray-50 p-4 text-center">
+                <div className="bg-white p-10 rounded-3xl shadow-sm max-w-md border border-gray-100">
+                    <div className="text-gray-300 text-6xl mb-4">☹️</div>
+                    <h2 className="text-2xl font-bold text-gray-800 mb-3">Página no Encontrada</h2>
+                    <p className="text-gray-500 leading-relaxed">
+                        La configuración de la landing page para este negocio no existe o aún no ha sido publicada.
+                    </p>
+                </div>
             </div>
         );
     }
