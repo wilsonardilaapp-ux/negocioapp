@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import RichTextEditor from '@/components/editor/RichTextEditor';
 import type { Product } from '@/models/product';
-import { UploadCloud, X, Loader2, Pencil, ChevronLeft, ChevronRight } from 'lucide-react';
+import { UploadCloud, X, Loader2, Pencil, ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 import Image from 'next/image';
 import { uploadMedia } from '@/ai/flows/upload-media-flow';
 import { useToast } from '@/hooks/use-toast';
@@ -74,7 +74,6 @@ export default function ProductForm({ product, onSave, onCancel, imageLimit }: P
                 description: product.description,
                 packagingCost: product.packagingCost ?? 0,
             });
-            // Assume old images are 'image'. If video support is needed for old data, model needs update.
             const initialMedia = product.images.map(url => (url ? { url, type: isVideo(url) ? 'video' : 'image' } : null)).filter(Boolean) as MediaItem[];
             setMediaItems(initialMedia);
         } else {
@@ -172,7 +171,7 @@ export default function ProductForm({ product, onSave, onCancel, imageLimit }: P
     
             document.addEventListener('keydown', handleKeyDown);
             return () => document.removeEventListener('keydown', handleKeyDown);
-        }, [isLightboxOpen, goToNext, goToPrevious]);
+        }, [isLightboxOpen]);
 
         return (
             <Dialog open={isLightboxOpen} onOpenChange={setIsLightboxOpen}>
@@ -255,7 +254,9 @@ export default function ProductForm({ product, onSave, onCancel, imageLimit }: P
                         <div className="flex flex-col gap-2 w-20 shrink-0">
                             {Array.from({ length: 4 }).map((_, thumbIndex) => {
                                 const mediaIndex = thumbIndex + 1;
-                                
+                                const currentItem = mediaItems[mediaIndex];
+                                const remainingImages = mediaItems.length - 5;
+
                                 if (thumbIndex === 3 && mediaItems.length > 5) {
                                     return (
                                         <div key="more" className="relative aspect-square w-20">
@@ -264,13 +265,13 @@ export default function ProductForm({ product, onSave, onCancel, imageLimit }: P
                                                 onClick={() => openLightbox(mediaIndex)}
                                                 className="flex flex-col items-center justify-center w-full h-full border-2 border-dashed rounded-md bg-muted hover:bg-muted/80 text-muted-foreground"
                                             >
-                                                <span className="text-xl font-bold">+{mediaItems.length - 4}</span>
+                                                <Plus className="h-6 w-6"/>
+                                                <span className="text-xl font-bold">{remainingImages}</span>
                                             </button>
                                         </div>
                                     );
                                 }
-
-                                const currentItem = mediaItems[mediaIndex];
+                                
                                 const canUploadThisSlot = mediaItems.length === mediaIndex && canUploadMore;
 
                                 return (
@@ -407,3 +408,5 @@ export default function ProductForm({ product, onSave, onCancel, imageLimit }: P
         </>
     );
 }
+
+    
