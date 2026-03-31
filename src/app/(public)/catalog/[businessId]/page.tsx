@@ -1,6 +1,7 @@
+
 'use client';
 
-import { useMemo, useState, useEffect, useRef } from 'react';
+import { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import { useFirebase } from '@/firebase';
 import { doc, getDoc, collectionGroup, query, where, getDocs, limit } from 'firebase/firestore';
 import Image from 'next/image';
@@ -10,7 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Badge } from '@/components/ui/badge';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
 import Autoplay from "embla-carousel-autoplay";
-import { Star, Loader2, PackageSearch, Mail, Printer, FileDown, Settings, Frown } from 'lucide-react';
+import { Star, Loader2, PackageSearch, Mail, Printer, FileDown, Settings, Frown, ArrowRight, ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Product } from '@/models/product';
 import type { Module } from '@/models/module';
@@ -185,6 +186,31 @@ const PublicProductCard = ({ product, onOpenModal }: { product: Product, onOpenM
     );
 }
 
+const Lightbox = ({ isOpen, onOpenChange, imageUrl }: { isOpen: boolean, onOpenChange: (open: boolean) => void, imageUrl: string }) => {
+  if (!isOpen) return null;
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-[800px] w-full p-2 bg-transparent border-none shadow-none">
+        <div className="relative aspect-square w-full">
+          <Image src={imageUrl} alt="Vista ampliada del producto" fill sizes="800px" className="object-contain" />
+           <DialogHeader>
+                <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => onOpenChange(false)}
+                    className="absolute -top-10 -right-10 rounded-full h-8 w-8 bg-black/50 text-white hover:bg-black/75"
+                >
+                    <X className="h-5 w-5" />
+                </Button>
+           </DialogHeader>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+
 const ProductViewModal = ({ product, isOpen, onOpenChange, businessPhone, businessId, paymentSettings, onAddToCart }: { product: Product | null, isOpen: boolean, onOpenChange: (open: boolean) => void, businessPhone: string, businessId: string | null, paymentSettings: PaymentSettings | null, onAddToCart: (items: CartItem[]) => void }) => {
     const [mainImage, setMainImage] = useState(product?.images[0] || '');
     const [isRating, setIsRating] = useState(false);
@@ -192,6 +218,7 @@ const ProductViewModal = ({ product, isOpen, onOpenChange, businessPhone, busine
     const [suggestion, setSuggestion] = useState<SuggestionOutput | null>(null);
     const [isSuggestionModalOpen, setIsSuggestionModalOpen] = useState(false);
     const [isLoadingSuggestion, setIsLoadingSuggestion] = useState(false);
+    const [isLightboxOpen, setIsLightboxOpen] = useState(false);
     const { toast } = useToast();
 
     useEffect(() => {
@@ -344,17 +371,21 @@ const ProductViewModal = ({ product, isOpen, onOpenChange, businessPhone, busine
     return (
         <>
             <Dialog open={isOpen} onOpenChange={onOpenChange}>
-                <DialogContent className="sm:max-w-5xl p-0 max-h-[90vh] flex flex-col">
+                <DialogContent className="sm:max-w-6xl p-0 flex flex-col max-h-[90vh]">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-0 flex-grow min-h-0">
                         {/* Columna Izquierda (Imagen) */}
                         <div className="p-6 flex flex-col gap-4">
-                            <div className="relative aspect-square w-full rounded-lg overflow-hidden border">
+                            <button
+                                type="button"
+                                className="relative aspect-square w-full rounded-lg overflow-hidden border cursor-zoom-in"
+                                onClick={() => setIsLightboxOpen(true)}
+                            >
                                 {isVideo(mainImage) ? (
                                     <video src={mainImage} autoPlay loop muted controls className="object-contain w-full h-full" />
                                 ) : (
                                     <Image src={mainImage} alt={product.name} fill sizes="(max-width: 768px) 90vw, 40vw" className="object-contain"/>
                                 )}
-                            </div>
+                            </button>
                             <div className="grid grid-cols-5 gap-2">
                                 {product.images.map((img, index) => {
                                     const isThumbVideo = isVideo(img);
@@ -423,6 +454,11 @@ const ProductViewModal = ({ product, isOpen, onOpenChange, businessPhone, busine
                     onDecline={handleSuggestionDeclined}
                 />
             )}
+             <Lightbox
+                isOpen={isLightboxOpen}
+                onOpenChange={setIsLightboxOpen}
+                imageUrl={mainImage}
+            />
         </>
     )
 }
