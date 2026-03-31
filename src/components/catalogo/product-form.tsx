@@ -49,6 +49,12 @@ type MediaItem = {
     type: 'image' | 'video';
 };
 
+const isVideo = (url: string) => {
+    if (!url) return false;
+    const videoExtensions = ['.mp4', '.webm', '.ogg'];
+    return videoExtensions.some(ext => url.toLowerCase().includes(ext));
+};
+
 const Lightbox = ({ 
     isOpen, 
     onOpenChange, 
@@ -87,6 +93,7 @@ const Lightbox = ({
 
         document.addEventListener('keydown', handleKeyDown);
         return () => document.removeEventListener('keydown', handleKeyDown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isOpen, items.length]);
 
     return (
@@ -151,6 +158,7 @@ const Lightbox = ({
         </Dialog>
     );
 };
+
 
 export default function ProductForm({ product, onSave, onCancel, imageLimit }: ProductFormProps) {
     const { register, handleSubmit, control, reset, formState: { errors } } = useForm<z.infer<typeof productSchema>>({
@@ -240,18 +248,13 @@ export default function ProductForm({ product, onSave, onCancel, imageLimit }: P
         setMediaItems(prev => prev.filter((_, i) => i !== index));
     };
 
-    const isVideo = (url: string) => {
-        if (!url) return false;
-        const videoExtensions = ['.mp4', '.webm', '.ogg'];
-        return videoExtensions.some(ext => url.toLowerCase().includes(ext));
-    };
-
     const openLightbox = (index: number) => {
         setSelectedLightboxIndex(index);
         setIsLightboxOpen(true);
     };
 
     const mainMediaItem = mediaItems[0];
+    const thumbnailItems = mediaItems.slice(1);
     const canUploadMore = mediaItems.length < imageLimit;
 
     const MediaPreview = ({ item, alt }: { item: MediaItem, alt: string }) => {
@@ -259,42 +262,6 @@ export default function ProductForm({ product, onSave, onCancel, imageLimit }: P
             return <video src={item.url} className="rounded-md object-cover w-full h-full" autoPlay loop muted />;
         }
         return <Image src={item.url} alt={alt} fill sizes="10rem" className="rounded-md object-cover" />;
-    };
-
-    const ThumbnailSlot = ({ index }: { index: number }) => {
-      const currentItem = mediaItems[index];
-
-      return (
-        <div className="relative aspect-square w-20">
-          {isUploading === index ? (
-            <div className="flex items-center justify-center w-full h-full border-2 border-dashed rounded-md bg-muted">
-              <Loader2 className="h-6 w-6 animate-spin" />
-            </div>
-          ) : currentItem ? (
-            <div className="group relative w-full h-full">
-              <button type="button" onClick={() => openLightbox(index)} className="w-full h-full">
-                <MediaPreview item={currentItem} alt={`Producto ${index + 1}`} />
-              </button>
-              <Button
-                type="button"
-                variant="destructive"
-                size="icon"
-                className="absolute top-0.5 right-0.5 h-5 w-5 opacity-0 group-hover:opacity-100"
-                onClick={() => removeMedia(index)}
-              >
-                <X className="h-3 w-3" />
-              </Button>
-            </div>
-          ) : canUploadMore ? (
-            <label className="flex flex-col items-center justify-center w-full h-full border-2 border-dashed rounded-md cursor-pointer hover:bg-muted p-2">
-              <UploadCloud className="h-5 w-5 text-muted-foreground" />
-              <Input type="file" className="hidden" onChange={(e) => e.target.files && handleMediaUpload(e.target.files[0], index)} accept="image/*,video/*" />
-            </label>
-          ) : (
-            <div className="flex items-center justify-center w-full h-full border-2 border-dashed rounded-md bg-muted/30" />
-          )}
-        </div>
-      );
     };
 
     return (
@@ -306,23 +273,48 @@ export default function ProductForm({ product, onSave, onCancel, imageLimit }: P
                     <Label>Imágenes/Videos del Producto (hasta {imageLimit})</Label>
                     <div className="flex gap-4">
                         <div className="flex flex-col gap-2 w-20 shrink-0">
-                           <ThumbnailSlot index={1} />
-                           <ThumbnailSlot index={2} />
-                           <ThumbnailSlot index={3} />
-                           {mediaItems.length > 4 ? (
-                             <div className="relative aspect-square w-20">
-                                <button
-                                  type="button"
-                                  onClick={() => openLightbox(4)}
-                                  className="flex flex-col items-center justify-center w-full h-full border-2 border-dashed rounded-md bg-muted hover:bg-muted/80 text-muted-foreground"
-                                >
-                                  <Plus className="h-6 w-6"/>
-                                  <span className="text-xl font-bold">{mediaItems.length - 4}</span>
-                                </button>
-                              </div>
-                           ) : (
-                            <ThumbnailSlot index={4} />
-                           )}
+                           {Array.from({ length: 4 }).map((_, i) => {
+                               const itemIndex = i + 1;
+                               const currentItem = mediaItems[itemIndex];
+                               const remainingCount = mediaItems.length - 4;
+
+                               if (i === 3 && remainingCount > 0) {
+                                   return (
+                                     <div key="plus-btn" className="relative aspect-square w-20">
+                                        <button
+                                          type="button"
+                                          onClick={() => openLightbox(4)}
+                                          className="flex flex-col items-center justify-center w-full h-full border-2 border-dashed rounded-md bg-muted hover:bg-muted/80 text-muted-foreground"
+                                        >
+                                          <Plus className="h-6 w-6"/>
+                                          <span className="text-xl font-bold">{remainingCount}</span>
+                                        </button>
+                                      </div>
+                                   );
+                               }
+
+                               return (
+                                  <div key={itemIndex} className="relative aspect-square w-20">
+                                    {isUploading === itemIndex ? (
+                                        <div className="flex items-center justify-center w-full h-full border-2 border-dashed rounded-md bg-muted"><Loader2 className="h-6 w-6 animate-spin" /></div>
+                                    ) : currentItem ? (
+                                        <div className="group relative w-full h-full">
+                                            <button type="button" onClick={() => openLightbox(itemIndex)} className="w-full h-full">
+                                                <MediaPreview item={currentItem} alt={`Producto ${itemIndex + 1}`} />
+                                            </button>
+                                            <Button type="button" variant="destructive" size="icon" className="absolute top-0.5 right-0.5 h-5 w-5 opacity-0 group-hover:opacity-100" onClick={() => removeMedia(itemIndex)}><X className="h-3 w-3" /></Button>
+                                        </div>
+                                    ) : canUploadMore ? (
+                                        <label className="flex flex-col items-center justify-center w-full h-full border-2 border-dashed rounded-md cursor-pointer hover:bg-muted p-2">
+                                            <UploadCloud className="h-5 w-5 text-muted-foreground" />
+                                            <Input type="file" className="hidden" onChange={(e) => e.target.files && handleMediaUpload(e.target.files[0], itemIndex)} accept="image/*,video/*" />
+                                        </label>
+                                    ) : (
+                                        <div className="flex items-center justify-center w-full h-full border-2 border-dashed rounded-md bg-muted/30" />
+                                    )}
+                                </div>
+                               )
+                           })}
                         </div>
                         
                         <div className="flex-1 relative aspect-square w-full">
@@ -426,7 +418,9 @@ export default function ProductForm({ product, onSave, onCancel, imageLimit }: P
             onOpenChange={setIsLightboxOpen}
             items={mediaItems}
             startIndex={selectedLightboxIndex}
+            isArrowNavigation={true}
         />
         </>
     );
 }
+    

@@ -68,13 +68,13 @@ export default function CatalogoPage() {
         products: Product[];
         headerConfig: LandingHeaderConfigData;
         productLimit: number;
-        imageLimit: number; // Added imageLimit
+        imageLimit: number;
         catalogModule: Module | null;
     }>({
         products: [],
         headerConfig: initialHeaderConfig,
         productLimit: 10,
-        imageLimit: 5, // Default image limit
+        imageLimit: 5,
         catalogModule: null,
     });
     const [isLoading, setIsLoading] = useState(true);
@@ -424,3 +424,4 @@ export default function CatalogoPage() {
         </div>
     );
 }
+    
