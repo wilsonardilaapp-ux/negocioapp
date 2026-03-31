@@ -68,11 +68,13 @@ export default function CatalogoPage() {
         products: Product[];
         headerConfig: LandingHeaderConfigData;
         productLimit: number;
+        imageLimit: number;
         catalogModule: Module | null;
     }>({
         products: [],
         headerConfig: initialHeaderConfig,
         productLimit: 10,
+        imageLimit: 5,
         catalogModule: null,
     });
     const [isLoading, setIsLoading] = useState(true);
@@ -113,17 +115,20 @@ export default function CatalogoPage() {
 
                 // 2. Fetch all other data concurrently after module check
                 const productLimitServiceRef = doc(firestore, 'systemServices', 'product_limit');
+                const imageLimitServiceRef = doc(firestore, 'systemServices', 'limite-de-imagenes-por-producto');
                 const businessRef = doc(firestore, 'businesses', user.uid);
                 const productsRef = collection(firestore, 'businesses', user.uid, 'products');
                 const headerConfigRef = doc(firestore, 'businesses', user.uid, 'landingConfig', 'header');
 
                 const [
                     productLimitSnap,
+                    imageLimitSnap,
                     businessSnap,
                     productsSnap,
                     headerConfigSnap
                 ] = await Promise.all([
                     getDoc(productLimitServiceRef),
+                    getDoc(imageLimitSnap),
                     getDoc(businessRef),
                     getDocs(productsRef),
                     getDoc(headerConfigRef),
@@ -148,18 +153,27 @@ export default function CatalogoPage() {
                 };
 
                 const fetchedProductLimitService = productLimitSnap.exists() ? productLimitSnap.data() as SystemService : null;
+                const fetchedImageLimitService = imageLimitSnap.exists() ? imageLimitSnap.data() as SystemService : null;
 
-                let limit = 10; // Default limit
+                let productLimitValue = 10;
                 if (fetchedBusiness?.productLimit && fetchedBusiness.productLimit !== 0) {
-                    limit = fetchedBusiness.productLimit;
+                    productLimitValue = fetchedBusiness.productLimit;
                 } else if (fetchedProductLimitService?.status === 'active' && fetchedProductLimitService.limit > 0) {
-                    limit = fetchedProductLimitService.limit;
+                    productLimitValue = fetchedProductLimitService.limit;
+                }
+                
+                let imageLimitValue = 5;
+                if (fetchedBusiness?.imageLimit && fetchedBusiness.imageLimit > 0) {
+                    imageLimitValue = fetchedBusiness.imageLimit;
+                } else if (fetchedImageLimitService?.status === 'active' && fetchedImageLimitService.limit > 0) {
+                    imageLimitValue = fetchedImageLimitService.limit;
                 }
                 
                 setPageData({
                     products: fetchedProducts,
                     headerConfig: mergedConfigData,
-                    productLimit: limit,
+                    productLimit: productLimitValue,
+                    imageLimit: imageLimitValue,
                     catalogModule: fetchedCatalogModule,
                 });
 
@@ -333,7 +347,7 @@ export default function CatalogoPage() {
                                     </TooltipProvider>
                                 )}
                             </DialogTrigger>
-                            <DialogContent className="max-w-4xl">
+                            <DialogContent className="max-w-[95vw] w-full">
                                 <DialogHeader>
                                     <DialogTitle>{editingProduct ? 'Editar Producto' : 'Añadir Nuevo Producto'}</DialogTitle>
                                     <DialogDescription>
@@ -344,7 +358,7 @@ export default function CatalogoPage() {
                                     product={editingProduct} 
                                     onSave={handleSaveProduct} 
                                     onCancel={() => setIsFormOpen(false)}
-                                    imageLimit={pageData.productLimit}
+                                    imageLimit={pageData.imageLimit}
                                 />
                             </DialogContent>
                         </Dialog>
