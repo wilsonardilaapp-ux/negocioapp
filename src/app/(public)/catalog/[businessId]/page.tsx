@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useMemo, useState, useEffect, useRef, useCallback } from 'react';
@@ -29,7 +30,7 @@ import type { SuggestionOutput } from '@/models/suggestion-io';
 import { SuggestionModal } from '@/components/suggestions/suggestion-modal';
 import { updateSuggestionMetrics } from '@/ai/flows/update-suggestion-metrics-flow';
 import PublicNav from '@/components/layout/public-nav';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 
 
 export type CartItem = Product & { quantity: number };
@@ -386,7 +387,8 @@ const ProductViewModal = ({ product, isOpen, onOpenChange, businessPhone, busine
                                     <Image src={mainImage} alt={product.name} fill sizes="(max-width: 768px) 90vw, 40vw" className="object-contain"/>
                                 )}
                             </button>
-                            <div className="grid grid-cols-5 gap-2">
+                            <ScrollArea className="w-full whitespace-nowrap rounded-md">
+                                <div className="flex w-max space-x-2 p-2">
                                 {product.images.map((img, index) => {
                                     const isThumbVideo = isVideo(img);
                                     return (
@@ -394,7 +396,7 @@ const ProductViewModal = ({ product, isOpen, onOpenChange, businessPhone, busine
                                             key={index} 
                                             onClick={() => setMainImage(img)} 
                                             className={cn(
-                                                "relative aspect-square w-full shrink-0 rounded-md overflow-hidden ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring transition-all",
+                                                "relative aspect-square w-20 h-20 shrink-0 rounded-md overflow-hidden ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring transition-all",
                                                 mainImage === img ? "ring-2 ring-primary opacity-100" : "opacity-70 hover:opacity-100"
                                             )}
                                         >
@@ -406,7 +408,9 @@ const ProductViewModal = ({ product, isOpen, onOpenChange, businessPhone, busine
                                         </button>
                                     );
                                 })}
-                            </div>
+                                </div>
+                                <ScrollBar orientation="horizontal" />
+                            </ScrollArea>
                         </div>
                         {/* Columna Derecha (Detalles) */}
                         <div className="p-6 flex flex-col min-h-0">
@@ -754,3 +758,4 @@ export default function CatalogPage() {
         </div>
     );
 }
+
