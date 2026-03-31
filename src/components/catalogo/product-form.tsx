@@ -14,7 +14,7 @@ import Image from 'next/image';
 import { uploadMedia } from '@/ai/flows/upload-media-flow';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { ScrollArea } from '../ui/scroll-area';
 
 const productSchema = z.object({
@@ -60,7 +60,7 @@ const Lightbox = ({
     onOpenChange, 
     items, 
     startIndex,
-    isArrowNavigation = true 
+    isArrowNavigation = true
 }: { 
     isOpen: boolean;
     onOpenChange: (open: boolean) => void;
@@ -101,6 +101,9 @@ const Lightbox = ({
           <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col p-4 sm:p-6">
             <DialogHeader>
               <DialogTitle>Galería de Imágenes</DialogTitle>
+              <DialogDescription>
+                Navega por todas las imágenes del producto.
+              </DialogDescription>
             </DialogHeader>
             <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4 overflow-hidden relative">
               <div className="md:col-span-2 relative bg-muted rounded-md flex items-center justify-center">
@@ -158,7 +161,6 @@ const Lightbox = ({
         </Dialog>
     );
 };
-
 
 const MediaPreview = ({ item, alt }: { item: MediaItem, alt: string }) => {
     if (item.type === 'video') {
@@ -268,7 +270,6 @@ export default function ProductForm({ product, onSave, onCancel, imageLimit }: P
         const newMediaItems = mediaItems.filter((_, i) => i !== indexToRemove);
         setMediaItems(newMediaItems);
 
-        // If the removed item was the main image, select the next one or clear
         if (mainImage?.url === removedItem?.url) {
             setMainImage(newMediaItems[0] || null);
         }
