@@ -74,7 +74,7 @@ export default function CatalogoPage() {
         products: [],
         headerConfig: initialHeaderConfig,
         productLimit: 10,
-        imageLimit: 5,
+        imageLimit: 18,
         catalogModule: null,
     });
     const [isLoading, setIsLoading] = useState(true);
@@ -128,7 +128,7 @@ export default function CatalogoPage() {
                     headerConfigSnap
                 ] = await Promise.all([
                     getDoc(productLimitServiceRef),
-                    getDoc(imageLimitSnap),
+                    getDoc(imageLimitServiceRef),
                     getDoc(businessRef),
                     getDocs(productsRef),
                     getDoc(headerConfigRef),
@@ -162,7 +162,7 @@ export default function CatalogoPage() {
                     productLimitValue = fetchedProductLimitService.limit;
                 }
                 
-                let imageLimitValue = 5;
+                let imageLimitValue = 18;
                 if (fetchedBusiness?.imageLimit && fetchedBusiness.imageLimit > 0) {
                     imageLimitValue = fetchedBusiness.imageLimit;
                 } else if (fetchedImageLimitService?.status === 'active' && fetchedImageLimitService.limit > 0) {
@@ -347,7 +347,7 @@ export default function CatalogoPage() {
                                     </TooltipProvider>
                                 )}
                             </DialogTrigger>
-                            <DialogContent className="max-w-4xl">
+                            <DialogContent className="max-w-[95vw] w-full">
                                 <DialogHeader>
                                     <DialogTitle>{editingProduct ? 'Editar Producto' : 'Añadir Nuevo Producto'}</DialogTitle>
                                     <DialogDescription>
@@ -389,7 +389,7 @@ export default function CatalogoPage() {
                         </ProductCard>
                     ))
                 ) : (
-                    <Card className="sm:col-span-2 md:col-span-3 lg:col-span-4">
+                    <Card className="sm:col-span-2 md:col-span-3 lg:grid-cols-4">
                         <CardContent className="h-[400px] flex flex-col items-center justify-center text-center gap-4">
                             <div className="p-4 bg-secondary rounded-full">
                                 <ShoppingBag className="h-12 w-12 text-muted-foreground" />
