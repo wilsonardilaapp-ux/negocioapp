@@ -27,55 +27,48 @@ export function useDocOnce<T = DocumentData>(
   const [isLoading, setIsLoading] = useState<boolean>(true); // Empezamos en true para evitar parpadeos
   const [error, setError] = useState<FirestoreError | Error | null>(null);
   
-  // Guardamos el path para evitar re-ejecuciones si el objeto docRef cambia pero apunta a lo mismo
-  const lastPath = useRef<string | null>(null);
-
   useEffect(() => {
-    // Si no hay referencia, dejamos de cargar
+    // Si no hay referencia, dejamos de cargar inmediatamente
     if (!docRef) {
       setIsLoading(false);
       setData(null);
+      setError(null);
       return;
     }
 
-    // Evitar re-ejecución si es el mismo documento
-    if (docRef.path === lastPath.current) return;
-    lastPath.current = docRef.path;
-
     let isMounted = true;
+    
+    // Iniciamos la carga
     setIsLoading(true);
 
-    const fetchDoc = async () => {
-      try {
-        const snapshot = await getDoc(docRef);
-        
+    getDoc(docRef)
+      .then((snapshot) => {
         if (!isMounted) return;
 
         if (snapshot.exists()) {
-          setData({ ...(snapshot.data() as T), id: snapshot.id } as WithId<T>);
+          setData({ ...(snapshot.data() as T), id: snapshot.id });
         } else {
-          console.warn(`[useDocOnce] El documento no existe en la ruta: ${docRef.path}`);
+          console.warn(`[useDocOnce] El documento no existe: ${docRef.path}`);
           setData(null);
         }
         setError(null);
-      } catch (err) {
+      })
+      .catch((err) => {
         if (!isMounted) return;
-        console.error(`[useDocOnce] Error al obtener documento (${docRef.path}):`, err);
-        setError(err as FirestoreError | Error);
+        console.error(`[useDocOnce] Error en ${docRef.path}:`, err);
+        setError(err);
         setData(null);
-      } finally {
+      })
+      .finally(() => {
         if (isMounted) {
           setIsLoading(false);
         }
-      }
-    };
-
-    fetchDoc();
+      });
 
     return () => {
       isMounted = false;
     };
-  }, [docRef]);
+  }, [docRef?.path]); // Usamos path como dependencia para estabilidad
 
   return { data, isLoading, error };
 }
