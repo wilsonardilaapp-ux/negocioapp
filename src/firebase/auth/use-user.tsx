@@ -14,116 +14,113 @@ interface UserAuthState {
   userError: Error | null;
 }
 
-export interface UserHookResult {
-  user: User | null;
-  profile: UserProfile | null;
-  isUserLoading: boolean;
-  userError: Error | null;
-}
-
 const SUPER_ADMIN_EMAILS = ['allseosoporte@gmail.com'];
 
-export function useUser(): UserHookResult {
+export function useUser() {
   const { auth, firestore, isNetworkEnabled } = useFirebase();
-  const [userAuthState, setUserAuthState] = useState<UserAuthState>({
+  const [authState, setAuthState] = useState<{ user: User | null; isLoading: boolean; error: Error | null; }>({
     user: null,
-    profile: null,
-    isUserLoading: true,
-    userError: null,
+    isLoading: true,
+    error: null,
   });
-  
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [isProfileLoading, setProfileLoading] = useState(true);
+
   const router = useRouter();
   const pathname = usePathname();
 
+  // Effect 1: Handle Auth State Changes ONLY
   useEffect(() => {
-    // Wait until network is enabled to set up listeners
-    if (!auth || !firestore || !isNetworkEnabled) {
-        // If services aren't ready, we are not strictly "loading a user", 
-        // but we are not in a final state either. We keep loading true.
+    if (!auth || !isNetworkEnabled) {
+        setAuthState({ user: null, isLoading: false, error: null });
+        return;
+    };
+    
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+        setAuthState({ user, isLoading: false, error: null });
+    }, (error) => {
+        console.error("useUser: onAuthStateChanged error:", error);
+        setAuthState({ user: null, isLoading: false, error });
+    });
+
+    return () => unsubscribe();
+  }, [auth, isNetworkEnabled]);
+
+  // Effect 2: Handle Profile Fetching based on Auth State
+  useEffect(() => {
+    if (!firestore || !authState.user) {
+        setProfile(null);
+        setProfileLoading(false);
         return;
     }
 
-    let profileUnsubscribe: Unsubscribe | undefined;
+    setProfileLoading(true);
+    const userDocRef = doc(firestore, 'users', authState.user.uid);
 
-    const authUnsubscribe = onAuthStateChanged(
-      auth,
-      (currentUser) => {
-        if (profileUnsubscribe) {
-          profileUnsubscribe();
-          profileUnsubscribe = undefined;
-        }
-
-        if (currentUser) {
-          const userDocRef = doc(firestore, 'users', currentUser.uid);
-          profileUnsubscribe = onSnapshot(
-            userDocRef,
-            (userDocSnap) => {
-              let profile: UserProfile | null = null;
-              if (userDocSnap.exists()) {
-                profile = userDocSnap.data() as UserProfile;
-              } else if (SUPER_ADMIN_EMAILS.includes(currentUser.email || '')) {
-                profile = {
-                  id: currentUser.uid,
-                  name: currentUser.displayName || 'Super Admin',
-                  email: currentUser.email!,
-                  role: 'super_admin',
-                  status: 'active',
-                  createdAt: new Date().toISOString(),
-                  lastLogin: new Date().toISOString(),
-                };
-              }
-              setUserAuthState({ user: currentUser, profile, isUserLoading: false, userError: null });
-            },
-            (error) => {
-              console.error("useUser: Profile onSnapshot error:", error);
-              setUserAuthState({ user: currentUser, profile: null, isUserLoading: false, userError: error });
-            }
-          );
+    const unsubscribe = onSnapshot(userDocRef, (docSnap) => {
+        if (docSnap.exists()) {
+            setProfile(docSnap.data() as UserProfile);
+        } else if (SUPER_ADMIN_EMAILS.includes(authState.user?.email || '')) {
+            // Create a virtual profile for super admin if it doesn't exist
+            setProfile({
+                id: authState.user.uid,
+                name: authState.user.displayName || 'Super Admin',
+                email: authState.user.email!,
+                role: 'super_admin',
+                status: 'active',
+                createdAt: new Date().toISOString(),
+                lastLogin: new Date().toISOString(),
+            });
         } else {
-          setUserAuthState({ user: null, profile: null, isUserLoading: false, userError: null });
+            setProfile(null);
         }
-      },
-      (error) => {
-        console.error("useUser: onAuthStateChanged error:", error);
-        if (profileUnsubscribe) profileUnsubscribe();
-        setUserAuthState({ user: null, profile: null, isUserLoading: false, userError: error });
-      }
-    );
+        setProfileLoading(false);
+    }, (error) => {
+        console.error("useUser: Profile onSnapshot error:", error);
+        setProfile(null);
+        setProfileLoading(false);
+        // We set the auth error here if profile fails, to signal a problem
+        setAuthState(prev => ({...prev, error}));
+    });
 
-    return () => {
-      authUnsubscribe();
-      if (profileUnsubscribe) {
-        profileUnsubscribe();
-      }
-    };
-  }, [auth, firestore, isNetworkEnabled]);
+    return () => unsubscribe();
+  }, [firestore, authState.user]);
+
+  // Effect 3: Handle Redirection based on combined state
+  const isUserLoading = authState.isLoading || isProfileLoading;
   
-  // Logic for redirection, can also be moved here to be coupled with user state
   useEffect(() => {
-    if (userAuthState.isUserLoading) return;
+    // Don't redirect while still figuring out who the user is
+    if (isUserLoading) return;
 
     const isAuthPage = pathname === '/login' || pathname === '/register' || pathname === '/forgot-password';
     const isDashboardPage = pathname.startsWith('/dashboard');
     const isSuperAdminPage = pathname.startsWith('/superadmin');
-    const role = userAuthState.profile?.role;
+    const role = profile?.role;
 
-    if (userAuthState.user) {
+    if (authState.user) {
         if (role === 'super_admin') {
             if (isAuthPage || isDashboardPage) {
                 router.replace('/superadmin');
             }
-        } else { // Assumes 'cliente_admin' or any other non-super-admin role
+        } else if (role) { // Any other defined role
             if (isAuthPage || isSuperAdminPage) {
                 router.replace('/dashboard');
             }
         }
+        // If user exists but profile is null (still loading or doesn't exist), we wait.
     } else {
         // No user logged in
         if (isDashboardPage || isSuperAdminPage) {
             router.replace('/login');
         }
     }
-  }, [userAuthState, pathname, router]);
+  }, [isUserLoading, authState.user, profile, pathname, router]);
 
-  return userAuthState;
+  return {
+    user: authState.user,
+    profile: profile,
+    isUserLoading: isUserLoading,
+    userError: authState.error,
+  };
 }
