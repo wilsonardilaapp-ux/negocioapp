@@ -1,10 +1,11 @@
 'use client';
 
 import React, { useMemo } from 'react';
-import { useFirestore, useMemoFirebase, useDoc } from '@/firebase';
+import { useFirestore, useMemoFirebase } from '@/firebase';
+import { useDocOnce } from '@/firebase/hooks/use-doc-once';
 import { doc } from 'firebase/firestore';
 import { useParams } from 'next/navigation';
-import { Loader2, Frown } from 'lucide-react';
+import { Loader2, Frown, Settings } from 'lucide-react';
 import type { LandingPageData } from '@/models/landing-page';
 import LandingPageContent from '@/components/landing-page/landing-page-content';
 import { ChatbotWidget } from '@/components/chatbot/chatbot-widget';
@@ -27,8 +28,8 @@ export default function BusinessLandingPage() {
         return doc(firestore, 'modules', 'chatbot-integrado-con-whatsapp-para-soporte-y-ventas');
     }, [firestore]);
 
-    const { data: landingData, isLoading: isLandingLoading, error } = useDoc<LandingPageData>(landingPageDocRef);
-    const { data: chatbotModule, isLoading: isModuleLoading } = useDoc<Module>(chatbotModuleRef);
+    const { data: landingData, isLoading: isLandingLoading, error } = useDocOnce<LandingPageData>(landingPageDocRef);
+    const { data: chatbotModule, isLoading: isModuleLoading } = useDocOnce<Module>(chatbotModuleRef);
 
     const isLoading = isLandingLoading || isModuleLoading;
 
