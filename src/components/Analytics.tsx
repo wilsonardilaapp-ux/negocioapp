@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useDoc, useFirestore, useUser, useMemoFirebase } from '@/firebase';
@@ -6,12 +5,24 @@ import { doc } from 'firebase/firestore';
 import Script from 'next/script';
 import type { Module } from '@/models/module';
 import type { Business } from '@/models/business';
+import { usePathname } from 'next/navigation';
 
 const GTAG_URL = "https://www.googletagmanager.com/gtag/js?id=";
 
 export default function Analytics() {
     const firestore = useFirestore();
     const { user, isUserLoading } = useUser(); // Get user and loading state
+    const pathname = usePathname();
+
+    // The root cause of the "Target ID already exists" error on public pages
+    // is this component trying to fetch user-specific data (triggering useUser)
+    // on pages where it's not needed, causing listener conflicts in React's Strict Mode.
+    // By checking the path, we prevent any user-related hooks from running on public pages.
+    const isDashboardOrAdminPage = pathname.startsWith('/dashboard') || pathname.startsWith('/superadmin');
+
+    if (!isDashboardOrAdminPage) {
+        return null;
+    }
 
     // 1. Check if the 'google-analytics' module is active
     const gaModuleQuery = useMemoFirebase(() => {
