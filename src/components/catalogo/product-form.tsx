@@ -62,7 +62,6 @@ const MediaPreview = ({ item, alt }: { item: MediaItem, alt: string }) => {
     return <Image src={item.url} alt={alt} fill sizes="10rem" className="rounded-md object-cover" />;
 };
 
-// Lightbox component is defined outside to prevent re-creation on re-renders
 const Lightbox = ({
     isOpen,
     onOpenChange,
@@ -292,30 +291,10 @@ export default function ProductForm({ product, onSave, onCancel, imageLimit }: P
                         </div>
 
                         {/* Thumbnail Column */}
-                        <ScrollArea className="w-20 shrink-0 h-full">
+                         <ScrollArea className="h-full w-24 shrink-0">
                             <div className="space-y-2 pr-2">
                                 {Array.from({ length: Math.min(mediaItems.length + 1, imageLimit) }).map((_, i) => {
                                     const currentItem = mediaItems[i];
-                                    const isPlusButton = i === 3 && mediaItems.length > 4;
-                                    
-                                    if (isPlusButton) {
-                                      const remainingCount = mediaItems.length - 3;
-                                      return (
-                                        <div key="plus-btn" className="relative aspect-square w-full">
-                                            <button
-                                                type="button"
-                                                onClick={() => openLightbox(3)}
-                                                className="flex flex-col items-center justify-center w-full h-full border-2 border-dashed rounded-md bg-muted hover:bg-muted/80 text-muted-foreground"
-                                            >
-                                                <Plus className="h-4 w-4"/>
-                                                <span className="text-lg font-bold">{remainingCount}</span>
-                                            </button>
-                                        </div>
-                                      )
-                                    }
-
-                                    if (i > 3) return null;
-
                                     return (
                                         <div key={currentItem?.url || `placeholder-${i}`} className="relative aspect-square w-full">
                                             {isUploading === i ? (
@@ -374,18 +353,18 @@ export default function ProductForm({ product, onSave, onCancel, imageLimit }: P
                  <div>
                     <Label htmlFor="name">Nombre del Producto</Label>
                     <Input id="name" {...register("name")} placeholder="Ej: Café Orgánico de Altura" />
-                    {errors.name && <p className="text-sm text-destructive">{errors.name.message}</p>}
+                    {errors.name && <p className="text-sm text-destructive mt-1">{errors.name.message}</p>}
                 </div>
                 <div className="grid grid-cols-3 gap-4">
                     <div>
                         <Label htmlFor="price">Precio</Label>
                         <Input id="price" type="number" step="0.01" {...register("price")} />
-                        {errors.price && <p className="text-sm text-destructive">{errors.price.message}</p>}
+                        {errors.price && <p className="text-sm text-destructive mt-1">{errors.price.message}</p>}
                     </div>
                     <div>
                         <Label htmlFor="stock">Stock</Label>
                         <Input id="stock" type="number" {...register("stock")} />
-                        {errors.stock && <p className="text-sm text-destructive">{errors.stock.message}</p>}
+                        {errors.stock && <p className="text-sm text-destructive mt-1">{errors.stock.message}</p>}
                     </div>
                   <div>
                     <Label htmlFor="packagingCost">Costo de empaque</Label>
