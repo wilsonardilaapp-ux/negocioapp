@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import { useMemo, useState, useEffect, useRef, useCallback } from 'react';
@@ -55,9 +54,9 @@ const CatalogHeader = ({ config }: { config: LandingHeaderConfigData | null }) =
     return (
         <div className="w-full">
             {config.banner.mediaUrl && (
-                <div className="relative aspect-[1920/500] w-full">
+                <div className="relative w-full h-[200px] sm:h-[280px] lg:h-[360px] xl:h-[420px]">
                     {config.banner.mediaType === 'image' ? (
-                        <Image src={config.banner.mediaUrl} alt="Banner" fill sizes="100vw" className="object-cover"/>
+                        <Image src={config.banner.mediaUrl} alt="Banner" fill sizes="100vw" className="object-cover object-center"/>
                     ) : (
                         <video src={config.banner.mediaUrl} autoPlay loop muted controls className="w-full h-full object-cover" />
                     )}
@@ -66,7 +65,7 @@ const CatalogHeader = ({ config }: { config: LandingHeaderConfigData | null }) =
             <div className="bg-card shadow-md p-4">
                 <div className="container mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
                     <div className="text-center md:text-left">
-                        <h1 className="text-2xl font-bold font-headline">{config.businessInfo.name}</h1>
+                        <h1 className="text-xl md:text-3xl font-bold font-headline">{config.businessInfo.name}</h1>
                         <p className="text-sm text-muted-foreground">{config.businessInfo.address}</p>
                         {config.businessInfo.email && (
                             <a href={`mailto:${config.businessInfo.email}`} className="text-sm text-muted-foreground hover:text-primary flex items-center justify-center md:justify-start gap-1 mt-1">
@@ -103,7 +102,7 @@ const CatalogHeader = ({ config }: { config: LandingHeaderConfigData | null }) =
                     <CarouselContent>
                         {config.carouselItems.map(item => item.mediaUrl && (
                             <CarouselItem key={item.id}>
-                                 <div className="relative aspect-[1920/600] w-full">
+                                 <div className="relative w-full h-[200px] sm:h-[300px] lg:h-[420px]">
                                     {item.mediaType === 'image' ? (
                                         <Image src={item.mediaUrl} alt={item.slogan || 'Carousel image'} fill sizes="100vw" className="object-cover" />
                                     ) : (
@@ -149,7 +148,7 @@ const PublicProductCard = ({ product, onOpenModal }: { product: Product, onOpenM
     return (
         <Card className="flex flex-col overflow-hidden transition-shadow hover:shadow-lg h-full">
             <CardHeader className="p-0">
-                <div className="relative aspect-video w-full">
+                <div className="relative aspect-square w-full">
                     {isMediaVideo ? (
                         <video 
                             src={mediaUrl} 
@@ -170,13 +169,13 @@ const PublicProductCard = ({ product, onOpenModal }: { product: Product, onOpenM
                 </div>
             </CardHeader>
             <CardContent className="p-4 flex-grow">
-                <CardTitle className="h-[2.8rem] text-base font-semibold leading-snug overflow-hidden [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical] mb-1">{product.name}</CardTitle>
+                <CardTitle className="text-sm font-medium h-5 truncate mb-1">{product.name}</CardTitle>
                  <div className="flex items-center gap-1 text-sm text-muted-foreground mb-2">
                     <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
                     <span>{product.rating.toFixed(1)}</span>
                     <span className="text-xs">({product.ratingCount} valoraciones)</span>
                 </div>
-                <p className="text-2xl font-bold text-primary">{formatCurrency(product.price)}</p>
+                <p className="text-base font-semibold">{formatCurrency(product.price)}</p>
             </CardContent>
             <CardFooter className="p-4 pt-0">
                 <Button className="w-full" onClick={() => onOpenModal(product)}>
@@ -702,7 +701,7 @@ export default function CatalogPage() {
                 </div>
             )}
             
-            <main className="container mx-auto py-8 pb-10 md:pb-16 lg:pb-20">
+            <main className="container mx-auto max-w-[1400px] py-8 px-4 sm:px-6 lg:px-8 xl:px-12">
                 {isCatalogEmpty ? (
                     <Card className="sm:col-span-2 md:col-span-3 lg:col-span-4">
                         <CardContent className="h-[400px] flex flex-col items-center justify-center text-center gap-4">
@@ -716,7 +715,7 @@ export default function CatalogPage() {
                         </CardContent>
                     </Card>
                 ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                    <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-3 md:gap-5">
                         {products?.map(product => (
                             <PublicProductCard key={product.id} product={product} onOpenModal={handleOpenModal} />
                         ))}
