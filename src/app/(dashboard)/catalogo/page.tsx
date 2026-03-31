@@ -424,5 +424,3 @@ export default function CatalogoPage() {
         </div>
     );
 }
-
-    

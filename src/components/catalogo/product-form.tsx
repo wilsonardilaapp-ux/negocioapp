@@ -49,12 +49,115 @@ type MediaItem = {
     type: 'image' | 'video';
 };
 
+const Lightbox = ({ 
+    isOpen, 
+    onOpenChange, 
+    items, 
+    startIndex,
+    isArrowNavigation = true 
+}: { 
+    isOpen: boolean;
+    onOpenChange: (open: boolean) => void;
+    items: MediaItem[];
+    startIndex: number;
+    isArrowNavigation?: boolean;
+}) => {
+    const [currentIndex, setCurrentIndex] = useState(startIndex);
+
+    useEffect(() => {
+        if(isOpen) {
+            setCurrentIndex(startIndex);
+        }
+    }, [isOpen, startIndex]);
+
+    const goToNext = () => {
+        setCurrentIndex((prevIndex) => (prevIndex + 1) % items.length);
+    };
+
+    const goToPrevious = () => {
+        setCurrentIndex((prevIndex) => (prevIndex - 1 + items.length) % items.length);
+    };
+
+    useEffect(() => {
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (!isOpen) return;
+            if (event.key === 'ArrowRight') goToNext();
+            if (event.key === 'ArrowLeft') goToPrevious();
+        };
+
+        document.addEventListener('keydown', handleKeyDown);
+        return () => document.removeEventListener('keydown', handleKeyDown);
+    }, [isOpen, items.length]);
+
+    return (
+        <Dialog open={isOpen} onOpenChange={onOpenChange}>
+          <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col p-4 sm:p-6">
+            <DialogHeader>
+              <DialogTitle>Galería de Imágenes</DialogTitle>
+            </DialogHeader>
+            <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4 overflow-hidden relative">
+              <div className="md:col-span-2 relative bg-muted rounded-md flex items-center justify-center">
+                {items[currentIndex] && (
+                    <Image
+                        src={items[currentIndex]!.url}
+                        alt={`Imagen ${currentIndex + 1}`}
+                        fill
+                        className="object-contain"
+                    />
+                )}
+                 {isArrowNavigation && items.length > 1 && (
+                    <>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={goToPrevious}
+                            aria-label="Imagen anterior"
+                            className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-black/50 text-white hover:bg-black/75 h-10 w-10 z-10"
+                        >
+                            <ChevronLeft className="h-6 w-6" />
+                        </Button>
+                         <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={goToNext}
+                            aria-label="Siguiente imagen"
+                            className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-black/50 text-white hover:bg-black/75 h-10 w-10 z-10"
+                        >
+                            <ChevronRight className="h-6 w-6" />
+                        </Button>
+                    </>
+                )}
+              </div>
+              {!isArrowNavigation && (
+                  <ScrollArea className="md:col-span-1 h-full">
+                    <div className="grid grid-cols-3 md:grid-cols-2 gap-2 pr-4">
+                      {items.map((item, index) => item && (
+                        <button
+                          key={item.url}
+                          onClick={() => setCurrentIndex(index)}
+                          className={cn(
+                            "relative aspect-square rounded-md overflow-hidden ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring transition-all",
+                            currentIndex === index ? "ring-2 ring-primary" : "opacity-70 hover:opacity-100"
+                          )}
+                        >
+                          <Image src={item.url} alt={`Thumbnail ${index + 1}`} fill sizes="6rem" className="object-cover" />
+                        </button>
+                      ))}
+                    </div>
+                  </ScrollArea>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
+    );
+};
+
 export default function ProductForm({ product, onSave, onCancel, imageLimit }: ProductFormProps) {
     const { register, handleSubmit, control, reset, formState: { errors } } = useForm<z.infer<typeof productSchema>>({
         resolver: zodResolver(productSchema),
     });
 
-    const [mediaItems, setMediaItems] = useState<Array<MediaItem | null>>([]);
+    const [mediaItems, setMediaItems] = useState<MediaItem[]>([]);
     const [isUploading, setIsUploading] = useState<number | null>(null);
     const { toast } = useToast();
 
@@ -134,9 +237,7 @@ export default function ProductForm({ product, onSave, onCancel, imageLimit }: P
     };
     
     const removeMedia = (index: number) => {
-        const itemToRemove = mediaItems[index];
-        if (!itemToRemove) return;
-        setMediaItems(prev => prev.filter(item => item?.url !== itemToRemove.url));
+        setMediaItems(prev => prev.filter((_, i) => i !== index));
     };
 
     const isVideo = (url: string) => {
@@ -153,89 +254,6 @@ export default function ProductForm({ product, onSave, onCancel, imageLimit }: P
     const mainMediaItem = mediaItems[0];
     const canUploadMore = mediaItems.length < imageLimit;
 
-    const Lightbox = ({ isArrowNavigation = true }: { isArrowNavigation?: boolean }) => {
-        const goToNext = () => {
-            setSelectedLightboxIndex((prevIndex) => (prevIndex + 1) % mediaItems.length);
-        };
-    
-        const goToPrevious = () => {
-            setSelectedLightboxIndex((prevIndex) => (prevIndex - 1 + mediaItems.length) % mediaItems.length);
-        };
-    
-        useEffect(() => {
-            const handleKeyDown = (event: KeyboardEvent) => {
-                if (!isLightboxOpen) return;
-                if (event.key === 'ArrowRight') goToNext();
-                if (event.key === 'ArrowLeft') goToPrevious();
-            };
-    
-            document.addEventListener('keydown', handleKeyDown);
-            return () => document.removeEventListener('keydown', handleKeyDown);
-        }, [isLightboxOpen]);
-
-        return (
-            <Dialog open={isLightboxOpen} onOpenChange={setIsLightboxOpen}>
-              <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col p-4 sm:p-6">
-                <DialogHeader>
-                  <DialogTitle>Galería de Imágenes</DialogTitle>
-                </DialogHeader>
-                <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4 overflow-hidden relative">
-                  <div className="md:col-span-2 relative bg-muted rounded-md flex items-center justify-center">
-                    {mediaItems[selectedLightboxIndex] && (
-                        <Image
-                            src={mediaItems[selectedLightboxIndex]!.url}
-                            alt={`Imagen ${selectedLightboxIndex + 1}`}
-                            fill
-                            className="object-contain"
-                        />
-                    )}
-                     {isArrowNavigation && mediaItems.length > 1 && (
-                        <>
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={goToPrevious}
-                                aria-label="Imagen anterior"
-                                className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-black/50 text-white hover:bg-black/75 h-10 w-10 z-10"
-                            >
-                                <ChevronLeft className="h-6 w-6" />
-                            </Button>
-                             <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={goToNext}
-                                aria-label="Siguiente imagen"
-                                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-black/50 text-white hover:bg-black/75 h-10 w-10 z-10"
-                            >
-                                <ChevronRight className="h-6 w-6" />
-                            </Button>
-                        </>
-                    )}
-                  </div>
-                  {!isArrowNavigation && (
-                      <ScrollArea className="md:col-span-1 h-full">
-                        <div className="grid grid-cols-3 md:grid-cols-2 gap-2 pr-4">
-                          {mediaItems.map((item, index) => item && (
-                            <button
-                              key={item.url}
-                              onClick={() => setSelectedLightboxIndex(index)}
-                              className={cn(
-                                "relative aspect-square rounded-md overflow-hidden ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring transition-all",
-                                selectedLightboxIndex === index ? "ring-2 ring-primary" : "opacity-70 hover:opacity-100"
-                              )}
-                            >
-                              <Image src={item.url} alt={`Thumbnail ${index + 1}`} fill sizes="6rem" className="object-cover" />
-                            </button>
-                          ))}
-                        </div>
-                      </ScrollArea>
-                  )}
-                </div>
-              </DialogContent>
-            </Dialog>
-        );
-    };
-
     const MediaPreview = ({ item, alt }: { item: MediaItem, alt: string }) => {
         if (item.type === 'video') {
             return <video src={item.url} className="rounded-md object-cover w-full h-full" autoPlay loop muted />;
@@ -243,69 +261,68 @@ export default function ProductForm({ product, onSave, onCancel, imageLimit }: P
         return <Image src={item.url} alt={alt} fill sizes="10rem" className="rounded-md object-cover" />;
     };
 
+    const ThumbnailSlot = ({ index }: { index: number }) => {
+      const currentItem = mediaItems[index];
+
+      return (
+        <div className="relative aspect-square w-20">
+          {isUploading === index ? (
+            <div className="flex items-center justify-center w-full h-full border-2 border-dashed rounded-md bg-muted">
+              <Loader2 className="h-6 w-6 animate-spin" />
+            </div>
+          ) : currentItem ? (
+            <div className="group relative w-full h-full">
+              <button type="button" onClick={() => openLightbox(index)} className="w-full h-full">
+                <MediaPreview item={currentItem} alt={`Producto ${index + 1}`} />
+              </button>
+              <Button
+                type="button"
+                variant="destructive"
+                size="icon"
+                className="absolute top-0.5 right-0.5 h-5 w-5 opacity-0 group-hover:opacity-100"
+                onClick={() => removeMedia(index)}
+              >
+                <X className="h-3 w-3" />
+              </Button>
+            </div>
+          ) : canUploadMore ? (
+            <label className="flex flex-col items-center justify-center w-full h-full border-2 border-dashed rounded-md cursor-pointer hover:bg-muted p-2">
+              <UploadCloud className="h-5 w-5 text-muted-foreground" />
+              <Input type="file" className="hidden" onChange={(e) => e.target.files && handleMediaUpload(e.target.files[0], index)} accept="image/*,video/*" />
+            </label>
+          ) : (
+            <div className="flex items-center justify-center w-full h-full border-2 border-dashed rounded-md bg-muted/30" />
+          )}
+        </div>
+      );
+    };
+
     return (
         <>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 p-1 max-h-[80vh] overflow-y-auto">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 
-                <div className="space-y-2">
+                 <div className="space-y-2">
                     <Label>Imágenes/Videos del Producto (hasta {imageLimit})</Label>
                     <div className="flex gap-4">
                         <div className="flex flex-col gap-2 w-20 shrink-0">
-                            {Array.from({ length: 4 }).map((_, thumbIndex) => {
-                                const mediaIndex = thumbIndex + 1;
-                                const currentItem = mediaItems[mediaIndex];
-                                const remainingImages = mediaItems.length - 5;
-
-                                if (thumbIndex === 3 && mediaItems.length > 5) {
-                                    return (
-                                        <div key="more" className="relative aspect-square w-20">
-                                            <button
-                                                type="button"
-                                                onClick={() => openLightbox(mediaIndex)}
-                                                className="flex flex-col items-center justify-center w-full h-full border-2 border-dashed rounded-md bg-muted hover:bg-muted/80 text-muted-foreground"
-                                            >
-                                                <Plus className="h-6 w-6"/>
-                                                <span className="text-xl font-bold">{remainingImages}</span>
-                                            </button>
-                                        </div>
-                                    );
-                                }
-                                
-                                const canUploadThisSlot = mediaItems.length === mediaIndex && canUploadMore;
-
-                                return (
-                                    <div key={mediaIndex} className="relative aspect-square w-20">
-                                        {isUploading === mediaIndex ? (
-                                            <div className="flex items-center justify-center w-full h-full border-2 border-dashed rounded-md bg-muted">
-                                                <Loader2 className="h-6 w-6 animate-spin" />
-                                            </div>
-                                        ) : currentItem ? (
-                                            <div className="group relative w-full h-full">
-                                                <button type="button" onClick={() => openLightbox(mediaIndex)} className="w-full h-full">
-                                                    <MediaPreview item={currentItem} alt={`Producto ${mediaIndex + 1}`} />
-                                                </button>
-                                                <Button
-                                                    type="button"
-                                                    variant="destructive"
-                                                    size="icon"
-                                                    className="absolute top-0.5 right-0.5 h-5 w-5 opacity-0 group-hover:opacity-100"
-                                                    onClick={() => removeMedia(mediaIndex)}
-                                                >
-                                                    <X className="h-3 w-3" />
-                                                </Button>
-                                            </div>
-                                        ) : canUploadThisSlot ? (
-                                            <label className="flex flex-col items-center justify-center w-full h-full border-2 border-dashed rounded-md cursor-pointer hover:bg-muted p-2">
-                                                <UploadCloud className="h-5 w-5 text-muted-foreground" />
-                                                <Input type="file" className="hidden" onChange={(e) => e.target.files && handleMediaUpload(e.target.files[0], mediaIndex)} accept="image/*,video/*" />
-                                            </label>
-                                        ) : (
-                                            <div className="flex items-center justify-center w-full h-full border-2 border-dashed rounded-md bg-muted/30" />
-                                        )}
-                                    </div>
-                                );
-                            })}
+                           <ThumbnailSlot index={1} />
+                           <ThumbnailSlot index={2} />
+                           <ThumbnailSlot index={3} />
+                           {mediaItems.length > 4 ? (
+                             <div className="relative aspect-square w-20">
+                                <button
+                                  type="button"
+                                  onClick={() => openLightbox(4)}
+                                  className="flex flex-col items-center justify-center w-full h-full border-2 border-dashed rounded-md bg-muted hover:bg-muted/80 text-muted-foreground"
+                                >
+                                  <Plus className="h-6 w-6"/>
+                                  <span className="text-xl font-bold">{mediaItems.length - 4}</span>
+                                </button>
+                              </div>
+                           ) : (
+                            <ThumbnailSlot index={4} />
+                           )}
                         </div>
                         
                         <div className="flex-1 relative aspect-square w-full">
@@ -404,9 +421,12 @@ export default function ProductForm({ product, onSave, onCancel, imageLimit }: P
                 <Button type="submit">Guardar Producto</Button>
             </div>
         </form>
-        <Lightbox isArrowNavigation={true} />
+        <Lightbox 
+            isOpen={isLightboxOpen} 
+            onOpenChange={setIsLightboxOpen}
+            items={mediaItems}
+            startIndex={selectedLightboxIndex}
+        />
         </>
     );
 }
-
-    
