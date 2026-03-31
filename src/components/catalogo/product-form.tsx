@@ -221,9 +221,11 @@ export default function ProductForm({ product, onSave, onCancel, imageLimit }: P
             const mediaDataUri = reader.result as string;
             try {
                 const result = await uploadMedia({ mediaDataUri });
-                const mediaType = file.type.startsWith('image') ? 'image' : 'video';
                 
-                const newMediaItem = { url: result.secure_url, type: mediaType };
+                const newMediaItem: MediaItem = { 
+                    url: result.secure_url, 
+                    type: file.type.startsWith('image') ? 'image' : 'video'
+                };
                 const newMediaItems = [...mediaItems];
 
                 if (index >= newMediaItems.length) {
