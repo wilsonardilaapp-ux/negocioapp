@@ -147,8 +147,7 @@ const Lightbox = ({
     );
 };
 
-const IMAGE_SIZES = [600, 700, 800, 900, 1000, 1100, 1200] as const;
-type ImageSize = typeof IMAGE_SIZES[number];
+const IMAGE_SIZE = 800;
 
 export default function ProductForm({ product, onSave, onCancel, imageLimit }: ProductFormProps) {
     const { register, handleSubmit, control, reset, formState: { errors } } = useForm<z.infer<typeof productSchema>>({
@@ -162,7 +161,6 @@ export default function ProductForm({ product, onSave, onCancel, imageLimit }: P
 
     const [isLightboxOpen, setIsLightboxOpen] = useState(false);
     const [selectedLightboxIndex, setSelectedLightboxIndex] = useState(0);
-    const [imageSize, setImageSize] = useState<ImageSize>(600);
 
     const isLimitReached = useMemo(() => mediaItems.filter(item => item).length >= imageLimit, [mediaItems, imageLimit]);
 
@@ -270,32 +268,9 @@ export default function ProductForm({ product, onSave, onCancel, imageLimit }: P
                 <div className="space-y-4">
                     <Label>Imágenes/Videos del Producto (hasta {imageLimit})</Label>
 
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-xs text-muted-foreground whitespace-nowrap">
-                        Tamaño imagen principal:
-                      </span>
-                      <div className="flex gap-1 flex-wrap">
-                        {IMAGE_SIZES.map((size) => (
-                          <button
-                            key={size}
-                            type="button"
-                            onClick={() => setImageSize(size)}
-                            className={cn(
-                              "px-2 py-0.5 text-xs rounded border transition-colors",
-                              imageSize === size
-                                ? "bg-primary text-primary-foreground border-primary font-semibold"
-                                : "bg-background text-muted-foreground border-border hover:border-primary hover:text-primary"
-                            )}
-                          >
-                            {size}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                    
-                    <div className="flex gap-4" style={{ height: `${imageSize}px` }}>
+                    <div className="flex gap-4" style={{ height: `${IMAGE_SIZE}px` }}>
                         
-                        <div className="relative flex-shrink-0" style={{ width: `${imageSize}px`, height: `${imageSize}px` }}>
+                        <div className="relative flex-shrink-0" style={{ width: `${IMAGE_SIZE}px`, height: `${IMAGE_SIZE}px` }}>
                             {mainImage ? (
                                 <div className="group relative w-full h-full">
                                     <MediaPreview item={mainImage} alt="Producto Principal" objectFit="contain" />
@@ -319,22 +294,6 @@ export default function ProductForm({ product, onSave, onCancel, imageLimit }: P
                             <div className="space-y-2 pr-2">
                                 {Array.from({ length: imageLimit }).map((_, i) => {
                                     const currentItem = mediaItems[i];
-                                    const isPlusButton = i === 3 && mediaItems.length > 4;
-
-                                    if (isPlusButton) {
-                                        return (
-                                            <button
-                                                key="plus-button"
-                                                type="button"
-                                                onClick={() => openLightbox(i)}
-                                                className="flex items-center justify-center w-full aspect-square border-2 border-dashed rounded-md bg-muted hover:bg-accent"
-                                            >
-                                                <span className="text-lg font-bold text-muted-foreground">+{mediaItems.length - 3}</span>
-                                            </button>
-                                        );
-                                    }
-                                    
-                                    if (i > 3) return null;
 
                                     return (
                                         <div key={currentItem?.url || `placeholder-${i}`} className="relative aspect-square w-full">
