@@ -83,7 +83,7 @@ async function getPostBySlug(slug: string) {
       id: docSnapshot.id,
       title: data.title,
       content: data.content,
-      image_url: data.image_url || data.imageUrl || null,
+      image_url: data.image_url || data.imageUrl || "https://picsum.photos/seed/picsum/1200/800",
       createdAt: displayDate,
       rawDate: data.createdAt,
       seo: data.seo || {},
