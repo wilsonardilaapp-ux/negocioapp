@@ -23,7 +23,7 @@ export interface ContactMessage {
     read: boolean;
     replied: boolean;
     createdAt: string;
-    source: 'webform' | 'client_reply';
+    source: 'webform' | 'client_reply' | 'admin_form';
     userId?: string;
 }
 
