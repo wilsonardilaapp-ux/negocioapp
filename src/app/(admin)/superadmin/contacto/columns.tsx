@@ -23,6 +23,13 @@ import { AlertDialog, AlertDialogTrigger, AlertDialogContent, AlertDialogHeader,
 import type { ContactMessage } from "@/models/notification";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+
 
 type ColumnsProps = {
   handleDeleteMessage: (id: string) => Promise<void>;
@@ -75,8 +82,30 @@ export const columns = ({ handleDeleteMessage, handleUpdateMessage }: ColumnsPro
             const message = row.original;
             return (
                 <div className="flex items-center gap-2">
-                    {!message.read && <div className="h-2 w-2 rounded-full bg-primary" title="No leído"></div>}
-                    {message.replied && <CornerDownRight className="h-4 w-4 text-green-500" title="Respondido"/>}
+                    {!message.read && (
+                        <TooltipProvider>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <div className="h-2 w-2 rounded-full bg-primary"></div>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                    <p>No leído</p>
+                                </TooltipContent>
+                            </Tooltip>
+                        </TooltipProvider>
+                    )}
+                    {message.replied && (
+                       <TooltipProvider>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <CornerDownRight className="h-4 w-4 text-green-500" />
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                    <p>Respondido</p>
+                                </TooltipContent>
+                            </Tooltip>
+                        </TooltipProvider>
+                    )}
                 </div>
             );
         }
