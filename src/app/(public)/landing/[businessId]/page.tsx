@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { doc } from 'firebase/firestore';
 import { useFirestore, useMemoFirebase } from '@/firebase';
@@ -47,7 +47,7 @@ export default function BusinessLandingPage() {
     }
     
     if (businessError || !business) {
-        return (
+       return (
            <div className="flex h-screen w-full flex-col items-center justify-center bg-gray-50 p-4 text-center">
                <div className="bg-white p-10 rounded-3xl shadow-sm max-w-md border border-gray-100">
                    <div className="text-gray-300 text-6xl mb-4">☹️</div>
