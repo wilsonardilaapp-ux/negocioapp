@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -21,6 +21,7 @@ import {
   HardDrive,
   Calculator,
   Mail,
+  Bell,
 } from "lucide-react";
 import { MessageCircle as MessageCircleIcon } from "@/components/icons";
 
@@ -32,7 +33,8 @@ const allNavItems = [
   { href: "/dashboard/catalogo", icon: ShoppingCart, label: "Catálogo", moduleId: 'catalogo' },
   { href: "/dashboard/share", icon: Share2, label: "Compartir Menú" },
   { href: "/dashboard/blog", icon: FileText, label: "Blog", moduleId: 'blog' },
-  { href: "/dashboard/mensajes", icon: Mail, label: "Mensajes" },
+  { href: "/dashboard/messages", icon: Bell, label: "Notificaciones" },
+  { href: "/dashboard/mensajes-clientes", icon: Mail, label: "Mensajes de Clientes" },
   { href: "/dashboard/contacto", icon: MessageSquare, label: "Soporte" },
   { href: "/dashboard/pedidos", icon: ShoppingBag, label: "Pedidos" },
   { href: "/dashboard/empaque", icon: Package, label: "Empaque" },

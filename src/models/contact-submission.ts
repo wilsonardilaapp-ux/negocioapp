@@ -4,7 +4,7 @@ export type ContactSubmission = {
     formId: string;
     sender: string;
     email: string;
-    whatsapp?: string; // Nuevo campo opcional
+    whatsapp?: string;
     message: string;
     date: string; // ISO 8601 date string
 };
