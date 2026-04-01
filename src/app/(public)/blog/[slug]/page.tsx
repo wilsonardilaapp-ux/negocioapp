@@ -6,6 +6,9 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight, Calendar, User } from "lucide-react";
 import { firebaseConfig } from "@/firebase/config";
+import Header from "@/components/layout/header";
+import Footer from "@/components/layout/footer";
+import type { LandingPageData } from "@/models/landing-page";
 
 export const dynamic = 'force-dynamic';
 
@@ -16,6 +19,26 @@ const db = getFirestore(app);
 type Props = {
   params: Promise<{ slug: string }>;
 };
+
+async function getHeaderData(): Promise<{ businessId: string | null, navigation: LandingPageData['navigation'] | null }> {
+    try {
+        const configSnap = await getDoc(doc(db, "globalConfig", "system"));
+        const mainBusinessId = configSnap.exists() ? configSnap.data().mainBusinessId : null;
+
+        if (!mainBusinessId) {
+            return { businessId: null, navigation: null };
+        }
+
+        const landingSnap = await getDoc(doc(db, "businesses", mainBusinessId, "landingPages", "main"));
+        const navigation = landingSnap.exists() ? (landingSnap.data() as LandingPageData).navigation : null;
+        
+        return { businessId: mainBusinessId, navigation };
+    } catch (error) {
+        console.error("Error fetching header data:", error);
+        return { businessId: null, navigation: null };
+    }
+}
+
 
 function getQueryDate(dateVal: any) {
   if (typeof dateVal === 'string') return dateVal;
@@ -131,6 +154,8 @@ export async function generateMetadata({ params }: Props) {
 
 export default async function BlogPostPage({ params }: Props) {
   const { slug } = await params;
+  const { businessId, navigation } = await getHeaderData();
+
 
   if (!isConfigValid) {
     return (
@@ -151,6 +176,7 @@ export default async function BlogPostPage({ params }: Props) {
 
   return (
     <div className="bg-white">
+      <Header businessId={businessId} navigation={navigation} />
       <article className="min-h-screen pb-20">
         <div className="container mx-auto px-4 py-6">
           <Link href="/blog"> 
@@ -225,6 +251,7 @@ export default async function BlogPostPage({ params }: Props) {
           </div>
         </div>
       </article>
+      <Footer />
     </div>
   );
 }

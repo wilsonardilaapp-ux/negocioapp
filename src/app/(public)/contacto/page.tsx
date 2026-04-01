@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -17,7 +18,6 @@ import type { ContactMessage } from '@/models/notification';
 import { Loader2, Mail, Phone, Instagram, Facebook, ShieldCheck, HeartHandshake, History, ArrowLeft, Send } from "lucide-react";
 import Link from 'next/link';
 import { TikTokIcon, WhatsAppIcon } from '@/components/icons';
-import Footer from '@/components/layout/footer';
 
 
 // List of country codes
@@ -82,19 +82,16 @@ export default function ContactoPage() {
     try {
       const fullWhatsapp = data.countryCode && data.whatsapp ? `${data.countryCode}${data.whatsapp.replace(/\s/g, '')}` : undefined;
 
-      const submissionData: Omit<ContactMessage, 'id'> = {
+      const submissionData: Omit<ContactMessage, 'id' | 'replied' | 'read'> = {
         name: data.name,
         email: data.email,
         whatsapp: fullWhatsapp,
         subject: data.subject,
         body: data.body,
-        read: false,
-        replied: false,
         createdAt: new Date().toISOString(),
         source: 'webform',
       };
       
-      // The 'company' field is optional and was missing in the previous logic
       if (data.company) {
         (submissionData as any).company = data.company;
       }
@@ -128,18 +125,6 @@ export default function ContactoPage() {
 
   return (
     <div className="w-full bg-gray-50/50">
-      {/* Header with Back Button */}
-      <header className="py-4 bg-white border-b">
-        <div className="container mx-auto px-4">
-          <Button asChild variant="ghost">
-            <Link href="/">
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Volver al inicio
-            </Link>
-          </Button>
-        </div>
-      </header>
-
       <main className="container mx-auto px-4 py-16">
         {/* Hero Section */}
         <section className="text-center max-w-3xl mx-auto mb-16">
@@ -294,8 +279,6 @@ export default function ContactoPage() {
             </div>
         </section>
       </main>
-
-      <Footer />
     </div>
   );
 }
