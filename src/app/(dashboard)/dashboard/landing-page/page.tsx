@@ -7,7 +7,7 @@ import { Save, Loader2 } from 'lucide-react';
 import type { LandingPageData } from '@/models/landing-page';
 import EditorLandingForm from '@/components/landing-page/editor-landing-form';
 import EditorLandingPreview from '@/components/landing-page/editor-landing-preview';
-import { useUser, useFirestore, useMemoFirebase } from '@/firebase';
+import { useUser, useFirestore, useMemoFirebase, setDocumentNonBlocking } from '@/firebase';
 import { doc, getDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { v4 as uuidv4 } from 'uuid';
@@ -96,11 +96,16 @@ export default function LandingPageBuilder() {
     setIsSaving(true);
     
     try {
-        const result = await saveBusinessLanding(user.uid, data);
+        // Step 1: Client-side write using the non-blocking function
+        await setDocumentNonBlocking(docRef, data, { merge: true });
+
+        // Step 2: Server-side cache revalidation via the simplified Server Action
+        const result = await saveBusinessLanding(user.uid);
+        
         if (result.success) {
-            toast({ title: "Guardado", description: "Cambios aplicados con éxito." });
+            toast({ title: "Guardado y Publicado", description: "Tus cambios han sido guardados y la página pública ha sido actualizada." });
         } else {
-            throw new Error(result.error || 'Error desconocido en el servidor.');
+            throw new Error(result.error || 'Los datos se guardaron, pero falló la actualización de la página pública.');
         }
     } catch(error: any) {
         toast({

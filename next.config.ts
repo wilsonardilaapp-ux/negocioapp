@@ -9,7 +9,7 @@ const nextConfig: NextConfig = {
         // By marking them as external, we tell Next.js to use
         // the version from node_modules directly at runtime on the server,
         // which bypasses the bundling issue.
-        serverComponentsExternalPackages: ['@opentelemetry/api', 'firebase', 'firebase-admin'],
+        serverComponentsExternalPackages: ['@opentelemetry/api', 'firebase-admin'],
     },
     images: {
         remotePatterns: [
