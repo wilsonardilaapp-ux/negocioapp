@@ -18,6 +18,7 @@ import {
   UserCircle,
   Building,
   Bell,
+  Mail, // Added icon
 } from "lucide-react";
 
 import { SidebarMenu, SidebarMenuItem, SidebarMenuButton } from "@/components/ui/sidebar";
@@ -32,6 +33,7 @@ const navItems = [
   { href: "/superadmin/payment-methods", icon: CreditCard, label: "Pasarelas de Pago" },
   { href: "/superadmin/blog", icon: FileText, label: "Blog" },
   { href: "/superadmin/notifications", icon: Bell, label: "Notificaciones" },
+  { href: "/superadmin/contacto", icon: Mail, label: "Contacto" }, // Added new page
   { href: "/superadmin/landing-public", icon: FileText, label: "Editor de Landing" },
   { href: "/superadmin/servicios", icon: Server, label: "Servicios" },
   { href: "/superadmin/modulos", icon: Box, label: "Módulos" },
