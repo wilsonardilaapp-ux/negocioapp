@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ColumnDef } from "@tanstack/react-table"
 import { MoreHorizontal, Eye, Trash2, Mail, Phone, CornerDownRight, Check, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -31,7 +31,7 @@ type ColumnsProps = {
 
 const ViewMessageDialog = ({ submission, onOpenChange, isOpen, onMarkRead }: { submission: ContactMessage, onOpenChange: (open: boolean) => void, isOpen: boolean, onMarkRead: () => void }) => {
     
-    React.useEffect(() => {
+    useEffect(() => {
         if(isOpen && !submission.read) {
             onMarkRead();
         }
