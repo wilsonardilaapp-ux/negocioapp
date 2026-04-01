@@ -43,9 +43,9 @@ export default function ContactoAdminPage() {
         <div className="flex flex-col gap-6">
             <Card>
                 <CardHeader>
-                    <CardTitle>Bandeja de Entrada de Contacto</CardTitle>
+                    <CardTitle>Bandeja de Entrada Global</CardTitle>
                     <CardDescription>
-                        Administra los mensajes recibidos desde el formulario de contacto principal.
+                        Gestiona los mensajes recibidos desde el formulario de contacto principal y desde los paneles de clientes.
                     </CardDescription>
                 </CardHeader>
             </Card>

@@ -106,7 +106,21 @@ export const columns = ({ handleDeleteMessage, handleUpdateMessage }: ColumnsPro
       header: "Origen",
       cell: ({ row }) => {
           const source = row.getValue("source") as ContactMessage['source'];
-          return <Badge variant={source === 'client_reply' ? 'default' : 'secondary'}>{source === 'client_reply' ? 'Respuesta de Cliente' : 'Formulario Web'}</Badge>;
+          let variant: "default" | "secondary" | "outline" = "secondary";
+          let text = "Formulario Web";
+
+          if (source === 'client_reply') {
+              variant = "default";
+              text = "Respuesta de Cliente";
+          } else if (source === 'client_contact') {
+              variant = "outline";
+              text = "Panel de Cliente";
+          } else if (source === 'admin_form') {
+              variant = "default"
+              text = "Admin Form"
+          }
+          
+          return <Badge variant={variant}>{text}</Badge>;
       }
     },
     {

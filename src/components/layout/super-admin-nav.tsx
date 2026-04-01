@@ -34,7 +34,6 @@ const navItems = [
   { href: "/superadmin/blog", icon: FileText, label: "Blog" },
   { href: "/superadmin/notifications", icon: Bell, label: "Notificaciones" },
   { href: "/superadmin/contacto", icon: Mail, label: "Bandeja de Entrada" },
-  { href: "/superadmin/contactoadmin", icon: Mail, label: "Contactar Soporte" },
   { href: "/superadmin/landing-public", icon: FileText, label: "Editor de Landing" },
   { href: "/superadmin/servicios", icon: Server, label: "Servicios" },
   { href: "/superadmin/modulos", icon: Box, label: "Módulos" },
