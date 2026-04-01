@@ -264,7 +264,7 @@ export default function LandingPageContent({ data, businessId, logoUrl }: Landin
                             </div>
                             <div className="prose prose-sm text-gray-600 mb-6 flex-grow" dangerouslySetInnerHTML={{ __html: testimonial.text }} />
                             <div className="flex items-center gap-4 mt-auto">
-                                <Image src={testimonial.avatarUrl} alt={testimonial.authorName} width={56} height={56} className="rounded-full" />
+                                <Image src={testimonial.avatarUrl} alt={testimonial.authorName} width={72} height={72} className="rounded-full" />
                                 <div>
                                     <p className="font-semibold text-gray-900">{testimonial.authorName}</p>
                                     <p className="text-sm text-gray-500">{testimonial.authorRole}</p>
