@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useMemo, useState, useEffect, useRef, useCallback } from 'react';
@@ -374,42 +373,46 @@ const ProductViewModal = ({ product, isOpen, onOpenChange, businessPhone, busine
                 <DialogContent className="sm:max-w-6xl p-0 flex flex-col max-h-[90vh]">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-0 flex-grow min-h-0">
                         {/* Columna Izquierda (Imagen) */}
-                        <div className="p-6 flex flex-col gap-4">
-                            <button
-                                type="button"
-                                className="relative aspect-square w-full rounded-lg overflow-hidden border cursor-zoom-in"
-                                onClick={() => setIsLightboxOpen(true)}
-                            >
-                                {isVideo(mainImage) ? (
-                                    <video src={mainImage} autoPlay loop muted controls className="object-contain w-full h-full" />
-                                ) : (
-                                    <Image src={mainImage} alt={product.name} fill sizes="(max-width: 768px) 90vw, 40vw" className="object-contain"/>
-                                )}
-                            </button>
-                            <ScrollArea className="w-full whitespace-nowrap rounded-md">
-                                <div className="flex w-max space-x-2 p-2">
-                                {product.images.map((img, index) => {
-                                    const isThumbVideo = isVideo(img);
-                                    return (
-                                        <button 
-                                            key={index} 
-                                            onClick={() => setMainImage(img)} 
-                                            className={cn(
-                                                "relative aspect-square w-20 h-20 shrink-0 rounded-md overflow-hidden ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring transition-all",
-                                                mainImage === img ? "ring-2 ring-primary opacity-100" : "opacity-70 hover:opacity-100"
-                                            )}
-                                        >
-                                            {isThumbVideo ? (
-                                                <video src={img} muted className="object-cover w-full h-full"/>
-                                            ) : (
-                                                <Image src={img} alt={`${product.name} thumbnail ${index + 1}`} fill sizes="6rem" className="object-cover"/>
-                                            )}
-                                        </button>
-                                    );
-                                })}
-                                </div>
-                                <ScrollBar orientation="horizontal" />
-                            </ScrollArea>
+                        <div className="p-6 flex flex-col gap-4 min-h-0">
+                            <div className="relative flex-grow min-h-0">
+                                <button
+                                    type="button"
+                                    className="relative w-full h-full rounded-lg overflow-hidden border cursor-zoom-in"
+                                    onClick={() => setIsLightboxOpen(true)}
+                                >
+                                    {isVideo(mainImage) ? (
+                                        <video src={mainImage} autoPlay loop muted controls className="object-contain w-full h-full" />
+                                    ) : (
+                                        <Image src={mainImage} alt={product.name} fill sizes="(max-width: 768px) 90vw, 40vw" className="object-contain"/>
+                                    )}
+                                </button>
+                            </div>
+                            <div className="flex-shrink-0">
+                                <ScrollArea className="w-full whitespace-nowrap rounded-md">
+                                    <div className="flex w-max space-x-2 p-2">
+                                    {product.images.map((img, index) => {
+                                        const isThumbVideo = isVideo(img);
+                                        return (
+                                            <button 
+                                                key={index} 
+                                                onClick={() => setMainImage(img)} 
+                                                className={cn(
+                                                    "relative aspect-square w-20 h-20 shrink-0 rounded-md overflow-hidden ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring transition-all",
+                                                    mainImage === img ? "ring-2 ring-primary opacity-100" : "opacity-70 hover:opacity-100"
+                                                )}
+                                            >
+                                                {isThumbVideo ? (
+                                                    <video src={img} muted className="object-cover w-full h-full"/>
+                                                ) : (
+                                                    <Image src={img} alt={`${product.name} thumbnail ${index + 1}`} fill sizes="6rem" className="object-cover"/>
+                                                )}
+                                            </button>
+                                        );
+                                    })}
+                                    </div>
+                                    <ScrollBar orientation="horizontal" />
+                                </ScrollArea>
+                            </div>
                         </div>
                         {/* Columna Derecha (Detalles) */}
                         <div className="p-6 flex flex-col min-h-0">
@@ -757,4 +760,3 @@ export default function CatalogPage() {
         </div>
     );
 }
-
