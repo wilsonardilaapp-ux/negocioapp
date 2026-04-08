@@ -18,7 +18,8 @@ import {
   UserCircle,
   Building,
   Bell,
-  Mail, // Added icon
+  Mail,
+  ScanLine, // Importado
 } from "lucide-react";
 
 import { SidebarMenu, SidebarMenuItem, SidebarMenuButton } from "@/components/ui/sidebar";
@@ -39,6 +40,7 @@ const navItems = [
   { href: "/superadmin/modulos", icon: Box, label: "Módulos" },
   { href: "/superadmin/integraciones", icon: Plug, label: "Integraciones" },
   { href: "/superadmin/monitoreo", icon: Activity, label: "Monitoreo" },
+  { href: "/superadmin/pistola-scanner", icon: ScanLine, label: "Pistola Escáner" },
   { href: "/superadmin/configuracion", icon: Settings, label: "Configuración" },
   { href: "/superadmin/analytics", icon: BarChart, label: "Métricas" },
   { href: "/superadmin/perfil", icon: UserCircle, label: "Perfil" },
