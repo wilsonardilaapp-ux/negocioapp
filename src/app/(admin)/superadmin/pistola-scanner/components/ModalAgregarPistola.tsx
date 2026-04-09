@@ -26,11 +26,10 @@ const tiposConexion = ['USB HID', 'Bluetooth SPP', 'RS-232 Serial', 'Wi-Fi'] as 
 const terminales = ['POS Principal', 'Inventario', 'Móvil / Tablet', 'Recepción'] as const;
 
 // Aplanar todos los modelos en un solo array para que Zod pueda crear el enum
-const allModelos = [...new Set(Object.values(modelosPorMarca).flat())];
-
-// Zod's .enum needs a non-empty array literal type. This workaround ensures that.
+const allModelos = [...new Set(Object.values(modelosPorMarca).flat())] as const;
 const [firstModel, ...otherModels] = allModelos;
-const nonEmptyModelos: [string, ...string[]] = [firstModel, ...otherModels];
+const nonEmptyModelos: [string, ...string[]] = [firstModel!, ...otherModels];
+
 
 const schema = z.object({
   nombre: z.string().min(3, 'El nombre es requerido'),
