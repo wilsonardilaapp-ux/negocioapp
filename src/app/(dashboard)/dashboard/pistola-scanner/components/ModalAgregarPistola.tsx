@@ -1,4 +1,3 @@
-
 // src/app/(dashboard)/dashboard/pistola-scanner/components/ModalAgregarPistola.tsx
 "use client";
 
@@ -14,8 +13,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import type { FormularioPistolaScanner, MarcaScanner, ModeloScanner, TipoConexion, TerminalAsignada } from '@/models/pistolaScanner';
 
-const marcas: MarcaScanner[] = ['Honeywell', 'Zebra', 'Datalogic', 'Newland', 'Opticon', 'Metrologic', 'Otro'];
-const modelosPorMarca: Record<MarcaScanner, ModeloScanner[]> = {
+const marcas = ['Honeywell', 'Zebra', 'Datalogic', 'Newland', 'Opticon', 'Metrologic', 'Otro'] as const;
+const modelosPorMarca = {
     Honeywell: ['Honeywell Voyager 1202g', 'Honeywell Xenon 1900', 'Honeywell Granit 1981i', 'Honeywell Genesis 7580g', 'Otro'],
     Zebra: ['Zebra DS2208-SR', 'Zebra DS8178', 'Zebra LI3678', 'Zebra CS6080', 'Otro'],
     Datalogic: ['Datalogic QuickScan QD2430', 'Datalogic Gryphon GD4430', 'Datalogic Heron HD3430', 'Otro'],
@@ -23,19 +22,28 @@ const modelosPorMarca: Record<MarcaScanner, ModeloScanner[]> = {
     Opticon: ['Opticon OPI-3601', 'Opticon OPR-3301', 'Otro'],
     Metrologic: ['Otro'],
     Otro: ['Otro'],
-};
-const tiposConexion: TipoConexion[] = ['USB HID', 'Bluetooth SPP', 'RS-232 Serial', 'Wi-Fi'];
-const terminales: TerminalAsignada[] = ['POS Principal', 'Inventario', 'Móvil / Tablet', 'Recepción'];
+} as const;
+const tiposConexion = ['USB HID', 'Bluetooth SPP', 'RS-232 Serial', 'Wi-Fi'] as const;
+const terminales = ['POS Principal', 'Inventario', 'Móvil / Tablet', 'Recepción'] as const;
+
+// Aplanar todos los modelos en un solo array para que Zod pueda crear el enum
+const allModelos = [...new Set(Object.values(modelosPorMarca).flat())] as const;
+const [firstModel, ...otherModels] = allModelos;
+const nonEmptyModelos: [string, ...string[]] = [firstModel!, ...otherModels];
+
 
 const schema = z.object({
   nombre: z.string().min(3, 'El nombre es requerido'),
   marca: z.enum(marcas),
-  modelo: z.string().min(1, 'El modelo es requerido'),
+  modelo: z.enum(nonEmptyModelos),
   numeroSerie: z.string().min(3, 'El número de serie es requerido'),
   tipoConexion: z.enum(tiposConexion),
   puerto: z.string().min(1, 'El puerto es requerido'),
   terminalAsignada: z.enum(terminales),
 });
+
+// Infer the type from the Zod schema to avoid mismatches
+type PistolaFormData = z.infer<typeof schema>;
 
 interface ModalAgregarPistolaProps {
   abierto: boolean;
@@ -45,7 +53,7 @@ interface ModalAgregarPistolaProps {
 
 export default function ModalAgregarPistola({ abierto, onCerrar, onGuardar }: ModalAgregarPistolaProps) {
     const { toast } = useToast();
-    const { register, handleSubmit, control, watch, formState: { errors } } = useForm<FormularioPistolaScanner>({
+    const { register, handleSubmit, control, watch, formState: { errors } } = useForm<PistolaFormData>({
         resolver: zodResolver(schema),
         defaultValues: {
             nombre: '',
@@ -60,8 +68,9 @@ export default function ModalAgregarPistola({ abierto, onCerrar, onGuardar }: Mo
 
     const marcaSeleccionada = watch('marca');
 
-    const onSubmit = (data: FormularioPistolaScanner) => {
-        onGuardar(data);
+    const onSubmit = (data: PistolaFormData) => {
+        // Assert the type to satisfy the onGuardar prop
+        onGuardar(data as FormularioPistolaScanner);
     };
 
     return (
@@ -93,7 +102,7 @@ export default function ModalAgregarPistola({ abierto, onCerrar, onGuardar }: Mo
                                 <Select onValueChange={field.onChange} value={field.value}>
                                     <SelectTrigger id="modelo"><SelectValue /></SelectTrigger>
                                     <SelectContent>
-                                        {modelosPorMarca[marcaSeleccionada].map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                                        {(modelosPorMarca[marcaSeleccionada] || []).map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
                                     </SelectContent>
                                 </Select>
                             )} />
