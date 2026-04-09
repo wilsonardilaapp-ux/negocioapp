@@ -61,6 +61,7 @@ const DEFAULT_MODULES: { name: string; description: string; limit: number; }[] =
     { name: 'Motor de Sugerencias Inteligentes', description: 'Motor para sugerir productos', limit: -1 },
     { name: 'Google Analytics', description: 'Integración con Google Analytics', limit: -1 },
     { name: 'Cloudinary', description: 'Almacenamiento de medios en la nube', limit: -1 },
+    { name: 'Pistola Escáner', description: 'Gestión de dispositivos de escaneo de códigos de barras.', limit: -1 },
 ];
 
 const slugify = (text: string) => 
