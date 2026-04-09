@@ -1,3 +1,4 @@
+
 export interface PistolaScanner {
   id: string;
   nombre: string;

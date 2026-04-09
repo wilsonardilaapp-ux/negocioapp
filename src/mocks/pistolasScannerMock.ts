@@ -1,3 +1,4 @@
+
 import {
   PistolaScanner,
   ConfiguracionScanner
