@@ -26,17 +26,24 @@ const tiposConexion = ['USB HID', 'Bluetooth SPP', 'RS-232 Serial', 'Wi-Fi'] as 
 const terminales = ['POS Principal', 'Inventario', 'Móvil / Tablet', 'Recepción'] as const;
 
 // Aplanar todos los modelos en un solo array para que Zod pueda crear el enum
-const allModelos = [...new Set(Object.values(modelosPorMarca).flat())] as const;
+const allModelos = [...new Set(Object.values(modelosPorMarca).flat())];
+
+// Zod's .enum needs a non-empty array literal type. This workaround ensures that.
+const [firstModel, ...otherModels] = allModelos;
+const nonEmptyModelos: [string, ...string[]] = [firstModel, ...otherModels];
 
 const schema = z.object({
   nombre: z.string().min(3, 'El nombre es requerido'),
   marca: z.enum(marcas),
-  modelo: z.enum(allModelos),
+  modelo: z.enum(nonEmptyModelos),
   numeroSerie: z.string().min(3, 'El número de serie es requerido'),
   tipoConexion: z.enum(tiposConexion),
   puerto: z.string().min(1, 'El puerto es requerido'),
   terminalAsignada: z.enum(terminales),
 });
+
+// Infer the type from the Zod schema to avoid mismatches
+type PistolaFormData = z.infer<typeof schema>;
 
 interface ModalAgregarPistolaProps {
   abierto: boolean;
@@ -46,7 +53,7 @@ interface ModalAgregarPistolaProps {
 
 export default function ModalAgregarPistola({ abierto, onCerrar, onGuardar }: ModalAgregarPistolaProps) {
     const { toast } = useToast();
-    const { register, handleSubmit, control, watch, formState: { errors } } = useForm<FormularioPistolaScanner>({
+    const { register, handleSubmit, control, watch, formState: { errors } } = useForm<PistolaFormData>({
         resolver: zodResolver(schema),
         defaultValues: {
             nombre: '',
@@ -61,8 +68,9 @@ export default function ModalAgregarPistola({ abierto, onCerrar, onGuardar }: Mo
 
     const marcaSeleccionada = watch('marca');
 
-    const onSubmit = (data: FormularioPistolaScanner) => {
-        onGuardar(data);
+    const onSubmit = (data: PistolaFormData) => {
+        // Assert the type to satisfy the onGuardar prop
+        onGuardar(data as FormularioPistolaScanner);
     };
 
     return (
