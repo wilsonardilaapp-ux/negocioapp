@@ -13,7 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 import type { FormularioPistolaScanner, MarcaScanner, ModeloScanner, TipoConexion, TerminalAsignada } from '@/models/pistolaScanner';
 
 const marcas = ['Honeywell', 'Zebra', 'Datalogic', 'Newland', 'Opticon', 'Metrologic', 'Otro'] as const;
-const modelosPorMarca: Record<MarcaScanner, ModeloScanner[]> = {
+const modelosPorMarca = {
     Honeywell: ['Honeywell Voyager 1202g', 'Honeywell Xenon 1900', 'Honeywell Granit 1981i', 'Honeywell Genesis 7580g', 'Otro'],
     Zebra: ['Zebra DS2208-SR', 'Zebra DS8178', 'Zebra LI3678', 'Zebra CS6080', 'Otro'],
     Datalogic: ['Datalogic QuickScan QD2430', 'Datalogic Gryphon GD4430', 'Datalogic Heron HD3430', 'Otro'],
@@ -21,14 +21,17 @@ const modelosPorMarca: Record<MarcaScanner, ModeloScanner[]> = {
     Opticon: ['Opticon OPI-3601', 'Opticon OPR-3301', 'Otro'],
     Metrologic: ['Otro'],
     Otro: ['Otro'],
-};
+} as const;
 const tiposConexion = ['USB HID', 'Bluetooth SPP', 'RS-232 Serial', 'Wi-Fi'] as const;
 const terminales = ['POS Principal', 'Inventario', 'Móvil / Tablet', 'Recepción'] as const;
+
+// Aplanar todos los modelos en un solo array para que Zod pueda crear el enum
+const allModelos = [...new Set(Object.values(modelosPorMarca).flat())] as [string, ...string[]];
 
 const schema = z.object({
   nombre: z.string().min(3, 'El nombre es requerido'),
   marca: z.enum(marcas),
-  modelo: z.string().min(1, 'El modelo es requerido'),
+  modelo: z.enum(allModelos),
   numeroSerie: z.string().min(3, 'El número de serie es requerido'),
   tipoConexion: z.enum(tiposConexion),
   puerto: z.string().min(1, 'El puerto es requerido'),
@@ -91,7 +94,7 @@ export default function ModalAgregarPistola({ abierto, onCerrar, onGuardar }: Mo
                                 <Select onValueChange={field.onChange} value={field.value}>
                                     <SelectTrigger id="modelo"><SelectValue /></SelectTrigger>
                                     <SelectContent>
-                                        {modelosPorMarca[marcaSeleccionada].map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                                        {(modelosPorMarca[marcaSeleccionada] || []).map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
                                     </SelectContent>
                                 </Select>
                             )} />
