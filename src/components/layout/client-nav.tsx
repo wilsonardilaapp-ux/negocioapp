@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useUser, useCollection, useFirestore, useMemoFirebase } from "@/firebase";
 import { collection, query, where } from "firebase/firestore";
 import type { Module } from "@/models/module";
+import type { SystemService } from "@/models/system-service";
 import {
   LayoutDashboard,
   FileText,
@@ -22,8 +23,10 @@ import {
   Calculator,
   Mail,
   Bell,
+  ScanLine,
 } from "lucide-react";
 import { MessageCircle as MessageCircleIcon } from "@/components/icons";
+import { useMemo } from 'react';
 
 import { SidebarMenu, SidebarMenuItem, SidebarMenuButton, useSidebar } from "@/components/ui/sidebar";
 
@@ -43,6 +46,7 @@ const allNavItems = [
   { href: "/dashboard/kardex", icon: Package, label: "Inventario Kardex", moduleId: 'inventario-kardex' },
   { href: "/dashboard/configuracion/factura", icon: FileText, label: "Editor Factura" },
   { href: "/dashboard/configuracion/impresoras", icon: Printer, label: "Impresoras" },
+  { href: "/dashboard/pistola-scanner", icon: ScanLine, label: "Pistola Escáner", moduleId: 'pistola-scanner' },
   { href: "/dashboard/backups", icon: HardDrive, label: "Backups" },
   { href: "/dashboard/subscription", icon: CreditCard, label: "Suscripción" },
   { href: "/dashboard/perfil", icon: UserCircle, label: "Perfil" },
@@ -62,7 +66,21 @@ export function ClientNav() {
     return collection(firestore, 'businesses', user.uid, 'modules');
   }, [firestore, user?.uid]);
   
-  const { data: modules, isLoading } = useCollection<Module>(modulesQuery);
+  const servicesQuery = useMemoFirebase(() => {
+    if (!firestore || !user?.uid) return null;
+    return collection(firestore, 'businesses', user.uid, 'services');
+  }, [firestore, user?.uid]);
+
+  const { data: modules, isLoading: areModulesLoading } = useCollection<Module>(modulesQuery);
+  const { data: services, isLoading: areServicesLoading } = useCollection<SystemService>(servicesQuery);
+
+  const activeFeatures = useMemo(() => {
+    const activeModules = modules?.filter(m => m.status === 'active').map(m => m.id) || [];
+    const activeServices = services?.filter(s => s.status === 'active').map(s => s.id) || [];
+    return new Set([...activeModules, ...activeServices]);
+  }, [modules, services]);
+  
+  const isLoading = areModulesLoading || areServicesLoading;
 
   const handleLinkClick = () => {
     setOpenMobile(false);
@@ -72,8 +90,7 @@ export function ClientNav() {
     if (!item.moduleId) {
       return true;
     }
-    const module = modules?.find(m => m.id === item.moduleId);
-    return module?.status === 'active';
+    return activeFeatures.has(item.moduleId);
   });
 
   if (isLoading) {
