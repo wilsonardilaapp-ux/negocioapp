@@ -1,4 +1,3 @@
-// src/app/(admin)/superadmin/pistola-scanner/components/ModalAgregarPistola.tsx
 "use client";
 
 import React from 'react';
@@ -13,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import type { FormularioPistolaScanner, MarcaScanner, ModeloScanner, TipoConexion, TerminalAsignada } from '@/models/pistolaScanner';
 
-const marcas: MarcaScanner[] = ['Honeywell', 'Zebra', 'Datalogic', 'Newland', 'Opticon', 'Metrologic', 'Otro'];
+const marcas = ['Honeywell', 'Zebra', 'Datalogic', 'Newland', 'Opticon', 'Metrologic', 'Otro'] as const;
 const modelosPorMarca: Record<MarcaScanner, ModeloScanner[]> = {
     Honeywell: ['Honeywell Voyager 1202g', 'Honeywell Xenon 1900', 'Honeywell Granit 1981i', 'Honeywell Genesis 7580g', 'Otro'],
     Zebra: ['Zebra DS2208-SR', 'Zebra DS8178', 'Zebra LI3678', 'Zebra CS6080', 'Otro'],
@@ -23,8 +22,8 @@ const modelosPorMarca: Record<MarcaScanner, ModeloScanner[]> = {
     Metrologic: ['Otro'],
     Otro: ['Otro'],
 };
-const tiposConexion: TipoConexion[] = ['USB HID', 'Bluetooth SPP', 'RS-232 Serial', 'Wi-Fi'];
-const terminales: TerminalAsignada[] = ['POS Principal', 'Inventario', 'Móvil / Tablet', 'Recepción'];
+const tiposConexion = ['USB HID', 'Bluetooth SPP', 'RS-232 Serial', 'Wi-Fi'] as const;
+const terminales = ['POS Principal', 'Inventario', 'Móvil / Tablet', 'Recepción'] as const;
 
 const schema = z.object({
   nombre: z.string().min(3, 'El nombre es requerido'),
