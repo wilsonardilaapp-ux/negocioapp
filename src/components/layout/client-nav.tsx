@@ -46,7 +46,7 @@ const allNavItems = [
   { href: "/dashboard/kardex", icon: Package, label: "Inventario Kardex", moduleId: 'inventario-kardex' },
   { href: "/dashboard/configuracion/factura", icon: FileText, label: "Editor Factura" },
   { href: "/dashboard/configuracion/impresoras", icon: Printer, label: "Impresoras" },
-  { href: "/dashboard/pistola-scanner", icon: ScanLine, label: "Pistola Escáner", moduleId: 'pistola-scanner' },
+  { href: "/dashboard/pistola-scanner", icon: ScanLine, label: "Pistola Escáner", moduleId: 'lector-de-escaner' },
   { href: "/dashboard/backups", icon: HardDrive, label: "Backups" },
   { href: "/dashboard/subscription", icon: CreditCard, label: "Suscripción" },
   { href: "/dashboard/perfil", icon: UserCircle, label: "Perfil" },
