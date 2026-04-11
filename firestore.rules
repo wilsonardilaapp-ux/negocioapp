@@ -253,20 +253,15 @@ service cloud.firestore {
           'name',
           'email',
           'message',
-          'createdAt'
-        ])
-        && request.resource.data.name is string
-        && request.resource.data.email is string
-        && request.resource.data.message is string
-        && request.resource.data.name.size() > 0
-        && request.resource.data.name.size() <= 100
-        && request.resource.data.email.size() <= 150
-        && request.resource.data.message.size() > 0
-        && request.resource.data.message.size() <= 2000;
-
-      match /replies/{replyId} {
-        allow read, create: if isSuperAdmin();
-      }
+          'createdAt',
+          'source',
+          'subject',
+          'userId',
+          'whatsapp',
+          'replied',
+          'read',
+          'company'
+        ]);
     }
 
     // Default deny
