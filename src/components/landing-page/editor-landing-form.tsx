@@ -24,11 +24,14 @@ import Image from 'next/image';
 import { TikTokIcon, WhatsAppIcon, XIcon, FacebookIcon, InstagramIcon } from '@/components/icons';
 import { useFirestore, useDoc, useMemoFirebase, setDocumentNonBlocking } from "@/firebase";
 import { doc } from "firebase/firestore";
+import type { SubscriptionPlan } from "@/models/subscription-plan";
 
 
 interface EditorLandingFormProps {
   data: LandingPageData;
   setData: React.Dispatch<React.SetStateAction<LandingPageData>>;
+  plans: SubscriptionPlan[];
+  loadingPlans: boolean;
 }
 
 const MediaUploader = ({
@@ -108,7 +111,7 @@ const MediaUploader = ({
     );
   };
 
-export default function EditorLandingForm({ data, setData }: EditorLandingFormProps) {
+export default function EditorLandingForm({ data, setData, plans, loadingPlans }: EditorLandingFormProps) {
     const [newKeyword, setNewKeyword] = useState('');
     const { toast } = useToast();
     const firestore = useFirestore();
@@ -376,6 +379,7 @@ export default function EditorLandingForm({ data, setData }: EditorLandingFormPr
                     <TabsTrigger value="carousel">Carrusel</TabsTrigger>
                     <TabsTrigger value="sections">Secciones</TabsTrigger>
                     <TabsTrigger value="testimonials">Testimonios</TabsTrigger>
+                    <TabsTrigger value="planes">Planes</TabsTrigger>
                     <TabsTrigger value="seo">SEO</TabsTrigger>
                     <TabsTrigger value="form">Formulario</TabsTrigger>
                 </TabsList>
@@ -836,6 +840,101 @@ export default function EditorLandingForm({ data, setData }: EditorLandingFormPr
                             </div>
                         )}
                     </div>
+                </TabsContent>
+
+                {/* PLANS TAB */}
+                <TabsContent value="planes">
+                  <div className="space-y-4">
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-800">
+                        Planes de Suscripción
+                      </h3>
+                      <p className="text-sm text-gray-500">
+                        Se muestran debajo de Testimonios en tu página pública. Para editar los planes ve a: Superadmin → Planes.
+                      </p>
+                    </div>
+
+                    {loadingPlans && (
+                      <div className="flex justify-center py-8">
+                        <Loader2 className="animate-spin h-8 w-8 text-primary" />
+                      </div>
+                    )}
+
+                    {!loadingPlans && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {(plans || []).map((plan) => (
+                          <div
+                            key={plan.id}
+                            className={cn(
+                              "border rounded-xl p-5 bg-white shadow-sm relative",
+                              plan.isMostPopular && "border-primary border-2"
+                            )}
+                          >
+                            {plan.isMostPopular && (
+                              <span className="absolute top-4 right-4 bg-primary text-primary-foreground text-xs font-bold px-2 py-1 rounded-full">
+                                Más Popular
+                              </span>
+                            )}
+                            <h4 className="text-xl font-bold text-gray-800">
+                              {plan.name}
+                            </h4>
+                            <p className="text-sm text-gray-500 mt-1 h-10">
+                              {plan.description}
+                            </p>
+                            <div className="mt-3">
+                              <span className="text-3xl font-bold text-gray-900">
+                                ${plan.price.toFixed(2)}
+                              </span>
+                              <span className="text-gray-500 text-sm">
+                                /mes
+                              </span>
+                            </div>
+                            <div className="mt-4">
+                              <p className="text-sm font-semibold text-gray-700 mb-2">
+                                Características:
+                              </p>
+                              <ul className="space-y-1">
+                                {(plan.features || []).map((feature, idx) => (
+                                  <li
+                                    key={idx}
+                                    className="flex items-center gap-2 text-sm text-gray-600"
+                                  >
+                                    <span className="text-primary font-bold">✓</span>
+                                    {feature.value}
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                            <div className="mt-4 pt-4 border-t border-gray-100">
+                              <p className="text-sm font-semibold text-gray-700 mb-2">
+                                Límites:
+                              </p>
+                              <div className="space-y-1 text-sm text-gray-600">
+                                <div className="flex justify-between">
+                                  <span>Productos:</span>
+                                  <span className="font-medium">
+                                    {plan.limits.products === -1 ? 'Ilimitados' : plan.limits.products}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span>Posts de Blog:</span>
+                                  <span className="font-medium">
+                                    {plan.limits.blogPosts === -1 ? 'Ilimitados' : plan.limits.blogPosts}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span>Landing Pages:</span>
+                                  <span className="font-medium">
+                                    {plan.limits.landingPages === -1 ? 'Ilimitadas' : plan.limits.landingPages}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </TabsContent>
 
                 {/* SEO TAB */}

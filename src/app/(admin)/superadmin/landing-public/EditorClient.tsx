@@ -9,6 +9,9 @@ import EditorLandingForm from '@/components/landing-page/editor-landing-form';
 import SuperAdminEditorLandingPreview from '@/components/landing-page/superadmin-editor-landing-preview';
 import { useToast } from '@/hooks/use-toast';
 import { saveLandingConfig } from '@/actions/save-landing-config';
+import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { collection } from 'firebase/firestore';
+import type { SubscriptionPlan } from '@/models/subscription-plan';
 
 interface EditorClientProps {
   initialData: LandingPageData | null;
@@ -16,9 +19,13 @@ interface EditorClientProps {
 
 export default function LandingEditorClient({ initialData }: EditorClientProps) {
   const { toast } = useToast();
+  const firestore = useFirestore();
   
   const [formData, setFormData] = useState<LandingPageData | null>(initialData);
   const [isSaving, setIsSaving] = useState(false);
+
+  const plansQuery = useMemoFirebase(() => !firestore ? null : collection(firestore, 'plans'), [firestore]);
+  const { data: plans, isLoading: loadingPlans } = useCollection<SubscriptionPlan>(plansQuery);
   
   // EFECTO VITAL: Si refrescas y el servidor trae datos nuevos, actualiza el form
   useEffect(() => {
@@ -70,7 +77,14 @@ export default function LandingEditorClient({ initialData }: EditorClientProps) 
         </Button>
       </Card>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-        <div className="lg:col-span-2"><EditorLandingForm data={formData} setData={setFormData as React.Dispatch<React.SetStateAction<LandingPageData>>} /></div>
+        <div className="lg:col-span-2">
+          <EditorLandingForm 
+            data={formData} 
+            setData={setFormData as React.Dispatch<React.SetStateAction<LandingPageData>>}
+            plans={plans || []}
+            loadingPlans={loadingPlans}
+          />
+        </div>
         <div className="lg:col-span-1"><SuperAdminEditorLandingPreview data={formData} /></div>
       </div>
     </div>

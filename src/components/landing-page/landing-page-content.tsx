@@ -11,10 +11,12 @@ import { cn } from '@/lib/utils';
 import Image from 'next/image';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
 import Autoplay from "embla-carousel-autoplay";
+import type { SubscriptionPlan } from '@/models/subscription-plan';
 
 
 interface LandingPageContentProps {
   data: LandingPageData;
+  plans: SubscriptionPlan[];
   businessId?: string;
   logoUrl?: string;
 }
@@ -32,7 +34,7 @@ const getLinkUrl = (link: NavLink, currentBusinessId: string | undefined): strin
 };
 
 
-export default function LandingPageContent({ data, businessId, logoUrl }: LandingPageContentProps) {
+export default function LandingPageContent({ data, plans, businessId, logoUrl }: LandingPageContentProps) {
   const { hero, navigation, sections, testimonials, form, footer, header } = data;
 
   const finalLogoUrl = logoUrl || navigation.logoUrl;
@@ -276,6 +278,86 @@ export default function LandingPageContent({ data, businessId, logoUrl }: Landin
             </div>
         </section>
       )}
+
+      {/* Plans Section */}
+      {plans && plans.length > 0 && (
+          <section className="py-16 px-4 bg-gray-50">
+            <div className="max-w-5xl mx-auto">
+              <div className="text-center mb-10">
+                <h2 className="text-3xl font-bold text-gray-900">
+                  Planes y Precios
+                </h2>
+                <p className="text-gray-500 mt-2">
+                  Elige el plan que mejor se adapta a tu negocio.
+                </p>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {plans.map((plan) => (
+                    <div
+                      key={plan.id}
+                      className={cn(
+                        "rounded-2xl p-6 bg-white relative",
+                         plan.isMostPopular ? 'border-2 border-primary shadow-md' : 'border border-gray-200'
+                      )}
+                    >
+                      {plan.isMostPopular && (
+                        <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground text-xs font-bold px-3 py-1 rounded-full">
+                          Más Popular
+                        </span>
+                      )}
+                      <h3 className="text-xl font-bold text-gray-800">
+                        {plan.name}
+                      </h3>
+                      <p className="text-sm text-gray-500 mt-1 mb-4 h-10">
+                        {plan.description}
+                      </p>
+                      <div className="mb-6">
+                        <span className="text-4xl font-bold text-gray-900">
+                          ${plan.price.toFixed(2)}
+                        </span>
+                        <span className="text-gray-400 text-sm">
+                          /mes
+                        </span>
+                      </div>
+                      <ul className="space-y-2 mb-6">
+                        {plan.features.map((feature, idx) => (
+                          <li
+                            key={idx}
+                            className="flex items-center gap-2 text-sm text-gray-600"
+                          >
+                            <span className="text-primary font-bold">
+                              ✓
+                            </span>
+                            {feature.value}
+                          </li>
+                        ))}
+                      </ul>
+                      <div className="border-t border-gray-100 pt-4 space-y-1 text-sm text-gray-500">
+                        <div className="flex justify-between">
+                          <span>Productos:</span>
+                          <span className="font-medium text-gray-700">
+                            {plan.limits.products === -1 ? 'Ilimitados' : plan.limits.products}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Posts de Blog:</span>
+                          <span className="font-medium text-gray-700">
+                            {plan.limits.blogPosts === -1 ? 'Ilimitados' : plan.limits.blogPosts}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Landing Pages:</span>
+                          <span className="font-medium text-gray-700">
+                            {plan.limits.landingPages === -1 ? 'Ilimitadas' : plan.limits.landingPages}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          </section>
+        )}
 
       {/* Formulario */}
       <section id="contact" className="py-24 bg-gray-50 flex-grow">

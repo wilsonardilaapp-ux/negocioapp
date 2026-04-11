@@ -3,11 +3,33 @@ import LandingPageContent from '@/components/landing-page/landing-page-content';
 import type { LandingPageData } from '@/models/landing-page';
 import { v4 as uuidv4 } from 'uuid';
 import { unstable_noStore as noStore } from 'next/cache';
+import { firebaseConfig } from "@/firebase/config";
+import { initializeApp, getApps, getApp } from "firebase/app";
+import { getFirestore, collection, query, orderBy, getDocs } from "firebase/firestore";
+import type { SubscriptionPlan } from '@/models/subscription-plan';
 
 // Forzamos comportamiento dinámico total
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 export const revalidate = 0;
+
+async function getPlans(): Promise<SubscriptionPlan[]> {
+  const isConfigValid = !!firebaseConfig.projectId;
+  if (!isConfigValid) return [];
+
+  const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+
+  try {
+    const q = query(collection(db, "plans"), orderBy("price", "asc"));
+    const snapshot = await getDocs(q);
+    if (snapshot.empty) return [];
+    return snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })) as SubscriptionPlan[];
+  } catch (error) {
+    console.error("Error fetching plans for public page:", error);
+    return [];
+  }
+}
 
 const fallbackData: LandingPageData = {
   hero: {
@@ -165,19 +187,19 @@ export default async function RootPage() {
   noStore();
 
   try {
-    const dbData = await getLandingData();
+    const [dbData, plans] = await Promise.all([getLandingData(), getPlans()]);
     const dataToRender = deepMerge(fallbackData, dbData ?? {});
 
     return (
       <main className="w-full">
-        <LandingPageContent data={dataToRender} />
+        <LandingPageContent data={dataToRender} plans={plans} />
       </main>
     );
   } catch (error) {
       console.error("Error en Home:", error);
       return (
         <main className="w-full">
-            <LandingPageContent data={fallbackData} />
+            <LandingPageContent data={fallbackData} plans={[]} />
         </main>
       );
   }
