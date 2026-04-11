@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useMemo, useState, useEffect, useRef, useCallback } from 'react';
@@ -190,15 +191,15 @@ const Lightbox = ({ isOpen, onOpenChange, imageUrl }: { isOpen: boolean, onOpenC
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[800px] w-full p-2 bg-transparent border-none shadow-none">
+      <DialogContent className="max-w-3xl w-full p-2 bg-transparent border-none shadow-none">
         <div className="relative aspect-square w-full">
-          <Image src={imageUrl} alt="Vista ampliada del producto" fill sizes="800px" className="object-contain" />
+          <Image src={imageUrl} alt="Vista ampliada del producto" fill sizes="80vw" className="object-contain" />
            <DialogHeader>
                 <Button
                     variant="ghost"
                     size="icon"
                     onClick={() => onOpenChange(false)}
-                    className="absolute -top-10 -right-10 rounded-full h-8 w-8 bg-black/50 text-white hover:bg-black/75"
+                    className="absolute -top-10 -right-2 sm:-right-10 rounded-full h-8 w-8 bg-black/50 text-white hover:bg-black/75"
                 >
                     <X className="h-5 w-5" />
                 </Button>
@@ -370,80 +371,78 @@ const ProductViewModal = ({ product, isOpen, onOpenChange, businessPhone, busine
     return (
         <>
             <Dialog open={isOpen} onOpenChange={onOpenChange}>
-                <DialogContent className="sm:max-w-6xl p-0 flex flex-col max-h-[90vh]">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-0 flex-grow min-h-0">
-                        {/* Columna Izquierda (Imagen) */}
-                        <div className="p-6 flex flex-col gap-4 min-h-0">
-                            <div className="relative flex-grow min-h-0">
-                                <button
-                                    type="button"
-                                    className="relative w-full h-full rounded-lg overflow-hidden border cursor-zoom-in"
-                                    onClick={() => setIsLightboxOpen(true)}
-                                >
-                                    {isVideo(mainImage) ? (
-                                        <video src={mainImage} autoPlay loop muted controls className="object-contain w-full h-full" />
-                                    ) : (
-                                        <Image src={mainImage} alt={product.name} fill sizes="(max-width: 768px) 90vw, 40vw" className="object-contain"/>
-                                    )}
-                                </button>
-                            </div>
-                            <div className="flex-shrink-0">
-                                <ScrollArea className="w-full whitespace-nowrap rounded-md">
-                                    <div className="flex w-max space-x-2 p-2">
-                                    {product.images.map((img, index) => {
-                                        const isThumbVideo = isVideo(img);
-                                        return (
-                                            <button 
-                                                key={index} 
-                                                onClick={() => setMainImage(img)} 
-                                                className={cn(
-                                                    "relative aspect-square w-20 h-20 shrink-0 rounded-md overflow-hidden ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring transition-all",
-                                                    mainImage === img ? "ring-2 ring-primary opacity-100" : "opacity-70 hover:opacity-100"
-                                                )}
-                                            >
-                                                {isThumbVideo ? (
-                                                    <video src={img} muted className="object-cover w-full h-full"/>
-                                                ) : (
-                                                    <Image src={img} alt={`${product.name} thumbnail ${index + 1}`} fill sizes="6rem" className="object-cover"/>
-                                                )}
-                                            </button>
-                                        );
-                                    })}
-                                    </div>
-                                    <ScrollBar orientation="horizontal" />
-                                </ScrollArea>
-                            </div>
+                <DialogContent className="max-w-4xl w-full p-0 flex flex-col md:flex-row max-h-[90vh]">
+                    {/* Columna Izquierda (Imagen) */}
+                    <div className="w-full md:w-1/2 lg:w-3/5 flex flex-col p-4 sm:p-6">
+                        <div className="relative flex-grow w-full min-h-[250px] sm:min-h-[400px]">
+                            <button
+                                type="button"
+                                className="relative w-full h-full rounded-lg overflow-hidden border cursor-zoom-in"
+                                onClick={() => setIsLightboxOpen(true)}
+                            >
+                                {isVideo(mainImage) ? (
+                                    <video src={mainImage} autoPlay loop muted controls className="object-contain w-full h-full" />
+                                ) : (
+                                    <Image src={mainImage} alt={product.name} fill sizes="(max-width: 768px) 90vw, 40vw" className="object-contain"/>
+                                )}
+                            </button>
                         </div>
-                        {/* Columna Derecha (Detalles) */}
-                        <div className="p-6 flex flex-col min-h-0">
-                            <DialogHeader className="mb-4">
-                                <Badge className="w-fit mb-2">{product.category}</Badge>
-                                <DialogTitle className="text-3xl font-bold">{product.name}</DialogTitle>
-                            </DialogHeader>
-                            <ScrollArea className="flex-grow pr-4 -mr-4">
-                                <div className="space-y-4">
-                                    <div className="prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: product.description }} />
-                                    <p><span className="font-semibold">Disponibles:</span> {product.stock} unidades</p>
-                                    <div className="flex flex-col gap-2">
-                                        <span className="font-semibold">Califica este producto:</span>
-                                        <div className="flex items-center gap-1">
-                                            {[1, 2, 3, 4, 5].map(star => (
-                                                <button key={star} onClick={() => handleRating(star)} disabled={!!hasRated || isRating}>
-                                                    <Star className={cn("h-6 w-6 transition-colors", star <= (userRating || product.rating) ? "text-yellow-400 fill-yellow-400" : "text-gray-300 hover:text-yellow-300")} />
-                                                </button>
-                                            ))}
-                                            {isRating && <Loader2 className="h-5 w-5 animate-spin ml-2" />}
-                                        </div>
-                                        {hasRated && <p className="text-xs text-muted-foreground">Ya has calificado este producto.</p>}
-                                    </div>
+                        <div className="flex-shrink-0 mt-4">
+                            <ScrollArea className="w-full whitespace-nowrap rounded-md">
+                                <div className="flex w-max space-x-2 p-2">
+                                {product.images.map((img, index) => {
+                                    const isThumbVideo = isVideo(img);
+                                    return (
+                                        <button 
+                                            key={index} 
+                                            onClick={() => setMainImage(img)} 
+                                            className={cn(
+                                                "relative aspect-square w-16 h-16 sm:w-20 sm:h-20 shrink-0 rounded-md overflow-hidden ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring transition-all",
+                                                mainImage === img ? "ring-2 ring-primary opacity-100" : "opacity-70 hover:opacity-100"
+                                            )}
+                                        >
+                                            {isThumbVideo ? (
+                                                <video src={img} muted className="object-cover w-full h-full"/>
+                                            ) : (
+                                                <Image src={img} alt={`${product.name} thumbnail ${index + 1}`} fill sizes="6rem" className="object-cover"/>
+                                            )}
+                                        </button>
+                                    );
+                                })}
                                 </div>
+                                <ScrollBar orientation="horizontal" />
                             </ScrollArea>
-                            <div className="mt-auto pt-6">
-                                <Button size="lg" className="w-full" onClick={handlePurchaseClick} disabled={isLoadingSuggestion}>
-                                    {isLoadingSuggestion ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <WhatsAppIcon className="mr-2 h-5 w-5" />}
-                                    {isLoadingSuggestion ? 'Buscando sugerencias...' : 'Comprar'}
-                                </Button>
+                        </div>
+                    </div>
+                    {/* Columna Derecha (Detalles) */}
+                    <div className="w-full md:w-1/2 lg:w-2/5 flex flex-col p-4 sm:p-6 bg-background rounded-r-lg max-h-full overflow-y-auto">
+                        <DialogHeader className="mb-4">
+                            <Badge className="w-fit mb-2">{product.category}</Badge>
+                            <DialogTitle className="text-2xl sm:text-3xl font-bold">{product.name}</DialogTitle>
+                        </DialogHeader>
+                        <ScrollArea className="flex-grow pr-2 -mr-2">
+                            <div className="space-y-4">
+                                <div className="prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: product.description }} />
+                                <p><span className="font-semibold">Disponibles:</span> {product.stock} unidades</p>
+                                <div className="flex flex-col gap-2">
+                                    <span className="font-semibold">Califica este producto:</span>
+                                    <div className="flex items-center gap-1">
+                                        {[1, 2, 3, 4, 5].map(star => (
+                                            <button key={star} onClick={() => handleRating(star)} disabled={!!hasRated || isRating}>
+                                                <Star className={cn("h-6 w-6 transition-colors", star <= (userRating || product.rating) ? "text-yellow-400 fill-yellow-400" : "text-gray-300 hover:text-yellow-300")} />
+                                            </button>
+                                        ))}
+                                        {isRating && <Loader2 className="h-5 w-5 animate-spin ml-2" />}
+                                    </div>
+                                    {hasRated && <p className="text-xs text-muted-foreground">Ya has calificado este producto.</p>}
+                                </div>
                             </div>
+                        </ScrollArea>
+                        <div className="mt-auto pt-6">
+                            <Button size="lg" className="w-full" onClick={handlePurchaseClick} disabled={isLoadingSuggestion}>
+                                {isLoadingSuggestion ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <WhatsAppIcon className="mr-2 h-5 w-5" />}
+                                {isLoadingSuggestion ? 'Buscando sugerencias...' : 'Comprar'}
+                            </Button>
                         </div>
                     </div>
                 </DialogContent>
@@ -760,3 +759,4 @@ export default function CatalogPage() {
         </div>
     );
 }
+
