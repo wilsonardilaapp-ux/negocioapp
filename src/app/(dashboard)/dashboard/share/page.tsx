@@ -28,7 +28,7 @@ import type { MenuShare, QRConfig } from '@/models/share';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
 import QRCode from "react-qr-code";
-import { toPng, toSvg } from 'html-to-image';
+import html2canvas from 'html2canvas';
 import { WhatsAppIcon } from '@/components/icons';
 import { Slider } from '@/components/ui/slider';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -227,23 +227,22 @@ export default function SharePage() {
     setTimeout(() => setCopied(false), 2000);
   };
   
-  const downloadQR = async (format: 'png' | 'svg') => {
+  const downloadQR = () => {
     if (!qrCodeRef.current) return;
-    
-    let dataUrl;
-    try {
-        if(format === 'png') {
-            dataUrl = await toPng(qrCodeRef.current, { cacheBust: true });
-        } else {
-            dataUrl = await toSvg(qrCodeRef.current, { cacheBust: true });
-        }
+    html2canvas(qrCodeRef.current, { backgroundColor: null }).then((canvas) => {
+        const dataUrl = canvas.toDataURL('image/png');
         const link = document.createElement('a');
-        link.download = `qr-catalogo.${format}`;
+        link.download = 'qr-catalogo.png';
         link.href = dataUrl;
         link.click();
-    } catch(e) {
-        toast({variant: 'destructive', title: 'Error al descargar', description: 'No se pudo generar el archivo.'});
-    }
+    }).catch(function (error) {
+        console.error('Error generando QR:', error);
+        toast({
+          variant: 'destructive',
+          title: 'Error al descargar QR',
+          description: 'No se pudo generar la imagen del código QR.',
+        });
+      });
   };
 
     const handleSocialImageUpload = async (file: File) => {
@@ -390,8 +389,7 @@ export default function SharePage() {
                             />
                           </div>
                            <div className="flex gap-2 mt-4">
-                            <Button onClick={() => downloadQR('png')}><Download className="w-4 h-4 mr-2" /> PNG</Button>
-                            <Button variant="outline" onClick={() => downloadQR('svg')}><Download className="w-4 h-4 mr-2" /> SVG</Button>
+                            <Button onClick={downloadQR}><Download className="w-4 h-4 mr-2" /> Descargar PNG</Button>
                           </div>
                         </CardContent>
                     </Card>
