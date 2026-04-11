@@ -1,14 +1,16 @@
 'use client';
 
-import React from 'react';
+import React, { useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { LandingPageData } from '@/models/landing-page';
-import { Copy, ExternalLink } from 'lucide-react';
+import { Copy, ExternalLink, Download } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import LandingPageContent from '@/components/landing-page/landing-page-content';
 import type { SubscriptionPlan } from '@/models/subscription-plan';
+import QRCode from 'react-qr-code';
+import html2canvas from 'html2canvas';
 
 interface SuperAdminEditorLandingPreviewProps {
   data: LandingPageData;
@@ -17,6 +19,7 @@ interface SuperAdminEditorLandingPreviewProps {
 
 export default function SuperAdminEditorLandingPreview({ data, plans }: SuperAdminEditorLandingPreviewProps) {
   const { toast } = useToast();
+  const qrCodeRef = useRef<HTMLDivElement>(null);
   
   // The public URL for the global landing page. We can assume it's the root for now.
   const publicUrl = typeof window !== 'undefined' ? `${window.location.origin}/` : '';
@@ -28,6 +31,24 @@ export default function SuperAdminEditorLandingPreview({ data, plans }: SuperAdm
         title: "Enlace copiado",
         description: "El enlace público de tu landing page ha sido copiado al portapapeles.",
     });
+  };
+
+  const handleDownloadQR = () => {
+    if (!qrCodeRef.current) return;
+    html2canvas(qrCodeRef.current, { backgroundColor: null }).then((canvas) => {
+        const dataUrl = canvas.toDataURL('image/png');
+        const link = document.createElement('a');
+        link.download = 'landing-page-qr-code.png';
+        link.href = dataUrl;
+        link.click();
+    }).catch(function (error) {
+        console.error('Error generando QR:', error);
+        toast({
+          variant: 'destructive',
+          title: 'Error al descargar QR',
+          description: 'No se pudo generar la imagen del código QR.',
+        });
+      });
   };
 
   return (
@@ -57,6 +78,27 @@ export default function SuperAdminEditorLandingPreview({ data, plans }: SuperAdm
                     </Button>
                 </CardContent>
             </Card>
+
+            <Card>
+                <CardHeader>
+                    <CardTitle className="text-base">Código QR</CardTitle>
+                    <CardDescription className="text-xs">Usa este código para acceso rápido desde móviles.</CardDescription>
+                </CardHeader>
+                <CardContent className="flex flex-col items-center gap-4">
+                    <div ref={qrCodeRef} className="bg-white p-4 rounded-md border">
+                        {publicUrl ? (
+                            <QRCode value={publicUrl} size={150} />
+                        ) : (
+                            <div className="h-[150px] w-[150px] bg-muted animate-pulse rounded-md" />
+                        )}
+                    </div>
+                    <Button onClick={handleDownloadQR} disabled={!publicUrl} className="w-full">
+                        <Download className="mr-2 h-4 w-4" />
+                        Descargar QR
+                    </Button>
+                </CardContent>
+            </Card>
+
         </CardContent>
       </Card>
       <Card className="sticky top-6">
