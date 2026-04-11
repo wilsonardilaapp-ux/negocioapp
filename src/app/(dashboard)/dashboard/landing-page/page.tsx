@@ -7,11 +7,12 @@ import { Save, Loader2 } from 'lucide-react';
 import type { LandingPageData } from '@/models/landing-page';
 import EditorLandingForm from '@/components/landing-page/editor-landing-form';
 import EditorLandingPreview from '@/components/landing-page/editor-landing-preview';
-import { useUser, useFirestore, useMemoFirebase, setDocumentNonBlocking } from '@/firebase';
-import { doc, getDoc } from 'firebase/firestore';
+import { useUser, useFirestore, useMemoFirebase, setDocumentNonBlocking, useCollection } from '@/firebase';
+import { doc, getDoc, collection } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { v4 as uuidv4 } from 'uuid';
 import { saveBusinessLanding } from '@/actions/save-business-landing';
+import type { SubscriptionPlan } from '@/models/subscription-plan';
 
 const initialLandingData: LandingPageData = {
   hero: {
@@ -53,6 +54,9 @@ export default function LandingPageBuilder() {
 
   const docRef = useMemoFirebase(() => user ? doc(firestore, 'businesses', user.uid, 'landingPages', 'main') : null, [firestore, user]);
   
+  const plansQuery = useMemoFirebase(() => !firestore ? null : collection(firestore, 'plans'), [firestore]);
+  const { data: plans, isLoading: loadingPlans } = useCollection<SubscriptionPlan>(plansQuery);
+
   useEffect(() => {
     if (!docRef) {
         setIsFetching(false);
@@ -118,7 +122,7 @@ export default function LandingPageBuilder() {
     }
   };
   
-  if (isFetching) {
+  if (isFetching || loadingPlans) {
     return (
       <div className="flex justify-center items-center h-full">
         <Loader2 className="h-10 w-10 animate-spin text-primary" />
@@ -138,7 +142,14 @@ export default function LandingPageBuilder() {
             </Button>
         </Card>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2"><EditorLandingForm data={data} setData={setData} /></div>
+            <div className="lg:col-span-2">
+                <EditorLandingForm 
+                    data={data} 
+                    setData={setData}
+                    plans={plans || []}
+                    loadingPlans={loadingPlans}
+                />
+            </div>
             <div className="lg:col-span-1"><EditorLandingPreview data={data} /></div>
         </div>
     </div>
