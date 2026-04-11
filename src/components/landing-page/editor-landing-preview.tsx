@@ -9,12 +9,14 @@ import { Copy, ExternalLink } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useUser } from '@/firebase';
 import LandingPageContent from '@/components/landing-page/landing-page-content';
+import type { SubscriptionPlan } from '@/models/subscription-plan';
 
 interface EditorLandingPreviewProps {
   data: LandingPageData;
+  plans: SubscriptionPlan[];
 }
 
-export default function EditorLandingPreview({ data }: EditorLandingPreviewProps) {
+export default function EditorLandingPreview({ data, plans }: EditorLandingPreviewProps) {
   const { user } = useUser();
   const { toast } = useToast();
   
@@ -73,7 +75,7 @@ export default function EditorLandingPreview({ data }: EditorLandingPreviewProps
 
                   {/* Live Preview Content */}
                   <div className="bg-white max-h-[80vh] overflow-y-auto">
-                    <LandingPageContent data={data} businessId={user?.uid} logoUrl={data.navigation.logoUrl}/>
+                    <LandingPageContent data={data} plans={plans} businessId={user?.uid} logoUrl={data.navigation.logoUrl}/>
                   </div>
               </div>
           </CardContent>

@@ -150,7 +150,7 @@ export default function LandingPageBuilder() {
                     loadingPlans={loadingPlans}
                 />
             </div>
-            <div className="lg:col-span-1"><EditorLandingPreview data={data} /></div>
+            <div className="lg:col-span-1"><EditorLandingPreview data={data} plans={plans || []} /></div>
         </div>
     </div>
   );
