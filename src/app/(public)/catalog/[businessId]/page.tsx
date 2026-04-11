@@ -433,25 +433,23 @@ const ProductViewModal = ({ product, isOpen, onOpenChange, businessPhone, busine
             <Dialog open={isOpen} onOpenChange={onOpenChange}>
                 <DialogContent className="max-w-4xl w-full p-0 flex flex-col md:flex-row max-h-[90vh]">
                     <div className="w-full md:w-1/2 lg:w-3/5 p-4 sm:p-6 flex flex-col flex-shrink-0">
-                        <div className="relative w-full aspect-square">
-                            <button
-                                type="button"
-                                className="relative w-full h-full rounded-lg overflow-hidden border cursor-zoom-in"
-                                onClick={() => {
-                                    const idx = mediaItems.findIndex(item => item.url === mainImage?.url);
-                                    setSelectedLightboxIndex(idx > -1 ? idx : 0);
-                                    setIsLightboxOpen(true);
-                                }}
-                            >
-                                {mainImage ? (
-                                    <MediaPreview item={mainImage} alt={product.name} objectFit="contain" />
-                                ) : (
-                                    <div className="w-full h-full bg-muted flex items-center justify-center">
-                                        <ImageIcon className="h-12 w-12 text-muted-foreground" />
-                                    </div>
-                                )}
-                            </button>
-                        </div>
+                         <button
+                            type="button"
+                            className="relative w-full aspect-square rounded-lg overflow-hidden border cursor-zoom-in"
+                            onClick={() => {
+                                const idx = mediaItems.findIndex(item => item.url === mainImage?.url);
+                                setSelectedLightboxIndex(idx > -1 ? idx : 0);
+                                setIsLightboxOpen(true);
+                            }}
+                        >
+                            {mainImage ? (
+                                <MediaPreview item={mainImage} alt={product.name} objectFit="contain" />
+                            ) : (
+                                <div className="w-full h-full bg-muted flex items-center justify-center">
+                                    <ImageIcon className="h-12 w-12 text-muted-foreground" />
+                                </div>
+                            )}
+                        </button>
                         <div className="flex-shrink-0 mt-4">
                             <ScrollArea className="w-full whitespace-nowrap rounded-md">
                                 <div className="flex w-max space-x-2 p-2">
@@ -473,8 +471,8 @@ const ProductViewModal = ({ product, isOpen, onOpenChange, businessPhone, busine
                         </div>
                     </div>
                     
-                    <div className="w-full md:w-1/2 lg:w-2/5 flex flex-col p-4 sm:p-6 bg-background rounded-b-lg md:rounded-r-lg md:rounded-b-none max-h-full overflow-y-auto">
-                        <DialogHeader className="mb-4">
+                    <div className="w-full md:w-1/2 lg:w-2/5 flex flex-col flex-1 min-h-0 p-4 sm:p-6 bg-background rounded-b-lg md:rounded-r-lg md:rounded-b-none">
+                        <DialogHeader className="mb-4 flex-shrink-0">
                             <Badge className="w-fit mb-2">{product.category}</Badge>
                             <DialogTitle className="text-2xl sm:text-3xl font-bold">{product.name}</DialogTitle>
                         </DialogHeader>
@@ -496,7 +494,7 @@ const ProductViewModal = ({ product, isOpen, onOpenChange, businessPhone, busine
                                 </div>
                             </div>
                         </ScrollArea>
-                        <div className="mt-auto pt-6">
+                        <div className="mt-auto pt-6 flex-shrink-0">
                             <Button size="lg" className="w-full" onClick={handlePurchaseClick} disabled={isLoadingSuggestion}>
                                 {isLoadingSuggestion ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <WhatsAppIcon className="mr-2 h-5 w-5" />}
                                 {isLoadingSuggestion ? 'Buscando sugerencias...' : 'Comprar'}
