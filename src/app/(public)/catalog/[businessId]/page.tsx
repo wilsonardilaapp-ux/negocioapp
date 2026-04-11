@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Badge } from '@/components/ui/badge';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
 import Autoplay from "embla-carousel-autoplay";
-import { Star, Loader2, PackageSearch, Mail, Printer, FileDown, Settings, Frown, ArrowRight, ChevronLeft, ChevronRight, X } from 'lucide-react';
+import { Star, Loader2, PackageSearch, Mail, Printer, FileDown, Settings, Frown, ArrowRight, ChevronLeft, ChevronRight, X, ImageIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Product } from '@/models/product';
 import type { Module } from '@/models/module';
@@ -33,6 +33,11 @@ import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 
 
 export type CartItem = Product & { quantity: number };
+
+type MediaItem = {
+    url: string;
+    type: 'image' | 'video';
+};
 
 const CatalogHeader = ({ config }: { config: LandingHeaderConfigData | null }) => {
     if (!config) {
@@ -132,6 +137,13 @@ const isVideo = (url: string) => {
     return videoExtensions.some(ext => url.toLowerCase().includes(ext));
 };
 
+const MediaPreview = ({ item, alt, objectFit = 'cover' }: { item: MediaItem, alt: string, objectFit?: 'cover' | 'contain' }) => {
+    if (item.type === 'video') {
+        return <video src={item.url} className={cn('rounded-md object-cover w-full h-full')} autoPlay loop muted />;
+    }
+    return <Image src={item.url} alt={alt} fill sizes="10rem" className={cn('rounded-md', objectFit === 'contain' ? 'object-contain' : 'object-cover')} />;
+};
+
 const PublicProductCard = ({ product, onOpenModal }: { product: Product, onOpenModal: (product: Product) => void }) => {
     
     const formatCurrency = (value: number) => {
@@ -186,50 +198,98 @@ const PublicProductCard = ({ product, onOpenModal }: { product: Product, onOpenM
     );
 }
 
-const Lightbox = ({ isOpen, onOpenChange, imageUrl }: { isOpen: boolean, onOpenChange: (open: boolean) => void, imageUrl: string }) => {
-  if (!isOpen) return null;
+const Lightbox = ({
+    isOpen,
+    onOpenChange,
+    items,
+    startIndex = 0,
+}: {
+    isOpen: boolean;
+    onOpenChange: (open: boolean) => void;
+    items: MediaItem[];
+    startIndex?: number;
+}) => {
+    const [currentIndex, setCurrentIndex] = useState(startIndex);
 
-  return (
-    <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl w-full p-2 bg-transparent border-none shadow-none">
-        <div className="relative aspect-square w-full">
-          <Image src={imageUrl} alt="Vista ampliada del producto" fill sizes="80vw" className="object-contain" />
-           <DialogHeader>
-                <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => onOpenChange(false)}
-                    className="absolute -top-10 -right-2 sm:-right-10 rounded-full h-8 w-8 bg-black/50 text-white hover:bg-black/75"
-                >
-                    <X className="h-5 w-5" />
-                </Button>
-           </DialogHeader>
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
+    useEffect(() => {
+        if(isOpen) {
+            setCurrentIndex(startIndex);
+        }
+    }, [isOpen, startIndex]);
+
+    const goToNext = useCallback(() => {
+        setCurrentIndex((prevIndex) => (prevIndex + 1) % items.length);
+    }, [items.length]);
+
+    const goToPrevious = useCallback(() => {
+        setCurrentIndex((prevIndex) => (prevIndex - 1 + items.length) % items.length);
+    }, [items.length]);
+    
+    useEffect(() => {
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (!isOpen) return;
+            if (event.key === 'ArrowRight') goToNext();
+            if (event.key === 'ArrowLeft') goToPrevious();
+            if (event.key === 'Escape') onOpenChange(false);
+        };
+
+        document.addEventListener('keydown', handleKeyDown);
+        return () => document.removeEventListener('keydown', handleKeyDown);
+    }, [isOpen, goToNext, goToPrevious, onOpenChange]);
+
+    if (!isOpen || !items || items.length === 0) return null;
+
+    return (
+        <Dialog open={isOpen} onOpenChange={onOpenChange}>
+            <DialogContent className="max-w-3xl w-full p-2 bg-transparent border-none shadow-none">
+                <div className="relative aspect-square w-full">
+                    {items[currentIndex] && <MediaPreview item={items[currentIndex]} alt="Vista ampliada" objectFit="contain" />}
+                    <DialogHeader>
+                        <Button variant="ghost" size="icon" onClick={() => onOpenChange(false)} className="absolute -top-10 -right-2 sm:-right-10 rounded-full h-8 w-8 bg-black/50 text-white hover:bg-black/75">
+                            <X className="h-5 w-5" />
+                        </Button>
+                    </DialogHeader>
+                    {items.length > 1 && (
+                        <>
+                            <Button variant="ghost" size="icon" onClick={goToPrevious} className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full h-10 w-10 bg-black/50 text-white hover:bg-black/75">
+                                <ChevronLeft className="h-6 w-6" />
+                            </Button>
+                            <Button variant="ghost" size="icon" onClick={goToNext} className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full h-10 w-10 bg-black/50 text-white hover:bg-black/75">
+                                <ChevronRight className="h-6 w-6" />
+                            </Button>
+                        </>
+                    )}
+                </div>
+            </DialogContent>
+        </Dialog>
+    );
 };
 
 
 const ProductViewModal = ({ product, isOpen, onOpenChange, businessPhone, businessId, paymentSettings, onAddToCart }: { product: Product | null, isOpen: boolean, onOpenChange: (open: boolean) => void, businessPhone: string, businessId: string | null, paymentSettings: PaymentSettings | null, onAddToCart: (items: CartItem[]) => void }) => {
-    const [mainImage, setMainImage] = useState(product?.images[0] || '');
+    const [mainImage, setMainImage] = useState<MediaItem | null>(null);
     const [isRating, setIsRating] = useState(false);
     const [userRating, setUserRating] = useState(0);
     const [suggestion, setSuggestion] = useState<SuggestionOutput | null>(null);
     const [isSuggestionModalOpen, setIsSuggestionModalOpen] = useState(false);
     const [isLoadingSuggestion, setIsLoadingSuggestion] = useState(false);
     const [isLightboxOpen, setIsLightboxOpen] = useState(false);
+    const [selectedLightboxIndex, setSelectedLightboxIndex] = useState(0);
+
     const { toast } = useToast();
 
     useEffect(() => {
-        if (product) {
-            setMainImage(product.images[0] || '');
+        if (product && product.images.length > 0) {
+            setMainImage({ url: product.images[0], type: isVideo(product.images[0]) ? 'video' : 'image' });
+        } else {
+            setMainImage(null);
         }
     }, [product]);
 
     if (!product) return null;
     
     const hasRated = typeof window !== 'undefined' && localStorage.getItem(`rated_${product?.id}`);
+    const mediaItems: MediaItem[] = product.images.map(url => ({ url, type: isVideo(url) ? 'video' : 'image' }));
 
     const handleRating = async (rating: number) => {
         if (!product || !businessId || hasRated) return;
@@ -372,50 +432,48 @@ const ProductViewModal = ({ product, isOpen, onOpenChange, businessPhone, busine
         <>
             <Dialog open={isOpen} onOpenChange={onOpenChange}>
                 <DialogContent className="max-w-4xl w-full p-0 flex flex-col md:flex-row max-h-[90vh]">
-                    {/* Columna Izquierda (Imagen) */}
-                    <div className="w-full md:w-1/2 lg:w-3/5 flex flex-col p-4 sm:p-6">
-                        <div className="relative flex-grow w-full min-h-[250px] sm:min-h-[400px]">
+                    <div className="w-full md:w-1/2 lg:w-3/5 p-4 sm:p-6 flex flex-col flex-shrink-0">
+                        <div className="relative w-full aspect-square">
                             <button
                                 type="button"
                                 className="relative w-full h-full rounded-lg overflow-hidden border cursor-zoom-in"
-                                onClick={() => setIsLightboxOpen(true)}
+                                onClick={() => {
+                                    const idx = mediaItems.findIndex(item => item.url === mainImage?.url);
+                                    setSelectedLightboxIndex(idx > -1 ? idx : 0);
+                                    setIsLightboxOpen(true);
+                                }}
                             >
-                                {isVideo(mainImage) ? (
-                                    <video src={mainImage} autoPlay loop muted controls className="object-contain w-full h-full" />
+                                {mainImage ? (
+                                    <MediaPreview item={mainImage} alt={product.name} objectFit="contain" />
                                 ) : (
-                                    <Image src={mainImage} alt={product.name} fill sizes="(max-width: 768px) 90vw, 40vw" className="object-contain"/>
+                                    <div className="w-full h-full bg-muted flex items-center justify-center">
+                                        <ImageIcon className="h-12 w-12 text-muted-foreground" />
+                                    </div>
                                 )}
                             </button>
                         </div>
                         <div className="flex-shrink-0 mt-4">
                             <ScrollArea className="w-full whitespace-nowrap rounded-md">
                                 <div className="flex w-max space-x-2 p-2">
-                                {product.images.map((img, index) => {
-                                    const isThumbVideo = isVideo(img);
-                                    return (
-                                        <button 
-                                            key={index} 
-                                            onClick={() => setMainImage(img)} 
-                                            className={cn(
-                                                "relative aspect-square w-16 h-16 sm:w-20 sm:h-20 shrink-0 rounded-md overflow-hidden ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring transition-all",
-                                                mainImage === img ? "ring-2 ring-primary opacity-100" : "opacity-70 hover:opacity-100"
-                                            )}
-                                        >
-                                            {isThumbVideo ? (
-                                                <video src={img} muted className="object-cover w-full h-full"/>
-                                            ) : (
-                                                <Image src={img} alt={`${product.name} thumbnail ${index + 1}`} fill sizes="6rem" className="object-cover"/>
-                                            )}
-                                        </button>
-                                    );
-                                })}
+                                {mediaItems.map((item, index) => (
+                                    <button 
+                                        key={index} 
+                                        onClick={() => setMainImage(item)} 
+                                        className={cn(
+                                            "relative aspect-square w-16 h-16 sm:w-20 sm:h-20 shrink-0 rounded-md overflow-hidden ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring transition-all",
+                                            mainImage?.url === item.url ? "ring-2 ring-primary opacity-100" : "opacity-70 hover:opacity-100"
+                                        )}
+                                    >
+                                        <MediaPreview item={item} alt={`${product.name} thumbnail ${index + 1}`} />
+                                    </button>
+                                ))}
                                 </div>
                                 <ScrollBar orientation="horizontal" />
                             </ScrollArea>
                         </div>
                     </div>
-                    {/* Columna Derecha (Detalles) */}
-                    <div className="w-full md:w-1/2 lg:w-2/5 flex flex-col p-4 sm:p-6 bg-background rounded-r-lg max-h-full overflow-y-auto">
+                    
+                    <div className="w-full md:w-1/2 lg:w-2/5 flex flex-col p-4 sm:p-6 bg-background rounded-b-lg md:rounded-r-lg md:rounded-b-none max-h-full overflow-y-auto">
                         <DialogHeader className="mb-4">
                             <Badge className="w-fit mb-2">{product.category}</Badge>
                             <DialogTitle className="text-2xl sm:text-3xl font-bold">{product.name}</DialogTitle>
@@ -448,7 +506,6 @@ const ProductViewModal = ({ product, isOpen, onOpenChange, businessPhone, busine
                 </DialogContent>
             </Dialog>
 
-            {/* Suggestion Modal */}
             {suggestion?.suggestedProduct && (
                  <SuggestionModal
                     isOpen={isSuggestionModalOpen}
@@ -462,7 +519,8 @@ const ProductViewModal = ({ product, isOpen, onOpenChange, businessPhone, busine
              <Lightbox
                 isOpen={isLightboxOpen}
                 onOpenChange={setIsLightboxOpen}
-                imageUrl={mainImage}
+                items={mediaItems}
+                startIndex={selectedLightboxIndex}
             />
         </>
     )
@@ -759,4 +817,3 @@ export default function CatalogPage() {
         </div>
     );
 }
-
