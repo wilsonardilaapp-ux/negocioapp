@@ -85,7 +85,9 @@ export default function LandingEditorClient({ initialData }: EditorClientProps) 
             loadingPlans={loadingPlans}
           />
         </div>
-        <div className="lg:col-span-1"><SuperAdminEditorLandingPreview data={formData} /></div>
+        <div className="lg:col-span-1">
+          <SuperAdminEditorLandingPreview data={formData} plans={plans || []} />
+        </div>
       </div>
     </div>
   );

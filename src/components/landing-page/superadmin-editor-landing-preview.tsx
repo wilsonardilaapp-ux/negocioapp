@@ -8,12 +8,14 @@ import type { LandingPageData } from '@/models/landing-page';
 import { Copy, ExternalLink } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import LandingPageContent from '@/components/landing-page/landing-page-content';
+import type { SubscriptionPlan } from '@/models/subscription-plan';
 
 interface SuperAdminEditorLandingPreviewProps {
   data: LandingPageData;
+  plans: SubscriptionPlan[];
 }
 
-export default function SuperAdminEditorLandingPreview({ data }: SuperAdminEditorLandingPreviewProps) {
+export default function SuperAdminEditorLandingPreview({ data, plans }: SuperAdminEditorLandingPreviewProps) {
   const { toast } = useToast();
   
   // The public URL for the global landing page. We can assume it's the root for now.
@@ -72,7 +74,7 @@ export default function SuperAdminEditorLandingPreview({ data }: SuperAdminEdito
 
                   {/* Live Preview Content */}
                   <div className="bg-white max-h-[80vh] overflow-y-auto">
-                    <LandingPageContent data={data} />
+                    <LandingPageContent data={data} plans={plans} />
                   </div>
               </div>
           </CardContent>
