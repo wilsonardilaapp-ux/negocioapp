@@ -6,9 +6,10 @@ import { uploadMedia } from '@/ai/flows/upload-media-flow';
 import { useToast } from '@/hooks/use-toast';
 import 'quill/dist/quill.snow.css';
 
-// Simplified dynamic import for ReactQuill to prevent SSR issues.
+// Using a more explicit dynamic import to resolve the module correctly.
+// This pattern helps Next.js's bundler handle non-standard module exports.
 const QuillEditor = dynamic(
-  () => import('react-quill'),
+  () => import('react-quill').then((mod) => mod),
   {
     ssr: false,
     loading: () => <div className="h-[200px] w-full animate-pulse rounded-md bg-muted" />,
