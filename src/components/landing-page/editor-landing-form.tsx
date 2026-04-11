@@ -22,7 +22,7 @@ import { useToast } from "@/hooks/use-toast";
 import { uploadMedia } from "@/ai/flows/upload-media-flow";
 import Image from 'next/image';
 import { TikTokIcon, WhatsAppIcon, XIcon, FacebookIcon, InstagramIcon } from '@/components/icons';
-import { useFirestore, useDoc, useMemoFirebase, setDocumentNonBlocking } from "@/firebase";
+import { useFirestore, useDoc, useMemoFirebase, setDocumentNonBlocking, useUser } from "@/firebase";
 import { doc } from "firebase/firestore";
 import type { SubscriptionPlan } from "@/models/subscription-plan";
 
@@ -32,6 +32,18 @@ interface EditorLandingFormProps {
   setData: React.Dispatch<React.SetStateAction<LandingPageData>>;
   plans: SubscriptionPlan[];
   loadingPlans: boolean;
+}
+
+interface PlanButton {
+  label: string;
+  onClick: () => void;
+  variant: 'free' | 'popular' | 'paid';
+}
+
+interface HotmartLink {
+  planId: string;
+  planName: string;
+  hotmartUrl: string;
 }
 
 const MediaUploader = ({
@@ -115,9 +127,75 @@ export default function EditorLandingForm({ data, setData, plans, loadingPlans }
     const [newKeyword, setNewKeyword] = useState('');
     const { toast } = useToast();
     const firestore = useFirestore();
+    const { user } = useUser();
 
     const globalConfigRef = useMemoFirebase(() => !firestore ? null : doc(firestore, 'globalConfig/system'), [firestore]);
     const { data: globalConfig } = useDoc<GlobalConfig>(globalConfigRef);
+
+    const [hotmartLinks, setHotmartLinks] = useState<HotmartLink[]>([]);
+    
+    useEffect(() => {
+        if (plans) {
+            const links = plans.map(p => ({
+                planId: p.id,
+                planName: p.name,
+                hotmartUrl: (p as any).hotmartUrl || '',
+            }));
+            setHotmartLinks(links);
+        }
+    }, [plans]);
+
+    const getPlanButtonConfig = (plan: SubscriptionPlan): PlanButton => {
+        const hotmartLink = hotmartLinks.find((h) => h.planId === plan.id);
+      
+        if (plan.price === 0) {
+          return {
+            label: 'Empezar Gratis',
+            variant: 'free',
+            onClick: () => {
+              const url = hotmartLink?.hotmartUrl || '/register';
+              window.open(url, '_blank');
+            },
+          };
+        }
+      
+        return {
+          label: 'Suscribirse',
+          variant: plan.isMostPopular ? 'popular' : 'paid',
+          onClick: async () => {
+            if (hotmartLink?.hotmartUrl) {
+              window.open(hotmartLink.hotmartUrl, '_blank');
+              return;
+            }
+            if (plan.stripePriceId && !plan.stripePriceId.includes('placeholder') && user) {
+              try {
+                const res = await fetch('/api/stripe/create-checkout-session', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    priceId: plan.stripePriceId,
+                    businessId: user.uid,
+                    userId: user.uid,
+                    email: user.email,
+                  }),
+                });
+                if (!res.ok) throw new Error('Error en la creación de la sesión de checkout.');
+                const data: { url?: string } = await res.json();
+                if (data.url) {
+                  window.open(data.url, '_blank');
+                } else {
+                  throw new Error('URL de checkout no recibida.');
+                }
+              } catch (e) {
+                console.error(e);
+                window.location.href = '/contacto';
+              }
+              return;
+            }
+            window.location.href = '/contacto';
+          },
+        };
+      };
 
     const handleFileUpload = async (file: File): Promise<{ secure_url: string, mediaType: 'image' | 'video' } | null> => {
         return new Promise((resolve) => {
@@ -854,84 +932,97 @@ export default function EditorLandingForm({ data, setData, plans, loadingPlans }
                       </p>
                     </div>
 
-                    {loadingPlans && (
+                    {loadingPlans ? (
                       <div className="flex justify-center py-8">
                         <Loader2 className="animate-spin h-8 w-8 text-primary" />
                       </div>
-                    )}
-
-                    {!loadingPlans && (
+                    ) : (
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {(plans || []).map((plan) => (
-                          <div
-                            key={plan.id}
-                            className={cn(
-                              "border rounded-xl p-5 bg-white shadow-sm relative",
-                              plan.isMostPopular && "border-primary border-2"
-                            )}
-                          >
-                            {plan.isMostPopular && (
-                              <span className="absolute top-4 right-4 bg-primary text-primary-foreground text-xs font-bold px-2 py-1 rounded-full">
-                                Más Popular
-                              </span>
-                            )}
-                            <h4 className="text-xl font-bold text-gray-800">
-                              {plan.name}
-                            </h4>
-                            <p className="text-sm text-gray-500 mt-1 h-10">
-                              {plan.description}
-                            </p>
-                            <div className="mt-3">
-                              <span className="text-3xl font-bold text-gray-900">
-                                ${plan.price.toFixed(2)}
-                              </span>
-                              <span className="text-gray-500 text-sm">
-                                /mes
-                              </span>
-                            </div>
-                            <div className="mt-4">
-                              <p className="text-sm font-semibold text-gray-700 mb-2">
-                                Características:
-                              </p>
-                              <ul className="space-y-1">
-                                {(plan.features || []).map((feature, idx) => (
-                                  <li
-                                    key={idx}
-                                    className="flex items-center gap-2 text-sm text-gray-600"
-                                  >
-                                    <span className="text-primary font-bold">✓</span>
-                                    {feature.value}
-                                  </li>
-                                ))}
-                              </ul>
-                            </div>
-                            <div className="mt-4 pt-4 border-t border-gray-100">
-                              <p className="text-sm font-semibold text-gray-700 mb-2">
-                                Límites:
-                              </p>
-                              <div className="space-y-1 text-sm text-gray-600">
-                                <div className="flex justify-between">
-                                  <span>Productos:</span>
-                                  <span className="font-medium">
-                                    {plan.limits.products === -1 ? 'Ilimitados' : plan.limits.products}
+                        {(plans || []).map((plan) => {
+                           const btn = getPlanButtonConfig(plan);
+                           return (
+                              <div
+                                key={plan.id}
+                                className={cn(
+                                  "border rounded-xl p-5 bg-white shadow-sm relative",
+                                  plan.isMostPopular && "border-primary border-2"
+                                )}
+                              >
+                                {plan.isMostPopular && (
+                                  <span className="absolute top-4 right-4 bg-primary text-primary-foreground text-xs font-bold px-2 py-1 rounded-full">
+                                    Más Popular
+                                  </span>
+                                )}
+                                <h4 className="text-xl font-bold text-gray-800">
+                                  {plan.name}
+                                </h4>
+                                <p className="text-sm text-gray-500 mt-1 h-10">
+                                  {plan.description}
+                                </p>
+                                <div className="mt-3">
+                                  <span className="text-3xl font-bold text-gray-900">
+                                    ${plan.price.toFixed(2)}
+                                  </span>
+                                  <span className="text-gray-500 text-sm">
+                                    /mes
                                   </span>
                                 </div>
-                                <div className="flex justify-between">
-                                  <span>Posts de Blog:</span>
-                                  <span className="font-medium">
-                                    {plan.limits.blogPosts === -1 ? 'Ilimitados' : plan.limits.blogPosts}
-                                  </span>
+                                <div className="mt-4">
+                                  <p className="text-sm font-semibold text-gray-700 mb-2">
+                                    Características:
+                                  </p>
+                                  <ul className="space-y-1">
+                                    {(plan.features || []).map((feature, idx) => (
+                                      <li
+                                        key={idx}
+                                        className="flex items-center gap-2 text-sm text-gray-600"
+                                      >
+                                        <span className="text-primary font-bold">✓</span>
+                                        {feature.value}
+                                      </li>
+                                    ))}
+                                  </ul>
                                 </div>
-                                <div className="flex justify-between">
-                                  <span>Landing Pages:</span>
-                                  <span className="font-medium">
-                                    {plan.limits.landingPages === -1 ? 'Ilimitadas' : plan.limits.landingPages}
-                                  </span>
+                                <div className="mt-4 pt-4 border-t border-gray-100">
+                                  <p className="text-sm font-semibold text-gray-700 mb-2">
+                                    Límites:
+                                  </p>
+                                  <div className="space-y-1 text-sm text-gray-600">
+                                    <div className="flex justify-between">
+                                      <span>Productos:</span>
+                                      <span className="font-medium">
+                                        {plan.limits.products === -1 ? 'Ilimitados' : plan.limits.products}
+                                      </span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                      <span>Posts de Blog:</span>
+                                      <span className="font-medium">
+                                        {plan.limits.blogPosts === -1 ? 'Ilimitados' : plan.limits.blogPosts}
+                                      </span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                      <span>Landing Pages:</span>
+                                      <span className="font-medium">
+                                        {plan.limits.landingPages === -1 ? 'Ilimitadas' : plan.limits.landingPages}
+                                      </span>
+                                    </div>
+                                  </div>
                                 </div>
+                                <button
+                                  type="button"
+                                  onClick={btn.onClick}
+                                  className={cn(
+                                    "mt-4 w-full py-2 px-4 rounded-lg text-white text-sm font-semibold transition-colors duration-200",
+                                    btn.variant === 'free' ? 'bg-green-500 hover:bg-green-600' :
+                                    btn.variant === 'popular' ? 'bg-green-500 hover:bg-green-600' :
+                                    'bg-blue-600 hover:bg-blue-700'
+                                  )}
+                                >
+                                  {btn.label}
+                                </button>
                               </div>
-                            </div>
-                          </div>
-                        ))}
+                           )
+                        })}
                       </div>
                     )}
                   </div>
