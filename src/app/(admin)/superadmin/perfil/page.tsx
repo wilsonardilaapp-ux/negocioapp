@@ -9,7 +9,7 @@ import { z } from 'zod';
 import { updatePassword } from 'firebase/auth';
 import Image from 'next/image';
 import QRCode from 'react-qr-code';
-import { toPng } from 'html-to-image';
+import html2canvas from 'html2canvas';
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -281,15 +281,14 @@ export default function SuperAdminProfilePage() {
   
   const handleDownloadQR = () => {
     if (!qrCodeRef.current) return;
-    toPng(qrCodeRef.current)
-      .then(function (dataUrl) {
+    html2canvas(qrCodeRef.current, { backgroundColor: null }).then((canvas) => {
+        const dataUrl = canvas.toDataURL('image/png');
         const link = document.createElement('a');
         link.download = 'app-qr-code.png';
         link.href = dataUrl;
         link.click();
-      })
-      .catch(function (error) {
-        console.error('oops, something went wrong!', error);
+    }).catch(function (error) {
+        console.error('Error generando QR:', error);
         toast({
           variant: 'destructive',
           title: 'Error al descargar QR',
