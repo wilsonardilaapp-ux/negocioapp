@@ -8,6 +8,8 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { updatePassword } from 'firebase/auth';
 import Image from 'next/image';
+import QRCode from 'react-qr-code';
+import { toPng } from 'html-to-image';
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -16,7 +18,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Camera, Pencil, UploadCloud, Trash2, AlertTriangle } from 'lucide-react';
+import { Loader2, Camera, Pencil, UploadCloud, Trash2, AlertTriangle, Download } from 'lucide-react';
 import type { User as UserProfile } from '@/models/user';
 import type { GlobalConfig } from '@/models/global-config';
 import type { Integration } from '@/models/integration';
@@ -146,6 +148,14 @@ export default function SuperAdminProfilePage() {
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadingField, setUploadingField] = useState<string | null>(null);
+  const qrCodeRef = useRef<HTMLDivElement>(null);
+  const [appUrl, setAppUrl] = useState('');
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setAppUrl(window.location.origin);
+    }
+  }, []);
 
   const globalConfigDocRef = useMemoFirebase(() => !firestore ? null : doc(firestore, 'globalConfig', 'system'), [firestore]);
   const { data: globalConfigData, isLoading: isGlobalConfigLoading } = useDoc<GlobalConfig>(globalConfigDocRef);
@@ -268,6 +278,25 @@ export default function SuperAdminProfilePage() {
     if (!globalConfigDocRef) return;
     await setDocumentNonBlocking(globalConfigDocRef, { [field]: null }, { merge: true });
   };
+  
+  const handleDownloadQR = () => {
+    if (!qrCodeRef.current) return;
+    toPng(qrCodeRef.current)
+      .then(function (dataUrl) {
+        const link = document.createElement('a');
+        link.download = 'app-qr-code.png';
+        link.href = dataUrl;
+        link.click();
+      })
+      .catch(function (error) {
+        console.error('oops, something went wrong!', error);
+        toast({
+          variant: 'destructive',
+          title: 'Error al descargar QR',
+          description: 'No se pudo generar la imagen del código QR.',
+        });
+      });
+  };
 
   const isLoading = isUserLoading || isGlobalConfigLoading;
 
@@ -380,6 +409,28 @@ export default function SuperAdminProfilePage() {
                 </form>
             </Card>
             
+            <Card>
+              <CardHeader>
+                <CardTitle>Código QR de la Aplicación</CardTitle>
+                <CardDescription>
+                  Usa este QR para compartir o acceder rápidamente a la aplicación.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="flex flex-col items-center gap-4">
+                <div ref={qrCodeRef} className="bg-white p-4 rounded-md">
+                  {appUrl ? (
+                    <QRCode value={appUrl} size={150} />
+                  ) : (
+                    <div className="h-[150px] w-[150px] bg-muted animate-pulse rounded-md" />
+                  )}
+                </div>
+                <Button onClick={handleDownloadQR} disabled={!appUrl} className="w-full">
+                  <Download className="mr-2 h-4 w-4" />
+                  Descargar QR
+                </Button>
+              </CardContent>
+            </Card>
+
             <Card>
               <CardHeader>
                 <div className="flex items-center justify-between">
