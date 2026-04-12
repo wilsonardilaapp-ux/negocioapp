@@ -1,8 +1,10 @@
 'use client';
 
-import { useState, useTransition, useEffect, useMemo } from 'react';
+import { useState, useTransition, useEffect, useMemo, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
+import QRCode from "react-qr-code";
+import html2canvas from "html2canvas";
 import { updatePost } from '@/actions/blog';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
@@ -10,7 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
-import { Save, Loader2, ArrowLeft, Bot, Copy, Check, Facebook, Twitter, Linkedin } from 'lucide-react';
+import { Save, Loader2, ArrowLeft, Bot, Copy, Check, Facebook, Twitter, Linkedin, Download } from 'lucide-react';
 import RichTextEditor from '@/components/editor/RichTextEditor';
 import { useDoc, useFirestore, useMemoFirebase } from '@/firebase';
 import { doc } from 'firebase/firestore';
@@ -23,6 +25,7 @@ export default function EditPostPage() {
     const { toast } = useToast();
     const [isPending, startTransition] = useTransition();
     const [copied, setCopied] = useState(false);
+    const qrCodeRef = useRef<HTMLDivElement>(null);
     
     const firestore = useFirestore();
     const postId = params.id as string;
@@ -55,6 +58,24 @@ export default function EditPostPage() {
         setCopied(true);
         toast({ title: 'Enlace copiado al portapapeles' });
         setTimeout(() => setCopied(false), 2500);
+    };
+
+    const handleDownloadQR = () => {
+        if (!qrCodeRef.current) return;
+        html2canvas(qrCodeRef.current, { backgroundColor: null }).then((canvas) => {
+            const dataUrl = canvas.toDataURL('image/png');
+            const link = document.createElement('a');
+            link.download = `qr-post-${post?.id || 'post'}.png`;
+            link.href = dataUrl;
+            link.click();
+        }).catch(function (error) {
+            console.error('Error generando QR:', error);
+            toast({
+              variant: 'destructive',
+              title: 'Error al descargar QR',
+              description: 'No se pudo generar la imagen del código QR.',
+            });
+        });
     };
     
     if (isLoading) {
@@ -187,6 +208,23 @@ export default function EditPostPage() {
                                 <a href="https://www.youtube.com" target="_blank" rel="noopener noreferrer">
                                     <YoutubeIcon className="mr-2" /> YouTube
                                 </a>
+                            </Button>
+                        </CardContent>
+                    </Card>
+                )}
+
+                {publicUrl && (
+                    <Card className="shadow-sm">
+                        <CardHeader>
+                            <CardTitle className="text-base">Código QR del Enlace Público</CardTitle>
+                        </CardHeader>
+                        <CardContent className="flex flex-col items-center gap-4">
+                            <div ref={qrCodeRef} className="bg-white p-4 rounded-md border">
+                                <QRCode value={publicUrl} size={150} />
+                            </div>
+                            <Button onClick={handleDownloadQR} className="w-full">
+                                <Download className="mr-2 h-4 w-4" />
+                                Descargar Código QR
                             </Button>
                         </CardContent>
                     </Card>
