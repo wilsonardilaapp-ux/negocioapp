@@ -190,7 +190,7 @@ export default function LandingPageContent({ data, plans = [], businessId, logoU
 
 
   return (
-    <div className="min-h-screen flex flex-col font-sans bg-white text-black">
+    <div className="flex flex-col">
       {/* Navegación */}
       {navigation.enabled && (
         <nav 
@@ -308,12 +308,12 @@ export default function LandingPageContent({ data, plans = [], businessId, logoU
                         <div key={testimonial.id} className="bg-white p-8 rounded-xl shadow-lg flex flex-col">
                             <div className="flex mb-4">
                                 {[...Array(5)].map((_, i) => (
-                                    <Star key={i} className={cn("h-5 w-5", i < testimonial.rating ? "text-yellow-400 fill-yellow-400" : "text-gray-300")} />
+                                    <Star key={i} className={cn("h-5 w-5", testimonial.rating >= i + 1 ? "text-yellow-400 fill-yellow-400" : "text-gray-300")} />
                                 ))}
                             </div>
                             <div className="prose prose-sm text-gray-600 mb-6 flex-grow" dangerouslySetInnerHTML={{ __html: testimonial.text }} />
                             <div className="flex items-center gap-4 mt-auto">
-                                <Image src={testimonial.avatarUrl} alt={testimonial.authorName} width={200} height={200} className="rounded-full" />
+                                <Image src={testimonial.avatarUrl} alt={testimonial.authorName} width={40} height={40} className="rounded-full" />
                                 <div>
                                     <p className="font-semibold text-gray-900">{testimonial.authorName}</p>
                                     <p className="text-sm text-gray-500">{testimonial.authorRole}</p>
@@ -358,7 +358,7 @@ export default function LandingPageContent({ data, plans = [], businessId, logoU
                             <h3 className="text-xl font-bold text-gray-800">
                                 {plan.name}
                             </h3>
-                            <p className="text-sm text-gray-500 mt-1 mb-4 h-10">
+                            <p className="text-sm text-gray-500 mt-1 h-10">
                                 {plan.description}
                             </p>
                             <div className="mb-6">
