@@ -1,20 +1,15 @@
-
-import { initializeApp, getApps, getApp } from "firebase/app";
-import { getFirestore, collection, query, orderBy, getDocs, doc, getDoc } from "firebase/firestore";
-import { firebaseConfig } from "@/firebase/config";
+import { getAdminFirestore } from "@/firebase/server-init";
 import type { SubscriptionPlan } from "@/models/subscription-plan";
 import type { LandingPageData } from "@/models/landing-page";
 import PublicPlanCard from "@/components/pricing/public-plan-card";
 import Header from "@/components/layout/header";
 import Footer from "@/components/layout/footer";
 
-const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
-const db = getFirestore(app);
-
 async function getPlans(): Promise<SubscriptionPlan[]> {
     try {
-        const q = query(collection(db, "plans"), orderBy("price", "asc"));
-        const snapshot = await getDocs(q);
+        const db = await getAdminFirestore();
+        const q = db.collection("plans").orderBy("price", "asc");
+        const snapshot = await q.get();
         if (snapshot.empty) {
             return [];
         }
@@ -27,15 +22,16 @@ async function getPlans(): Promise<SubscriptionPlan[]> {
 
 async function getHeaderData(): Promise<{ businessId: string | null, navigation: LandingPageData['navigation'] | null }> {
     try {
-        const configSnap = await getDoc(doc(db, "globalConfig", "system"));
-        const mainBusinessId = configSnap.exists() ? configSnap.data().mainBusinessId : null;
+        const db = await getAdminFirestore();
+        const configSnap = await db.collection("globalConfig").doc("system").get();
+        const mainBusinessId = configSnap.exists ? configSnap.data()?.mainBusinessId : null;
 
         if (!mainBusinessId) {
             return { businessId: null, navigation: null };
         }
 
-        const landingSnap = await getDoc(doc(db, "businesses", mainBusinessId, "landingPages", "main"));
-        const navigation = landingSnap.exists() ? (landingSnap.data() as LandingPageData).navigation : null;
+        const landingSnap = await db.collection("businesses").doc(mainBusinessId).collection("landingPages").doc("main").get();
+        const navigation = landingSnap.exists ? (landingSnap.data() as LandingPageData).navigation : null;
         
         return { businessId: mainBusinessId, navigation };
     } catch (error) {

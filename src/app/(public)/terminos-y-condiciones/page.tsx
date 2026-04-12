@@ -1,27 +1,22 @@
-import { initializeApp, getApps, getApp } from "firebase/app";
-import { getFirestore, doc, getDoc } from "firebase/firestore";
-import { firebaseConfig } from "@/firebase/config";
+import { getAdminFirestore } from "@/firebase/server-init";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import Footer from "@/components/layout/footer";
 import Header from "@/components/layout/header";
 import type { LandingPageData } from "@/models/landing-page";
 
-// Initialize Firebase for server-side fetching
-const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
-const db = getFirestore(app);
-
 // Data fetching function for header
 async function getHeaderData(): Promise<{ businessId: string | null, navigation: LandingPageData['navigation'] | null }> {
     try {
-        const configSnap = await getDoc(doc(db, "globalConfig", "system"));
-        const mainBusinessId = configSnap.exists() ? configSnap.data().mainBusinessId : null;
+        const db = await getAdminFirestore();
+        const configSnap = await db.collection("globalConfig").doc("system").get();
+        const mainBusinessId = configSnap.exists ? configSnap.data()?.mainBusinessId : null;
 
         if (!mainBusinessId) {
             return { businessId: null, navigation: null };
         }
 
-        const landingSnap = await getDoc(doc(db, "businesses", mainBusinessId, "landingPages", "main"));
-        const navigation = landingSnap.exists() ? (landingSnap.data() as LandingPageData).navigation : null;
+        const landingSnap = await db.collection("businesses").doc(mainBusinessId).collection("landingPages").doc("main").get();
+        const navigation = landingSnap.exists ? (landingSnap.data() as LandingPageData).navigation : null;
         
         return { businessId: mainBusinessId, navigation };
     } catch (error) {

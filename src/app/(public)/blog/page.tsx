@@ -9,6 +9,15 @@ import Footer from "@/components/layout/footer";
 
 export const dynamic = 'force-dynamic';
 
+// Default config object to ensure type consistency
+const defaultConfig = {
+  title: "Nuestro Blog Informativo",
+  content: "Bienvenido a nuestro espacio de noticias. Aquí encontrarás las últimas actualizaciones y artículos de interés.",
+  bannerUrl: null,
+  logoUrl: null,
+  headerBannerUrl: null,
+};
+
 // Función para obtener el ID del negocio principal
 async function getMainBusinessId(): Promise<string | null> {
     try {
@@ -25,13 +34,7 @@ async function getBlogData() {
   try {
     const db = await getAdminFirestore();
     const appearanceSnap = await db.collection("settings").doc("blog_appearance").get();
-    const config = appearanceSnap.exists ? appearanceSnap.data() : {
-      title: "Nuestro Blog Informativo",
-      content: "Bienvenido a nuestro espacio de noticias. Aquí encontrarás las últimas actualizaciones y artículos de interés.",
-      bannerUrl: null,
-      logoUrl: null,
-      headerBannerUrl: null,
-    };
+    const config = appearanceSnap.exists ? appearanceSnap.data() : defaultConfig;
 
     const q = db.collection("blog_posts").orderBy("createdAt", "desc");
     const snapshot = await q.get();
@@ -56,7 +59,8 @@ async function getBlogData() {
     return { config, posts, landingData };
   } catch (error) {
     console.error("Error cargando blog:", error);
-    return { config: {}, posts: [], landingData: null };
+    // Return default config on error to prevent build failure
+    return { config: defaultConfig, posts: [], landingData: null };
   }
 }
 

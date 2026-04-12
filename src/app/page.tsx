@@ -3,9 +3,7 @@ import LandingPageContent from '@/components/landing-page/landing-page-content';
 import type { LandingPageData } from '@/models/landing-page';
 import { v4 as uuidv4 } from 'uuid';
 import { unstable_noStore as noStore } from 'next/cache';
-import { firebaseConfig } from "@/firebase/config";
-import { initializeApp, getApps, getApp } from "firebase/app";
-import { getFirestore, collection, query, orderBy, getDocs } from "firebase/firestore";
+import { getAdminFirestore } from "@/firebase/server-init";
 import type { SubscriptionPlan } from '@/models/subscription-plan';
 
 // Forzamos comportamiento dinámico total
@@ -14,15 +12,10 @@ export const fetchCache = 'force-no-store';
 export const revalidate = 0;
 
 async function getPlans(): Promise<SubscriptionPlan[]> {
-  const isConfigValid = !!firebaseConfig.projectId;
-  if (!isConfigValid) return [];
-
-  const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
-  const db = getFirestore(app);
-
   try {
-    const q = query(collection(db, "plans"), orderBy("price", "asc"));
-    const snapshot = await getDocs(q);
+    const db = await getAdminFirestore();
+    const q = db.collection("plans").orderBy("price", "asc");
+    const snapshot = await q.get();
     if (snapshot.empty) return [];
     return snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })) as SubscriptionPlan[];
   } catch (error) {
