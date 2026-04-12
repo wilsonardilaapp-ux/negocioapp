@@ -1,14 +1,12 @@
 import LandingPageContent from '@/components/landing-page/landing-page-content';
 import type { LandingPageData } from '@/models/landing-page';
 import { v4 as uuidv4 } from 'uuid';
-import { unstable_noStore as noStore } from 'next/cache';
+import { getLandingData } from '@/lib/get-landing-data';
 import { getAdminFirestore } from "@/firebase/server-init";
 import type { SubscriptionPlan } from '@/models/subscription-plan';
 
 // Forzamos comportamiento dinámico total
 export const dynamic = 'force-dynamic';
-export const fetchCache = 'force-no-store';
-export const revalidate = 0;
 
 async function getPlans(): Promise<SubscriptionPlan[]> {
   try {
@@ -157,11 +155,11 @@ const fallbackData: LandingPageData = {
 };
 
 export default async function RootPage() {
-  noStore();
-
   try {
     const plans = await getPlans();
-    const dataToRender = { ...fallbackData };
+    // La página pública siempre obtiene los datos más recientes.
+    const dbData = await getLandingData();
+    const dataToRender = dbData || fallbackData;
 
     return (
       <main className="w-full">
