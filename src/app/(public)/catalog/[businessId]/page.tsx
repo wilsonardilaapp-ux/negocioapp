@@ -449,12 +449,12 @@ const ProductViewModal = ({ product, isOpen, onOpenChange, businessPhone, busine
     return (
         <>
             <Dialog open={isOpen} onOpenChange={onOpenChange}>
-                <DialogContent className="max-w-4xl w-full p-0 flex flex-col md:flex-row max-h-[90vh]">
+                <DialogContent className="max-w-4xl w-full p-0 flex flex-col md:flex-row h-[90vh]">
                     {/* Image Column */}
-                    <div className="w-full md:w-1/2 lg:w-3/5 p-4 sm:p-6 flex flex-col">
+                    <div className="relative w-full h-80 sm:h-auto sm:aspect-square md:w-1/2 lg:w-3/5 p-4 sm:p-6 flex flex-col">
                         <button
                             type="button"
-                            className="relative w-full h-80 sm:h-auto sm:aspect-square rounded-lg overflow-hidden border cursor-zoom-in"
+                            className="relative w-full flex-grow rounded-lg overflow-hidden border cursor-zoom-in"
                             onClick={() => {
                                 const idx = mediaItems.findIndex(item => item.url === mainImage?.url);
                                 setSelectedLightboxIndex(idx > -1 ? idx : 0);
@@ -793,7 +793,7 @@ export default function CatalogPage() {
                         </CardContent>
                     </Card>
                 ) : (
-                    <div className="grid grid-cols-2 sm:grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-3 md:gap-5">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-3 md:gap-5">
                         {products?.map(product => (
                             <PublicProductCard key={product.id} product={product} onOpenModal={handleOpenModal} />
                         ))}
