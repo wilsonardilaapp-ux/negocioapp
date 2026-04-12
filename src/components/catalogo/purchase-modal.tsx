@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -11,7 +12,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsTrigger, TabsList } from '@/components/ui/tabs';
 import { Card, CardContent } from '@/components/ui/card';
-import { ShoppingBag, Building2, HandCoins, Trash2 } from 'lucide-react';
+import { ShoppingBag, Building2, HandCoins, Minus, Plus } from 'lucide-react';
 import Image from 'next/image';
 import { useToast } from '@/hooks/use-toast';
 import type { PaymentSettings } from '@/models/payment-settings';
@@ -38,6 +39,7 @@ interface PurchaseModalProps {
   onOpenChange: (open: boolean) => void;
   cartItems: CartItem[];
   onRemoveItem: (productId: string) => void;
+  onUpdateQuantity: (productId: string, newQuantity: number) => void;
   businessId: string;
   businessInfo: LandingHeaderConfigData['businessInfo'] | null;
   paymentSettings: PaymentSettings | null;
@@ -60,7 +62,7 @@ const formatCurrency = (value: number) => {
 };
 
 
-export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, businessId, businessInfo, paymentSettings }: PurchaseModalProps) {
+export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, onUpdateQuantity, businessId, businessInfo, paymentSettings }: PurchaseModalProps) {
   const { toast } = useToast();
   const firestore = useFirestore();
   const [tipoEntrega, setTipoEntrega] = useState<TipoEntrega>('domicilio');
@@ -229,19 +231,25 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, b
                     <CardContent className="p-4 space-y-3">
                          <ScrollArea className="max-h-[150px]">
                             {cartItems.map(item => (
-                                 <div key={item.id} className="flex items-start gap-4 py-2 border-b last:border-b-0">
+                                 <div key={item.id} className="flex items-center gap-4 py-2 border-b last:border-b-0">
                                     <div className="relative aspect-square w-16 h-16 rounded-md overflow-hidden shrink-0">
                                         <Image src={item.images[0] || 'https://picsum.photos/seed/product/200'} alt={item.name} fill sizes="4rem" className="object-cover"/>
                                     </div>
                                     <div className="flex-grow space-y-1">
                                         <h4 className="font-semibold text-sm leading-tight">{item.name}</h4>
-                                        <p className="text-xs text-muted-foreground">{item.quantity} x {formatCurrency(item.price)}</p>
+                                        <p className="text-xs text-muted-foreground">{formatCurrency(item.price)} c/u</p>
+                                        <div className="flex items-center gap-2">
+                                            <Button type="button" variant="outline" size="icon" className="h-6 w-6" onClick={() => onUpdateQuantity(item.id, item.quantity - 1)}>
+                                                <Minus className="h-3 w-3" />
+                                            </Button>
+                                            <span className="font-bold text-sm w-4 text-center">{item.quantity}</span>
+                                            <Button type="button" variant="outline" size="icon" className="h-6 w-6" onClick={() => onUpdateQuantity(item.id, item.quantity + 1)}>
+                                                <Plus className="h-3 w-3" />
+                                            </Button>
+                                        </div>
                                     </div>
-                                     <div className="text-right">
-                                        <p className="font-semibold text-sm">{formatCurrency(item.price * item.quantity)}</p>
-                                        <Button variant="ghost" size="icon" className="h-7 w-7 mt-1 text-muted-foreground hover:text-destructive" onClick={() => onRemoveItem(item.id)}>
-                                            <Trash2 className="h-4 w-4"/>
-                                        </Button>
+                                     <div className="text-right font-semibold text-sm">
+                                        {formatCurrency(item.price * item.quantity)}
                                     </div>
                                 </div>
                             ))}

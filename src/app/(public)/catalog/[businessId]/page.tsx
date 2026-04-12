@@ -502,8 +502,31 @@ export default function CatalogPage() {
     }, [showPrintButton, selectedProduct, cart]);
 
     const handleAddToCart = (itemsToAdd: CartItem[]) => {
-        setCart(itemsToAdd);
+        setCart(prevCart => {
+            const newCart = [...prevCart];
+            itemsToAdd.forEach(newItem => {
+                const existingItemIndex = newCart.findIndex(item => item.id === newItem.id);
+                if (existingItemIndex > -1) {
+                    newCart[existingItemIndex].quantity += newItem.quantity;
+                } else {
+                    newCart.push(newItem);
+                }
+            });
+            return newCart;
+        });
         setIsPurchaseModalOpen(true);
+    };
+
+    const handleUpdateCartQuantity = (productId: string, newQuantity: number) => {
+        if (newQuantity <= 0) {
+            handleRemoveFromCart(productId);
+        } else {
+            setCart(prevCart =>
+                prevCart.map(item =>
+                    item.id === productId ? { ...item, quantity: newQuantity } : item
+                )
+            );
+        }
     };
 
     const handleRemoveFromCart = (productId: string) => {
@@ -603,6 +626,7 @@ export default function CatalogPage() {
                     onOpenChange={setIsPurchaseModalOpen}
                     cartItems={cart}
                     onRemoveItem={handleRemoveFromCart}
+                    onUpdateQuantity={handleUpdateCartQuantity}
                     businessId={pageData.resolvedBusinessId}
                     businessInfo={headerConfig?.businessInfo ?? null}
                     paymentSettings={pageData.paymentSettings}
@@ -710,5 +734,3 @@ const CatalogHeader = ({ config }: { config: LandingHeaderConfigData | null }) =
         </div>
     );
 }
-
-    
