@@ -9,7 +9,7 @@ import 'quill/dist/quill.snow.css';
 // Using a more explicit dynamic import to resolve the module correctly.
 // This pattern helps Next.js's bundler handle non-standard module exports.
 const QuillEditor = dynamic(
-  () => import('react-quill').then((mod) => mod),
+  () => import('react-quill'),
   {
     ssr: false,
     loading: () => <div className="h-[200px] w-full animate-pulse rounded-md bg-muted" />,

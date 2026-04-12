@@ -1,7 +1,6 @@
-
 'use client';
 
-import { useState, useTransition, useEffect } from 'react';
+import { useState, useTransition, useEffect, useMemo } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import { updatePost } from '@/actions/blog';
@@ -11,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
-import { Save, Loader2, ArrowLeft, Bot } from 'lucide-react';
+import { Save, Loader2, ArrowLeft, Bot, Copy, Check } from 'lucide-react';
 import RichTextEditor from '@/components/editor/RichTextEditor';
 import { useDoc, useFirestore, useMemoFirebase } from '@/firebase';
 import { doc } from 'firebase/firestore';
@@ -22,6 +21,7 @@ export default function EditPostPage() {
     const params = useParams();
     const { toast } = useToast();
     const [isPending, startTransition] = useTransition();
+    const [copied, setCopied] = useState(false);
     
     const firestore = useFirestore();
     const postId = params.id as string;
@@ -40,6 +40,21 @@ export default function EditPostPage() {
             setContent(post.content || '');
         }
     }, [post]);
+    
+    const publicUrl = useMemo(() => {
+        if (typeof window !== 'undefined' && post?.slug) {
+            return `${window.location.origin}/blog/${post.slug}`;
+        }
+        return '';
+    }, [post?.slug]);
+
+    const handleCopy = () => {
+        if (!publicUrl) return;
+        navigator.clipboard.writeText(publicUrl);
+        setCopied(true);
+        toast({ title: 'Enlace copiado al portapapeles' });
+        setTimeout(() => setCopied(false), 2500);
+    };
     
     if (isLoading) {
         return <div className="flex items-center justify-center h-64"><Loader2 className="h-8 w-8 animate-spin" /> Cargando post...</div>
@@ -117,6 +132,19 @@ export default function EditPostPage() {
                         </div>
                     </CardContent>
                 </Card>
+
+                <Card className="shadow-sm">
+                    <CardHeader><CardTitle className="text-base">Enlace Público</CardTitle></CardHeader>
+                    <CardContent>
+                        <Label htmlFor="publicUrl">URL del Post</Label>
+                        <div className="flex items-center space-x-2 mt-2">
+                            <Input id="publicUrl" value={publicUrl} readOnly />
+                            <Button type="button" variant="outline" size="icon" onClick={handleCopy} aria-label="Copiar enlace">
+                                {copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
+                            </Button>
+                        </div>
+                    </CardContent>
+                </Card>
                 
                  <Card className="shadow-sm">
                     <CardHeader><CardTitle className="text-base">Imagen Destacada</CardTitle></CardHeader>
@@ -155,4 +183,3 @@ export default function EditPostPage() {
     </form>
   );
 }
-
