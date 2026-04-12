@@ -34,7 +34,8 @@ async function getBlogData() {
   try {
     const db = await getAdminFirestore();
     const appearanceSnap = await db.collection("settings").doc("blog_appearance").get();
-    const config = appearanceSnap.exists ? appearanceSnap.data() : defaultConfig;
+    const configData = appearanceSnap.data();
+    const config = appearanceSnap.exists && configData ? { ...defaultConfig, ...configData } : defaultConfig;
 
     const q = db.collection("blog_posts").orderBy("createdAt", "desc");
     const snapshot = await q.get();
