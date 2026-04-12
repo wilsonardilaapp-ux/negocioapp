@@ -239,45 +239,68 @@ const Lightbox = ({
 
     if (!isOpen || !items || items.length === 0) return null;
 
+    const currentItem = items[currentIndex]!;
+
     return (
         <div
             role="dialog"
             aria-modal="true"
-            className="fixed inset-0 z-[999] bg-black/90 flex items-center justify-center p-4 sm:p-6 animate-in fade-in-0"
+            className="fixed inset-0 z-[999] bg-black/90 flex flex-col items-center justify-center p-4 sm:p-6 animate-in fade-in-0"
             onClick={() => onOpenChange(false)}
         >
-            <button 
-                onClick={(e) => { e.stopPropagation(); onOpenChange(false); }} 
-                className="absolute top-4 right-4 rounded-full bg-black/50 p-2 text-white transition-opacity hover:opacity-80"
-                aria-label="Cerrar"
-            >
-                <X className="h-6 w-6" />
-            </button>
+            <div className="absolute top-4 right-4 flex items-center gap-4 z-20">
+                {items.length > 1 && (
+                    <span className="text-white text-sm font-mono bg-black/50 px-2 py-1 rounded-md">
+                        {currentIndex + 1} / {items.length}
+                    </span>
+                )}
+                <button 
+                    onClick={(e) => { e.stopPropagation(); onOpenChange(false); }} 
+                    className="rounded-full bg-black/50 p-2 text-white transition-opacity hover:opacity-80"
+                    aria-label="Cerrar"
+                >
+                    <X className="h-6 w-6" />
+                </button>
+            </div>
 
-            <div className="relative w-full h-full" onClick={e => e.stopPropagation()}>
-                <div className="relative w-full h-full flex items-center justify-center">
-                    <div className="relative max-w-full max-h-full">
-                        <MediaPreview item={items[currentIndex]!} alt={`Imagen ${currentIndex + 1}`} objectFit="contain" />
-                    </div>
-                </div>
+            <div className="relative w-full h-full flex items-center justify-center" onClick={e => e.stopPropagation()}>
+                {/* Main media display */}
+                {currentItem.type === 'video' ? (
+                    <video
+                        key={currentItem.url}
+                        src={currentItem.url}
+                        controls
+                        autoPlay
+                        className="max-h-[85vh] max-w-full object-contain rounded-lg"
+                    />
+                ) : (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                        key={currentItem.url}
+                        src={currentItem.url}
+                        alt={`Vista ampliada ${currentIndex + 1}`}
+                        className="max-h-[85vh] max-w-full object-contain rounded-lg"
+                    />
+                )}
 
+                {/* Navigation buttons */}
                 {items.length > 1 && (
                     <>
                         <Button
                             variant="ghost"
                             size="icon"
-                            onClick={goToPrevious}
+                            onClick={(e) => { e.stopPropagation(); goToPrevious(); }}
                             aria-label="Imagen anterior"
-                            className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-black/50 text-white hover:bg-black/75 h-10 w-10 z-10"
+                            className="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 rounded-full bg-black/50 text-white hover:bg-black/75 h-10 w-10 z-10"
                         >
                             <ChevronLeft className="h-6 w-6" />
                         </Button>
                         <Button
                             variant="ghost"
                             size="icon"
-                            onClick={goToNext}
+                            onClick={(e) => { e.stopPropagation(); goToNext(); }}
                             aria-label="Siguiente imagen"
-                            className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-black/50 text-white hover:bg-black/75 h-10 w-10 z-10"
+                            className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 rounded-full bg-black/50 text-white hover:bg-black/75 h-10 w-10 z-10"
                         >
                             <ChevronRight className="h-6 w-6" />
                         </Button>
@@ -448,10 +471,10 @@ const ProductViewModal = ({ product, isOpen, onOpenChange, businessPhone, busine
     return (
         <>
             <Dialog open={isOpen} onOpenChange={onOpenChange}>
-                <DialogContent className="max-w-4xl w-full p-0 overflow-hidden sm:rounded-lg">
-                    <div className="flex flex-col md:flex-row h-full max-h-[90vh]">
+                <DialogContent className="w-[95vw] max-w-4xl p-0 overflow-hidden sm:rounded-lg md:max-h-[90vh] flex flex-col">
+                    <div className="flex flex-col md:flex-row flex-1 min-h-0">
                         {/* Image Column */}
-                        <div className="md:w-1/2 lg:w-3/5 p-4 sm:p-6 flex flex-col">
+                        <div className="md:w-1/2 lg:w-3/5 p-4 sm:p-6 flex flex-col min-h-0">
                             <button
                                 type="button"
                                 className="relative w-full aspect-square flex-shrink-0 rounded-lg overflow-hidden border cursor-zoom-in"
@@ -491,12 +514,12 @@ const ProductViewModal = ({ product, isOpen, onOpenChange, businessPhone, busine
                         </div>
                         
                         {/* Details Column */}
-                        <div className="md:w-1/2 lg:w-2/5 flex flex-col p-4 sm:p-6 bg-background rounded-b-lg md:rounded-r-lg md:rounded-b-none">
+                        <div className="md:w-1/2 lg:w-2/5 flex flex-col p-4 sm:p-6 bg-background rounded-b-lg md:rounded-r-lg md:rounded-b-none min-h-0">
                             <DialogHeader className="mb-4 flex-shrink-0">
                                 <Badge className="w-fit mb-2">{product.category}</Badge>
                                 <DialogTitle className="text-2xl sm:text-3xl font-bold">{product.name}</DialogTitle>
                             </DialogHeader>
-                            <div className="flex-grow min-h-0 overflow-y-auto pr-2">
+                            <div className="flex-grow overflow-y-auto pr-2">
                                 <div className="space-y-4">
                                     <div className="prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: product.description }} />
                                     <p><span className="font-semibold">Disponibles:</span> {product.stock} unidades</p>
@@ -794,7 +817,7 @@ export default function CatalogPage() {
                         </CardContent>
                     </Card>
                 ) : (
-                    <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 md:gap-5">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 md:gap-5">
                         {products?.map(product => (
                             <PublicProductCard key={product.id} product={product} onOpenModal={handleOpenModal} />
                         ))}
