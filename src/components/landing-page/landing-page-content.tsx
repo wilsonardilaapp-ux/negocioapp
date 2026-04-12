@@ -195,7 +195,7 @@ export default function LandingPageContent({ data, plans = [], businessId, logoU
       {navigation.enabled && (
         <nav 
           style={navStyle} 
-          className={`sticky top-0 z-50 py-4 transition-shadow ${navigation.useShadow ? 'shadow-md' : ''}`}
+          className={cn('sticky top-0 z-50 py-4 transition-shadow', navigation.useShadow && 'shadow-md')}
         >
           <div className="container mx-auto px-4 flex justify-between items-center">
             <div className={`flex items-center ${navigation.logoAlignment === 'center' ? 'mx-auto' : navigation.logoAlignment === 'right' ? 'ml-auto' : ''}`}>
