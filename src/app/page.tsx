@@ -1,4 +1,3 @@
-import { getLandingData } from '@/lib/get-landing-data';
 import LandingPageContent from '@/components/landing-page/landing-page-content';
 import type { LandingPageData } from '@/models/landing-page';
 import { v4 as uuidv4 } from 'uuid';
@@ -157,31 +156,12 @@ const fallbackData: LandingPageData = {
   },
 };
 
-function deepMerge(target: any, source: any): any {
-    const output = { ...target };
-    if (target && typeof target === 'object' && source && typeof source === 'object') {
-        Object.keys(source).forEach(key => {
-            if (source[key] && typeof source[key] === 'object' && key in target && typeof target[key] === 'object' && !Array.isArray(source[key])) {
-                output[key] = deepMerge(target[key], source[key]);
-            } else {
-                output[key] = source[key];
-            }
-        });
-        Object.keys(target).forEach(key => {
-            if (!(key in source)) {
-                output[key] = target[key];
-            }
-        });
-    }
-    return output;
-}
-
 export default async function RootPage() {
   noStore();
 
   try {
-    const [dbData, plans] = await Promise.all([getLandingData(), getPlans()]);
-    const dataToRender = deepMerge(fallbackData, dbData ?? {});
+    const plans = await getPlans();
+    const dataToRender = { ...fallbackData };
 
     return (
       <main className="w-full">
