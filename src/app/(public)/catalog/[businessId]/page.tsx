@@ -25,7 +25,7 @@ import { PurchaseModal } from '@/components/catalogo/purchase-modal';
 import type { PaymentSettings } from '@/models/payment-settings';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
-import { getSuggestion } from '@/ai/flows/suggestion-flow';
+import { getSuggestion, updateSuggestionMetrics } from '@/ai/flows/suggestion-flow';
 import type { SuggestionOutput } from '@/models/suggestion-io';
 import { SuggestionModal } from '@/components/suggestions/suggestion-modal';
 import PublicNav from '@/components/layout/public-nav';
@@ -222,15 +222,13 @@ const Lightbox = ({
         }
     }, [isOpen, startIndex]);
 
-    const goToNext = useCallback((e?: React.MouseEvent) => {
-        e?.stopPropagation();
+    const goToNext = useCallback(() => {
         if (items.length > 0) {
             setCurrentIndex((prevIndex) => (prevIndex + 1) % items.length);
         }
     }, [items.length]);
 
-    const goToPrevious = useCallback((e?: React.MouseEvent) => {
-        e?.stopPropagation();
+    const goToPrevious = useCallback(() => {
         if (items.length > 0) {
             setCurrentIndex((prevIndex) => (prevIndex - 1 + items.length) % items.length);
         }
@@ -262,52 +260,50 @@ const Lightbox = ({
                 position: 'fixed',
                 inset: 0,
                 zIndex: 99999,
-                backgroundColor: 'rgba(0, 0, 0, 0.9)',
+                backgroundColor: 'rgba(0, 0, 0, 0.93)',
                 display: 'flex',
-                flexDirection: 'column',
                 alignItems: 'center',
                 justifyContent: 'center',
-                padding: '1rem',
+                padding: '0.5rem'
             }}
             onClick={() => onOpenChange(false)}
         >
-            <div style={{ position: 'absolute', top: '1rem', right: '1rem', display: 'flex', alignItems: 'center', gap: '1rem', zIndex: 10 }}>
-                {items.length > 1 && (
-                    <span style={{ color: 'white', fontSize: '0.875rem', backgroundColor: 'rgba(0,0,0,0.5)', padding: '0.25rem 0.5rem', borderRadius: '0.375rem' }}>
-                        {currentIndex + 1} / {items.length}
-                    </span>
-                )}
-                <button
-                    onClick={(e) => { e.stopPropagation(); onOpenChange(false); }}
-                    style={{ background: 'rgba(0,0,0,0.5)', borderRadius: '9999px', padding: '0.5rem', color: 'white', border: 'none', cursor: 'pointer' }}
-                    aria-label="Cerrar"
-                >
-                    <X className="h-6 w-6" />
-                </button>
-            </div>
+            <button
+                onClick={(e) => { e.stopPropagation(); onOpenChange(false); }}
+                style={{ position: 'absolute', top: '1rem', right: '1rem', background: 'rgba(0,0,0,0.5)', borderRadius: '9999px', padding: '0.5rem', color: 'white', border: 'none', cursor: 'pointer', zIndex: 10 }}
+                aria-label="Cerrar"
+            >
+                <X className="h-6 w-6" />
+            </button>
+            <span style={{ position: 'absolute', top: '1rem', left: '1rem', color: 'white', fontSize: '0.875rem', backgroundColor: 'rgba(0,0,0,0.5)', padding: '0.25rem 0.5rem', borderRadius: '0.375rem', zIndex: 10 }}>
+              {currentIndex + 1} / {items.length}
+            </span>
             
-            <div style={{ position: 'relative', width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={e => e.stopPropagation()}>
+            <div 
+              style={{ position: 'relative', width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              onClick={e => e.stopPropagation()}
+            >
                 {currentItem.type === 'video' ? (
-                    <video key={currentItem.url} src={currentItem.url} controls autoPlay style={{ maxHeight: '85vh', maxWidth: '100%', objectFit: 'contain', borderRadius: '0.5rem' }} />
+                    <video key={currentItem.url} src={currentItem.url} controls autoPlay style={{ maxHeight: '90vh', maxWidth: '95vw', objectFit: 'contain', borderRadius: '0.5rem', display: 'block', width: 'auto', height: 'auto' }} />
                 ) : (
-                    <img key={currentItem.url} src={currentItem.url} alt={`Vista ampliada ${currentIndex + 1}`} style={{ maxHeight: '85vh', maxWidth: '100%', objectFit: 'contain', borderRadius: '0.5rem' }} />
+                    <img key={currentItem.url} src={currentItem.url} alt={`Vista ampliada ${currentIndex + 1}`} style={{ maxHeight: '90vh', maxWidth: '95vw', objectFit: 'contain', borderRadius: '0.5rem', display: 'block', width: 'auto', height: 'auto' }} />
                 )}
 
                  {items.length > 1 && (
                     <>
                         <button
-                            onClick={goToPrevious}
+                            onClick={(e) => { e.stopPropagation(); goToPrevious(); }}
                             aria-label="Imagen anterior"
-                            style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', borderRadius: '9999px', backgroundColor: 'rgba(0,0,0,0.5)', color: 'white', border: 'none', cursor: 'pointer', height: '2.5rem', width: '2.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                            style={{ position: 'absolute', left: '0.5rem', top: '50%', transform: 'translateY(-50%)', borderRadius: '9999px', backgroundColor: 'rgba(0,0,0,0.5)', color: 'white', border: 'none', cursor: 'pointer', height: '3rem', width: '3rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                         >
-                            <ChevronLeft className="h-6 w-6" />
+                            <ChevronLeft className="h-7 w-7" />
                         </button>
                         <button
-                            onClick={goToNext}
+                            onClick={(e) => { e.stopPropagation(); goToNext(); }}
                             aria-label="Siguiente imagen"
-                            style={{ position: 'absolute', right: '1rem', top: '50%', transform: 'translateY(-50%)', borderRadius: '9999px', backgroundColor: 'rgba(0,0,0,0.5)', color: 'white', border: 'none', cursor: 'pointer', height: '2.5rem', width: '2.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                            style={{ position: 'absolute', right: '0.5rem', top: '50%', transform: 'translateY(-50%)', borderRadius: '9999px', backgroundColor: 'rgba(0,0,0,0.5)', color: 'white', border: 'none', cursor: 'pointer', height: '3rem', width: '3rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                         >
-                            <ChevronRight className="h-6 w-6" />
+                            <ChevronRight className="h-7 w-7" />
                         </button>
                     </>
                 )}
@@ -319,7 +315,6 @@ const Lightbox = ({
 };
 
 
-
 const ProductViewModal = ({ product, isOpen, onOpenChange, businessPhone, businessId, paymentSettings, onAddToCart }: { product: Product | null, isOpen: boolean, onOpenChange: (open: boolean) => void, businessPhone: string, businessId: string | null, paymentSettings: PaymentSettings | null, onAddToCart: (items: CartItem[]) => void }) => {
     const [mainImage, setMainImage] = useState<MediaItem | null>(null);
     const [isRating, setIsRating] = useState(false);
@@ -329,16 +324,29 @@ const ProductViewModal = ({ product, isOpen, onOpenChange, businessPhone, busine
     const [isLoadingSuggestion, setIsLoadingSuggestion] = useState(false);
     const [isLightboxOpen, setIsLightboxOpen] = useState(false);
     const [selectedLightboxIndex, setSelectedLightboxIndex] = useState(0);
+    const [isModalReady, setIsModalReady] = useState(false);
 
     const { toast } = useToast();
 
     useEffect(() => {
-        if (product && product.images.length > 0) {
-            setMainImage({ url: product.images[0], type: isVideo(product.images[0]) ? 'video' : 'image' });
-        } else {
-            setMainImage(null);
+        if (product?.id) {
+            setMainImage(product.images[0] ? { url: product.images[0], type: isVideo(product.images[0]) ? 'video' : 'image' } : null);
+            setIsLightboxOpen(false);
+            setSelectedLightboxIndex(0);
+            setUserRating(0);
         }
-    }, [product]);
+    }, [product?.id]);
+    
+    useEffect(() => {
+      if (isOpen) {
+        setIsModalReady(false);
+        const timer = setTimeout(() => setIsModalReady(true), 150);
+        return () => clearTimeout(timer);
+      } else {
+        setIsModalReady(false);
+        setIsLightboxOpen(false);
+      }
+    }, [isOpen]);
 
     if (!product) return null;
     
@@ -396,29 +404,21 @@ const ProductViewModal = ({ product, isOpen, onOpenChange, businessPhone, busine
             });
             
             if (suggestionResult.suggestedProduct && suggestionResult.ruleId) {
-                try {
-                    await updateSuggestionMetrics({ 
-                        businessId, 
-                        ruleId: suggestionResult.ruleId, 
-                        event: 'shown' 
-                    });
-                } catch (e) {
-                    console.error("Error logging impression:", e);
-                }
-
+                await updateSuggestionMetrics({ 
+                    businessId, 
+                    ruleId: suggestionResult.ruleId, 
+                    event: 'shown' 
+                });
                 setSuggestion(suggestionResult);
                 setIsSuggestionModalOpen(true);
-                
             } else {
                 onAddToCart([{ ...product, quantity: 1 }]);
                 onOpenChange(false);
             }
-            
         } catch (error) {
             console.error("Error getting suggestion:", error);
             onAddToCart([{ ...product, quantity: 1 }]);
             onOpenChange(false);
-            
         } finally {
             setIsLoadingSuggestion(false);
         }
@@ -426,52 +426,18 @@ const ProductViewModal = ({ product, isOpen, onOpenChange, businessPhone, busine
 
     const handleSuggestionAccepted = async () => {
         if (!businessId || !product || !suggestion?.suggestedProduct || !suggestion.ruleId) {
-            console.error("❌ Faltan datos para aceptar la sugerencia");
-            toast({
-                variant: "destructive",
-                title: "Error",
-                description: "No se pudo procesar la sugerencia (Faltan datos)."
-            });
-            setIsSuggestionModalOpen(false);
+            toast({ variant: "destructive", title: "Error", description: "No se pudo procesar la sugerencia." });
             return;
         }
-
-        try {
-            console.log("⏳ Guardando métrica de aceptación...");
-            const result = await updateSuggestionMetrics({ 
-                businessId, 
-                ruleId: suggestion.ruleId, 
-                event: 'accepted',
-                revenue: suggestion.suggestedProduct.price 
-            });
-
-            if (!result.success) {
-                console.warn("⚠️ La métrica no se guardó, pero continuamos con la venta.");
-            } else {
-                console.log("✅ Métrica registrada correctamente.");
-            }
-        } catch (error) {
-            console.error("❌ Error de conexión al guardar métrica:", error);
-        }
-
-        onAddToCart([
-            { ...product, quantity: 1 },
-            { ...suggestion.suggestedProduct, quantity: 1 }
-        ]);
-
-        toast({
-            title: "¡Oferta Aceptada!",
-            description: `Se añadió ${suggestion.suggestedProduct.name} a tu pedido.`,
-        });
-
+        await updateSuggestionMetrics({ businessId, ruleId: suggestion.ruleId, event: 'accepted' });
+        onAddToCart([{ ...product, quantity: 1 }, { ...suggestion.suggestedProduct, quantity: 1 }]);
+        toast({ title: "¡Oferta Aceptada!", description: `Se añadió ${suggestion.suggestedProduct.name} a tu pedido.` });
         setIsSuggestionModalOpen(false);
         onOpenChange(false);
     };
 
     const handleSuggestionDeclined = () => {
-        if (product) {
-            onAddToCart([{ ...product, quantity: 1 }]);
-        }
+        if (product) onAddToCart([{ ...product, quantity: 1 }]);
         setIsSuggestionModalOpen(false);
         onOpenChange(false);
     };
@@ -479,18 +445,23 @@ const ProductViewModal = ({ product, isOpen, onOpenChange, businessPhone, busine
     return (
         <>
             <Dialog open={isOpen} onOpenChange={onOpenChange}>
-                <DialogContent className="w-[95vw] max-w-4xl p-0 overflow-hidden sm:rounded-lg md:h-[90vh] flex flex-col">
-                    <div className="flex flex-col md:flex-row flex-1 min-h-0">
+                <DialogContent className="w-[95vw] max-w-4xl p-0 overflow-hidden sm:rounded-lg">
+                   <div className="flex flex-col md:flex-row h-full max-h-[90vh]">
                         {/* Image Column */}
                         <div className="md:w-1/2 lg:w-3/5 p-4 sm:p-6 flex flex-col min-h-0">
-                             <button
+                            <button
                                 type="button"
-                                className="relative w-full h-64 sm:h-72 md:h-auto md:aspect-square rounded-lg overflow-hidden border cursor-zoom-in"
+                                className={cn(
+                                    "relative w-full h-80 sm:h-auto sm:aspect-square rounded-lg overflow-hidden border group",
+                                    !isModalReady && "pointer-events-none"
+                                )}
                                 onClick={() => {
+                                    if (!isModalReady) return;
                                     const idx = mediaItems.findIndex(item => item.url === mainImage?.url);
                                     setSelectedLightboxIndex(idx > -1 ? idx : 0);
                                     setIsLightboxOpen(true);
                                 }}
+                                disabled={!isModalReady}
                             >
                                 {mainImage ? (
                                     <MediaPreview item={mainImage} alt={product.name} objectFit="contain" />
@@ -499,6 +470,7 @@ const ProductViewModal = ({ product, isOpen, onOpenChange, businessPhone, busine
                                         <ImageIcon className="h-12 w-12 text-muted-foreground" />
                                     </div>
                                 )}
+                                 <div className={cn("absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center", !isModalReady && "pointer-events-none")} />
                             </button>
                             <div className="flex-shrink-0 mt-4">
                                 <ScrollArea className="w-full whitespace-nowrap rounded-md">
@@ -523,11 +495,11 @@ const ProductViewModal = ({ product, isOpen, onOpenChange, businessPhone, busine
                         
                         {/* Details Column */}
                         <div className="md:w-1/2 lg:w-2/5 flex flex-col p-4 sm:p-6 bg-background rounded-b-lg md:rounded-r-lg md:rounded-b-none min-h-0">
-                            <DialogHeader className="mb-4 flex-shrink-0">
-                                <Badge className="w-fit mb-2">{product.category}</Badge>
-                                <DialogTitle className="text-2xl sm:text-3xl font-bold">{product.name}</DialogTitle>
-                            </DialogHeader>
-                            <div className="flex-grow overflow-y-auto pr-2">
+                             <div className="flex-grow overflow-y-auto pr-2">
+                                <DialogHeader className="mb-4 flex-shrink-0">
+                                    <Badge className="w-fit mb-2">{product.category}</Badge>
+                                    <DialogTitle className="text-2xl sm:text-3xl font-bold">{product.name}</DialogTitle>
+                                </DialogHeader>
                                 <div className="space-y-4">
                                     <div className="prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: product.description }} />
                                     <p><span className="font-semibold">Disponibles:</span> {product.stock} unidades</p>
@@ -694,12 +666,6 @@ export default function CatalogPage() {
                 
                 if (primaryModuleSnap.exists() && primaryModuleSnap.data().status === 'active') {
                     fetchedCatalogModule = { ...primaryModuleSnap.data(), id: primaryModuleSnap.id } as Module;
-                } else {
-                    const fallbackModuleRef = doc(firestore, 'modules', 'catalogo-de-productos');
-                    const fallbackModuleSnap = await getDoc(fallbackModuleRef);
-                    if (fallbackModuleSnap.exists() && fallbackModuleSnap.data().status === 'active') {
-                        fetchedCatalogModule = { ...fallbackModuleSnap.data(), id: fallbackModuleSnap.id } as Module;
-                    }
                 }
                 
                 if (!fetchedCatalogModule) {
@@ -813,7 +779,7 @@ export default function CatalogPage() {
             
             <main className="container mx-auto max-w-[1400px] py-8 px-4 sm:px-6 lg:px-8 xl:px-12">
                 {isCatalogEmpty ? (
-                    <Card className="sm:col-span-2 md:col-span-3 lg:col-span-4">
+                    <Card className="sm:col-span-2 md:col-span-3 lg:grid-cols-4">
                         <CardContent className="h-[400px] flex flex-col items-center justify-center text-center gap-4">
                             <div className="p-4 bg-secondary rounded-full">
                                 <PackageSearch className="h-12 w-12 text-muted-foreground" />
@@ -825,7 +791,7 @@ export default function CatalogPage() {
                         </CardContent>
                     </Card>
                 ) : (
-                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 md:gap-5">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 md:gap-5">
                         {products?.map(product => (
                             <PublicProductCard key={product.id} product={product} onOpenModal={handleOpenModal} />
                         ))}
