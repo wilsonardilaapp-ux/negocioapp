@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useMemo, useState, useEffect, useRef, useCallback } from 'react';
@@ -432,8 +433,9 @@ const ProductViewModal = ({ product, isOpen, onOpenChange, businessPhone, busine
         <>
             <Dialog open={isOpen} onOpenChange={onOpenChange}>
                 <DialogContent className="max-w-4xl w-full p-0 flex flex-col md:flex-row max-h-[90vh]">
+                    {/* Image Column */}
                     <div className="w-full md:w-1/2 lg:w-3/5 p-4 sm:p-6 flex flex-col flex-shrink-0">
-                         <button
+                        <button
                             type="button"
                             className="relative w-full aspect-square rounded-lg overflow-hidden border cursor-zoom-in"
                             onClick={() => {
@@ -471,12 +473,13 @@ const ProductViewModal = ({ product, isOpen, onOpenChange, businessPhone, busine
                         </div>
                     </div>
                     
+                    {/* Details Column */}
                     <div className="w-full md:w-1/2 lg:w-2/5 flex flex-col flex-1 min-h-0 p-4 sm:p-6 bg-background rounded-b-lg md:rounded-r-lg md:rounded-b-none">
                         <DialogHeader className="mb-4 flex-shrink-0">
                             <Badge className="w-fit mb-2">{product.category}</Badge>
                             <DialogTitle className="text-2xl sm:text-3xl font-bold">{product.name}</DialogTitle>
                         </DialogHeader>
-                        <ScrollArea className="flex-grow pr-2 -mr-2">
+                        <div className="flex-grow overflow-y-auto pr-2">
                             <div className="space-y-4">
                                 <div className="prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: product.description }} />
                                 <p><span className="font-semibold">Disponibles:</span> {product.stock} unidades</p>
@@ -493,7 +496,7 @@ const ProductViewModal = ({ product, isOpen, onOpenChange, businessPhone, busine
                                     {hasRated && <p className="text-xs text-muted-foreground">Ya has calificado este producto.</p>}
                                 </div>
                             </div>
-                        </ScrollArea>
+                        </div>
                         <div className="mt-auto pt-6 flex-shrink-0">
                             <Button size="lg" className="w-full" onClick={handlePurchaseClick} disabled={isLoadingSuggestion}>
                                 {isLoadingSuggestion ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <WhatsAppIcon className="mr-2 h-5 w-5" />}
