@@ -776,7 +776,7 @@ export default function CatalogPage() {
                         </CardContent>
                     </Card>
                 ) : (
-                    <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-3 md:gap-5">
+                    <div className="grid grid-cols-2 sm:grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-3 md:gap-5">
                         {products?.map(product => (
                             <PublicProductCard key={product.id} product={product} onOpenModal={handleOpenModal} />
                         ))}
