@@ -7,11 +7,11 @@ import { doc, getDoc, collectionGroup, query, where, getDocs, limit } from 'fire
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
 import Autoplay from "embla-carousel-autoplay";
-import { Star, Loader2, PackageSearch, Mail, Printer, FileDown, Settings, Frown, ArrowRight, X, ImageIcon } from 'lucide-react';
+import { Star, Loader2, PackageSearch, Mail, Printer, FileDown, Settings, Frown, ArrowRight, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Product } from '@/models/product';
 import type { Module } from '@/models/module';
@@ -29,7 +29,6 @@ import type { SuggestionOutput } from '@/models/suggestion-io';
 import { SuggestionModal } from '@/components/suggestions/suggestion-modal';
 import PublicNav from '@/components/layout/public-nav';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
-
 
 export type CartItem = Product & { quantity: number };
 
@@ -310,11 +309,11 @@ const ProductViewModal = ({ product, isOpen, onOpenChange, businessPhone, busine
     return (
         <>
             <Dialog open={isOpen} onOpenChange={onOpenChange}>
-                <DialogContent className="w-[95vw] max-w-5xl p-0 sm:rounded-xl h-[95vh] md:h-[90vh] flex flex-col overflow-hidden">
-                   <div className="flex flex-col md:flex-row flex-1 min-h-0 overflow-hidden">
-                        {/* Image Column */}
-                        <div className="md:w-[55%] flex-shrink-0 flex flex-col p-4 gap-3 md:overflow-y-auto">
-                            <div className="relative w-full aspect-[4/3] md:aspect-square rounded-xl overflow-hidden border bg-white flex-shrink-0">
+                 <DialogContent className="w-[95vw] max-w-5xl p-0 overflow-hidden sm:rounded-xl h-[95vh] md:h-[90vh] flex flex-col">
+                    <div className="flex flex-col md:flex-row flex-1 min-h-0 overflow-hidden">
+                        
+                        <div className="md:w-[55%] bg-muted/30 flex flex-col p-4 gap-3 md:overflow-y-auto">
+                            <div className="relative w-full aspect-[4/3] md:aspect-auto rounded-xl overflow-hidden border bg-white md:flex-1 md:min-h-0">
                                 {mainImage ? (
                                     <MediaPreview item={mainImage} alt={product.name} objectFit="contain" />
                                 ) : (
@@ -323,30 +322,31 @@ const ProductViewModal = ({ product, isOpen, onOpenChange, businessPhone, busine
                                     </div>
                                 )}
                             </div>
-                            <ScrollArea className="w-full">
-                                <div className="flex w-max space-x-2 p-1">
-                                {mediaItems.map((item, index) => (
-                                    <button 
-                                        key={index} 
-                                        onClick={() => setMainImage(item)} 
-                                        className={cn(
-                                            "relative aspect-square w-16 h-16 sm:w-20 sm:h-20 shrink-0 rounded-lg overflow-hidden ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring transition-all",
-                                            mainImage?.url === item.url ? "ring-2 ring-primary opacity-100" : "opacity-70 hover:opacity-100"
-                                        )}
-                                    >
-                                        <MediaPreview item={item} alt={`${product.name} thumbnail ${index + 1}`} />
-                                    </button>
-                                ))}
-                                </div>
-                                <ScrollBar orientation="horizontal" />
-                            </ScrollArea>
+                             <div className="flex-shrink-0 h-[96px]">
+                                <ScrollArea className="w-full h-full">
+                                    <div className="flex w-max space-x-2 p-1">
+                                    {mediaItems.map((item, index) => (
+                                        <button 
+                                            key={index} 
+                                            onClick={() => setMainImage(item)} 
+                                            className={cn(
+                                                "relative aspect-square w-[88px] h-[88px] shrink-0 rounded-lg overflow-hidden ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring transition-all",
+                                                mainImage?.url === item.url ? "ring-2 ring-primary opacity-100" : "opacity-70 hover:opacity-100"
+                                            )}
+                                        >
+                                            <MediaPreview item={item} alt={`${product.name} thumbnail ${index + 1}`} />
+                                        </button>
+                                    ))}
+                                    </div>
+                                    <ScrollBar orientation="horizontal" />
+                                </ScrollArea>
+                            </div>
                         </div>
                         
-                        {/* Details Column */}
                         <div className="md:w-[45%] flex flex-col min-h-0 overflow-hidden">
                             <ScrollArea className="flex-1 min-h-0">
-                                <div className="p-4 sm:p-5 flex flex-col gap-4">
-                                    <DialogHeader>
+                                <div className="p-4 sm:p-6 flex flex-col gap-4">
+                                     <DialogHeader className="p-0 text-left">
                                         <Badge className="w-fit mb-1">{product.category}</Badge>
                                         <DialogTitle className="text-xl sm:text-2xl font-bold leading-tight">
                                             {product.name}
@@ -365,7 +365,7 @@ const ProductViewModal = ({ product, isOpen, onOpenChange, businessPhone, busine
                                     />
                                     <p className="text-sm">
                                       <span className="font-semibold">Disponibles: </span>
-                                      {product.stock} unidades
+                                      <Badge variant="outline">{product.stock} unidades</Badge>
                                     </p>
                                     <div className="flex flex-col gap-2 pt-3 border-t">
                                         <span className="text-sm font-semibold">
@@ -396,7 +396,7 @@ const ProductViewModal = ({ product, isOpen, onOpenChange, businessPhone, busine
                                     <div className="h-2" />
                                 </div>
                             </ScrollArea>
-                            <div className="p-4 border-t border-border bg-background flex-shrink-0">
+                            <div className="p-4 sm:p-5 border-t border-border bg-background flex-shrink-0">
                                 <Button size="lg" className="w-full h-12 text-base font-semibold"
                                         onClick={handlePurchaseClick} 
                                         disabled={isLoadingSuggestion}>
@@ -669,7 +669,7 @@ export default function CatalogPage() {
                         </CardContent>
                     </Card>
                 ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 md:gap-5">
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 md:gap-5">
                         {products?.map(product => (
                             <PublicProductCard key={product.id} product={product} onOpenModal={handleOpenModal} />
                         ))}
