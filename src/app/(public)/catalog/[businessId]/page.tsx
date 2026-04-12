@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Badge } from '@/components/ui/badge';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
 import Autoplay from "embla-carousel-autoplay";
-import { Star, Loader2, PackageSearch, Mail, Printer, FileDown, Settings, Frown, ArrowRight, ChevronLeft, ChevronRight, X, ImageIcon } from 'lucide-react';
+import { Star, Loader2, PackageSearch, Mail, Printer, FileDown, Settings, Frown, ArrowRight, X, ImageIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Product } from '@/models/product';
 import type { Module } from '@/models/module';
@@ -198,123 +198,6 @@ const PublicProductCard = ({ product, onOpenModal }: { product: Product, onOpenM
     );
 }
 
-const Lightbox = ({
-    isOpen,
-    onOpenChange,
-    items,
-    startIndex = 0,
-}: {
-    isOpen: boolean;
-    onOpenChange: (open: boolean) => void;
-    items: MediaItem[];
-    startIndex?: number;
-}) => {
-    const [currentIndex, setCurrentIndex] = useState(startIndex);
-    const [isMounted, setIsMounted] = useState(false);
-
-    useEffect(() => {
-        setIsMounted(true);
-    }, []);
-
-    useEffect(() => {
-        if (isOpen) {
-            setCurrentIndex(startIndex);
-        }
-    }, [isOpen, startIndex]);
-
-    const goToNext = useCallback(() => {
-        if (items.length > 0) {
-            setCurrentIndex((prevIndex) => (prevIndex + 1) % items.length);
-        }
-    }, [items.length]);
-
-    const goToPrevious = useCallback(() => {
-        if (items.length > 0) {
-            setCurrentIndex((prevIndex) => (prevIndex - 1 + items.length) % items.length);
-        }
-    }, [items.length]);
-
-    useEffect(() => {
-        const handleKeyDown = (event: KeyboardEvent) => {
-            if (!isOpen) return;
-            if (event.key === 'ArrowRight') goToNext();
-            if (event.key === 'ArrowLeft') goToPrevious();
-            if (event.key === 'Escape') onOpenChange(false);
-        };
-
-        window.addEventListener('keydown', handleKeyDown);
-        return () => document.removeEventListener('keydown', handleKeyDown);
-    }, [isOpen, goToNext, goToPrevious, onOpenChange]);
-
-    if (!isMounted || !isOpen || !items || items.length === 0) return null;
-
-    const currentItem = items[currentIndex];
-    
-    if (!currentItem) return null;
-
-    const lightboxJsx = (
-        <div
-            role="dialog"
-            aria-modal="true"
-            style={{
-                position: 'fixed',
-                inset: 0,
-                zIndex: 99999,
-                backgroundColor: 'rgba(0, 0, 0, 0.93)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                padding: '0.5rem'
-            }}
-            onClick={() => onOpenChange(false)}
-        >
-            <button
-                onClick={(e) => { e.stopPropagation(); onOpenChange(false); }}
-                style={{ position: 'absolute', top: '1rem', right: '1rem', background: 'rgba(0,0,0,0.5)', borderRadius: '9999px', padding: '0.5rem', color: 'white', border: 'none', cursor: 'pointer', zIndex: 10 }}
-                aria-label="Cerrar"
-            >
-                <X className="h-6 w-6" />
-            </button>
-            <span style={{ position: 'absolute', top: '1rem', left: '1rem', color: 'white', fontSize: '0.875rem', backgroundColor: 'rgba(0,0,0,0.5)', padding: '0.25rem 0.5rem', borderRadius: '0.375rem', zIndex: 10 }}>
-              {currentIndex + 1} / {items.length}
-            </span>
-            
-            <div 
-              style={{ position: 'relative', width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-              onClick={e => e.stopPropagation()}
-            >
-                {currentItem.type === 'video' ? (
-                    <video key={currentItem.url} src={currentItem.url} controls autoPlay style={{ maxHeight: '90vh', maxWidth: '95vw', objectFit: 'contain', borderRadius: '0.5rem', display: 'block', width: 'auto', height: 'auto' }} />
-                ) : (
-                    <img key={currentItem.url} src={currentItem.url} alt={`Vista ampliada ${currentIndex + 1}`} style={{ maxHeight: '90vh', maxWidth: '95vw', objectFit: 'contain', borderRadius: '0.5rem', display: 'block', width: 'auto', height: 'auto' }} />
-                )}
-
-                 {items.length > 1 && (
-                    <>
-                        <button
-                            onClick={(e) => { e.stopPropagation(); goToPrevious(); }}
-                            aria-label="Imagen anterior"
-                            style={{ position: 'absolute', left: '0.5rem', top: '50%', transform: 'translateY(-50%)', borderRadius: '9999px', backgroundColor: 'rgba(0,0,0,0.5)', color: 'white', border: 'none', cursor: 'pointer', height: '3rem', width: '3rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                        >
-                            <ChevronLeft className="h-7 w-7" />
-                        </button>
-                        <button
-                            onClick={(e) => { e.stopPropagation(); goToNext(); }}
-                            aria-label="Siguiente imagen"
-                            style={{ position: 'absolute', right: '0.5rem', top: '50%', transform: 'translateY(-50%)', borderRadius: '9999px', backgroundColor: 'rgba(0,0,0,0.5)', color: 'white', border: 'none', cursor: 'pointer', height: '3rem', width: '3rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                        >
-                            <ChevronRight className="h-7 w-7" />
-                        </button>
-                    </>
-                )}
-            </div>
-        </div>
-    );
-    
-    return createPortal(lightboxJsx, document.body);
-};
-
-
 const ProductViewModal = ({ product, isOpen, onOpenChange, businessPhone, businessId, paymentSettings, onAddToCart }: { product: Product | null, isOpen: boolean, onOpenChange: (open: boolean) => void, businessPhone: string, businessId: string | null, paymentSettings: PaymentSettings | null, onAddToCart: (items: CartItem[]) => void }) => {
     const [mainImage, setMainImage] = useState<MediaItem | null>(null);
     const [isRating, setIsRating] = useState(false);
@@ -322,32 +205,16 @@ const ProductViewModal = ({ product, isOpen, onOpenChange, businessPhone, busine
     const [suggestion, setSuggestion] = useState<SuggestionOutput | null>(null);
     const [isSuggestionModalOpen, setIsSuggestionModalOpen] = useState(false);
     const [isLoadingSuggestion, setIsLoadingSuggestion] = useState(false);
-    const [isLightboxOpen, setIsLightboxOpen] = useState(false);
-    const [selectedLightboxIndex, setSelectedLightboxIndex] = useState(0);
-    const [isModalReady, setIsModalReady] = useState(false);
-
+    
     const { toast } = useToast();
 
     useEffect(() => {
         if (product?.id) {
             setMainImage(product.images[0] ? { url: product.images[0], type: isVideo(product.images[0]) ? 'video' : 'image' } : null);
-            setIsLightboxOpen(false);
-            setSelectedLightboxIndex(0);
             setUserRating(0);
         }
     }, [product?.id]);
     
-    useEffect(() => {
-      if (isOpen) {
-        setIsModalReady(false);
-        const timer = setTimeout(() => setIsModalReady(true), 150);
-        return () => clearTimeout(timer);
-      } else {
-        setIsModalReady(false);
-        setIsLightboxOpen(false);
-      }
-    }, [isOpen]);
-
     if (!product) return null;
     
     const hasRated = typeof window !== 'undefined' && localStorage.getItem(`rated_${product?.id}`);
@@ -445,24 +312,11 @@ const ProductViewModal = ({ product, isOpen, onOpenChange, businessPhone, busine
     return (
         <>
             <Dialog open={isOpen} onOpenChange={onOpenChange}>
-                <DialogContent className="w-[95vw] max-w-4xl p-0 overflow-hidden sm:rounded-lg">
-                   <div className="flex flex-col md:flex-row h-full max-h-[90vh]">
+                <DialogContent className="w-[95vw] max-w-5xl p-0 overflow-hidden sm:rounded-xl max-h-[95vh] flex flex-col">
+                   <div className="flex flex-col md:flex-row flex-1 overflow-hidden min-h-0">
                         {/* Image Column */}
-                        <div className="md:w-1/2 lg:w-3/5 p-4 sm:p-6 flex flex-col min-h-0">
-                            <button
-                                type="button"
-                                className={cn(
-                                    "relative w-full h-80 sm:h-auto sm:aspect-square rounded-lg overflow-hidden border group",
-                                    !isModalReady && "pointer-events-none"
-                                )}
-                                onClick={() => {
-                                    if (!isModalReady) return;
-                                    const idx = mediaItems.findIndex(item => item.url === mainImage?.url);
-                                    setSelectedLightboxIndex(idx > -1 ? idx : 0);
-                                    setIsLightboxOpen(true);
-                                }}
-                                disabled={!isModalReady}
-                            >
+                        <div className="md:w-[55%] bg-muted/30 flex flex-col p-4 gap-3">
+                            <div className="relative w-full aspect-[4/3] md:aspect-square rounded-xl overflow-hidden border bg-white">
                                 {mainImage ? (
                                     <MediaPreview item={mainImage} alt={product.name} objectFit="contain" />
                                 ) : (
@@ -470,57 +324,87 @@ const ProductViewModal = ({ product, isOpen, onOpenChange, businessPhone, busine
                                         <ImageIcon className="h-12 w-12 text-muted-foreground" />
                                     </div>
                                 )}
-                                 <div className={cn("absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center", !isModalReady && "pointer-events-none")} />
-                            </button>
-                            <div className="flex-shrink-0 mt-4">
-                                <ScrollArea className="w-full whitespace-nowrap rounded-md">
-                                    <div className="flex w-max space-x-2 p-2">
-                                    {mediaItems.map((item, index) => (
-                                        <button 
-                                            key={index} 
-                                            onClick={() => setMainImage(item)} 
-                                            className={cn(
-                                                "relative aspect-square w-16 h-16 sm:w-20 sm:h-20 shrink-0 rounded-md overflow-hidden ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring transition-all",
-                                                mainImage?.url === item.url ? "ring-2 ring-primary opacity-100" : "opacity-70 hover:opacity-100"
-                                            )}
-                                        >
-                                            <MediaPreview item={item} alt={`${product.name} thumbnail ${index + 1}`} />
-                                        </button>
-                                    ))}
-                                    </div>
-                                    <ScrollBar orientation="horizontal" />
-                                </ScrollArea>
                             </div>
+                            <ScrollArea className="w-full flex-shrink-0">
+                                <div className="flex w-max space-x-2 p-1">
+                                {mediaItems.map((item, index) => (
+                                    <button 
+                                        key={index} 
+                                        onClick={() => setMainImage(item)} 
+                                        className={cn(
+                                            "relative aspect-square w-16 h-16 sm:w-20 sm:h-20 shrink-0 rounded-lg overflow-hidden ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring transition-all",
+                                            mainImage?.url === item.url ? "ring-2 ring-primary opacity-100" : "opacity-70 hover:opacity-100"
+                                        )}
+                                    >
+                                        <MediaPreview item={item} alt={`${product.name} thumbnail ${index + 1}`} />
+                                    </button>
+                                ))}
+                                </div>
+                                <ScrollBar orientation="horizontal" />
+                            </ScrollArea>
                         </div>
                         
                         {/* Details Column */}
-                        <div className="md:w-1/2 lg:w-2/5 flex flex-col p-4 sm:p-6 bg-background rounded-b-lg md:rounded-r-lg md:rounded-b-none min-h-0">
-                             <div className="flex-grow overflow-y-auto pr-2">
-                                <DialogHeader className="mb-4 flex-shrink-0">
-                                    <Badge className="w-fit mb-2">{product.category}</Badge>
-                                    <DialogTitle className="text-2xl sm:text-3xl font-bold">{product.name}</DialogTitle>
-                                </DialogHeader>
-                                <div className="space-y-4">
-                                    <div className="prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: product.description }} />
-                                    <p><span className="font-semibold">Disponibles:</span> {product.stock} unidades</p>
+                        <div className="md:w-[45%] flex flex-col overflow-hidden">
+                            <ScrollArea className="flex-1">
+                                <div className="p-5 sm:p-6 flex flex-col gap-4">
                                     <div className="flex flex-col gap-2">
-                                        <span className="font-semibold">Califica este producto:</span>
+                                        <Badge className="w-fit">{product.category}</Badge>
+                                        <DialogTitle className="text-xl sm:text-2xl font-bold leading-tight">
+                                            {product.name}
+                                        </DialogTitle>
+                                        <p className="text-2xl font-bold text-primary">
+                                            {formatCurrency(product.price)}
+                                        </p>
+                                    </div>
+                                    <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                                        <Star className="w-4 h-4 fill-yellow-400 text-yellow-400"/>
+                                        <span>{product.rating.toFixed(1)}</span>
+                                        <span>({product.ratingCount} valoraciones)</span>
+                                    </div>
+                                    <div className="prose prose-sm max-w-none text-sm text-muted-foreground leading-relaxed"
+                                        dangerouslySetInnerHTML={{ __html: product.description }}
+                                    />
+                                    <div className="flex items-center gap-2 text-sm">
+                                        <span className="font-semibold">Disponibles:</span>
+                                        <Badge variant="outline">{product.stock} unidades</Badge>
+                                    </div>
+                                    <div className="flex flex-col gap-2 pt-2 border-t border-border">
+                                        <span className="text-sm font-semibold">
+                                        Califica este producto:
+                                        </span>
                                         <div className="flex items-center gap-1">
-                                            {[1, 2, 3, 4, 5].map(star => (
-                                                <button key={star} onClick={() => handleRating(star)} disabled={!!hasRated || isRating}>
-                                                    <Star className={cn("h-6 w-6 transition-colors", star <= (userRating || product.rating) ? "text-yellow-400 fill-yellow-400" : "text-gray-300 hover:text-yellow-300")} />
-                                                </button>
-                                            ))}
-                                            {isRating && <Loader2 className="h-5 w-5 animate-spin ml-2" />}
+                                        {[1,2,3,4,5].map(star => (
+                                            <button key={star} 
+                                                    onClick={() => handleRating(star)}
+                                                    disabled={!!hasRated || isRating}>
+                                            <Star className={cn("h-6 w-6 transition-colors",
+                                                star <= (userRating || product.rating)
+                                                ? "text-yellow-400 fill-yellow-400"
+                                                : "text-gray-300 hover:text-yellow-300"
+                                            )} />
+                                            </button>
+                                        ))}
+                                        {isRating && 
+                                            <Loader2 className="h-4 w-4 animate-spin ml-2"/>}
                                         </div>
-                                        {hasRated && <p className="text-xs text-muted-foreground">Ya has calificado este producto.</p>}
+                                        {hasRated && 
+                                        <p className="text-xs text-muted-foreground">
+                                            Ya has calificado este producto.
+                                        </p>
+                                        }
                                     </div>
                                 </div>
-                            </div>
-                            <div className="mt-auto pt-6 flex-shrink-0">
-                                <Button size="lg" className="w-full" onClick={handlePurchaseClick} disabled={isLoadingSuggestion}>
-                                    {isLoadingSuggestion ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <WhatsAppIcon className="mr-2 h-5 w-5" />}
-                                    {isLoadingSuggestion ? 'Buscando sugerencias...' : 'Comprar'}
+                            </ScrollArea>
+                            <div className="p-4 sm:p-5 border-t border-border bg-background flex-shrink-0">
+                                <Button size="lg" className="w-full h-12 text-base font-semibold"
+                                        onClick={handlePurchaseClick} 
+                                        disabled={isLoadingSuggestion}>
+                                {isLoadingSuggestion 
+                                    ? <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                                    : <WhatsAppIcon className="mr-2 h-5 w-5" />
+                                }
+                                {isLoadingSuggestion ? 'Buscando sugerencias...' : 'Comprar'}
                                 </Button>
                             </div>
                         </div>
@@ -538,12 +422,6 @@ const ProductViewModal = ({ product, isOpen, onOpenChange, businessPhone, busine
                     onDecline={handleSuggestionDeclined}
                 />
             )}
-             <Lightbox
-                isOpen={isLightboxOpen}
-                onOpenChange={setIsLightboxOpen}
-                items={mediaItems}
-                startIndex={selectedLightboxIndex}
-            />
         </>
     )
 }
