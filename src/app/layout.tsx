@@ -2,7 +2,6 @@ import type { Metadata } from 'next';
 import { PT_Sans } from 'next/font/google';
 import './globals.css';
 import { Providers } from './providers';
-import 'quill/dist/quill.snow.css';
 
 const ptSans = PT_Sans({
   subsets: ['latin'],
