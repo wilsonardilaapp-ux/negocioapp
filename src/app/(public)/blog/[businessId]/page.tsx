@@ -60,9 +60,9 @@ async function getBlogData(businessId: string) {
         .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
     return { config, posts };
-  } catch (error) {
+  } catch (error: any) {
     console.error(`Error cargando blog para businessId ${businessId}:`, error);
-    return { config: { title: "Blog", content: "Error al cargar." }, posts: [] };
+    return { config: { title: "Blog", content: `Error al cargar: ${error.message}` }, posts: [] };
   }
 }
 
