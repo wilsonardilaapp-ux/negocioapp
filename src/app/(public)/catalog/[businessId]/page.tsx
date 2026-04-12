@@ -451,7 +451,7 @@ const ProductViewModal = ({ product, isOpen, onOpenChange, businessPhone, busine
             <Dialog open={isOpen} onOpenChange={onOpenChange}>
                 <DialogContent className="max-w-4xl w-full p-0 flex flex-col md:flex-row max-h-[90vh]">
                     {/* Image Column */}
-                    <div className="w-full md:w-1/2 lg:w-3/5 p-4 sm:p-6 flex flex-col flex-shrink-0">
+                    <div className="w-full md:w-1/2 lg:w-3/5 p-4 sm:p-6 flex flex-col">
                         <button
                             type="button"
                             className="relative w-full h-80 sm:h-auto sm:aspect-square rounded-lg overflow-hidden border cursor-zoom-in"
