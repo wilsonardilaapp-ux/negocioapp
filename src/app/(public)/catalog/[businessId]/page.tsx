@@ -15,7 +15,7 @@ import { Star, Loader2, PackageSearch, Mail, Printer, FileDown, Settings, Frown,
 import { cn } from '@/lib/utils';
 import type { Product } from '@/models/product';
 import type { Module } from '@/models/module';
-import type { LandingPageData } from '@/models/landing-page';
+import type { LandingPageData, LandingHeaderConfigData } from '@/models/landing-page';
 import { TikTokIcon, WhatsAppIcon, XIcon, FacebookIcon, InstagramIcon, YoutubeIcon } from '@/components/icons';
 import { useParams, useSearchParams } from 'next/navigation';
 import { rateProduct } from '@/ai/flows/rate-product-flow';
@@ -225,7 +225,7 @@ const ProductViewModal = ({ product, isOpen, onOpenChange, businessPhone, busine
                     <div className="flex flex-col md:flex-row flex-1 min-h-0 overflow-hidden">
                         
                         <div className="md:w-[55%] bg-muted/30 flex flex-col p-4 gap-3 md:overflow-y-auto">
-                            <div className="relative w-full aspect-[4/3] md:aspect-square rounded-xl overflow-hidden border bg-white flex-shrink-0">
+                             <div className="relative w-full aspect-[4/3] md:aspect-square rounded-xl overflow-hidden border bg-white flex-shrink-0">
                                 {mainImage ? (
                                     <MediaPreview item={mainImage} alt={product.name} objectFit="contain" />
                                 ) : (
@@ -710,3 +710,5 @@ const CatalogHeader = ({ config }: { config: LandingHeaderConfigData | null }) =
         </div>
     );
 }
+
+    
