@@ -242,20 +242,37 @@ const Lightbox = ({
 
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-3xl w-full p-2 bg-transparent border-none shadow-none">
-                <div className="relative aspect-square w-full">
-                    {items[currentIndex] && <MediaPreview item={items[currentIndex]} alt="Vista ampliada" objectFit="contain" />}
-                    <DialogHeader>
-                        <Button variant="ghost" size="icon" onClick={() => onOpenChange(false)} className="absolute -top-10 -right-2 sm:-right-10 rounded-full h-8 w-8 bg-black/50 text-white hover:bg-black/75">
-                            <X className="h-5 w-5" />
-                        </Button>
-                    </DialogHeader>
+            <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col p-4 sm:p-6 bg-background">
+                <DialogHeader>
+                    <DialogTitle>Galería</DialogTitle>
+                    <DialogDescription>
+                        Imágenes y videos del producto.
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="flex-1 relative flex items-center justify-center">
+                    {items[currentIndex] && (
+                        <div className="relative w-full h-full max-h-[70vh]">
+                            <MediaPreview item={items[currentIndex]!} alt={`Imagen ${currentIndex + 1}`} objectFit="contain" />
+                        </div>
+                    )}
                     {items.length > 1 && (
                         <>
-                            <Button variant="ghost" size="icon" onClick={goToPrevious} className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full h-10 w-10 bg-black/50 text-white hover:bg-black/75">
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={goToPrevious}
+                                aria-label="Imagen anterior"
+                                className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-black/50 text-white hover:bg-black/75 h-10 w-10 z-10"
+                            >
                                 <ChevronLeft className="h-6 w-6" />
                             </Button>
-                            <Button variant="ghost" size="icon" onClick={goToNext} className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full h-10 w-10 bg-black/50 text-white hover:bg-black/75">
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={goToNext}
+                                aria-label="Siguiente imagen"
+                                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-black/50 text-white hover:bg-black/75 h-10 w-10 z-10"
+                            >
                                 <ChevronRight className="h-6 w-6" />
                             </Button>
                         </>
@@ -437,7 +454,7 @@ const ProductViewModal = ({ product, isOpen, onOpenChange, businessPhone, busine
                     <div className="w-full md:w-1/2 lg:w-3/5 p-4 sm:p-6 flex flex-col flex-shrink-0">
                         <button
                             type="button"
-                            className="relative w-full aspect-square rounded-lg overflow-hidden border cursor-zoom-in"
+                            className="relative w-full h-80 sm:h-auto sm:aspect-square rounded-lg overflow-hidden border cursor-zoom-in"
                             onClick={() => {
                                 const idx = mediaItems.findIndex(item => item.url === mainImage?.url);
                                 setSelectedLightboxIndex(idx > -1 ? idx : 0);
