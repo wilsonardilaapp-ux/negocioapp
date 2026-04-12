@@ -2,7 +2,6 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { createPortal } from 'react-dom';
 import { useFirebase } from '@/firebase';
 import { doc, getDoc, collectionGroup, query, where, getDocs, limit } from 'firebase/firestore';
 import Image from 'next/image';
@@ -12,7 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Badge } from '@/components/ui/badge';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
 import Autoplay from "embla-carousel-autoplay";
-import { Star, Loader2, PackageSearch, Mail, Printer, FileDown, Settings, Frown, ArrowRight, X, ImageIcon, ZoomIn, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Star, Loader2, PackageSearch, Mail, Printer, FileDown, Settings, Frown, ArrowRight, X, ImageIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Product } from '@/models/product';
 import type { Module } from '@/models/module';
@@ -46,7 +45,6 @@ const formatCurrency = (value: number) => {
         minimumFractionDigits: 0,
     }).format(value);
 };
-
 
 const CatalogHeader = ({ config }: { config: LandingHeaderConfigData | null }) => {
     if (!config) {
@@ -151,112 +149,6 @@ const MediaPreview = ({ item, alt, objectFit = 'cover' }: { item: MediaItem, alt
         return <video src={item.url} className={cn('rounded-md object-cover w-full h-full')} autoPlay loop muted />;
     }
     return <Image src={item.url} alt={alt} fill sizes="10rem" className={cn('rounded-md', objectFit === 'contain' ? 'object-contain' : 'object-cover')} />;
-};
-
-const InlineLightbox = ({ isOpen, onClose, items, startIndex = 0 }: {
-    isOpen: boolean;
-    onClose: () => void;
-    items: MediaItem[];
-    startIndex?: number;
-}) => {
-    const [isMounted, setIsMounted] = useState(false);
-    const [currentIndex, setCurrentIndex] = useState(startIndex);
-
-    useEffect(() => {
-        setIsMounted(true);
-        if (isOpen) {
-            setCurrentIndex(startIndex);
-        }
-    }, [isOpen, startIndex]);
-
-    const goToPrevious = () => setCurrentIndex(prev => (prev - 1 + items.length) % items.length);
-    const goToNext = () => setCurrentIndex(prev => (prev + 1) % items.length);
-
-    useEffect(() => {
-        const handleKeyDown = (event: KeyboardEvent) => {
-            if (!isOpen) return;
-            if (event.key === 'ArrowRight') goToNext();
-            if (event.key === 'ArrowLeft') goToPrevious();
-            if (event.key === 'Escape') onClose();
-        };
-
-        window.addEventListener('keydown', handleKeyDown);
-        return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [isOpen, goToNext, goToPrevious, onClose]);
-    
-    if (!isMounted || !isOpen) return null;
-
-    const currentItem = items[currentIndex];
-
-    return (
-        <div
-            onClick={onClose}
-            style={{
-                position: 'fixed',
-                inset: 0,
-                zIndex: 99999,
-                backgroundColor: 'rgba(0,0,0,0.93)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                padding: '0.5rem',
-            }}
-        >
-            <button
-                onClick={(e) => { e.stopPropagation(); onClose(); }}
-                style={{ position: 'absolute', top: '1rem', right: '1rem', zIndex: 1, color: 'white' }}
-                className="p-2 rounded-full hover:bg-white/10 transition-colors"
-            >
-                <X className="h-7 w-7" />
-            </button>
-
-            <div
-                onClick={(e) => e.stopPropagation()}
-                style={{ position: 'relative', width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-            >
-                {currentItem && (currentItem.type === 'video' ? (
-                    <video
-                        key={currentItem.url}
-                        src={currentItem.url}
-                        controls
-                        autoPlay
-                        style={{ maxHeight: '90vh', maxWidth: '95vw', width: 'auto', height: 'auto', objectFit: 'contain', display: 'block', borderRadius: '0.5rem' }}
-                    />
-                ) : (
-                    <img
-                        key={currentItem.url}
-                        src={currentItem.url}
-                        alt={`Vista ampliada ${currentIndex + 1}`}
-                        style={{ maxHeight: '90vh', maxWidth: '95vw', width: 'auto', height: 'auto', objectFit: 'contain', display: 'block', borderRadius: '0.5rem' }}
-                    />
-                ))}
-                
-                {items.length > 1 && (
-                    <>
-                        <button
-                            onClick={(e) => { e.stopPropagation(); goToPrevious(); }}
-                            style={{ position: 'absolute', left: '0.5rem', top: '50%', transform: 'translateY(-50%)', zIndex: 1, color: 'white' }}
-                            className="p-2 rounded-full hover:bg-white/10 transition-colors"
-                        >
-                            <ChevronLeft className="h-8 w-8" />
-                        </button>
-                        <button
-                            onClick={(e) => { e.stopPropagation(); goToNext(); }}
-                            style={{ position: 'absolute', right: '0.5rem', top: '50%', transform: 'translateY(-50%)', zIndex: 1, color: 'white' }}
-                            className="p-2 rounded-full hover:bg-white/10 transition-colors"
-                        >
-                            <ChevronRight className="h-8 w-8" />
-                        </button>
-                        <div
-                           style={{ position: 'absolute', bottom: '1rem', left: '50%', transform: 'translateX(-50%)', zIndex: 1, color: 'white', backgroundColor: 'rgba(0,0,0,0.5)', padding: '0.25rem 0.75rem', borderRadius: '9999px', fontSize: '0.875rem' }}
-                        >
-                          {currentIndex + 1} / {items.length}
-                        </div>
-                    </>
-                )}
-            </div>
-        </div>
-    );
 };
 
 const PublicProductCard = ({ product, onOpenModal }: { product: Product, onOpenModal: (product: Product) => void }) => {
@@ -418,11 +310,11 @@ const ProductViewModal = ({ product, isOpen, onOpenChange, businessPhone, busine
     return (
         <>
             <Dialog open={isOpen} onOpenChange={onOpenChange}>
-                <DialogContent className="w-[95vw] max-w-5xl p-0 overflow-hidden sm:rounded-xl max-h-[95vh] flex flex-col">
-                   <div className="flex flex-col md:flex-row flex-1 overflow-hidden min-h-0">
+                <DialogContent className="w-[95vw] max-w-5xl p-0 sm:rounded-xl h-[95vh] md:h-[90vh] flex flex-col overflow-hidden">
+                   <div className="flex flex-col md:flex-row flex-1 min-h-0 overflow-hidden">
                         {/* Image Column */}
-                        <div className="md:w-[55%] bg-muted/30 flex flex-col p-4 gap-3 flex-shrink-0">
-                            <div className="relative w-full aspect-[4/3] md:aspect-square rounded-xl overflow-hidden border bg-white">
+                        <div className="md:w-[55%] flex-shrink-0 flex flex-col p-4 gap-3 md:overflow-y-auto">
+                            <div className="relative w-full aspect-[4/3] md:aspect-square rounded-xl overflow-hidden border bg-white flex-shrink-0">
                                 {mainImage ? (
                                     <MediaPreview item={mainImage} alt={product.name} objectFit="contain" />
                                 ) : (
@@ -451,37 +343,38 @@ const ProductViewModal = ({ product, isOpen, onOpenChange, businessPhone, busine
                         </div>
                         
                         {/* Details Column */}
-                        <div className="md:w-[45%] flex flex-col overflow-hidden min-h-0 flex-grow">
-                            <ScrollArea className="flex-1">
-                                <div className="p-5 sm:p-6 flex flex-col gap-4">
-                                    <div className="flex flex-col gap-2">
-                                        <Badge className="w-fit">{product.category}</Badge>
+                        <div className="md:w-[45%] flex flex-col min-h-0 overflow-hidden">
+                            <ScrollArea className="flex-1 min-h-0">
+                                <div className="p-4 sm:p-5 flex flex-col gap-4">
+                                    <DialogHeader>
+                                        <Badge className="w-fit mb-1">{product.category}</Badge>
                                         <DialogTitle className="text-xl sm:text-2xl font-bold leading-tight">
                                             {product.name}
                                         </DialogTitle>
-                                        <p className="text-2xl font-bold text-primary">
-                                            {formatCurrency(product.price)}
-                                        </p>
-                                    </div>
+                                    </DialogHeader>
+                                    <p className="text-2xl font-bold text-primary">
+                                        {formatCurrency(product.price)}
+                                    </p>
                                     <div className="flex items-center gap-1 text-sm text-muted-foreground">
                                         <Star className="w-4 h-4 fill-yellow-400 text-yellow-400"/>
                                         <span>{product.rating.toFixed(1)}</span>
                                         <span>({product.ratingCount} valoraciones)</span>
                                     </div>
-                                    <div className="prose prose-sm max-w-none text-sm text-muted-foreground leading-relaxed"
+                                    <div className="prose prose-sm max-w-none text-sm leading-relaxed text-muted-foreground"
                                         dangerouslySetInnerHTML={{ __html: product.description }}
                                     />
-                                    <div className="flex items-center gap-2 text-sm">
-                                        <span className="font-semibold">Disponibles:</span>
-                                        <Badge variant="outline">{product.stock} unidades</Badge>
-                                    </div>
-                                    <div className="flex flex-col gap-2 pt-2 border-t border-border">
+                                    <p className="text-sm">
+                                      <span className="font-semibold">Disponibles: </span>
+                                      {product.stock} unidades
+                                    </p>
+                                    <div className="flex flex-col gap-2 pt-3 border-t">
                                         <span className="text-sm font-semibold">
                                         Califica este producto:
                                         </span>
                                         <div className="flex items-center gap-1">
                                         {[1,2,3,4,5].map(star => (
                                             <button key={star} 
+                                                    type="button"
                                                     onClick={() => handleRating(star)}
                                                     disabled={!!hasRated || isRating}>
                                             <Star className={cn("h-6 w-6 transition-colors",
@@ -500,9 +393,10 @@ const ProductViewModal = ({ product, isOpen, onOpenChange, businessPhone, busine
                                         </p>
                                         }
                                     </div>
+                                    <div className="h-2" />
                                 </div>
                             </ScrollArea>
-                            <div className="p-4 sm:p-5 border-t border-border bg-background flex-shrink-0">
+                            <div className="p-4 border-t border-border bg-background flex-shrink-0">
                                 <Button size="lg" className="w-full h-12 text-base font-semibold"
                                         onClick={handlePurchaseClick} 
                                         disabled={isLoadingSuggestion}>
