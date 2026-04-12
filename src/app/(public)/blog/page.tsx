@@ -25,7 +25,7 @@ async function getBlogData() {
   try {
     const db = await getAdminFirestore();
     const appearanceSnap = await db.collection("settings").doc("blog_appearance").get();
-    const config = appearanceSnap.exists() ? appearanceSnap.data() : {
+    const config = appearanceSnap.exists ? appearanceSnap.data() : {
       title: "Nuestro Blog Informativo",
       content: "Bienvenido a nuestro espacio de noticias. Aquí encontrarás las últimas actualizaciones y artículos de interés.",
       bannerUrl: null,
@@ -48,7 +48,7 @@ async function getBlogData() {
     let landingData: LandingPageData | null = null;
     if (mainBusinessId) {
         const landingSnap = await db.collection("businesses").doc(mainBusinessId).collection("landingPages").doc("main").get();
-        if (landingSnap.exists()) {
+        if (landingSnap.exists) {
             landingData = landingSnap.data() as LandingPageData;
         }
     }
