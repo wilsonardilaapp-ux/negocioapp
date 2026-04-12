@@ -34,15 +34,18 @@ async function getBlogData(businessId: string) {
 
     const q = db.collection("blog_posts")
                 .where("businessId", "==", businessId)
-                .where("isActive", "==", true)
                 .orderBy("createdAt", "desc");
 
     const snapshot = await q.get();
-    const posts = snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data(),
-      createdAt: doc.data().createdAt?.toDate?.().toISOString() || new Date().toISOString()
-    }));
+    
+    // Filter for isActive in the code, after fetching, to avoid complex index requirements
+    const posts = snapshot.docs
+        .map(doc => ({
+            id: doc.id,
+            ...doc.data(),
+            createdAt: doc.data().createdAt?.toDate?.().toISOString() || new Date().toISOString()
+        }))
+        .filter((post: any) => post.isActive === true);
 
     return { config, posts };
   } catch (error) {
