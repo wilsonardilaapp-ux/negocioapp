@@ -90,8 +90,7 @@ service cloud.firestore {
     }
 
     match /paymentSettings/{userId} {
-      allow read: if true;
-      allow write: if request.auth != null && request.auth.uid == userId;
+      allow read, write: if request.auth != null && request.auth.uid == userId;
     }
 
     // Businesses
@@ -122,7 +121,17 @@ service cloud.firestore {
       }
 
       match /orders/{orderId} {
-        allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
+        allow create: if request.auth == null
+          && request.resource.data.businessId == businessId
+          && request.resource.data.customerName is string && request.resource.data.customerName.size() > 0
+          && request.resource.data.customerEmail is string && request.resource.data.customerEmail.size() > 0
+          && request.resource.data.productName is string && request.resource.data.productName.size() > 0
+          && request.resource.data.quantity is number && request.resource.data.quantity > 0
+          && request.resource.data.unitPrice is number && request.resource.data.unitPrice >= 0
+          && request.resource.data.subtotal is number && request.resource.data.subtotal > 0
+          && request.resource.data.orderStatus == 'Pendiente';
+
+        allow read, update, delete: if isBusinessMember(businessId) || isSuperAdmin();
       }
 
       match /contactForms/{formId} {
