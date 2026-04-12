@@ -1,36 +1,28 @@
 
 import { notFound } from "next/navigation";
-import { initializeApp, getApps, getApp } from "firebase/app";
-import { getFirestore, collection, query, where, getDocs, limit, orderBy, Timestamp, doc, getDoc } from "firebase/firestore";
+import { getAdminFirestore } from "@/firebase/server-init";
+import { Timestamp } from "firebase-admin/firestore";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight, Calendar, User } from "lucide-react";
-import { firebaseConfig } from "@/firebase/config";
 import Header from "@/components/layout/header";
 import Footer from "@/components/layout/footer";
 import type { LandingPageData } from "@/models/landing-page";
 
 export const dynamic = 'force-dynamic';
 
-const isConfigValid = !!firebaseConfig.projectId;
-const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
-const db = getFirestore(app);
-
-type Props = {
-  params: Promise<{ slug: string }>;
-};
-
 async function getHeaderData(): Promise<{ businessId: string | null, navigation: LandingPageData['navigation'] | null }> {
     try {
-        const configSnap = await getDoc(doc(db, "globalConfig", "system"));
-        const mainBusinessId = configSnap.exists() ? configSnap.data().mainBusinessId : null;
+        const db = await getAdminFirestore();
+        const configSnap = await db.collection("globalConfig").doc("system").get();
+        const mainBusinessId = configSnap.exists ? configSnap.data()?.mainBusinessId : null;
 
         if (!mainBusinessId) {
             return { businessId: null, navigation: null };
         }
 
-        const landingSnap = await getDoc(doc(db, "businesses", mainBusinessId, "landingPages", "main"));
-        const navigation = landingSnap.exists() ? (landingSnap.data() as LandingPageData).navigation : null;
+        const landingSnap = await db.collection("businesses").doc(mainBusinessId).collection("landingPages").doc("main").get();
+        const navigation = landingSnap.exists ? (landingSnap.data() as LandingPageData).navigation : null;
         
         return { businessId: mainBusinessId, navigation };
     } catch (error) {
@@ -50,17 +42,16 @@ function getQueryDate(dateVal: any) {
 }
 
 async function getPostBySlug(slug: string) {
-  if (!slug || !isConfigValid) return null;
+  if (!slug) return null;
   
   try {
+    const db = await getAdminFirestore();
     const decodedSlug = decodeURIComponent(slug);
-    const q = query(
-      collection(db, "blog_posts"),
-      where("slug", "==", decodedSlug),
-      limit(1)
-    );
+    const q = db.collection("blog_posts")
+      .where("slug", "==", decodedSlug)
+      .limit(1);
 
-    const snapshot = await getDocs(q);
+    const snapshot = await q.get();
     if (snapshot.empty) {
         return null;
     }
@@ -98,32 +89,29 @@ async function getPostBySlug(slug: string) {
 }
 
 async function getAdjacentPosts(currentPostDate: any) {
-  if (!currentPostDate || !isConfigValid) return { prevPost: null, nextPost: null };
+  if (!currentPostDate) return { prevPost: null, nextPost: null };
   
   let prevPost = null;
   let nextPost = null;
 
   try {
+    const db = await getAdminFirestore();
     const pivot = getQueryDate(currentPostDate);
-    const blogRef = collection(db, "blog_posts");
+    const blogRef = db.collection("blog_posts");
 
-    const prevQuery = query(
-      blogRef,
-      where("createdAt", "<", pivot),
-      orderBy("createdAt", "desc"),
-      limit(1)
-    );
+    const prevQuery = blogRef
+      .where("createdAt", "<", pivot)
+      .orderBy("createdAt", "desc")
+      .limit(1);
     
-    const nextQuery = query(
-      blogRef,
-      where("createdAt", ">", pivot),
-      orderBy("createdAt", "asc"),
-      limit(1)
-    );
+    const nextQuery = blogRef
+      .where("createdAt", ">", pivot)
+      .orderBy("createdAt", "asc")
+      .limit(1);
 
     const [prevSnap, nextSnap] = await Promise.all([
-      getDocs(prevQuery),
-      getDocs(nextQuery)
+      prevQuery.get(),
+      nextQuery.get()
     ]);
 
     if (!prevSnap.empty) {
@@ -142,8 +130,12 @@ async function getAdjacentPosts(currentPostDate: any) {
   return { prevPost, nextPost };
 }
 
-export async function generateMetadata({ params }: Props) {
-  const { slug } = await params;
+type Props = {
+  params: { slug: string };
+};
+
+export async function generateMetadata({ params }: { params: { slug: string } }) {
+  const { slug } = params;
   const post = await getPostBySlug(slug);
   if (!post) return { title: "Artículo no encontrado" };
   return {
@@ -153,18 +145,8 @@ export async function generateMetadata({ params }: Props) {
 }
 
 export default async function BlogPostPage({ params }: Props) {
-  const { slug } = await params;
+  const { slug } = params;
   const { businessId, navigation } = await getHeaderData();
-
-
-  if (!isConfigValid) {
-    return (
-        <div className="flex flex-col items-center justify-center min-h-screen p-4 text-center">
-            <h1 className="text-xl font-bold text-red-600 mb-2">Error de Configuración del Servidor</h1>
-            <p className="text-gray-600">El 'projectId' de Firebase no está definido en la configuración.</p>
-        </div>
-    );
-  }
 
   const post = await getPostBySlug(slug);
 

@@ -1,9 +1,7 @@
 
-import { initializeApp, getApps, getApp } from "firebase/app";
-import { getFirestore, collection, query, where, getDocs, orderBy, doc, getDoc } from "firebase/firestore";
+import { getAdminFirestore } from "@/firebase/server-init";
 import Link from "next/link";
 import { Calendar, User, ArrowRight, BookOpen, FileText } from "lucide-react";
-import { firebaseConfig } from "@/firebase/config";
 import type { LandingPageData } from "@/models/landing-page";
 import Header from "@/components/layout/header";
 import Footer from "@/components/layout/footer";
@@ -11,14 +9,12 @@ import Footer from "@/components/layout/footer";
 
 export const dynamic = 'force-dynamic';
 
-const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
-const db = getFirestore(app);
-
 // Función para obtener el ID del negocio principal
 async function getMainBusinessId(): Promise<string | null> {
     try {
-        const configSnap = await getDoc(doc(db, "globalConfig", "system"));
-        return configSnap.exists() ? configSnap.data().mainBusinessId : null;
+        const db = await getAdminFirestore();
+        const configSnap = await db.collection("globalConfig").doc("system").get();
+        return configSnap.exists ? configSnap.data()?.mainBusinessId : null;
     } catch (error) {
         console.error("Error fetching global config:", error);
         return null;
@@ -27,7 +23,8 @@ async function getMainBusinessId(): Promise<string | null> {
 
 async function getBlogData() {
   try {
-    const appearanceSnap = await getDoc(doc(db, "settings", "blog_appearance"));
+    const db = await getAdminFirestore();
+    const appearanceSnap = await db.collection("settings").doc("blog_appearance").get();
     const config = appearanceSnap.exists() ? appearanceSnap.data() : {
       title: "Nuestro Blog Informativo",
       content: "Bienvenido a nuestro espacio de noticias. Aquí encontrarás las últimas actualizaciones y artículos de interés.",
@@ -36,11 +33,8 @@ async function getBlogData() {
       headerBannerUrl: null,
     };
 
-    const q = query(
-      collection(db, "blog_posts"),
-      orderBy("createdAt", "desc")
-    );
-    const snapshot = await getDocs(q);
+    const q = db.collection("blog_posts").orderBy("createdAt", "desc");
+    const snapshot = await q.get();
     const allPosts = snapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data(),
@@ -53,7 +47,7 @@ async function getBlogData() {
     const mainBusinessId = await getMainBusinessId();
     let landingData: LandingPageData | null = null;
     if (mainBusinessId) {
-        const landingSnap = await getDoc(doc(db, "businesses", mainBusinessId, "landingPages", "main"));
+        const landingSnap = await db.collection("businesses").doc(mainBusinessId).collection("landingPages").doc("main").get();
         if (landingSnap.exists()) {
             landingData = landingSnap.data() as LandingPageData;
         }

@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
@@ -10,7 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Badge } from '@/components/ui/badge';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
 import Autoplay from "embla-carousel-autoplay";
-import { Star, Loader2, PackageSearch, Mail, Printer, FileDown, Settings, Frown, ArrowRight, X } from 'lucide-react';
+import { Star, Loader2, PackageSearch, Mail, Printer, FileDown, Settings, Frown, ArrowRight, X, Image as ImageIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Product } from '@/models/product';
 import type { Module } from '@/models/module';
@@ -29,13 +30,8 @@ import type { SuggestionOutput } from '@/models/suggestion-io';
 import { SuggestionModal } from '@/components/suggestions/suggestion-modal';
 import PublicNav from '@/components/layout/public-nav';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
-
-export type CartItem = Product & { quantity: number };
-
-type MediaItem = {
-    url: string;
-    type: 'image' | 'video';
-};
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import type { Order, TipoEntrega } from '@/models/order';
 
 const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('es-CO', {
@@ -45,6 +41,12 @@ const formatCurrency = (value: number) => {
     }).format(value);
 };
 
+export type CartItem = Product & { quantity: number };
+
+type MediaItem = {
+    url: string;
+    type: 'image' | 'video';
+};
 
 // Helper to check if a URL is for a video file
 const isVideo = (url: string) => {
@@ -117,7 +119,7 @@ const ProductViewModal = ({ product, isOpen, onOpenChange, businessPhone, busine
 
     useEffect(() => {
         if (product) {
-            setMainImage(product.images[0] ? { url: product.images[0], type: isVideo(product.images[0]) ? 'video' : 'image' } : null);
+            setMainImage(product.images?.[0] ? { url: product.images[0], type: isVideo(product.images[0]) ? 'video' : 'image' } : null);
             setUserRating(0);
         }
     }, [product?.id]);
@@ -219,11 +221,11 @@ const ProductViewModal = ({ product, isOpen, onOpenChange, businessPhone, busine
     return (
         <>
             <Dialog open={isOpen} onOpenChange={onOpenChange}>
-                <DialogContent className="w-[95vw] max-w-4xl p-0 overflow-hidden sm:rounded-xl h-[95vh] md:h-[90vh] flex flex-col">
+                <DialogContent className="w-[95vw] max-w-5xl p-0 overflow-hidden sm:rounded-xl max-h-[95vh] flex flex-col">
                     <div className="flex flex-col md:flex-row flex-1 min-h-0 overflow-hidden">
                         
                         <div className="md:w-[55%] bg-muted/30 flex flex-col p-4 gap-3 md:overflow-y-auto">
-                            <div className="relative w-full aspect-[4/3] md:flex-1 md:min-h-0 rounded-xl overflow-hidden border bg-white flex-shrink-0">
+                            <div className="relative w-full aspect-[4/3] md:aspect-square rounded-xl overflow-hidden border bg-white flex-shrink-0">
                                 {mainImage ? (
                                     <MediaPreview item={mainImage} alt={product.name} objectFit="contain" />
                                 ) : (
@@ -257,14 +259,16 @@ const ProductViewModal = ({ product, isOpen, onOpenChange, businessPhone, busine
                             <ScrollArea className="flex-1 min-h-0">
                                 <div className="p-4 sm:p-5 flex flex-col gap-4">
                                      <DialogHeader className="p-0 text-left">
-                                         <Badge className="w-fit mb-1">{product.category}</Badge>
-                                        <DialogTitle className="text-xl sm:text-2xl font-bold leading-tight">
-                                            {product.name}
-                                        </DialogTitle>
+                                        <div className="flex flex-col gap-2">
+                                         <Badge className="w-fit">{product.category}</Badge>
+                                         <DialogTitle className="text-xl sm:text-2xl font-bold leading-tight">
+                                             {product.name}
+                                         </DialogTitle>
+                                         <p className="text-2xl font-bold text-primary">
+                                             {formatCurrency(product.price)}
+                                         </p>
+                                     </div>
                                     </DialogHeader>
-                                    <p className="text-2xl font-bold text-primary">
-                                        {formatCurrency(product.price)}
-                                    </p>
                                     <div className="flex items-center gap-1 text-sm text-muted-foreground">
                                         <Star className="w-4 h-4 fill-yellow-400 text-yellow-400"/>
                                         <span>{product.rating.toFixed(1)}</span>
@@ -306,7 +310,7 @@ const ProductViewModal = ({ product, isOpen, onOpenChange, businessPhone, busine
                                     <div className="h-2" />
                                 </div>
                             </ScrollArea>
-                            <div className="p-4 border-t border-border bg-background flex-shrink-0">
+                            <div className="p-4 sm:p-5 border-t border-border bg-background flex-shrink-0">
                                 <Button size="lg" className="w-full h-12 text-base font-semibold"
                                         onClick={handlePurchaseClick} 
                                         disabled={isLoadingSuggestion}>
@@ -658,7 +662,7 @@ const CatalogHeader = ({ config }: { config: LandingHeaderConfigData | null }) =
                     </div>
                     <div className="flex items-center gap-3">
                         {Object.entries(config.socialLinks).map(([key, value]) => value && (
-                            <a key={key} href={value} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary">
+                            <a key={key} href={value as string} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary">
                                 {socialIcons[key]}
                             </a>
                         ))}
@@ -705,4 +709,4 @@ const CatalogHeader = ({ config }: { config: LandingHeaderConfigData | null }) =
             )}
         </div>
     );
-};
+}
