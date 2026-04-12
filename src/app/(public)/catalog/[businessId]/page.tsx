@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
@@ -24,7 +23,8 @@ import { PurchaseModal } from '@/components/catalogo/purchase-modal';
 import type { PaymentSettings } from '@/models/payment-settings';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
-import { getSuggestion, updateSuggestionMetrics } from '@/ai/flows/suggestion-flow';
+import { getSuggestion } from '@/ai/flows/suggestion-flow';
+import { updateSuggestionMetrics } from '@/ai/flows/update-suggestion-metrics-flow';
 import type { SuggestionOutput } from '@/models/suggestion-io';
 import { SuggestionModal } from '@/components/suggestions/suggestion-modal';
 import PublicNav from '@/components/layout/public-nav';
@@ -45,96 +45,6 @@ const formatCurrency = (value: number) => {
     }).format(value);
 };
 
-const CatalogHeader = ({ config }: { config: LandingHeaderConfigData | null }) => {
-    if (!config) {
-        return (
-            <div className="h-96 flex items-center justify-center bg-muted">
-                <Loader2 className="h-8 w-8 animate-spin" />
-            </div>
-        );
-    }
-    
-    const socialIcons: { [key: string]: React.ReactNode } = {
-        tiktok: <TikTokIcon className="h-5 w-5" />,
-        instagram: <InstagramIcon className="h-5 w-5" />,
-        facebook: <FacebookIcon className="h-5 w-5" />,
-        whatsapp: <WhatsAppIcon className="h-5 w-5" />,
-        twitter: <XIcon className="h-5 w-5" />,
-    };
-
-    return (
-        <div className="w-full">
-            {config.banner.mediaUrl && (
-                <div className="relative w-full h-[200px] sm:h-[280px] lg:h-[360px] xl:h-[420px]">
-                    {config.banner.mediaType === 'image' ? (
-                        <Image src={config.banner.mediaUrl} alt="Banner" fill sizes="100vw" className="object-cover object-center"/>
-                    ) : (
-                        <video src={config.banner.mediaUrl} autoPlay loop muted controls className="w-full h-full object-cover" />
-                    )}
-                </div>
-            )}
-            <div className="bg-card shadow-md p-4">
-                <div className="container mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
-                    <div className="text-center md:text-left">
-                        <h1 className="text-xl md:text-3xl font-bold font-headline">{config.businessInfo.name}</h1>
-                        <p className="text-sm text-muted-foreground">{config.businessInfo.address}</p>
-                        {config.businessInfo.email && (
-                            <a href={`mailto:${config.businessInfo.email}`} className="text-sm text-muted-foreground hover:text-primary flex items-center justify-center md:justify-start gap-1 mt-1">
-                                <Mail className="h-3 w-3" />
-                                {config.businessInfo.email}
-                            </a>
-                        )}
-                    </div>
-                    <div className="flex items-center gap-3">
-                        {Object.entries(config.socialLinks).map(([key, value]) => value && (
-                            <a key={key} href={value} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary">
-                                {socialIcons[key]}
-                            </a>
-                        ))}
-                         <Button asChild size="sm">
-                            <a href={`https://wa.me/${config.businessInfo.phone.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer">
-                                <WhatsAppIcon className="mr-2 h-4 w-4" /> Contactar
-                            </a>
-                        </Button>
-                    </div>
-                </div>
-            </div>
-            {config.carouselItems && config.carouselItems.some(item => item.mediaUrl) && (
-                 <Carousel 
-                    className="w-full" 
-                    opts={{ loop: true }}
-                    plugins={[
-                        Autoplay({
-                          delay: 5000,
-                          stopOnInteraction: true,
-                        }),
-                    ]}
-                >
-                    <CarouselContent>
-                        {config.carouselItems.map(item => item.mediaUrl && (
-                            <CarouselItem key={item.id}>
-                                 <div className="relative w-full h-[200px] sm:h-[300px] lg:h-[420px]">
-                                    {item.mediaType === 'image' ? (
-                                        <Image src={item.mediaUrl} alt={item.slogan || 'Carousel image'} fill sizes="100vw" className="object-cover" />
-                                    ) : (
-                                        <video src={item.mediaUrl} autoPlay loop muted controls={false} className="w-full h-full object-cover"/>
-                                    )}
-                                    {item.slogan && (
-                                        <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-                                            <p className="text-white text-2xl font-bold text-center drop-shadow-md p-4">{item.slogan}</p>
-                                        </div>
-                                    )}
-                                </div>
-                            </CarouselItem>
-                        ))}
-                    </CarouselContent>
-                    <CarouselPrevious className="absolute left-4 top-1/2 -translate-y-1/2 z-10 bg-white/50 hover:bg-white text-foreground" />
-                    <CarouselNext className="absolute right-4 top-1/2 -translate-y-1/2 z-10 bg-white/50 hover:bg-white text-foreground" />
-                </Carousel>
-            )}
-        </div>
-    );
-};
 
 // Helper to check if a URL is for a video file
 const isVideo = (url: string) => {
@@ -151,7 +61,7 @@ const MediaPreview = ({ item, alt, objectFit = 'cover' }: { item: MediaItem, alt
 };
 
 const PublicProductCard = ({ product, onOpenModal }: { product: Product, onOpenModal: (product: Product) => void }) => {
-    const mediaUrl = product.images[0] || 'https://picsum.photos/seed/placeholder/600/400';
+    const mediaUrl = product.images?.[0] || 'https://picsum.photos/seed/placeholder/600/400';
     const isMediaVideo = isVideo(mediaUrl);
 
     return (
@@ -309,11 +219,11 @@ const ProductViewModal = ({ product, isOpen, onOpenChange, businessPhone, busine
     return (
         <>
             <Dialog open={isOpen} onOpenChange={onOpenChange}>
-                 <DialogContent className="w-[95vw] max-w-5xl p-0 overflow-hidden sm:rounded-xl h-[95vh] md:h-[90vh] flex flex-col">
+                <DialogContent className="w-[95vw] max-w-4xl p-0 overflow-hidden sm:rounded-xl h-[95vh] md:h-[90vh] flex flex-col">
                     <div className="flex flex-col md:flex-row flex-1 min-h-0 overflow-hidden">
                         
                         <div className="md:w-[55%] bg-muted/30 flex flex-col p-4 gap-3 md:overflow-y-auto">
-                            <div className="relative w-full aspect-[4/3] md:aspect-auto rounded-xl overflow-hidden border bg-white md:flex-1 md:min-h-0">
+                            <div className="relative w-full aspect-[4/3] md:flex-1 md:min-h-0 rounded-xl overflow-hidden border bg-white flex-shrink-0">
                                 {mainImage ? (
                                     <MediaPreview item={mainImage} alt={product.name} objectFit="contain" />
                                 ) : (
@@ -330,7 +240,7 @@ const ProductViewModal = ({ product, isOpen, onOpenChange, businessPhone, busine
                                             key={index} 
                                             onClick={() => setMainImage(item)} 
                                             className={cn(
-                                                "relative aspect-square w-[88px] h-[88px] shrink-0 rounded-lg overflow-hidden ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring transition-all",
+                                                "relative aspect-square w-16 h-16 sm:w-20 sm:h-20 shrink-0 rounded-lg overflow-hidden ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring transition-all",
                                                 mainImage?.url === item.url ? "ring-2 ring-primary opacity-100" : "opacity-70 hover:opacity-100"
                                             )}
                                         >
@@ -345,9 +255,9 @@ const ProductViewModal = ({ product, isOpen, onOpenChange, businessPhone, busine
                         
                         <div className="md:w-[45%] flex flex-col min-h-0 overflow-hidden">
                             <ScrollArea className="flex-1 min-h-0">
-                                <div className="p-4 sm:p-6 flex flex-col gap-4">
+                                <div className="p-4 sm:p-5 flex flex-col gap-4">
                                      <DialogHeader className="p-0 text-left">
-                                        <Badge className="w-fit mb-1">{product.category}</Badge>
+                                         <Badge className="w-fit mb-1">{product.category}</Badge>
                                         <DialogTitle className="text-xl sm:text-2xl font-bold leading-tight">
                                             {product.name}
                                         </DialogTitle>
@@ -365,7 +275,7 @@ const ProductViewModal = ({ product, isOpen, onOpenChange, businessPhone, busine
                                     />
                                     <p className="text-sm">
                                       <span className="font-semibold">Disponibles: </span>
-                                      <Badge variant="outline">{product.stock} unidades</Badge>
+                                       <Badge variant="outline">{product.stock} unidades</Badge>
                                     </p>
                                     <div className="flex flex-col gap-2 pt-3 border-t">
                                         <span className="text-sm font-semibold">
@@ -396,7 +306,7 @@ const ProductViewModal = ({ product, isOpen, onOpenChange, businessPhone, busine
                                     <div className="h-2" />
                                 </div>
                             </ScrollArea>
-                            <div className="p-4 sm:p-5 border-t border-border bg-background flex-shrink-0">
+                            <div className="p-4 border-t border-border bg-background flex-shrink-0">
                                 <Button size="lg" className="w-full h-12 text-base font-semibold"
                                         onClick={handlePurchaseClick} 
                                         disabled={isLoadingSuggestion}>
@@ -647,13 +557,7 @@ export default function CatalogPage() {
     return (
         <div id="catalog-page-root" ref={pageRef} className="bg-muted/40">
             <PublicNav navigation={pageData.landingPageData?.navigation} businessId={pageData.resolvedBusinessId ?? undefined} />
-            {headerConfig ? (
-                <CatalogHeader config={headerConfig} />
-            ) : (
-                <div className="bg-card shadow-md p-4 text-center">
-                     <h1 className="text-2xl font-bold font-headline">Catálogo de Productos</h1>
-                </div>
-            )}
+            <CatalogHeader config={headerConfig} />
             
             <main className="container mx-auto max-w-[1400px] py-8 px-4 sm:px-6 lg:px-8 xl:px-12">
                 {isCatalogEmpty ? (
@@ -711,3 +615,94 @@ export default function CatalogPage() {
         </div>
     );
 }
+
+const CatalogHeader = ({ config }: { config: LandingHeaderConfigData | null }) => {
+    if (!config) {
+        return (
+            <div className="bg-card shadow-md p-4 text-center">
+                 <h1 className="text-2xl font-bold font-headline">Catálogo de Productos</h1>
+            </div>
+        );
+    }
+    
+    const socialIcons: { [key: string]: React.ReactNode } = {
+        tiktok: <TikTokIcon className="h-5 w-5" />,
+        instagram: <InstagramIcon className="h-5 w-5" />,
+        facebook: <FacebookIcon className="h-5 w-5" />,
+        whatsapp: <WhatsAppIcon className="h-5 w-5" />,
+        twitter: <XIcon className="h-5 w-5" />,
+    };
+
+    return (
+        <div className="w-full">
+            {config.banner.mediaUrl && (
+                <div className="relative w-full h-[200px] sm:h-[280px] lg:h-[360px] xl:h-[420px]">
+                    {config.banner.mediaType === 'image' ? (
+                        <Image src={config.banner.mediaUrl} alt="Banner" fill sizes="100vw" className="object-cover object-center"/>
+                    ) : (
+                        <video src={config.banner.mediaUrl} autoPlay loop muted controls className="w-full h-full object-cover" />
+                    )}
+                </div>
+            )}
+            <div className="bg-card shadow-md p-4">
+                <div className="container mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
+                    <div className="text-center md:text-left">
+                        <h1 className="text-xl md:text-3xl font-bold font-headline">{config.businessInfo.name}</h1>
+                        <p className="text-sm text-muted-foreground">{config.businessInfo.address}</p>
+                        {config.businessInfo.email && (
+                            <a href={`mailto:${config.businessInfo.email}`} className="text-sm text-muted-foreground hover:text-primary flex items-center justify-center md:justify-start gap-1 mt-1">
+                                <Mail className="h-3 w-3" />
+                                {config.businessInfo.email}
+                            </a>
+                        )}
+                    </div>
+                    <div className="flex items-center gap-3">
+                        {Object.entries(config.socialLinks).map(([key, value]) => value && (
+                            <a key={key} href={value} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary">
+                                {socialIcons[key]}
+                            </a>
+                        ))}
+                         <Button asChild size="sm">
+                            <a href={`https://wa.me/${config.businessInfo.phone.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer">
+                                <WhatsAppIcon className="mr-2 h-4 w-4" /> Contactar
+                            </a>
+                        </Button>
+                    </div>
+                </div>
+            </div>
+            {config.carouselItems && config.carouselItems.some(item => item.mediaUrl) && (
+                 <Carousel 
+                    className="w-full" 
+                    opts={{ loop: true }}
+                    plugins={[
+                        Autoplay({
+                          delay: 5000,
+                          stopOnInteraction: true,
+                        }),
+                    ]}
+                >
+                    <CarouselContent>
+                        {config.carouselItems.map(item => item.mediaUrl && (
+                            <CarouselItem key={item.id}>
+                                 <div className="relative w-full h-[200px] sm:h-[300px] lg:h-[420px]">
+                                    {item.mediaType === 'image' ? (
+                                        <Image src={item.mediaUrl} alt={item.slogan || 'Carousel image'} fill sizes="100vw" className="object-cover" />
+                                    ) : (
+                                        <video src={item.mediaUrl} autoPlay loop muted controls={false} className="w-full h-full object-cover"/>
+                                    )}
+                                    {item.slogan && (
+                                        <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                                            <p className="text-white text-2xl font-bold text-center drop-shadow-md p-4">{item.slogan}</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </CarouselItem>
+                        ))}
+                    </CarouselContent>
+                    <CarouselPrevious className="absolute left-4 top-1/2 -translate-y-1/2 z-10 bg-white/50 hover:bg-white text-foreground" />
+                    <CarouselNext className="absolute right-4 top-1/2 -translate-y-1/2 z-10 bg-white/50 hover:bg-white text-foreground" />
+                </Carousel>
+            )}
+        </div>
+    );
+};
