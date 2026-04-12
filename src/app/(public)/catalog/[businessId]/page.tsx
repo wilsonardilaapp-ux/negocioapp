@@ -28,7 +28,6 @@ import jsPDF from 'jspdf';
 import { getSuggestion } from '@/ai/flows/suggestion-flow';
 import type { SuggestionOutput } from '@/models/suggestion-io';
 import { SuggestionModal } from '@/components/suggestions/suggestion-modal';
-import { updateSuggestionMetrics } from '@/ai/flows/update-suggestion-metrics-flow';
 import PublicNav from '@/components/layout/public-nav';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 
@@ -241,45 +240,51 @@ const Lightbox = ({
     if (!isOpen || !items || items.length === 0) return null;
 
     return (
-        <Dialog open={isOpen} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col p-4 sm:p-6 bg-background">
-                <DialogHeader>
-                    <DialogTitle>Galería</DialogTitle>
-                    <DialogDescription>
-                        Imágenes y videos del producto.
-                    </DialogDescription>
-                </DialogHeader>
-                <div className="flex-1 relative flex items-center justify-center">
-                    {items[currentIndex] && (
-                        <div className="relative w-full h-full max-h-[70vh]">
-                            <MediaPreview item={items[currentIndex]!} alt={`Imagen ${currentIndex + 1}`} objectFit="contain" />
-                        </div>
-                    )}
-                    {items.length > 1 && (
-                        <>
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={goToPrevious}
-                                aria-label="Imagen anterior"
-                                className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-black/50 text-white hover:bg-black/75 h-10 w-10 z-10"
-                            >
-                                <ChevronLeft className="h-6 w-6" />
-                            </Button>
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={goToNext}
-                                aria-label="Siguiente imagen"
-                                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-black/50 text-white hover:bg-black/75 h-10 w-10 z-10"
-                            >
-                                <ChevronRight className="h-6 w-6" />
-                            </Button>
-                        </>
-                    )}
+        <div
+            role="dialog"
+            aria-modal="true"
+            className="fixed inset-0 z-[999] bg-black/90 flex items-center justify-center p-4 sm:p-6 animate-in fade-in-0"
+            onClick={() => onOpenChange(false)}
+        >
+            <button 
+                onClick={(e) => { e.stopPropagation(); onOpenChange(false); }} 
+                className="absolute top-4 right-4 rounded-full bg-black/50 p-2 text-white transition-opacity hover:opacity-80"
+                aria-label="Cerrar"
+            >
+                <X className="h-6 w-6" />
+            </button>
+
+            <div className="relative w-full h-full" onClick={e => e.stopPropagation()}>
+                <div className="relative w-full h-full flex items-center justify-center">
+                    <div className="relative max-w-full max-h-full">
+                        <MediaPreview item={items[currentIndex]!} alt={`Imagen ${currentIndex + 1}`} objectFit="contain" />
+                    </div>
                 </div>
-            </DialogContent>
-        </Dialog>
+
+                {items.length > 1 && (
+                    <>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={goToPrevious}
+                            aria-label="Imagen anterior"
+                            className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-black/50 text-white hover:bg-black/75 h-10 w-10 z-10"
+                        >
+                            <ChevronLeft className="h-6 w-6" />
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={goToNext}
+                            aria-label="Siguiente imagen"
+                            className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-black/50 text-white hover:bg-black/75 h-10 w-10 z-10"
+                        >
+                            <ChevronRight className="h-6 w-6" />
+                        </Button>
+                    </>
+                )}
+            </div>
+        </div>
     );
 };
 
@@ -360,7 +365,6 @@ const ProductViewModal = ({ product, isOpen, onOpenChange, businessPhone, busine
             });
             
             if (suggestionResult.suggestedProduct && suggestionResult.ruleId) {
-                // Notificar que se mostró la sugerencia (AWAIT AÑADIDO PARA ASEGURAR REGISTRO)
                 try {
                     await updateSuggestionMetrics({ 
                         businessId, 
@@ -390,7 +394,6 @@ const ProductViewModal = ({ product, isOpen, onOpenChange, businessPhone, busine
     };
 
     const handleSuggestionAccepted = async () => {
-        // Validación estricta antes de proceder
         if (!businessId || !product || !suggestion?.suggestedProduct || !suggestion.ruleId) {
             console.error("❌ Faltan datos para aceptar la sugerencia");
             toast({
@@ -402,7 +405,6 @@ const ProductViewModal = ({ product, isOpen, onOpenChange, businessPhone, busine
             return;
         }
 
-        // 1. Intentar guardar la métrica (Sin bloquear la UI excesivamente)
         try {
             console.log("⏳ Guardando métrica de aceptación...");
             const result = await updateSuggestionMetrics({ 
@@ -421,19 +423,16 @@ const ProductViewModal = ({ product, isOpen, onOpenChange, businessPhone, busine
             console.error("❌ Error de conexión al guardar métrica:", error);
         }
 
-        // 2. Agregar productos al carrito
         onAddToCart([
             { ...product, quantity: 1 },
             { ...suggestion.suggestedProduct, quantity: 1 }
         ]);
 
-        // 3. Notificar al usuario (Opcional, da buena sensación de que algo pasó)
         toast({
             title: "¡Oferta Aceptada!",
             description: `Se añadió ${suggestion.suggestedProduct.name} a tu pedido.`,
         });
 
-        // 4. Cerrar modales
         setIsSuggestionModalOpen(false);
         onOpenChange(false);
     };
@@ -449,76 +448,78 @@ const ProductViewModal = ({ product, isOpen, onOpenChange, businessPhone, busine
     return (
         <>
             <Dialog open={isOpen} onOpenChange={onOpenChange}>
-                <DialogContent className="max-w-4xl w-full p-0 flex flex-col md:flex-row h-[90vh]">
-                    {/* Image Column */}
-                    <div className="relative w-full h-80 sm:h-auto sm:aspect-square md:w-1/2 lg:w-3/5 p-4 sm:p-6 flex flex-col">
-                        <button
-                            type="button"
-                            className="relative w-full flex-grow rounded-lg overflow-hidden border cursor-zoom-in"
-                            onClick={() => {
-                                const idx = mediaItems.findIndex(item => item.url === mainImage?.url);
-                                setSelectedLightboxIndex(idx > -1 ? idx : 0);
-                                setIsLightboxOpen(true);
-                            }}
-                        >
-                            {mainImage ? (
-                                <MediaPreview item={mainImage} alt={product.name} objectFit="contain" />
-                            ) : (
-                                <div className="w-full h-full bg-muted flex items-center justify-center">
-                                    <ImageIcon className="h-12 w-12 text-muted-foreground" />
-                                </div>
-                            )}
-                        </button>
-                        <div className="flex-shrink-0 mt-4">
-                            <ScrollArea className="w-full whitespace-nowrap rounded-md">
-                                <div className="flex w-max space-x-2 p-2">
-                                {mediaItems.map((item, index) => (
-                                    <button 
-                                        key={index} 
-                                        onClick={() => setMainImage(item)} 
-                                        className={cn(
-                                            "relative aspect-square w-16 h-16 sm:w-20 sm:h-20 shrink-0 rounded-md overflow-hidden ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring transition-all",
-                                            mainImage?.url === item.url ? "ring-2 ring-primary opacity-100" : "opacity-70 hover:opacity-100"
-                                        )}
-                                    >
-                                        <MediaPreview item={item} alt={`${product.name} thumbnail ${index + 1}`} />
-                                    </button>
-                                ))}
-                                </div>
-                                <ScrollBar orientation="horizontal" />
-                            </ScrollArea>
-                        </div>
-                    </div>
-                    
-                    {/* Details Column */}
-                    <div className="w-full md:w-1/2 lg:w-2/5 flex flex-col flex-1 min-h-0 p-4 sm:p-6 bg-background rounded-b-lg md:rounded-r-lg md:rounded-b-none">
-                        <DialogHeader className="mb-4 flex-shrink-0">
-                            <Badge className="w-fit mb-2">{product.category}</Badge>
-                            <DialogTitle className="text-2xl sm:text-3xl font-bold">{product.name}</DialogTitle>
-                        </DialogHeader>
-                        <div className="flex-grow overflow-y-auto pr-2">
-                            <div className="space-y-4">
-                                <div className="prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: product.description }} />
-                                <p><span className="font-semibold">Disponibles:</span> {product.stock} unidades</p>
-                                <div className="flex flex-col gap-2">
-                                    <span className="font-semibold">Califica este producto:</span>
-                                    <div className="flex items-center gap-1">
-                                        {[1, 2, 3, 4, 5].map(star => (
-                                            <button key={star} onClick={() => handleRating(star)} disabled={!!hasRated || isRating}>
-                                                <Star className={cn("h-6 w-6 transition-colors", star <= (userRating || product.rating) ? "text-yellow-400 fill-yellow-400" : "text-gray-300 hover:text-yellow-300")} />
-                                            </button>
-                                        ))}
-                                        {isRating && <Loader2 className="h-5 w-5 animate-spin ml-2" />}
+                <DialogContent className="max-w-4xl w-full p-0 overflow-hidden sm:rounded-lg">
+                    <div className="flex flex-col md:flex-row h-full max-h-[90vh]">
+                        {/* Image Column */}
+                        <div className="md:w-1/2 lg:w-3/5 p-4 sm:p-6 flex flex-col">
+                            <button
+                                type="button"
+                                className="relative w-full aspect-square flex-shrink-0 rounded-lg overflow-hidden border cursor-zoom-in"
+                                onClick={() => {
+                                    const idx = mediaItems.findIndex(item => item.url === mainImage?.url);
+                                    setSelectedLightboxIndex(idx > -1 ? idx : 0);
+                                    setIsLightboxOpen(true);
+                                }}
+                            >
+                                {mainImage ? (
+                                    <MediaPreview item={mainImage} alt={product.name} objectFit="contain" />
+                                ) : (
+                                    <div className="w-full h-full bg-muted flex items-center justify-center">
+                                        <ImageIcon className="h-12 w-12 text-muted-foreground" />
                                     </div>
-                                    {hasRated && <p className="text-xs text-muted-foreground">Ya has calificado este producto.</p>}
-                                </div>
+                                )}
+                            </button>
+                            <div className="flex-shrink-0 mt-4">
+                                <ScrollArea className="w-full whitespace-nowrap rounded-md">
+                                    <div className="flex w-max space-x-2 p-2">
+                                    {mediaItems.map((item, index) => (
+                                        <button 
+                                            key={index} 
+                                            onClick={() => setMainImage(item)} 
+                                            className={cn(
+                                                "relative aspect-square w-16 h-16 sm:w-20 sm:h-20 shrink-0 rounded-md overflow-hidden ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring transition-all",
+                                                mainImage?.url === item.url ? "ring-2 ring-primary opacity-100" : "opacity-70 hover:opacity-100"
+                                            )}
+                                        >
+                                            <MediaPreview item={item} alt={`${product.name} thumbnail ${index + 1}`} />
+                                        </button>
+                                    ))}
+                                    </div>
+                                    <ScrollBar orientation="horizontal" />
+                                </ScrollArea>
                             </div>
                         </div>
-                        <div className="mt-auto pt-6 flex-shrink-0">
-                            <Button size="lg" className="w-full" onClick={handlePurchaseClick} disabled={isLoadingSuggestion}>
-                                {isLoadingSuggestion ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <WhatsAppIcon className="mr-2 h-5 w-5" />}
-                                {isLoadingSuggestion ? 'Buscando sugerencias...' : 'Comprar'}
-                            </Button>
+                        
+                        {/* Details Column */}
+                        <div className="md:w-1/2 lg:w-2/5 flex flex-col p-4 sm:p-6 bg-background rounded-b-lg md:rounded-r-lg md:rounded-b-none">
+                            <DialogHeader className="mb-4 flex-shrink-0">
+                                <Badge className="w-fit mb-2">{product.category}</Badge>
+                                <DialogTitle className="text-2xl sm:text-3xl font-bold">{product.name}</DialogTitle>
+                            </DialogHeader>
+                            <div className="flex-grow min-h-0 overflow-y-auto pr-2">
+                                <div className="space-y-4">
+                                    <div className="prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: product.description }} />
+                                    <p><span className="font-semibold">Disponibles:</span> {product.stock} unidades</p>
+                                    <div className="flex flex-col gap-2">
+                                        <span className="font-semibold">Califica este producto:</span>
+                                        <div className="flex items-center gap-1">
+                                            {[1, 2, 3, 4, 5].map(star => (
+                                                <button key={star} onClick={() => handleRating(star)} disabled={!!hasRated || isRating}>
+                                                    <Star className={cn("h-6 w-6 transition-colors", star <= (userRating || product.rating) ? "text-yellow-400 fill-yellow-400" : "text-gray-300 hover:text-yellow-300")} />
+                                                </button>
+                                            ))}
+                                            {isRating && <Loader2 className="h-5 w-5 animate-spin ml-2" />}
+                                        </div>
+                                        {hasRated && <p className="text-xs text-muted-foreground">Ya has calificado este producto.</p>}
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="mt-auto pt-6 flex-shrink-0">
+                                <Button size="lg" className="w-full" onClick={handlePurchaseClick} disabled={isLoadingSuggestion}>
+                                    {isLoadingSuggestion ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <WhatsAppIcon className="mr-2 h-5 w-5" />}
+                                    {isLoadingSuggestion ? 'Buscando sugerencias...' : 'Comprar'}
+                                </Button>
+                            </div>
                         </div>
                     </div>
                 </DialogContent>
@@ -793,7 +794,7 @@ export default function CatalogPage() {
                         </CardContent>
                     </Card>
                 ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-3 md:gap-5">
+                    <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 md:gap-5">
                         {products?.map(product => (
                             <PublicProductCard key={product.id} product={product} onOpenModal={handleOpenModal} />
                         ))}
