@@ -80,12 +80,12 @@ export default function CatalogoPage() {
     const [isLoading, setIsLoading] = useState(true);
     const [moduleInactive, setModuleInactive] = useState(false);
 
-    const { user, isUserLoading } = useUser();
+    const { user } = useUser();
     const firestore = useFirestore();
     const { toast } = useToast();
 
     useEffect(() => {
-        if (isUserLoading || !user || !firestore) {
+        if (!user || !firestore) {
             return;
         }
 
@@ -93,18 +93,9 @@ export default function CatalogoPage() {
             setIsLoading(true);
             try {
                 // 1. Fetch Module status first
-                const primaryModuleRef = doc(firestore, 'modules', 'catalogo');
-                let fetchedCatalogModule: Module | null = null;
-                const primaryModuleSnap = await getDoc(primaryModuleRef);
-                 if (primaryModuleSnap.exists()) {
-                    fetchedCatalogModule = { ...primaryModuleSnap.data(), id: primaryModuleSnap.id } as Module;
-                } else {
-                    const fallbackModuleRef = doc(firestore, 'modules', 'catalogo-de-productos');
-                    const fallbackModuleSnap = await getDoc(fallbackModuleRef);
-                    if (fallbackModuleSnap.exists()) {
-                        fetchedCatalogModule = { ...fallbackModuleSnap.data(), id: fallbackModuleSnap.id } as Module;
-                    }
-                }
+                const moduleRef = doc(firestore, 'modules', 'catalogo');
+                const moduleSnap = await getDoc(moduleRef);
+                const fetchedCatalogModule = moduleSnap.exists() ? { ...moduleSnap.data(), id: moduleSnap.id } as Module : null;
 
                 if (!fetchedCatalogModule || fetchedCatalogModule.status === 'inactive') {
                     setModuleInactive(true);
@@ -186,7 +177,7 @@ export default function CatalogoPage() {
         };
 
         fetchData();
-    }, [user, firestore, isUserLoading, toast]);
+    }, [user, firestore, toast]);
 
 
     const canCreateProduct = useMemo(() => {
