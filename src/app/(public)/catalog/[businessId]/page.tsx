@@ -1,8 +1,8 @@
 
-
 'use client';
 
 import { useMemo, useState, useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useFirebase } from '@/firebase';
 import { doc, getDoc, collectionGroup, query, where, getDocs, limit } from 'firebase/firestore';
 import Image from 'next/image';
@@ -181,7 +181,7 @@ const PublicProductCard = ({ product, onOpenModal }: { product: Product, onOpenM
                 </div>
             </CardHeader>
             <CardContent className="p-4 flex-grow">
-                <CardTitle className="text-sm font-medium h-5 truncate mb-1">{product.name}</CardTitle>
+                <CardTitle className="text-sm font-medium h-10 overflow-hidden">{product.name}</CardTitle>
                  <div className="flex items-center gap-1 text-sm text-muted-foreground mb-2">
                     <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
                     <span>{product.rating.toFixed(1)}</span>
@@ -210,21 +210,32 @@ const Lightbox = ({
     startIndex?: number;
 }) => {
     const [currentIndex, setCurrentIndex] = useState(startIndex);
+    const [isMounted, setIsMounted] = useState(false);
 
     useEffect(() => {
-        if(isOpen) {
+        setIsMounted(true);
+    }, []);
+
+    useEffect(() => {
+        if (isOpen) {
             setCurrentIndex(startIndex);
         }
     }, [isOpen, startIndex]);
 
-    const goToNext = useCallback(() => {
-        setCurrentIndex((prevIndex) => (prevIndex + 1) % items.length);
+    const goToNext = useCallback((e?: React.MouseEvent) => {
+        e?.stopPropagation();
+        if (items.length > 0) {
+            setCurrentIndex((prevIndex) => (prevIndex + 1) % items.length);
+        }
     }, [items.length]);
 
-    const goToPrevious = useCallback(() => {
-        setCurrentIndex((prevIndex) => (prevIndex - 1 + items.length) % items.length);
+    const goToPrevious = useCallback((e?: React.MouseEvent) => {
+        e?.stopPropagation();
+        if (items.length > 0) {
+            setCurrentIndex((prevIndex) => (prevIndex - 1 + items.length) % items.length);
+        }
     }, [items.length]);
-    
+
     useEffect(() => {
         const handleKeyDown = (event: KeyboardEvent) => {
             if (!isOpen) return;
@@ -233,83 +244,80 @@ const Lightbox = ({
             if (event.key === 'Escape') onOpenChange(false);
         };
 
-        document.addEventListener('keydown', handleKeyDown);
+        window.addEventListener('keydown', handleKeyDown);
         return () => document.removeEventListener('keydown', handleKeyDown);
     }, [isOpen, goToNext, goToPrevious, onOpenChange]);
 
-    if (!isOpen || !items || items.length === 0) return null;
+    if (!isMounted || !isOpen || !items || items.length === 0) return null;
 
-    const currentItem = items[currentIndex]!;
+    const currentItem = items[currentIndex];
+    
+    if (!currentItem) return null;
 
-    return (
+    const lightboxJsx = (
         <div
             role="dialog"
             aria-modal="true"
-            className="fixed inset-0 z-[999] bg-black/90 flex flex-col items-center justify-center p-4 sm:p-6 animate-in fade-in-0"
+            style={{
+                position: 'fixed',
+                inset: 0,
+                zIndex: 99999,
+                backgroundColor: 'rgba(0, 0, 0, 0.9)',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '1rem',
+            }}
             onClick={() => onOpenChange(false)}
         >
-            <div className="absolute top-4 right-4 flex items-center gap-4 z-20">
+            <div style={{ position: 'absolute', top: '1rem', right: '1rem', display: 'flex', alignItems: 'center', gap: '1rem', zIndex: 10 }}>
                 {items.length > 1 && (
-                    <span className="text-white text-sm font-mono bg-black/50 px-2 py-1 rounded-md">
+                    <span style={{ color: 'white', fontSize: '0.875rem', backgroundColor: 'rgba(0,0,0,0.5)', padding: '0.25rem 0.5rem', borderRadius: '0.375rem' }}>
                         {currentIndex + 1} / {items.length}
                     </span>
                 )}
-                <button 
-                    onClick={(e) => { e.stopPropagation(); onOpenChange(false); }} 
-                    className="rounded-full bg-black/50 p-2 text-white transition-opacity hover:opacity-80"
+                <button
+                    onClick={(e) => { e.stopPropagation(); onOpenChange(false); }}
+                    style={{ background: 'rgba(0,0,0,0.5)', borderRadius: '9999px', padding: '0.5rem', color: 'white', border: 'none', cursor: 'pointer' }}
                     aria-label="Cerrar"
                 >
                     <X className="h-6 w-6" />
                 </button>
             </div>
-
-            <div className="relative w-full h-full flex items-center justify-center" onClick={e => e.stopPropagation()}>
-                {/* Main media display */}
+            
+            <div style={{ position: 'relative', width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={e => e.stopPropagation()}>
                 {currentItem.type === 'video' ? (
-                    <video
-                        key={currentItem.url}
-                        src={currentItem.url}
-                        controls
-                        autoPlay
-                        className="max-h-[85vh] max-w-full object-contain rounded-lg"
-                    />
+                    <video key={currentItem.url} src={currentItem.url} controls autoPlay style={{ maxHeight: '85vh', maxWidth: '100%', objectFit: 'contain', borderRadius: '0.5rem' }} />
                 ) : (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                        key={currentItem.url}
-                        src={currentItem.url}
-                        alt={`Vista ampliada ${currentIndex + 1}`}
-                        className="max-h-[85vh] max-w-full object-contain rounded-lg"
-                    />
+                    <img key={currentItem.url} src={currentItem.url} alt={`Vista ampliada ${currentIndex + 1}`} style={{ maxHeight: '85vh', maxWidth: '100%', objectFit: 'contain', borderRadius: '0.5rem' }} />
                 )}
 
-                {/* Navigation buttons */}
-                {items.length > 1 && (
+                 {items.length > 1 && (
                     <>
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={(e) => { e.stopPropagation(); goToPrevious(); }}
+                        <button
+                            onClick={goToPrevious}
                             aria-label="Imagen anterior"
-                            className="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 rounded-full bg-black/50 text-white hover:bg-black/75 h-10 w-10 z-10"
+                            style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', borderRadius: '9999px', backgroundColor: 'rgba(0,0,0,0.5)', color: 'white', border: 'none', cursor: 'pointer', height: '2.5rem', width: '2.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                         >
                             <ChevronLeft className="h-6 w-6" />
-                        </Button>
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={(e) => { e.stopPropagation(); goToNext(); }}
+                        </button>
+                        <button
+                            onClick={goToNext}
                             aria-label="Siguiente imagen"
-                            className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 rounded-full bg-black/50 text-white hover:bg-black/75 h-10 w-10 z-10"
+                            style={{ position: 'absolute', right: '1rem', top: '50%', transform: 'translateY(-50%)', borderRadius: '9999px', backgroundColor: 'rgba(0,0,0,0.5)', color: 'white', border: 'none', cursor: 'pointer', height: '2.5rem', width: '2.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                         >
                             <ChevronRight className="h-6 w-6" />
-                        </Button>
+                        </button>
                     </>
                 )}
             </div>
         </div>
     );
+    
+    return createPortal(lightboxJsx, document.body);
 };
+
 
 
 const ProductViewModal = ({ product, isOpen, onOpenChange, businessPhone, businessId, paymentSettings, onAddToCart }: { product: Product | null, isOpen: boolean, onOpenChange: (open: boolean) => void, businessPhone: string, businessId: string | null, paymentSettings: PaymentSettings | null, onAddToCart: (items: CartItem[]) => void }) => {
@@ -471,13 +479,13 @@ const ProductViewModal = ({ product, isOpen, onOpenChange, businessPhone, busine
     return (
         <>
             <Dialog open={isOpen} onOpenChange={onOpenChange}>
-                <DialogContent className="w-[95vw] max-w-4xl p-0 overflow-hidden sm:rounded-lg md:max-h-[90vh] flex flex-col">
+                <DialogContent className="w-[95vw] max-w-4xl p-0 overflow-hidden sm:rounded-lg md:h-[90vh] flex flex-col">
                     <div className="flex flex-col md:flex-row flex-1 min-h-0">
                         {/* Image Column */}
                         <div className="md:w-1/2 lg:w-3/5 p-4 sm:p-6 flex flex-col min-h-0">
-                            <button
+                             <button
                                 type="button"
-                                className="relative w-full aspect-square flex-shrink-0 rounded-lg overflow-hidden border cursor-zoom-in"
+                                className="relative w-full h-64 sm:h-72 md:h-auto md:aspect-square rounded-lg overflow-hidden border cursor-zoom-in"
                                 onClick={() => {
                                     const idx = mediaItems.findIndex(item => item.url === mainImage?.url);
                                     setSelectedLightboxIndex(idx > -1 ? idx : 0);
@@ -817,7 +825,7 @@ export default function CatalogPage() {
                         </CardContent>
                     </Card>
                 ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 md:gap-5">
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 md:gap-5">
                         {products?.map(product => (
                             <PublicProductCard key={product.id} product={product} onOpenModal={handleOpenModal} />
                         ))}
