@@ -4,6 +4,7 @@ import type { LandingPageData } from '@/models/landing-page';
 import { v4 as uuidv4 } from 'uuid';
 import { getAdminFirestore } from "@/firebase/server-init";
 import type { SubscriptionPlan } from '@/models/subscription-plan';
+import { getLandingData } from '@/lib/get-landing-data';
 
 // Forzamos comportamiento dinámico total
 export const dynamic = 'force-dynamic';
@@ -156,9 +157,11 @@ const fallbackData: LandingPageData = {
 
 export default async function RootPage() {
   try {
-    const plans = await getPlans();
-    // La página pública siempre usa los datos de fallback definidos en este archivo.
-    const dataToRender = { ...fallbackData };
+    const [landingData, plans] = await Promise.all([getLandingData(), getPlans()]);
+    
+    // Si no hay datos en la DB (porque se eliminó 'main'), usa los datos de fallback.
+    // Esto asegura que la página no se rompa y que el editor pueda crear el documento en el primer guardado.
+    const dataToRender = landingData || fallbackData;
 
     return (
       <main className="w-full">
@@ -167,9 +170,11 @@ export default async function RootPage() {
     );
   } catch (error) {
       console.error("Error en Home:", error);
+      // Intenta obtener los planes incluso si la landing falla para no tener una página totalmente en blanco.
+      const plans = await getPlans();
       return (
         <main className="w-full">
-            <LandingPageContent data={fallbackData} plans={[]} />
+            <LandingPageContent data={fallbackData} plans={plans} />
         </main>
       );
   }
