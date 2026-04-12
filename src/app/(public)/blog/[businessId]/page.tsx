@@ -10,17 +10,22 @@ import Footer from "@/components/layout/footer";
 export const dynamic = 'force-dynamic';
 
 async function getHeaderData(businessId: string | null): Promise<{ businessId: string | null, navigation: LandingPageData['navigation'] | null }> {
-    if (!businessId) {
-        return { businessId: null, navigation: null };
-    }
     try {
         const db = await getAdminFirestore();
-        const landingSnap = await db.collection("businesses").doc(businessId).collection("landingPages").doc("main").get();
+        const configSnap = await db.collection("globalConfig").doc("system").get();
+        const mainBusinessId = configSnap.exists ? configSnap.data()?.mainBusinessId : null;
+
+        if (!mainBusinessId) {
+            return { businessId: null, navigation: null };
+        }
+
+        const landingSnap = await db.collection("businesses").doc(mainBusinessId).collection("landingPages").doc("main").get();
         const navigation = landingSnap.exists ? (landingSnap.data() as LandingPageData).navigation : null;
-        return { businessId, navigation };
+        
+        return { businessId: mainBusinessId, navigation };
     } catch (error) {
-        console.error("Error fetching header data for business:", error);
-        return { businessId, navigation: null };
+        console.error("Error fetching header data:", error);
+        return { businessId: null, navigation: null };
     }
 }
 
@@ -30,7 +35,7 @@ async function getBlogData(businessId: string) {
     
     // Asumimos que la configuración de apariencia es global, pero podría ser por negocio
     const appearanceSnap = await db.collection("settings").doc("blog_appearance").get();
-    const config = appearanceSnap.exists() ? appearanceSnap.data() : { title: "Blog", content: "Nuestros últimos artículos."};
+    const config = appearanceSnap.exists ? appearanceSnap.data() : { title: "Blog", content: "Nuestros últimos artículos."};
 
     const q = db.collection("blog_posts")
                 .where("businessId", "==", businessId);
