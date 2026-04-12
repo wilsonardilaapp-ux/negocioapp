@@ -11,26 +11,21 @@ import type { LandingPageData } from "@/models/landing-page";
 
 export const dynamic = 'force-dynamic';
 
-async function getHeaderData(): Promise<{ businessId: string | null, navigation: LandingPageData['navigation'] | null }> {
-    try {
-        const db = await getAdminFirestore();
-        const configSnap = await db.collection("globalConfig").doc("system").get();
-        const mainBusinessId = configSnap.exists ? configSnap.data()?.mainBusinessId : null;
-
-        if (!mainBusinessId) {
-            return { businessId: null, navigation: null };
-        }
-
-        const landingSnap = await db.collection("businesses").doc(mainBusinessId).collection("landingPages").doc("main").get();
-        const navigation = landingSnap.exists ? (landingSnap.data() as LandingPageData).navigation : null;
-        
-        return { businessId: mainBusinessId, navigation };
-    } catch (error) {
-        console.error("Error fetching header data:", error);
+async function getHeaderData(businessId: string | null): Promise<{ businessId: string | null, navigation: LandingPageData['navigation'] | null }> {
+    if (!businessId) {
         return { businessId: null, navigation: null };
     }
+    try {
+        const db = await getAdminFirestore();
+        const landingSnap = await db.collection("businesses").doc(businessId).collection("landingPages").doc("main").get();
+        const navigation = landingSnap.exists ? (landingSnap.data() as LandingPageData).navigation : null;
+        
+        return { businessId, navigation };
+    } catch (error) {
+        console.error("Error fetching header data for business:", error);
+        return { businessId, navigation: null };
+    }
 }
-
 
 function getQueryDate(dateVal: any) {
   if (typeof dateVal === 'string') return dateVal;
@@ -41,13 +36,14 @@ function getQueryDate(dateVal: any) {
   return dateVal;
 }
 
-async function getPostBySlug(slug: string) {
-  if (!slug) return null;
+async function getPostBySlug(businessId: string, slug: string) {
+  if (!slug || !businessId) return null;
   
   try {
     const db = await getAdminFirestore();
     const decodedSlug = decodeURIComponent(slug);
     const q = db.collection("blog_posts")
+      .where("businessId", "==", businessId)
       .where("slug", "==", decodedSlug)
       .limit(1);
 
@@ -74,22 +70,19 @@ async function getPostBySlug(slug: string) {
       id: docSnapshot.id,
       title: data.title,
       content: data.content,
-      image_url: data.image_url || data.imageUrl || "https://picsum.photos/seed/picsum/1200/800",
+      image_url: data.imageUrl || "https://picsum.photos/seed/picsum/1200/800",
       createdAt: displayDate,
       rawDate: data.createdAt,
       seo: data.seo || {},
     };
   } catch (error: any) {
-    if (error.message?.includes("project-id")) {
-        console.error("CRÍTICO: El Project ID de Firebase no está llegando al servidor Next.js");
-    }
     console.error("Error en getPostBySlug:", error);
     return null;
   }
 }
 
-async function getAdjacentPosts(currentPostDate: any) {
-  if (!currentPostDate) return { prevPost: null, nextPost: null };
+async function getAdjacentPosts(businessId: string, currentPostDate: any) {
+  if (!currentPostDate || !businessId) return { prevPost: null, nextPost: null };
   
   let prevPost = null;
   let nextPost = null;
@@ -100,11 +93,13 @@ async function getAdjacentPosts(currentPostDate: any) {
     const blogRef = db.collection("blog_posts");
 
     const prevQuery = blogRef
+      .where("businessId", "==", businessId)
       .where("createdAt", "<", pivot)
       .orderBy("createdAt", "desc")
       .limit(1);
     
     const nextQuery = blogRef
+      .where("businessId", "==", businessId)
       .where("createdAt", ">", pivot)
       .orderBy("createdAt", "asc")
       .limit(1);
@@ -131,12 +126,12 @@ async function getAdjacentPosts(currentPostDate: any) {
 }
 
 type Props = {
-  params: { slug: string };
+  params: { businessId: string, slug: string };
 };
 
-export async function generateMetadata({ params }: { params: { slug: string } }) {
-  const { slug } = params;
-  const post = await getPostBySlug(slug);
+export async function generateMetadata({ params }: { params: { businessId: string, slug: string } }) {
+  const { businessId, slug } = params;
+  const post = await getPostBySlug(businessId, slug);
   if (!post) return { title: "Artículo no encontrado" };
   return {
     title: post.seo?.title || post.title,
@@ -145,23 +140,23 @@ export async function generateMetadata({ params }: { params: { slug: string } })
 }
 
 export default async function BlogPostPage({ params }: Props) {
-  const { slug } = params;
-  const { businessId, navigation } = await getHeaderData();
+  const { businessId, slug } = params;
+  const { navigation } = await getHeaderData(businessId);
 
-  const post = await getPostBySlug(slug);
+  const post = await getPostBySlug(businessId, slug);
 
   if (!post) {
     notFound();
   }
 
-  const { prevPost, nextPost } = await getAdjacentPosts(post.rawDate);
+  const { prevPost, nextPost } = await getAdjacentPosts(businessId, post.rawDate);
 
   return (
     <div className="bg-white">
       <Header businessId={businessId} navigation={navigation} />
       <article className="min-h-screen pb-20">
         <div className="container mx-auto px-4 py-6">
-          <Link href="/blog"> 
+          <Link href={`/blog/${businessId}`}> 
             <Button variant="ghost" className="gap-2 pl-0 hover:pl-2 transition-all text-gray-600 hover:text-primary">
               <ChevronLeft className="h-4 w-4" /> Volver al listado
             </Button>
@@ -208,7 +203,7 @@ export default async function BlogPostPage({ params }: Props) {
           
           <div className="flex flex-col md:flex-row justify-between items-center gap-4">
             {prevPost ? (
-              <Link href={`/blog/${prevPost.slug}`} className="w-full md:w-auto">
+              <Link href={`/blog/${businessId}/${prevPost.slug}`} className="w-full md:w-auto">
                 <Button variant="outline" className="w-full justify-start h-auto py-3 px-4 border-gray-300 hover:border-primary hover:text-primary group">
                   <ChevronLeft className="mr-2 h-4 w-4 group-hover:-translate-x-1 transition-transform" />
                   <div className="text-left">
@@ -220,7 +215,7 @@ export default async function BlogPostPage({ params }: Props) {
             ) : <div className="flex-1"></div>}
 
             {nextPost ? (
-              <Link href={`/blog/${nextPost.slug}`} className="w-full md:w-auto">
+              <Link href={`/blog/${businessId}/${nextPost.slug}`} className="w-full md:w-auto">
                 <Button variant="outline" className="w-full justify-end h-auto py-3 px-4 border-gray-300 hover:border-primary hover:text-primary group">
                   <div className="text-right">
                     <span className="block text-xs text-gray-500">Siguiente</span>

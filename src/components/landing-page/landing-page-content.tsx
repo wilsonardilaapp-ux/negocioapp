@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useMemo } from 'react';
@@ -37,7 +38,7 @@ const getLinkUrl = (link: NavLink, currentBusinessId: string | undefined): strin
     return link.url;
   }
   const text = link.text.toLowerCase();
-  if (text.includes('blog')) return '/blog';
+  if (text.includes('blog')) return currentBusinessId ? `/blog/${currentBusinessId}` : '/blog';
   if (text.includes('catálogo')) return currentBusinessId ? `/catalog/${currentBusinessId}` : '#';
   if (text.includes('contacto')) return '/contacto';
   if (text.includes('inicio')) return currentBusinessId ? `/landing/${currentBusinessId}` : '/';
