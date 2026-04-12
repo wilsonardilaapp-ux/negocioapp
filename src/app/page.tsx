@@ -1,7 +1,6 @@
 import LandingPageContent from '@/components/landing-page/landing-page-content';
 import type { LandingPageData } from '@/models/landing-page';
 import { v4 as uuidv4 } from 'uuid';
-import { getLandingData } from '@/lib/get-landing-data';
 import { getAdminFirestore } from "@/firebase/server-init";
 import type { SubscriptionPlan } from '@/models/subscription-plan';
 
@@ -157,9 +156,8 @@ const fallbackData: LandingPageData = {
 export default async function RootPage() {
   try {
     const plans = await getPlans();
-    // La página pública siempre obtiene los datos más recientes.
-    const dbData = await getLandingData();
-    const dataToRender = dbData || fallbackData;
+    // La página pública siempre usa los datos de fallback definidos en este archivo.
+    const dataToRender = fallbackData;
 
     return (
       <main className="w-full">
