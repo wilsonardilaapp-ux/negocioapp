@@ -33,19 +33,31 @@ async function getBlogData(businessId: string) {
     const config = appearanceSnap.exists() ? appearanceSnap.data() : { title: "Blog", content: "Nuestros últimos artículos."};
 
     const q = db.collection("blog_posts")
-                .where("businessId", "==", businessId)
-                .orderBy("createdAt", "desc");
+                .where("businessId", "==", businessId);
 
     const snapshot = await q.get();
     
-    // Filter for isActive in the code, after fetching, to avoid complex index requirements
     const posts = snapshot.docs
-        .map(doc => ({
-            id: doc.id,
-            ...doc.data(),
-            createdAt: doc.data().createdAt?.toDate?.().toISOString() || new Date().toISOString()
-        }))
-        .filter((post: any) => post.isActive === true);
+        .map(doc => {
+            const data = doc.data();
+            const createdAtRaw = data.createdAt;
+            let createdAtISO = new Date().toISOString(); // Fallback
+            if (createdAtRaw) {
+                if (typeof createdAtRaw === 'string') {
+                    createdAtISO = createdAtRaw;
+                } else if (createdAtRaw.toDate && typeof createdAtRaw.toDate === 'function') {
+                    // It's a Firestore Timestamp
+                    createdAtISO = createdAtRaw.toDate().toISOString();
+                }
+            }
+            return {
+                id: doc.id,
+                ...data,
+                createdAt: createdAtISO
+            };
+        })
+        .filter((post: any) => post.isActive === true)
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
     return { config, posts };
   } catch (error) {
