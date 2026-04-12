@@ -1,3 +1,4 @@
+
 import LandingPageContent from '@/components/landing-page/landing-page-content';
 import type { LandingPageData } from '@/models/landing-page';
 import { v4 as uuidv4 } from 'uuid';
@@ -157,7 +158,7 @@ export default async function RootPage() {
   try {
     const plans = await getPlans();
     // La página pública siempre usa los datos de fallback definidos en este archivo.
-    const dataToRender = fallbackData;
+    const dataToRender = { ...fallbackData };
 
     return (
       <main className="w-full">
