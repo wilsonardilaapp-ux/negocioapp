@@ -10,11 +10,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
-import { Save, Loader2, ArrowLeft, Bot, Copy, Check } from 'lucide-react';
+import { Save, Loader2, ArrowLeft, Bot, Copy, Check, Facebook, Twitter, Linkedin } from 'lucide-react';
 import RichTextEditor from '@/components/editor/RichTextEditor';
 import { useDoc, useFirestore, useMemoFirebase } from '@/firebase';
 import { doc } from 'firebase/firestore';
 import type { BlogPost } from '@/models/blog-post';
+import { WhatsAppIcon, XIcon, InstagramIcon, TikTokIcon, YoutubeIcon } from '@/components/icons';
 
 export default function EditPostPage() {
     const router = useRouter();
@@ -145,8 +146,53 @@ export default function EditPostPage() {
                         </div>
                     </CardContent>
                 </Card>
+
+                {publicUrl && (
+                    <Card className="shadow-sm">
+                        <CardHeader>
+                            <CardTitle className="text-base">Compartir en redes sociales</CardTitle>
+                        </CardHeader>
+                        <CardContent className="grid grid-cols-2 gap-2">
+                            <Button asChild variant="outline" size="sm">
+                                <a href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(publicUrl)}`} target="_blank" rel="noopener noreferrer">
+                                    <Facebook className="mr-2" /> Facebook
+                                </a>
+                            </Button>
+                            <Button asChild variant="outline" size="sm">
+                                <a href={`https://api.whatsapp.com/send?text=${encodeURIComponent(publicUrl)}`} target="_blank" rel="noopener noreferrer">
+                                    <WhatsAppIcon className="mr-2" /> WhatsApp
+                                </a>
+                            </Button>
+                            <Button asChild variant="outline" size="sm">
+                                <a href={`https://twitter.com/intent/tweet?url=${encodeURIComponent(publicUrl)}`} target="_blank" rel="noopener noreferrer">
+                                    <XIcon className="mr-2" /> Twitter/X
+                                </a>
+                            </Button>
+                             <Button asChild variant="outline" size="sm">
+                                <a href={`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(publicUrl)}`} target="_blank" rel="noopener noreferrer">
+                                    <Linkedin className="mr-2" /> LinkedIn
+                                </a>
+                            </Button>
+                             <Button asChild variant="outline" size="sm">
+                                <a href="https://www.instagram.com" target="_blank" rel="noopener noreferrer">
+                                    <InstagramIcon className="mr-2" /> Instagram
+                                </a>
+                            </Button>
+                             <Button asChild variant="outline" size="sm">
+                                <a href="https://www.tiktok.com" target="_blank" rel="noopener noreferrer">
+                                    <TikTokIcon className="mr-2" /> TikTok
+                                </a>
+                            </Button>
+                             <Button asChild variant="outline" size="sm">
+                                <a href="https://www.youtube.com" target="_blank" rel="noopener noreferrer">
+                                    <YoutubeIcon className="mr-2" /> YouTube
+                                </a>
+                            </Button>
+                        </CardContent>
+                    </Card>
+                )}
                 
-                 <Card className="shadow-sm">
+                <Card className="shadow-sm">
                     <CardHeader><CardTitle className="text-base">Imagen Destacada</CardTitle></CardHeader>
                     <CardContent>
                         <Label htmlFor="imageUrl">URL de la Imagen</Label>
