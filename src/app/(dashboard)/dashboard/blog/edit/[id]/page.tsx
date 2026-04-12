@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useTransition, useEffect, useMemo, useRef } from 'react';
@@ -46,11 +47,11 @@ export default function EditPostPage() {
     }, [post]);
     
     const publicUrl = useMemo(() => {
-        if (typeof window !== 'undefined' && post?.slug) {
-            return `${window.location.origin}/blog/${post.slug}`;
+        if (typeof window !== 'undefined' && post?.slug && post?.businessId) {
+            return `${window.location.origin}/blog/${post.businessId}/${post.slug}`;
         }
         return '';
-    }, [post?.slug]);
+    }, [post?.slug, post?.businessId]);
 
     const handleCopy = () => {
         if (!publicUrl) return;
