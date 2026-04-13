@@ -1,13 +1,27 @@
 
 import { getAdminFirestore } from "@/firebase/server-init";
 import Link from "next/link";
-import { Calendar, User, ArrowRight, BookOpen, FileText } from "lucide-react";
+import { Calendar, User, ArrowRight, BookOpen, FileText, Newspaper, Rss } from "lucide-react";
 import type { LandingPageData } from "@/models/landing-page";
 import Header from "@/components/layout/header";
 import Footer from "@/components/layout/footer";
-
+import type { BlogAppearanceConfig } from "@/models/blog-post";
+import type { LucideProps } from 'lucide-react';
+import React from 'react';
 
 export const dynamic = 'force-dynamic';
+
+const iconMap: { [key: string]: React.FC<LucideProps> } = {
+  BookOpen,
+  FileText,
+  Newspaper,
+  Rss,
+};
+
+const DynamicIcon = ({ name, ...props }: { name: string } & LucideProps) => {
+    const IconComponent = iconMap[name] || BookOpen;
+    return <IconComponent {...props} />;
+};
 
 async function getHeaderData(businessId: string | null): Promise<{ businessId: string | null, navigation: LandingPageData['navigation'] | null }> {
     try {
@@ -15,14 +29,18 @@ async function getHeaderData(businessId: string | null): Promise<{ businessId: s
         const configSnap = await db.collection("globalConfig").doc("system").get();
         const mainBusinessId = configSnap.exists ? configSnap.data()?.mainBusinessId : null;
 
-        if (!mainBusinessId) {
+        if (!businessId) { // If no businessId is passed, use the main one
+            businessId = mainBusinessId;
+        }
+
+        if (!businessId) {
             return { businessId: null, navigation: null };
         }
 
-        const landingSnap = await db.collection("businesses").doc(mainBusinessId).collection("landingPages").doc("main").get();
+        const landingSnap = await db.collection("businesses").doc(businessId).collection("landingPages").doc("main").get();
         const navigation = landingSnap.exists ? (landingSnap.data() as LandingPageData).navigation : null;
         
-        return { businessId: mainBusinessId, navigation };
+        return { businessId: businessId, navigation };
     } catch (error) {
         console.error("Error fetching header data:", error);
         return { businessId: null, navigation: null };
@@ -33,9 +51,22 @@ async function getBlogData(businessId: string) {
   try {
     const db = await getAdminFirestore();
     
-    // Asumimos que la configuración de apariencia es global, pero podría ser por negocio
-    const appearanceSnap = await db.collection("settings").doc("blog_appearance").get();
-    const config = appearanceSnap.exists ? appearanceSnap.data() : { title: "Blog", content: "Nuestros últimos artículos."};
+    // Fetch per-business appearance settings
+    const appearanceSnap = await db.collection("businesses").doc(businessId).collection("settings").doc("blog_appearance").get();
+    let config: Partial<BlogAppearanceConfig> = {};
+
+    if (appearanceSnap.exists) {
+        config = appearanceSnap.data() as BlogAppearanceConfig;
+    } else {
+        // Fallback to global settings if per-business doesn't exist
+        const globalAppearanceSnap = await db.collection("settings").doc("blog_appearance").get();
+        if (globalAppearanceSnap.exists) {
+            config = globalAppearanceSnap.data() as BlogAppearanceConfig;
+        } else {
+            // Hardcoded fallback if nothing exists
+            config = { title: "Blog", content: "Nuestros últimos artículos.", iconName: "BookOpen" };
+        }
+    }
 
     const q = db.collection("blog_posts")
                 .where("businessId", "==", businessId);
@@ -46,12 +77,11 @@ async function getBlogData(businessId: string) {
         .map(doc => {
             const data = doc.data();
             const createdAtRaw = data.createdAt;
-            let createdAtISO = new Date().toISOString(); // Fallback
+            let createdAtISO = new Date().toISOString(); 
             if (createdAtRaw) {
                 if (typeof createdAtRaw === 'string') {
                     createdAtISO = createdAtRaw;
                 } else if (createdAtRaw.toDate && typeof createdAtRaw.toDate === 'function') {
-                    // It's a Firestore Timestamp
                     createdAtISO = createdAtRaw.toDate().toISOString();
                 }
             }
@@ -67,7 +97,7 @@ async function getBlogData(businessId: string) {
     return { config, posts };
   } catch (error: any) {
     console.error(`Error cargando blog para businessId ${businessId}:`, error);
-    return { config: { title: "Blog", content: `Error al cargar: ${error.message}` }, posts: [] };
+    return { config: { title: "Blog", content: `Error al cargar: ${error.message}`, iconName: "BookOpen" }, posts: [] };
   }
 }
 
@@ -83,7 +113,7 @@ export default async function BusinessBlogPage({ params }: { params: { businessI
         <section className="relative bg-white pt-24 pb-16 border-b border-gray-100 overflow-hidden">
           <div className="container mx-auto px-4 text-center relative z-10 space-y-6">
             <div className="h-14 w-14 bg-primary rounded-2xl flex items-center justify-center mx-auto text-white shadow-lg mb-4">
-                <BookOpen className="h-6 w-6" />
+                <DynamicIcon name={config?.iconName || 'BookOpen'} className="h-6 w-6" />
             </div>
             <div className="space-y-3">
               <h1 className="text-4xl md:text-5xl font-black text-gray-900 tracking-tight leading-tight">
