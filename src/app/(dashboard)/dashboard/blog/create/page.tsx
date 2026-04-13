@@ -1,7 +1,6 @@
-
 'use client';
 
-import { useState, useTransition, useEffect } from 'react';
+import { useState, useTransition, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { createPost } from '@/actions/blog';
@@ -12,12 +11,15 @@ import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
-import { Save, Loader2, ArrowLeft, Bot, Lock } from 'lucide-react';
+import { Save, Loader2, ArrowLeft, Bot, Lock, UploadCloud, Trash2 } from 'lucide-react';
 import RichTextEditor from '@/components/editor/RichTextEditor';
 import { useCollection, useMemoFirebase, useUser, useFirestore } from '@/firebase';
 import { collection, query, where } from 'firebase/firestore';
 import type { BlogPost } from '@/models/blog-post';
 import { useSubscription } from '@/hooks/useSubscription';
+import Image from 'next/image';
+import { uploadMedia } from '@/ai/flows/upload-media-flow';
+
 
 export default function CreatePostPage() {
     const router = useRouter();
@@ -26,6 +28,11 @@ export default function CreatePostPage() {
     const firestore = useFirestore();
     const [isPending, startTransition] = useTransition();
     const [content, setContent] = useState('');
+    
+    // State for image uploader
+    const [imageUrl, setImageUrl] = useState('');
+    const [isUploading, setIsUploading] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
     
     const { plan, isFree, canAddBlogPosts, limits, isLoading: isSubscriptionLoading } = useSubscription();
 
@@ -41,10 +48,59 @@ export default function CreatePostPage() {
     useEffect(() => {
         if (!isLoading && isFree && !canAddBlogPosts(totalPosts)) {
             // User is at their limit, but might have navigated here directly.
-            // The UI will show the lock screen, but this could be a good place
-            // for a toast or a redirect if preferred.
         }
     }, [isLoading, isFree, canAddBlogPosts, totalPosts, router]);
+    
+    const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        setIsUploading(true);
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onloadend = async () => {
+            const mediaDataUri = reader.result as string;
+            try {
+                const result = await uploadMedia({ mediaDataUri });
+                setImageUrl(result.secure_url);
+                toast({ title: 'Imagen subida con éxito.' });
+            } catch (error: any) {
+                toast({ variant: 'destructive', title: 'Error al subir', description: error.message });
+            } finally {
+                setIsUploading(false);
+            }
+        };
+    };
+
+    const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+        event.preventDefault();
+        if (!imageUrl) {
+            toast({
+                variant: 'destructive',
+                title: 'Imagen Requerida',
+                description: 'Por favor, sube o proporciona una URL para la imagen destacada.',
+            });
+            return;
+        }
+
+        const formData = new FormData(event.currentTarget);
+        formData.set('content', content);
+        formData.set('imageUrl', imageUrl);
+        
+        if(user) {
+            formData.set('businessId', user.uid);
+        }
+
+        startTransition(async () => {
+            const result = await createPost(formData);
+            if (result.success) {
+                toast({ title: 'Éxito', description: result.message });
+                router.push('/dashboard/blog');
+            } else {
+                toast({ variant: 'destructive', title: 'Error', description: result.error });
+            }
+        });
+    };
     
     if (isLoading) {
         return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin" /> Cargando...</div>
@@ -77,26 +133,6 @@ export default function CreatePostPage() {
             </Card>
         );
     }
-
-    const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
-        event.preventDefault();
-        const formData = new FormData(event.currentTarget);
-        formData.set('content', content);
-        
-        if(user) {
-            formData.set('businessId', user.uid);
-        }
-
-        startTransition(async () => {
-            const result = await createPost(formData);
-            if (result.success) {
-                toast({ title: 'Éxito', description: result.message });
-                router.push('/dashboard/blog');
-            } else {
-                toast({ variant: 'destructive', title: 'Error', description: result.error });
-            }
-        });
-    };
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-6">
@@ -168,9 +204,42 @@ export default function CreatePostPage() {
 
                  <Card className="shadow-sm">
                     <CardHeader><CardTitle className="text-base">Imagen Destacada</CardTitle></CardHeader>
-                    <CardContent>
-                        <Label htmlFor="imageUrl">URL de la Imagen</Label>
-                        <Input id="imageUrl" name="imageUrl" placeholder="https://ejemplo.com/imagen.jpg" required />
+                    <CardContent className="space-y-4">
+                        <div 
+                            className="relative aspect-video w-full border-2 border-dashed rounded-lg flex items-center justify-center p-2 group bg-muted/50 cursor-pointer"
+                            onClick={() => fileInputRef.current?.click()}
+                        >
+                            {isUploading ? (
+                                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                            ) : imageUrl ? (
+                                <>
+                                    <Image src={imageUrl} alt="Imagen destacada" fill sizes="100%" className="object-contain rounded-md" />
+                                    <div className="absolute top-2 right-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <Button variant="destructive" size="icon" onClick={(e) => { e.stopPropagation(); setImageUrl(''); }}>
+                                            <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                    </div>
+                                </>
+                            ) : (
+                                <div className="text-center">
+                                    <UploadCloud className="h-8 w-8 mx-auto text-muted-foreground" />
+                                    <p className="mt-2 text-sm font-semibold">Subir imagen</p>
+                                    <p className="text-xs text-muted-foreground">O pega una URL abajo</p>
+                                </div>
+                            )}
+                        </div>
+                        <input type="file" ref={fileInputRef} onChange={handleImageUpload} className="hidden" accept="image/*" />
+
+                        <div>
+                            <Label htmlFor="imageUrl-input">URL de la Imagen</Label>
+                            <Input 
+                                id="imageUrl-input" 
+                                name="imageUrl" 
+                                value={imageUrl} 
+                                onChange={(e) => setImageUrl(e.target.value)} 
+                                placeholder="https://ejemplo.com/imagen.jpg"
+                            />
+                        </div>
                     </CardContent>
                 </Card>
 
