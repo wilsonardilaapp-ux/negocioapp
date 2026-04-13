@@ -90,7 +90,8 @@ service cloud.firestore {
       && request.resource.data.businessId == resource.data.businessId;
 
       allow list: if isSuperAdmin();
-      allow create, delete: if isSuperAdmin();
+      allow create: if request.auth != null && request.auth.uid == userId; // Allow user to create their own profile
+      allow delete: if isSuperAdmin(); // Only super admins can delete
     }
 
     match /paymentSettings/{userId} {
@@ -147,7 +148,8 @@ service cloud.firestore {
       }
 
       match /contactSubmissions/{submissionId} {
-        allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
+        allow create: if true; // Allow public submissions
+        allow read, update, delete: if isBusinessMember(businessId) || isSuperAdmin();
       }
 
       match /suggestionRules/{ruleId} {
@@ -265,20 +267,12 @@ service cloud.firestore {
     match /contactMessages/{messageId} {
       allow read, update, delete: if isSuperAdmin();
 
-      allow create: if
-        request.resource.data.keys().hasOnly([
-          'name',
-          'email',
-          'message',
-          'createdAt',
-          'source',
-          'subject',
-          'userId',
-          'whatsapp',
-          'replied',
-          'read',
-          'company'
-        ]);
+      // Allow anyone to submit a contact form
+      allow create: if true;
+
+      match /replies/{replyId} {
+        allow read, create: if isSuperAdmin();
+      }
     }
 
     // Default deny
