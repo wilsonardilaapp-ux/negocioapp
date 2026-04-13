@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -222,209 +223,209 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
           <DialogTitle className="text-2xl font-bold">Realizar Pedido</DialogTitle>
           <DialogDescription>Completa el formulario para enviar tu pedido y consulta las opciones de pago.</DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit(onSubmit)} className="flex-grow overflow-y-auto pr-2">
-          <div className="grid md:grid-cols-2 gap-8 py-4">
-            {/* Columna del Formulario */}
-            <div className="space-y-4">
-                <Card>
-                    <CardContent className="p-4 space-y-3">
-                         <ScrollArea className="max-h-[220px]">
-                            <div className="pr-4">
-                                {cartItems.map(item => (
-                                    <div key={item.id} className="flex items-center gap-4 py-2 border-b last:border-b-0">
-                                        <div className="relative aspect-square w-16 h-16 rounded-md overflow-hidden shrink-0">
-                                            <Image src={item.images[0] || 'https://picsum.photos/seed/product/200'} alt={item.name} fill sizes="4rem" className="object-cover"/>
-                                        </div>
-                                        <div className="flex-grow space-y-1">
-                                            <h4 className="font-semibold text-sm leading-tight">{item.name}</h4>
-                                            <p className="text-xs text-muted-foreground">{formatCurrency(item.price)} c/u</p>
-                                            <div className="flex items-center gap-2">
-                                                <Button type="button" variant="outline" size="icon" className="h-6 w-6" onClick={() => onUpdateQuantity(item.id, item.quantity - 1)}>
-                                                    <Minus className="h-3 w-3" />
-                                                </Button>
-                                                <span className="font-bold text-sm w-4 text-center">{item.quantity}</span>
-                                                <Button type="button" variant="outline" size="icon" className="h-6 w-6" onClick={() => onUpdateQuantity(item.id, item.quantity + 1)}>
-                                                    <Plus className="h-3 w-3" />
-                                                </Button>
+        <div className="flex-grow overflow-y-auto pr-2">
+            <form onSubmit={handleSubmit(onSubmit)}>
+                <div className="grid md:grid-cols-2 gap-8 py-4">
+                    {/* Columna del Formulario */}
+                    <div className="space-y-4">
+                        <Card>
+                             <ScrollArea className="max-h-[220px]">
+                                <CardContent className="p-4 space-y-3">
+                                    {cartItems.map(item => (
+                                        <div key={item.id} className="flex items-center gap-4 py-2 border-b last:border-b-0">
+                                            <div className="relative aspect-square w-16 h-16 rounded-md overflow-hidden shrink-0">
+                                                <Image src={item.images[0] || 'https://picsum.photos/seed/product/200'} alt={item.name} fill sizes="4rem" className="object-cover"/>
+                                            </div>
+                                            <div className="flex-grow space-y-1">
+                                                <h4 className="font-semibold text-sm leading-tight">{item.name}</h4>
+                                                <p className="text-xs text-muted-foreground">{formatCurrency(item.price)} c/u</p>
+                                                <div className="flex items-center gap-2">
+                                                    <Button type="button" variant="outline" size="icon" className="h-6 w-6" onClick={() => onUpdateQuantity(item.id, item.quantity - 1)}>
+                                                        <Minus className="h-3 w-3" />
+                                                    </Button>
+                                                    <span className="font-bold text-sm w-4 text-center">{item.quantity}</span>
+                                                    <Button type="button" variant="outline" size="icon" className="h-6 w-6" onClick={() => onUpdateQuantity(item.id, item.quantity + 1)}>
+                                                        <Plus className="h-3 w-3" />
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                            <div className="text-right font-semibold text-sm">
+                                                {formatCurrency(item.price * item.quantity)}
                                             </div>
                                         </div>
-                                        <div className="text-right font-semibold text-sm">
-                                            {formatCurrency(item.price * item.quantity)}
+                                    ))}
+                                </CardContent>
+                            </ScrollArea>
+                          <div className="p-4 bg-muted border-t space-y-1">
+                            <div className="flex justify-between text-sm text-muted-foreground">
+                              <span>Subtotal productos:</span>
+                              <span>{formatCurrency(subtotalProducts)}</span>
+                            </div>
+                            {packagingTotal > 0 && (
+                              <div className="flex justify-between text-sm text-muted-foreground">
+                                <span>Empaque:</span>
+                                <span>{formatCurrency(packagingTotal)}</span>
+                              </div>
+                            )}
+                            <div className="flex justify-between text-sm">
+                              <span>Subtotal:</span>
+                              <span>{formatCurrency(subtotalBeforeVat)}</span>
+                            </div>
+                            {vatRate > 0 && (
+                              <div className="flex justify-between text-sm text-muted-foreground">
+                                  <span>IVA ({vatRate}%):</span>
+                                  <span>{formatCurrency(vatAmount)}</span>
+                              </div>
+                            )}
+                            <RadioGroup value={tipoEntrega} onValueChange={(v) => setTipoEntrega(v as TipoEntrega)} className="my-3 space-y-2">
+                                <Label htmlFor="recoger_en_tienda" className={cn("flex items-center justify-between gap-4 rounded-lg border bg-background p-3 cursor-pointer", tipoEntrega === 'recoger_en_tienda' && 'border-primary ring-2 ring-primary')}>
+                                    <div className="flex items-center gap-3">
+                                        <RadioGroupItem value="recoger_en_tienda" id="recoger_en_tienda" />
+                                        <div>
+                                            <p className="font-medium text-sm">Recoger en tienda</p>
+                                            <p className="text-xs text-muted-foreground">Sin costo adicional</p>
                                         </div>
                                     </div>
-                                ))}
+                                    <span className="font-semibold text-sm">$0</span>
+                                </Label>
+                                {deliveryFee > 0 && (
+                                   <Label htmlFor="domicilio" className={cn("flex items-center justify-between gap-4 rounded-lg border bg-background p-3 cursor-pointer", tipoEntrega === 'domicilio' && 'border-primary ring-2 ring-primary')}>
+                                        <div className="flex items-center gap-3">
+                                            <RadioGroupItem value="domicilio" id="domicilio" />
+                                            <div>
+                                                <p className="font-medium text-sm">Domicilio</p>
+                                                <p className="text-xs text-muted-foreground">Envío a tu dirección</p>
+                                            </div>
+                                        </div>
+                                        <span className="font-semibold text-sm">{formatCurrency(deliveryFee)}</span>
+                                    </Label>
+                                )}
+                            </RadioGroup>
+
+                            <div className="flex justify-between items-center pt-2 border-t">
+                              <span className="font-semibold text-lg">Total:</span>
+                              <span className="text-xl font-bold">{formatCurrency(total)}</span>
                             </div>
-                        </ScrollArea>
-                    </CardContent>
-                  <div className="p-4 bg-muted border-t space-y-1">
-                    <div className="flex justify-between text-sm text-muted-foreground">
-                      <span>Subtotal productos:</span>
-                      <span>{formatCurrency(subtotalProducts)}</span>
-                    </div>
-                    {packagingTotal > 0 && (
-                      <div className="flex justify-between text-sm text-muted-foreground">
-                        <span>Empaque:</span>
-                        <span>{formatCurrency(packagingTotal)}</span>
-                      </div>
-                    )}
-                    <div className="flex justify-between text-sm">
-                      <span>Subtotal:</span>
-                      <span>{formatCurrency(subtotalBeforeVat)}</span>
-                    </div>
-                    {vatRate > 0 && (
-                      <div className="flex justify-between text-sm text-muted-foreground">
-                          <span>IVA ({vatRate}%):</span>
-                          <span>{formatCurrency(vatAmount)}</span>
-                      </div>
-                    )}
-                    <RadioGroup value={tipoEntrega} onValueChange={(v) => setTipoEntrega(v as TipoEntrega)} className="my-3 space-y-2">
-                        <Label htmlFor="recoger_en_tienda" className={cn("flex items-center justify-between gap-4 rounded-lg border bg-background p-3 cursor-pointer", tipoEntrega === 'recoger_en_tienda' && 'border-primary ring-2 ring-primary')}>
-                            <div className="flex items-center gap-3">
-                                <RadioGroupItem value="recoger_en_tienda" id="recoger_en_tienda" />
-                                <div>
-                                    <p className="font-medium text-sm">Recoger en tienda</p>
-                                    <p className="text-xs text-muted-foreground">Sin costo adicional</p>
-                                </div>
+                          </div>
+                        </Card>
+
+                      <h3 className="font-semibold text-lg">1. Completa tus datos</h3>
+                      <div className="space-y-4">
+                        <div>
+                          <Label htmlFor="fullName">Nombre Completo</Label>
+                          <Input id="fullName" {...register('fullName')} />
+                          {errors.fullName && <p className="text-sm text-destructive mt-1">{errors.fullName.message}</p>}
+                        </div>
+                        <div>
+                          <Label htmlFor="email">Correo Electrónico</Label>
+                          <Input id="email" type="email" {...register('email')} />
+                          {errors.email && <p className="text-sm text-destructive mt-1">{errors.email.message}</p>}
+                        </div>
+                        <div>
+                          <Label htmlFor="whatsapp">Número de WhatsApp</Label>
+                          <Input id="whatsapp" type="tel" {...register('whatsapp')} placeholder="ej. 3001234567" />
+                          {errors.whatsapp && <p className="text-sm text-destructive mt-1">{errors.whatsapp.message}</p>}
+                        </div>
+                        {tipoEntrega === 'domicilio' && (
+                            <div>
+                              <Label htmlFor="address">Dirección de envío</Label>
+                              <Input id="address" {...register('address')} placeholder="Tu dirección de envío" />
                             </div>
-                            <span className="font-semibold text-sm">$0</span>
-                        </Label>
-                        {deliveryFee > 0 && (
-                           <Label htmlFor="domicilio" className={cn("flex items-center justify-between gap-4 rounded-lg border bg-background p-3 cursor-pointer", tipoEntrega === 'domicilio' && 'border-primary ring-2 ring-primary')}>
-                                <div className="flex items-center gap-3">
-                                    <RadioGroupItem value="domicilio" id="domicilio" />
-                                    <div>
-                                        <p className="font-medium text-sm">Domicilio</p>
-                                        <p className="text-xs text-muted-foreground">Envío a tu dirección</p>
-                                    </div>
-                                </div>
-                                <span className="font-semibold text-sm">{formatCurrency(deliveryFee)}</span>
-                            </Label>
                         )}
-                    </RadioGroup>
-
-                    <div className="flex justify-between items-center pt-2 border-t">
-                      <span className="font-semibold text-lg">Total:</span>
-                      <span className="text-xl font-bold">{formatCurrency(total)}</span>
-                    </div>
-                  </div>
-                </Card>
-
-              <h3 className="font-semibold text-lg">1. Completa tus datos</h3>
-              <div className="space-y-4">
-                <div>
-                  <Label htmlFor="fullName">Nombre Completo</Label>
-                  <Input id="fullName" {...register('fullName')} />
-                  {errors.fullName && <p className="text-sm text-destructive mt-1">{errors.fullName.message}</p>}
-                </div>
-                <div>
-                  <Label htmlFor="email">Correo Electrónico</Label>
-                  <Input id="email" type="email" {...register('email')} />
-                  {errors.email && <p className="text-sm text-destructive mt-1">{errors.email.message}</p>}
-                </div>
-                <div>
-                  <Label htmlFor="whatsapp">Número de WhatsApp</Label>
-                  <Input id="whatsapp" type="tel" {...register('whatsapp')} placeholder="ej. 3001234567" />
-                  {errors.whatsapp && <p className="text-sm text-destructive mt-1">{errors.whatsapp.message}</p>}
-                </div>
-                {tipoEntrega === 'domicilio' && (
-                    <div>
-                      <Label htmlFor="address">Dirección de envío</Label>
-                      <Input id="address" {...register('address')} placeholder="Tu dirección de envío" />
-                    </div>
-                )}
-                <div>
-                  <Label htmlFor="message">Mensaje Adicional</Label>
-                  <Textarea id="message" {...register('message')} placeholder="Instrucciones especiales, etc." />
-                </div>
-              </div>
-            </div>
-
-            {/* Columna de Pagos */}
-            <div className="space-y-4">
-              <h3 className="font-semibold text-lg">2. Realiza el pago</h3>
-              {availableMethods.length > 0 ? (
-                <Tabs defaultValue={defaultTab} value={selectedPaymentMethod} onValueChange={setSelectedPaymentMethod} className="w-full">
-                  <TabsList className="grid grid-cols-2 gap-3 mb-4 h-auto bg-transparent p-0">
-                    {availableMethods.map((method) => (
-                      <TabsTrigger
-                        key={method.key}
-                        value={method.key}
-                        className={cn(
-                          "flex flex-col items-center justify-center gap-2 p-4 h-auto border rounded-lg transition-colors data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:border-primary",
-                          "bg-background text-foreground hover:bg-accent"
-                        )}
-                      >
-                         {typeof method.icon === 'string' ? (
-                            <Image src={method.icon} alt={method.label} width={24} height={24} className="object-contain" />
-                         ) : (
-                            method.icon
-                         )}
-                        <span className="text-sm font-medium">{method.label}</span>
-                      </TabsTrigger>
-                    ))}
-                  </TabsList>
-                  
-                  {paymentSettings?.nequi?.enabled && (
-                      <TabsContent value="nequi">
-                          <PaymentTabContent
-                              methodName="Nequi"
-                              accountNumber={paymentSettings.nequi.accountNumber}
-                              qrImageUrl={paymentSettings.nequi.qrImageUrl ?? null}
-                              onCopy={copyToClipboard}
-                          />
-                      </TabsContent>
-                  )}
-                  {paymentSettings?.bancolombia?.enabled && (
-                      <TabsContent value="bancolombia">
-                          <PaymentTabContent
-                              methodName="Bancolombia"
-                              accountNumber={paymentSettings.bancolombia.accountNumber}
-                              qrImageUrl={paymentSettings.bancolombia.qrImageUrl ?? null}
-                              onCopy={copyToClipboard}
-                          />
-                      </TabsContent>
-                  )}
-                  {paymentSettings?.daviplata?.enabled && (
-                      <TabsContent value="daviplata">
-                          <PaymentTabContent
-                              methodName="Daviplata"
-                              accountNumber={paymentSettings.daviplata.accountNumber}
-                              qrImageUrl={paymentSettings.daviplata.qrImageUrl ?? null}
-                              onCopy={copyToClipboard}
-                          />
-                      </TabsContent>
-                  )}
-                  {paymentSettings?.breB?.enabled && (
-                    <TabsContent value="breB">
-                        <BreBPaymentTabContent
-                            data={paymentSettings.breB}
-                            onCopy={copyToClipboard}
-                        />
-                    </TabsContent>
-                  )}
-                  {paymentSettings?.pagoContraEntrega?.enabled && (
-                    <TabsContent value="pagoContraEntrega">
-                      <div className="mt-4 space-y-4 text-center p-4 border rounded-lg">
-                        <p className="text-sm text-muted-foreground">Pagarás el pedido cuando lo recibas. Asegúrate de tener el monto exacto.</p>
+                        <div>
+                          <Label htmlFor="message">Mensaje Adicional</Label>
+                          <Textarea id="message" {...register('message')} placeholder="Instrucciones especiales, etc." />
+                        </div>
                       </div>
-                    </TabsContent>
-                  )}
-                </Tabs>
-              ) : (
-                <p className="text-sm text-muted-foreground">El vendedor no ha configurado métodos de pago.</p>
-              )}
-            </div>
-          </div>
-          <DialogFooter className="flex flex-col-reverse sm:flex-row justify-end gap-2 pt-4 sticky bottom-0 bg-background pb-4">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              Seguir Comprando
-            </Button>
-            <Button type="submit" disabled={isSubmitting}>
-              <ShoppingBag className="mr-2 h-5 w-5" />
-              {isSubmitting ? 'Enviando Pedido...' : 'Confirmar y Enviar Pedido'}
-            </Button>
-          </DialogFooter>
-        </form>
+                    </div>
+
+                    {/* Columna de Pagos */}
+                    <div className="space-y-4">
+                      <h3 className="font-semibold text-lg">2. Realiza el pago</h3>
+                      {availableMethods.length > 0 ? (
+                        <Tabs defaultValue={defaultTab} value={selectedPaymentMethod} onValueChange={setSelectedPaymentMethod} className="w-full">
+                          <TabsList className="grid grid-cols-2 gap-3 mb-4 h-auto bg-transparent p-0">
+                            {availableMethods.map((method) => (
+                              <TabsTrigger
+                                key={method.key}
+                                value={method.key}
+                                className={cn(
+                                  "flex flex-col items-center justify-center gap-2 p-4 h-auto border rounded-lg transition-colors data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:border-primary",
+                                  "bg-background text-foreground hover:bg-accent"
+                                )}
+                              >
+                                 {typeof method.icon === 'string' ? (
+                                    <Image src={method.icon} alt={method.label} width={24} height={24} className="object-contain" />
+                                 ) : (
+                                    method.icon
+                                 )}
+                                <span className="text-sm font-medium">{method.label}</span>
+                              </TabsTrigger>
+                            ))}
+                          </TabsList>
+                          
+                          {paymentSettings?.nequi?.enabled && (
+                              <TabsContent value="nequi">
+                                  <PaymentTabContent
+                                      methodName="Nequi"
+                                      accountNumber={paymentSettings.nequi.accountNumber}
+                                      qrImageUrl={paymentSettings.nequi.qrImageUrl ?? null}
+                                      onCopy={copyToClipboard}
+                                  />
+                              </TabsContent>
+                          )}
+                          {paymentSettings?.bancolombia?.enabled && (
+                              <TabsContent value="bancolombia">
+                                  <PaymentTabContent
+                                      methodName="Bancolombia"
+                                      accountNumber={paymentSettings.bancolombia.accountNumber}
+                                      qrImageUrl={paymentSettings.bancolombia.qrImageUrl ?? null}
+                                      onCopy={copyToClipboard}
+                                  />
+                              </TabsContent>
+                          )}
+                          {paymentSettings?.daviplata?.enabled && (
+                              <TabsContent value="daviplata">
+                                  <PaymentTabContent
+                                      methodName="Daviplata"
+                                      accountNumber={paymentSettings.daviplata.accountNumber}
+                                      qrImageUrl={paymentSettings.daviplata.qrImageUrl ?? null}
+                                      onCopy={copyToClipboard}
+                                  />
+                              </TabsContent>
+                          )}
+                          {paymentSettings?.breB?.enabled && (
+                            <TabsContent value="breB">
+                                <BreBPaymentTabContent
+                                    data={paymentSettings.breB}
+                                    onCopy={copyToClipboard}
+                                />
+                            </TabsContent>
+                          )}
+                          {paymentSettings?.pagoContraEntrega?.enabled && (
+                            <TabsContent value="pagoContraEntrega">
+                              <div className="mt-4 space-y-4 text-center p-4 border rounded-lg">
+                                <p className="text-sm text-muted-foreground">Pagarás el pedido cuando lo recibas. Asegúrate de tener el monto exacto.</p>
+                              </div>
+                            </TabsContent>
+                          )}
+                        </Tabs>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">El vendedor no ha configurado métodos de pago.</p>
+                      )}
+                    </div>
+                </div>
+                 <DialogFooter className="flex flex-col-reverse sm:flex-row justify-end gap-2 pt-4 sticky bottom-0 bg-background pb-4">
+                    <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                      Seguir Comprando
+                    </Button>
+                    <Button type="submit" disabled={isSubmitting}>
+                      <ShoppingBag className="mr-2 h-5 w-5" />
+                      {isSubmitting ? 'Enviando Pedido...' : 'Confirmar y Enviar Pedido'}
+                    </Button>
+                </DialogFooter>
+            </form>
+        </div>
       </DialogContent>
     </Dialog>
   );
@@ -478,3 +479,5 @@ const BreBPaymentTabContent = ({ data, onCopy }: { data: PaymentSettings['breB']
         </div>
     </div>
 );
+
+    
