@@ -12,10 +12,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { useUser } from '@/firebase';
+import { useUser, useFirestore } from '@/firebase';
 import { sendClientMessage } from '@/actions/send-client-message';
-import { Loader2, Send, Building } from "lucide-react";
-import Link from 'next/link';
+import { Loader2, Send } from "lucide-react";
+import Header from "@/components/layout/header";
+import { doc, getDoc } from 'firebase/firestore';
+import type { LandingPageData } from '@/models/landing-page';
+
 
 const contactClientSchema = z.object({
   name: z.string().min(3, "Tu nombre es requerido."),
@@ -32,6 +35,9 @@ export default function ContactoClientePage() {
     const { user } = useUser();
     const params = useParams();
     const businessId = params.businessId as string;
+    const firestore = useFirestore();
+
+    const [navigation, setNavigation] = React.useState<LandingPageData['navigation'] | null>(null);
 
     const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<ContactClientFormData>({
         resolver: zodResolver(contactClientSchema),
@@ -52,6 +58,24 @@ export default function ContactoClientePage() {
             });
         }
     }, [user, reset]);
+
+    React.useEffect(() => {
+      if (!firestore || !businessId) return;
+
+      const getNavData = async () => {
+        try {
+          const landingSnap = await getDoc(doc(firestore, "businesses", businessId, "landingPages", "main"));
+          if (landingSnap.exists()) {
+            const navData = (landingSnap.data() as LandingPageData).navigation;
+            setNavigation(navData);
+          }
+        } catch (error) {
+          console.error("Error fetching navigation data for client contact page:", error);
+        }
+      };
+
+      getNavData();
+    }, [firestore, businessId]);
 
 
     const onSubmit = async (data: ContactClientFormData) => {
@@ -89,58 +113,55 @@ export default function ContactoClientePage() {
     };
 
     return (
-        <div className="w-full min-h-screen bg-gray-50 flex items-center justify-center p-4">
-            <main className="w-full max-w-2xl">
-                 <div className="flex justify-center mb-6">
-                    <Link href="/" className="flex items-center gap-2 text-foreground">
-                        <Building className="h-8 w-8 text-primary" />
-                        <span className="text-2xl font-bold font-headline">Contactar al Negocio</span>
-                    </Link>
+        <div className="w-full min-h-screen bg-gray-50/50">
+            <Header businessId={businessId} navigation={navigation} />
+            <main className="container mx-auto px-4 py-16">
+                <div className="w-full max-w-2xl mx-auto">
+                    <Card className="shadow-lg">
+                        <CardHeader className="text-center">
+                            <CardTitle className="text-3xl">Contáctanos</CardTitle>
+                            <CardDescription>Envíanos tu mensaje y te responderemos lo antes posible.</CardDescription>
+                        </CardHeader>
+                        <form onSubmit={handleSubmit(onSubmit)}>
+                            <CardContent className="space-y-6">
+                                <div className="grid sm:grid-cols-2 gap-6">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="name">Nombre completo *</Label>
+                                        <Input id="name" {...register('name')} />
+                                        {errors.name && <p className="text-sm text-destructive">{errors.name.message}</p>}
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="email">Correo electrónico *</Label>
+                                        <Input id="email" type="email" {...register('email')} />
+                                        {errors.email && <p className="text-sm text-destructive">{errors.email.message}</p>}
+                                    </div>
+                                </div>
+                                <div className="grid sm:grid-cols-2 gap-6">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="phone">Teléfono (Opcional)</Label>
+                                        <Input id="phone" type="tel" {...register('phone')} />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="subject">Asunto *</Label>
+                                        <Input id="subject" {...register('subject')} />
+                                        {errors.subject && <p className="text-sm text-destructive">{errors.subject.message}</p>}
+                                    </div>
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="message">Mensaje *</Label>
+                                    <Textarea id="message" rows={6} {...register('message')} />
+                                    {errors.message && <p className="text-sm text-destructive">{errors.message.message}</p>}
+                                </div>
+                            </CardContent>
+                            <CardFooter>
+                                <Button type="submit" disabled={isSubmitting} className="w-full">
+                                    {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
+                                    {isSubmitting ? 'Enviando...' : 'Enviar Mensaje'}
+                                </Button>
+                            </CardFooter>
+                        </form>
+                    </Card>
                 </div>
-                <Card className="shadow-lg">
-                    <CardHeader className="text-center">
-                        <CardTitle className="text-3xl">Contáctanos</CardTitle>
-                        <CardDescription>Envíanos tu mensaje y te responderemos lo antes posible.</CardDescription>
-                    </CardHeader>
-                    <form onSubmit={handleSubmit(onSubmit)}>
-                        <CardContent className="space-y-6">
-                            <div className="grid sm:grid-cols-2 gap-6">
-                                <div className="space-y-2">
-                                    <Label htmlFor="name">Nombre completo *</Label>
-                                    <Input id="name" {...register('name')} />
-                                    {errors.name && <p className="text-sm text-destructive">{errors.name.message}</p>}
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="email">Correo electrónico *</Label>
-                                    <Input id="email" type="email" {...register('email')} />
-                                    {errors.email && <p className="text-sm text-destructive">{errors.email.message}</p>}
-                                </div>
-                            </div>
-                            <div className="grid sm:grid-cols-2 gap-6">
-                                <div className="space-y-2">
-                                    <Label htmlFor="phone">Teléfono (Opcional)</Label>
-                                    <Input id="phone" type="tel" {...register('phone')} />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="subject">Asunto *</Label>
-                                    <Input id="subject" {...register('subject')} />
-                                    {errors.subject && <p className="text-sm text-destructive">{errors.subject.message}</p>}
-                                </div>
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="message">Mensaje *</Label>
-                                <Textarea id="message" rows={6} {...register('message')} />
-                                {errors.message && <p className="text-sm text-destructive">{errors.message.message}</p>}
-                            </div>
-                        </CardContent>
-                        <CardFooter>
-                            <Button type="submit" disabled={isSubmitting} className="w-full">
-                                {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
-                                {isSubmitting ? 'Enviando...' : 'Enviar Mensaje'}
-                            </Button>
-                        </CardFooter>
-                    </form>
-                </Card>
             </main>
         </div>
     );
