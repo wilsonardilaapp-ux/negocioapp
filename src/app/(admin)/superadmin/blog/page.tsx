@@ -1,4 +1,3 @@
-
 'use client';
 
 import {
@@ -15,9 +14,12 @@ import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { collection, query, orderBy } from 'firebase/firestore';
 import type { BlogPost } from '@/models/blog-post';
 import { PostsTable } from '@/components/blog/posts-table';
+import { useToast } from '@/hooks/use-toast';
+import { deletePost } from '@/actions/blog';
 
 export default function BlogPage() {
   const firestore = useFirestore();
+  const { toast } = useToast();
 
   // El superadmin ve todos los posts, ordenados por fecha
   const postsQuery = useMemoFirebase(() => 
@@ -28,6 +30,16 @@ export default function BlogPage() {
   );
 
   const { data: posts, isLoading } = useCollection<BlogPost>(postsQuery);
+
+  const handleDeletePost = async (postId: string) => {
+    const result = await deletePost(postId);
+    if (result.success) {
+      toast({ title: 'Éxito', description: result.message });
+      // The useCollection hook will automatically update the UI on deletion
+    } else {
+      toast({ variant: 'destructive', title: 'Error', description: result.error });
+    }
+  };
 
   return (
     <div className="flex flex-col gap-6">
@@ -54,7 +66,12 @@ export default function BlogPage() {
             <CardDescription>Listado de todos los artículos de la plataforma.</CardDescription>
         </CardHeader>
         <CardContent>
-          <PostsTable posts={posts || []} isLoading={isLoading} basePath="/superadmin/blog" />
+          <PostsTable
+            posts={posts || []}
+            isLoading={isLoading}
+            basePath="/superadmin/blog"
+            onDeletePost={handleDeletePost}
+          />
         </CardContent>
       </Card>
     </div>
