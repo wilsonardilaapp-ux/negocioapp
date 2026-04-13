@@ -223,13 +223,13 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
           <DialogTitle className="text-2xl font-bold">Realizar Pedido</DialogTitle>
           <DialogDescription>Completa el formulario para enviar tu pedido y consulta las opciones de pago.</DialogDescription>
         </DialogHeader>
-        <div className="flex-grow overflow-y-auto pr-2">
-            <form onSubmit={handleSubmit(onSubmit)}>
+        <div className="flex-grow overflow-y-auto pr-4 -mr-4">
+            <form id="purchase-form" onSubmit={handleSubmit(onSubmit)}>
                 <div className="grid md:grid-cols-2 gap-8 py-4">
                     {/* Columna del Formulario */}
                     <div className="space-y-4">
                         <Card>
-                             <ScrollArea className="max-h-[220px]">
+                             <ScrollArea className="h-[220px]">
                                 <CardContent className="p-4 space-y-3">
                                     {cartItems.map(item => (
                                         <div key={item.id} className="flex items-center gap-4 py-2 border-b last:border-b-0">
@@ -415,17 +415,17 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
                       )}
                     </div>
                 </div>
-                 <DialogFooter className="flex flex-col-reverse sm:flex-row justify-end gap-2 pt-4 sticky bottom-0 bg-background pb-4">
-                    <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-                      Seguir Comprando
-                    </Button>
-                    <Button type="submit" disabled={isSubmitting}>
-                      <ShoppingBag className="mr-2 h-5 w-5" />
-                      {isSubmitting ? 'Enviando Pedido...' : 'Confirmar y Enviar Pedido'}
-                    </Button>
-                </DialogFooter>
             </form>
         </div>
+        <DialogFooter className="flex-col-reverse sm:flex-row justify-end gap-2 pt-4 border-t px-6 pb-4 -mx-6 -mb-6 bg-background rounded-b-lg">
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                Seguir Comprando
+            </Button>
+            <Button type="submit" form="purchase-form" disabled={isSubmitting}>
+                <ShoppingBag className="mr-2 h-5 w-5" />
+                {isSubmitting ? 'Enviando Pedido...' : 'Confirmar y Enviar Pedido'}
+            </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
@@ -479,5 +479,3 @@ const BreBPaymentTabContent = ({ data, onCopy }: { data: PaymentSettings['breB']
         </div>
     </div>
 );
-
-    
