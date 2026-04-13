@@ -1,5 +1,5 @@
 
-"use client";
+'use client';
 
 import { useState } from 'react';
 import { useCollection, useFirestore, useMemoFirebase, addDocumentNonBlocking, initiateEmailSignUp, updateDocumentNonBlocking } from '@/firebase';
@@ -144,10 +144,16 @@ export default function UsersPage() {
         reset();
         setAddDialogOpen(false);
     } catch (error: any) {
+        let description = 'No se pudo crear el usuario. Verifique los datos e intente de nuevo.';
+        if (error.code === 'auth/email-already-in-use') {
+            description = 'Este correo electrónico ya está registrado. Por favor, utiliza un correo diferente.';
+        } else if (error.code === 'auth/weak-password') {
+            description = 'La contraseña es demasiado débil. Debe tener al menos 6 caracteres.';
+        }
         toast({
             variant: 'destructive',
             title: 'Error al crear usuario',
-            description: error.message || 'No se pudo crear el usuario. Verifique el correo o la contraseña.',
+            description: description,
         });
     }
   };
