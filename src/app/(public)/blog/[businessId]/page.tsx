@@ -32,7 +32,7 @@ async function getHeaderData(businessId: string | null): Promise<{ businessId: s
     try {
         const db = await getAdminFirestore();
         const configSnap = await db.collection("globalConfig").doc("system").get();
-        const mainBusinessId = configSnap.exists() ? configSnap.data()?.mainBusinessId : null;
+        const mainBusinessId = configSnap.exists ? configSnap.data()?.mainBusinessId : null;
 
         if (!businessId) { // If no businessId is passed, use the main one
             businessId = mainBusinessId;
@@ -43,7 +43,7 @@ async function getHeaderData(businessId: string | null): Promise<{ businessId: s
         }
 
         const landingSnap = await db.collection("businesses").doc(businessId).collection("landingPages").doc("main").get();
-        const navigation = landingSnap.exists() ? (landingSnap.data() as LandingPageData).navigation : null;
+        const navigation = landingSnap.exists ? (landingSnap.data() as LandingPageData).navigation : null;
         
         return { businessId: businessId, navigation };
     } catch (error) {
@@ -65,7 +65,7 @@ async function getBlogData(businessId: string) {
     } else {
         // Fallback to global settings if per-business doesn't exist
         const globalAppearanceSnap = await db.collection("settings").doc("blog_appearance").get();
-        if (globalAppearanceSnap.exists()) {
+        if (globalAppearanceSnap.exists) {
             config = globalAppearanceSnap.data() as BlogAppearanceConfig;
         } else {
             // Hardcoded fallback if nothing exists

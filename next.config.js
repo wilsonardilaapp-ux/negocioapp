@@ -41,10 +41,6 @@ const nextConfig = {
                 protocol: 'https',
                 hostname: 'img.freepik.com',
             },
-             {
-                protocol: 'https',
-                hostname: 'ing.freepik.com',
-            },
             {
                 protocol: 'https',
                 hostname: 'firebasestorage.googleapis.com',
