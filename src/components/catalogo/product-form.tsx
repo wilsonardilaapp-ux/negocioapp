@@ -16,7 +16,7 @@ import { uploadMedia } from '@/ai/flows/upload-media-flow';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { ScrollArea } from '../ui/scroll-area';
+import { ScrollArea, ScrollBar } from '../ui/scroll-area';
 
 const productSchema = z.object({
     name: z.string().min(3, "El nombre es requerido."),
@@ -148,8 +148,6 @@ const Lightbox = ({
     );
 };
 
-const IMAGE_SIZE = 800;
-
 export default function ProductForm({ product, onSave, onCancel, imageLimit }: ProductFormProps) {
     const { register, handleSubmit, control, reset, formState: { errors } } = useForm<z.infer<typeof productSchema>>({
         resolver: zodResolver(productSchema),
@@ -199,7 +197,7 @@ export default function ProductForm({ product, onSave, onCancel, imageLimit }: P
             rating: product?.rating || 0,
             ratingCount: product?.ratingCount || 0,
             packagingCost: data.packagingCost ?? 0,
-            imageSize: IMAGE_SIZE,
+            imageSize: 800, // Hardcoded, as per original logic
         };
         onSave(productData);
     };
@@ -261,75 +259,106 @@ export default function ProductForm({ product, onSave, onCancel, imageLimit }: P
 
     return (
         <>
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 p-1 max-h-[80vh] overflow-y-auto">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 max-h-[85vh] overflow-y-auto p-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
                 
+                {/* --- LEFT COLUMN --- */}
                 <div className="space-y-4">
                     <Label>Imágenes/Videos del Producto (hasta {imageLimit})</Label>
 
-                    <div className="flex gap-4" style={{ height: `${IMAGE_SIZE}px` }}>
-                        
-                        <div className="relative flex-shrink-0" style={{ width: `${IMAGE_SIZE}px`, height: `${IMAGE_SIZE}px` }}>
-                            {mainImage ? (
-                                <div className="group relative w-full h-full">
-                                    <MediaPreview item={mainImage} alt="Producto Principal" objectFit="contain" />
-                                </div>
-                            ) : (
-                                <label className={cn("flex flex-col items-center justify-center w-full h-full border-2 border-dashed rounded-md cursor-pointer hover:bg-muted p-4", isLimitReached && "cursor-not-allowed opacity-50")}>
-                                    <UploadCloud className="h-8 w-8 text-muted-foreground" />
-                                    <span className="text-sm text-center font-semibold text-muted-foreground mt-2">Imagen/Video Principal</span>
-                                    <Input 
-                                        type="file" 
-                                        className="hidden" 
-                                        onChange={(e) => e.target.files && handleMediaUpload(e.target.files[0], 0)} 
-                                        accept="image/*,video/*"
-                                        disabled={isLimitReached}
-                                    />
-                                </label>
-                            )}
-                        </div>
-
-                        <ScrollArea className="h-full w-24 shrink-0">
-                            <div className="space-y-2 pr-2">
-                                {Array.from({ length: imageLimit }).map((_, i) => {
-                                    const currentItem = mediaItems[i];
-
-                                    return (
-                                        <div key={currentItem?.url || `placeholder-${i}`} className="relative aspect-square w-full">
-                                            {isUploading === i ? (
-                                                <div className="flex items-center justify-center w-full h-full border-2 border-dashed rounded-md bg-muted"><Loader2 className="h-6 w-6 animate-spin" /></div>
-                                            ) : currentItem ? (
-                                                <div className="group relative w-full h-full">
-                                                    <button 
-                                                        type="button" 
-                                                        onClick={() => setMainImage(currentItem)} 
-                                                        className={cn(
-                                                            "w-full h-full rounded-md ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring", 
-                                                            mainImage?.url === currentItem.url && "ring-2 ring-primary"
-                                                        )}
-                                                    >
-                                                        <MediaPreview item={currentItem} alt={`Producto ${i + 1}`} />
-                                                    </button>
-                                                    <Button type="button" variant="destructive" size="icon" className="absolute -top-1 -right-1 h-5 w-5 opacity-0 group-hover:opacity-100 rounded-full" onClick={() => removeMedia(i)}><X className="h-3 w-3" /></Button>
-                                                </div>
-                                            ) : !isLimitReached ? (
-                                                <label className="flex flex-col items-center justify-center w-full h-full border-2 border-dashed rounded-md cursor-pointer hover:bg-muted p-1">
-                                                    <Plus className="h-5 w-5 text-muted-foreground" />
-                                                    <Input type="file" className="hidden" onChange={(e) => e.target.files && handleMediaUpload(e.target.files[0], i)} accept="image/*,video/*" />
-                                                </label>
-                                            ) : (
-                                                <div className="flex items-center justify-center w-full h-full border-2 border-dashed rounded-md bg-muted/30" />
-                                            )}
-                                        </div>
-                                    );
-                                })}
+                    {/* Main Image */}
+                    <div className="relative w-full aspect-[4/3] border-2 border-dashed rounded-md flex items-center justify-center p-2 bg-muted/30">
+                        {mainImage ? (
+                            <div className="group relative w-full h-full">
+                                <MediaPreview item={mainImage} alt="Producto Principal" objectFit="contain" />
                             </div>
-                        </ScrollArea>
+                        ) : (
+                            <label className={cn("flex flex-col items-center justify-center w-full h-full cursor-pointer hover:bg-muted", isLimitReached && "cursor-not-allowed opacity-50")}>
+                                <UploadCloud className="h-8 w-8 text-muted-foreground" />
+                                <span className="text-sm text-center font-semibold text-muted-foreground mt-2">Imagen/Video Principal</span>
+                                <Input 
+                                    type="file" 
+                                    className="hidden" 
+                                    onChange={(e) => e.target.files && handleMediaUpload(e.target.files[0], 0)} 
+                                    accept="image/*,video/*"
+                                    disabled={isLimitReached}
+                                />
+                            </label>
+                        )}
                     </div>
-                </div>
 
+                    {/* Horizontal Thumbnails */}
+                     <ScrollArea className="w-full">
+                        <div className="flex w-max space-x-2 pb-2">
+                             {Array.from({ length: imageLimit }).map((_, i) => {
+                                const currentItem = mediaItems[i];
+                                return (
+                                    <div key={currentItem?.url || `placeholder-${i}`} className="relative aspect-square w-20 h-20 shrink-0">
+                                        {isUploading === i ? (
+                                            <div className="flex items-center justify-center w-full h-full border-2 border-dashed rounded-md bg-muted"><Loader2 className="h-6 w-6 animate-spin" /></div>
+                                        ) : currentItem ? (
+                                            <div className="group relative w-full h-full">
+                                                <button 
+                                                    type="button" 
+                                                    onClick={() => setMainImage(currentItem)} 
+                                                    className={cn(
+                                                        "w-full h-full rounded-md ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring", 
+                                                        mainImage?.url === currentItem.url && "ring-2 ring-primary"
+                                                    )}
+                                                >
+                                                    <MediaPreview item={currentItem} alt={`Producto ${i + 1}`} />
+                                                </button>
+                                                <Button type="button" variant="destructive" size="icon" className="absolute -top-1 -right-1 h-5 w-5 opacity-0 group-hover:opacity-100 rounded-full" onClick={() => removeMedia(i)}><X className="h-3 w-3" /></Button>
+                                            </div>
+                                        ) : !isLimitReached ? (
+                                            <label className="flex flex-col items-center justify-center w-full h-full border-2 border-dashed rounded-md cursor-pointer hover:bg-muted p-1">
+                                                <Plus className="h-5 w-5 text-muted-foreground" />
+                                                <Input type="file" className="hidden" onChange={(e) => e.target.files && handleMediaUpload(e.target.files[0], i)} accept="image/*,video/*" />
+                                            </label>
+                                        ) : (
+                                            <div className="flex items-center justify-center w-full h-full border-2 border-dashed rounded-md bg-muted/30" />
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                        <ScrollBar orientation="horizontal" />
+                    </ScrollArea>
+                </div>
+                
+                {/* --- RIGHT COLUMN --- */}
                 <div className="space-y-4">
-                    <div>
+                     <div>
+                        <Label htmlFor="name">Nombre del Producto</Label>
+                        <Input id="name" {...register("name")} placeholder="Ej: Café Orgánico de Altura" />
+                        {errors.name && <p className="text-sm text-destructive mt-1">{errors.name.message}</p>}
+                    </div>
+                    <div className="grid grid-cols-3 gap-4">
+                        <div>
+                            <Label htmlFor="price">Precio</Label>
+                            <Input id="price" type="number" step="0.01" {...register("price")} />
+                            {errors.price && <p className="text-sm text-destructive mt-1">{errors.price.message}</p>}
+                        </div>
+                        <div>
+                            <Label htmlFor="stock">Stock</Label>
+                            <Input id="stock" type="number" {...register("stock")} />
+                            {errors.stock && <p className="text-sm text-destructive mt-1">{errors.stock.message}</p>}
+                        </div>
+                      <div>
+                        <Label htmlFor="packagingCost">Costo de empaque</Label>
+                        <Input
+                          id="packagingCost"
+                          type="number"
+                          step="0.01"
+                          placeholder="0 = sin empaque"
+                          {...register("packagingCost")}
+                        />
+                        {errors.packagingCost && (
+                          <p className="text-sm text-destructive">{errors.packagingCost.message}</p>
+                        )}
+                      </div>
+                    </div>
+                     <div>
                         <Label htmlFor="category">Categoría</Label>
                         <Input id="category" {...register("category")} placeholder="Ej: Bebidas Calientes" />
                         {errors.category && <p className="text-sm text-destructive mt-1">{errors.category.message}</p>}
@@ -348,40 +377,7 @@ export default function ProductForm({ product, onSave, onCancel, imageLimit }: P
                 </div>
             </div>
 
-            <div className="space-y-4">
-                 <div>
-                    <Label htmlFor="name">Nombre del Producto</Label>
-                    <Input id="name" {...register("name")} placeholder="Ej: Café Orgánico de Altura" />
-                    {errors.name && <p className="text-sm text-destructive mt-1">{errors.name.message}</p>}
-                </div>
-                <div className="grid grid-cols-3 gap-4">
-                    <div>
-                        <Label htmlFor="price">Precio</Label>
-                        <Input id="price" type="number" step="0.01" {...register("price")} />
-                        {errors.price && <p className="text-sm text-destructive mt-1">{errors.price.message}</p>}
-                    </div>
-                    <div>
-                        <Label htmlFor="stock">Stock</Label>
-                        <Input id="stock" type="number" {...register("stock")} />
-                        {errors.stock && <p className="text-sm text-destructive mt-1">{errors.stock.message}</p>}
-                    </div>
-                  <div>
-                    <Label htmlFor="packagingCost">Costo de empaque</Label>
-                    <Input
-                      id="packagingCost"
-                      type="number"
-                      step="0.01"
-                      placeholder="0 = sin empaque"
-                      {...register("packagingCost")}
-                    />
-                    {errors.packagingCost && (
-                      <p className="text-sm text-destructive">{errors.packagingCost.message}</p>
-                    )}
-                  </div>
-                </div>
-            </div>
-
-            <div className="flex justify-end gap-2 pt-4">
+            <div className="flex justify-end gap-2 pt-4 border-t">
                 <Button type="button" variant="outline" onClick={onCancel}>Cancelar</Button>
                 <Button type="submit">Guardar Producto</Button>
             </div>
@@ -395,3 +391,4 @@ export default function ProductForm({ product, onSave, onCancel, imageLimit }: P
         </>
     );
 }
+
