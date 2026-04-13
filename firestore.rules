@@ -38,7 +38,11 @@ service cloud.firestore {
 
     // Public blog posts
     match /blog_posts/{postId} {
-      allow read: if request.auth != null;
+      allow get: if request.auth != null;
+      allow list: if request.auth != null && (
+        request.auth.uid == resource.data.businessId ||
+        isSuperAdmin()
+      );
 
       allow create: if request.auth != null && (
         request.resource.data.businessId == request.auth.uid ||
