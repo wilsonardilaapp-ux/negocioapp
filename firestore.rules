@@ -21,10 +21,9 @@ service cloud.firestore {
     }
 
     function isBusinessMember(businessId) {
-      return userExists() && (
-        request.auth.uid == businessId ||
-        userData().businessId == businessId
-      );
+      // OPTIMIZED: Check for owner UID first to avoid unnecessary 'exists/get' calls on list queries.
+      // This is the primary fix for the "Missing or insufficient permissions" error on the dashboard.
+      return request.auth.uid == businessId || (userExists() && userData().businessId == businessId);
     }
 
     // This rule is necessary for resolving custom catalog slugs publicly.
