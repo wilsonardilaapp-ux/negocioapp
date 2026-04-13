@@ -1,10 +1,9 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { onAuthStateChanged, type User } from 'firebase/auth';
-import { doc, onSnapshot, type Unsubscribe } from 'firebase/firestore';
+import { doc, onSnapshot, getDoc, setDoc, type Unsubscribe } from 'firebase/firestore';
 import { useFirebase } from '@/firebase/provider';
 import type { User as UserProfile } from '@/models/user';
 
@@ -47,7 +46,7 @@ export function useUser() {
     return () => unsubscribe();
   }, [auth, isNetworkEnabled]);
 
-  // Effect 2: Handle Profile Fetching based on Auth State
+  // Effect 2: Handle Profile Fetching and Self-Healing
   useEffect(() => {
     if (!firestore || !authState.user) {
         setProfile(null);
@@ -58,29 +57,60 @@ export function useUser() {
     setProfileLoading(true);
     const userDocRef = doc(firestore, 'users', authState.user.uid);
 
-    const unsubscribe = onSnapshot(userDocRef, (docSnap) => {
+    const unsubscribe = onSnapshot(userDocRef, async (docSnap) => {
         if (docSnap.exists()) {
             setProfile(docSnap.data() as UserProfile);
-        } else if (authState.user && SUPER_ADMIN_EMAILS.includes(authState.user.email || '')) {
-            // Create a virtual profile for super admin if it doesn't exist
-            setProfile({
-                id: authState.user.uid,
-                name: authState.user.displayName || 'Super Admin',
-                email: authState.user.email!,
-                role: 'super_admin',
-                status: 'active',
-                createdAt: new Date().toISOString(),
-                lastLogin: new Date().toISOString(),
-            });
-        } else {
-            setProfile(null);
+            setProfileLoading(false);
+        } else if (authState.user) {
+            // Self-healing logic for users affected by the old registration bug.
+            try {
+                const businessDocRef = doc(firestore, 'businesses', authState.user.uid);
+                const businessSnap = await getDoc(businessDocRef);
+
+                if (businessSnap.exists()) {
+                    // Business doc exists but user doc doesn't. Let's fix it.
+                    const businessData = businessSnap.data();
+                    const newUserProfile: UserProfile = {
+                        id: authState.user.uid,
+                        name: businessData.ownerName || authState.user.displayName || 'Usuario Recuperado',
+                        email: authState.user.email!,
+                        role: 'cliente_admin', // Assume 'cliente_admin' for recovered accounts
+                        status: 'active',
+                        createdAt: new Date().toISOString(),
+                        lastLogin: new Date().toISOString(),
+                    };
+                    
+                    // Atomically create the user document.
+                    await setDoc(userDocRef, newUserProfile);
+                    
+                    // Set the profile in state so the app can proceed immediately
+                    setProfile(newUserProfile);
+                } else if (SUPER_ADMIN_EMAILS.includes(authState.user.email || '')) {
+                    // Handle virtual super admin profile
+                    setProfile({
+                        id: authState.user.uid,
+                        name: authState.user.displayName || 'Super Admin',
+                        email: authState.user.email!,
+                        role: 'super_admin',
+                        status: 'active',
+                        createdAt: new Date().toISOString(),
+                        lastLogin: new Date().toISOString(),
+                    });
+                } else {
+                    // No user profile and no business profile to recover from.
+                    setProfile(null);
+                }
+            } catch (healError) {
+                console.error("Error during self-healing profile creation:", healError);
+                setProfile(null);
+            } finally {
+                setProfileLoading(false);
+            }
         }
-        setProfileLoading(false);
     }, (error) => {
         console.error("useUser: Profile onSnapshot error:", error);
         setProfile(null);
         setProfileLoading(false);
-        // We set the auth error here if profile fails, to signal a problem
         setAuthState(prev => ({...prev, error}));
     });
 
