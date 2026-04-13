@@ -27,6 +27,7 @@ import RichTextEditor from '@/components/editor/RichTextEditor';
 import { uploadMedia } from '@/ai/flows/upload-media-flow';
 import Image from 'next/image';
 import { cn } from '@/lib/utils';
+import { deletePost } from '@/actions/blog';
 
 const MediaUploader = ({
     label,
@@ -216,6 +217,7 @@ function BlogHeaderEditor({ businessId }: { businessId: string }) {
 export default function BlogPage() {
   const firestore = useFirestore();
   const { user } = useUser();
+  const { toast } = useToast();
 
   const blogModuleQuery = useMemoFirebase(() => 
     !firestore ? null : doc(firestore, 'modules', 'blog'), 
@@ -245,6 +247,16 @@ export default function BlogPage() {
   
   const totalPosts = posts?.length ?? 0;
   const isLoading = isModuleLoading || arePostsLoading || isSubscriptionLoading;
+
+  const handleDeletePost = async (postId: string) => {
+    const result = await deletePost(postId);
+    if (result.success) {
+      toast({ title: 'Éxito', description: result.message });
+      // The useCollection hook will automatically update the UI on deletion
+    } else {
+      toast({ variant: 'destructive', title: 'Error', description: result.error });
+    }
+  };
 
   if (isLoading) {
       return <div>Cargando...</div>
@@ -297,7 +309,7 @@ export default function BlogPage() {
             <CardDescription>Listado de todos tus artículos.</CardDescription>
         </CardHeader>
         <CardContent>
-          <PostsTable posts={posts || []} isLoading={arePostsLoading} basePath="/dashboard/blog" />
+          <PostsTable posts={posts || []} isLoading={arePostsLoading} basePath="/dashboard/blog" onDeletePost={handleDeletePost} />
         </CardContent>
       </Card>
     </div>

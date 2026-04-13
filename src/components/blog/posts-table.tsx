@@ -17,6 +17,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
 } from '@/components/ui/dropdown-menu';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { MoreHorizontal, Edit, Trash2, Loader2, FileEdit } from 'lucide-react';
 import type { BlogPost } from '@/models/blog-post';
 import { useRouter } from 'next/navigation';
@@ -25,18 +26,14 @@ interface PostsTableProps {
   posts: BlogPost[];
   isLoading: boolean;
   basePath: string; // e.g., '/superadmin/blog' or '/dashboard/blog'
+  onDeletePost: (postId: string) => Promise<void>;
 }
 
-export function PostsTable({ posts, isLoading, basePath }: PostsTableProps) {
+export function PostsTable({ posts, isLoading, basePath, onDeletePost }: PostsTableProps) {
   const router = useRouter();
 
   const handleEdit = (postId: string) => {
     router.push(`${basePath}/edit/${postId}`);
-  };
-  
-  // En una futura implementación, esto llamaría a una server action para eliminar
-  const handleDelete = (postId: string) => {
-    alert(`Funcionalidad para eliminar el post ${postId} no implementada.`);
   };
 
   if (isLoading) {
@@ -98,9 +95,30 @@ export function PostsTable({ posts, isLoading, basePath }: PostsTableProps) {
                     <DropdownMenuItem onClick={() => handleEdit(post.id)}>
                       <Edit className="mr-2 h-4 w-4" /> Editar
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleDelete(post.id)} className="text-destructive">
-                      <Trash2 className="mr-2 h-4 w-4" /> Eliminar
-                    </DropdownMenuItem>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                         <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive">
+                           <Trash2 className="mr-2 h-4 w-4" /> Eliminar
+                         </DropdownMenuItem>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>¿Estás seguro de eliminar esta publicación?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Esta acción no se puede deshacer. El post "{post.title}" será eliminado permanentemente.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                          <AlertDialogAction 
+                            onClick={() => onDeletePost(post.id)}
+                            className="bg-destructive hover:bg-destructive/90"
+                          >
+                            Eliminar
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                   </DropdownMenuContent>
                 </DropdownMenu>
               </TableCell>

@@ -131,3 +131,39 @@ export async function updatePost(formData: FormData) {
 
     return { success: true, message: 'Post actualizado con éxito.' };
 }
+
+export async function deletePost(postId: string) {
+  if (!postId) {
+    return { success: false, error: 'Post ID is required.' };
+  }
+
+  const firestore = await getAdminFirestore();
+  const postRef = firestore.collection('blog_posts').doc(postId);
+
+  try {
+    const doc = await postRef.get();
+    if (!doc.exists) {
+      return { success: false, error: 'Post not found.' };
+    }
+    const postData = doc.data();
+
+    await postRef.delete();
+
+    // Revalidate paths
+    const revalidationPath = postData?.businessId ? '/dashboard/blog' : '/superadmin/blog';
+    revalidatePath(revalidationPath);
+    revalidatePath('/blog');
+    if (postData?.slug) {
+        if (postData?.businessId) {
+             revalidatePath(`/blog/${postData.businessId}/${postData.slug}`);
+        } else {
+             revalidatePath(`/blog/${postData.slug}`); // Assuming global posts have a different structure
+        }
+    }
+
+    return { success: true, message: 'Post eliminado con éxito.' };
+
+  } catch (error: any) {
+    return { success: false, error: `Error al eliminar el post: ${error.message}` };
+  }
+}
