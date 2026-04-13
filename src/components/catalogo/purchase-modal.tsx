@@ -5,7 +5,7 @@ import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -229,7 +229,7 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
             <div className="space-y-4">
                 <Card>
                     <CardContent className="p-4 space-y-3">
-                         <ScrollArea className="max-h-[150px]">
+                         <ScrollArea className="max-h-[220px]">
                             {cartItems.map(item => (
                                  <div key={item.id} className="flex items-center gap-4 py-2 border-b last:border-b-0">
                                     <div className="relative aspect-square w-16 h-16 rounded-md overflow-hidden shrink-0">
@@ -414,12 +414,15 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
               )}
             </div>
           </div>
-          <div className="flex justify-end pt-4 sticky bottom-0 bg-background pb-4">
-             <Button type="submit" className="w-full md:w-auto" disabled={isSubmitting}>
+          <DialogFooter className="flex flex-col-reverse sm:flex-row justify-end gap-2 pt-4 sticky bottom-0 bg-background pb-4">
+             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                Seguir Comprando
+              </Button>
+             <Button type="submit" disabled={isSubmitting}>
                 <ShoppingBag className="mr-2 h-5 w-5" />
                 {isSubmitting ? 'Enviando Pedido...' : 'Confirmar y Enviar Pedido'}
               </Button>
-          </div>
+          </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>
