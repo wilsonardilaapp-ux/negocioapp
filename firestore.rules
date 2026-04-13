@@ -118,6 +118,10 @@ service cloud.firestore {
         allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
       }
 
+      match /settings/{docId=**} {
+        allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
+      }
+
       // Private business resources
       match /products/{productId} {
         allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
