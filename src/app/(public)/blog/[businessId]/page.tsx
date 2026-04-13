@@ -1,4 +1,3 @@
-
 import { getAdminFirestore } from "@/firebase/server-init";
 import Link from "next/link";
 import { Calendar, User, ArrowRight, BookOpen, FileText, Newspaper, Rss } from "lucide-react";
@@ -8,6 +7,9 @@ import Footer from "@/components/layout/footer";
 import type { BlogAppearanceConfig } from "@/models/blog-post";
 import type { LucideProps } from 'lucide-react';
 import React from 'react';
+import Image from "next/image";
+import { cn } from "@/lib/utils";
+
 
 export const dynamic = 'force-dynamic';
 
@@ -18,7 +20,10 @@ const iconMap: { [key: string]: React.FC<LucideProps> } = {
   Rss,
 };
 
-const DynamicIcon = ({ name, ...props }: { name: string } & LucideProps) => {
+const DynamicIcon = ({ name, iconUrl, ...props }: { name: string, iconUrl?: string | null } & LucideProps) => {
+    if (iconUrl) {
+      return <Image src={iconUrl} alt="Blog Icon" width={24} height={24} className="h-6 w-6 object-contain" />;
+    }
     const IconComponent = iconMap[name] || BookOpen;
     return <IconComponent {...props} />;
 };
@@ -27,7 +32,7 @@ async function getHeaderData(businessId: string | null): Promise<{ businessId: s
     try {
         const db = await getAdminFirestore();
         const configSnap = await db.collection("globalConfig").doc("system").get();
-        const mainBusinessId = configSnap.exists ? configSnap.data()?.mainBusinessId : null;
+        const mainBusinessId = configSnap.exists() ? configSnap.data()?.mainBusinessId : null;
 
         if (!businessId) { // If no businessId is passed, use the main one
             businessId = mainBusinessId;
@@ -38,7 +43,7 @@ async function getHeaderData(businessId: string | null): Promise<{ businessId: s
         }
 
         const landingSnap = await db.collection("businesses").doc(businessId).collection("landingPages").doc("main").get();
-        const navigation = landingSnap.exists ? (landingSnap.data() as LandingPageData).navigation : null;
+        const navigation = landingSnap.exists() ? (landingSnap.data() as LandingPageData).navigation : null;
         
         return { businessId: businessId, navigation };
     } catch (error) {
@@ -60,7 +65,7 @@ async function getBlogData(businessId: string) {
     } else {
         // Fallback to global settings if per-business doesn't exist
         const globalAppearanceSnap = await db.collection("settings").doc("blog_appearance").get();
-        if (globalAppearanceSnap.exists) {
+        if (globalAppearanceSnap.exists()) {
             config = globalAppearanceSnap.data() as BlogAppearanceConfig;
         } else {
             // Hardcoded fallback if nothing exists
@@ -111,16 +116,22 @@ export default async function BusinessBlogPage({ params }: { params: { businessI
       <Header businessId={businessId} navigation={navigation} />
       <main className="min-h-screen bg-gray-50/30">
         <section className="relative bg-white pt-24 pb-16 border-b border-gray-100 overflow-hidden">
-          <div className="container mx-auto px-4 text-center relative z-10 space-y-6">
-            <div className="h-14 w-14 bg-primary rounded-2xl flex items-center justify-center mx-auto text-white shadow-lg mb-4">
-                <DynamicIcon name={config?.iconName || 'BookOpen'} className="h-6 w-6" />
+          {config?.bannerUrl && (
+            <div className="absolute inset-0 z-0">
+                <Image src={config.bannerUrl} alt={config.title || "Blog Banner"} fill sizes="100vw" className="object-cover" />
+                <div className="absolute inset-0 bg-black/30" />
             </div>
-            <div className="space-y-3">
-              <h1 className="text-4xl md:text-5xl font-black text-gray-900 tracking-tight leading-tight">
+          )}
+          <div className="container mx-auto px-4 text-center relative z-10 space-y-6">
+            <div className={cn("h-14 w-14 rounded-2xl flex items-center justify-center mx-auto text-white shadow-lg mb-4", config?.bannerUrl ? "bg-white/90 text-primary" : "bg-primary")}>
+                <DynamicIcon name={config?.iconName || 'BookOpen'} iconUrl={config?.iconUrl} className="h-6 w-6" />
+            </div>
+            <div className={cn("space-y-3", config?.bannerUrl && "text-white")}>
+              <h1 className={cn("text-4xl md:text-5xl font-black text-gray-900 tracking-tight leading-tight", config?.bannerUrl && "text-white drop-shadow-md")}>
                 {config?.title || "Nuestro Blog"}
               </h1>
                <div
-                className="text-lg text-gray-500 font-medium max-w-2xl mx-auto leading-relaxed prose"
+                className={cn("text-lg font-medium max-w-2xl mx-auto leading-relaxed prose", config?.bannerUrl ? "text-gray-200 drop-shadow" : "text-gray-500" )}
                 dangerouslySetInnerHTML={{ __html: config?.content || "" }}
               />
             </div>

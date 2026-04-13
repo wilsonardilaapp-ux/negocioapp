@@ -19,4 +19,6 @@ export type BlogAppearanceConfig = {
   title: string;
   content: string;
   iconName: string;
+  bannerUrl?: string | null;
+  iconUrl?: string | null;
 };

@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState, useEffect, useRef } from 'react';
 import {
   Card,
   CardContent,
@@ -10,7 +10,7 @@ import {
   CardFooter,
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Frown, Save, Loader2 } from 'lucide-react';
+import { PlusCircle, Frown, Save, Loader2, Image as ImageIcon, UploadCloud, Trash2, Pencil } from 'lucide-react';
 import Link from 'next/link';
 import { useCollection, useFirestore, useMemoFirebase, useUser, useDoc, setDocumentNonBlocking } from '@/firebase';
 import { collection, query, where, doc, type Timestamp, getDoc } from 'firebase/firestore';
@@ -23,13 +23,85 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import RichTextEditor from '@/components/editor/RichTextEditor';
+import { uploadMedia } from '@/ai/flows/upload-media-flow';
+import Image from 'next/image';
+
+const MediaUploader = ({
+    label,
+    mediaUrl,
+    onUpload,
+    onRemove,
+    dimensions,
+    isUploading,
+    aspectRatio = 'aspect-video',
+    isIcon = false,
+}: {
+    label: string;
+    mediaUrl: string | null | undefined;
+    onUpload: (file: File) => void;
+    onRemove: () => void;
+    dimensions: string;
+    isUploading: boolean;
+    aspectRatio?: string;
+    isIcon?: boolean;
+}) => {
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    return (
+        <div className="space-y-2">
+            <Label>{label}</Label>
+            <div
+                className={`relative w-full border-2 border-dashed rounded-lg flex items-center justify-center text-center p-4 group ${aspectRatio}`}
+                onClick={() => !mediaUrl && fileInputRef.current?.click()}
+                >
+                {isUploading ? (
+                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                ) : mediaUrl ? (
+                    <>
+                         {isIcon ? (
+                            <div className="relative w-16 h-16 mx-auto">
+                                <Image 
+                                    src={mediaUrl} 
+                                    alt={label} 
+                                    fill 
+                                    sizes="4rem"
+                                    className="object-contain" 
+                                />
+                            </div>
+                        ) : (
+                            <Image 
+                                src={mediaUrl} 
+                                alt={label} 
+                                fill 
+                                sizes="100%"
+                                className="object-contain rounded-md" 
+                            />
+                        )}
+                        <div className="absolute top-1 right-1 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Button variant="outline" size="icon" className="h-7 w-7 bg-background" onClick={() => fileInputRef.current?.click()}><Pencil className="h-4 w-4" /></Button>
+                            <Button variant="destructive" size="icon" className="h-7 w-7" onClick={onRemove}><Trash2 className="h-4 w-4" /></Button>
+                        </div>
+                    </>
+                ) : (
+                    <div className="cursor-pointer">
+                        <UploadCloud className="h-8 w-8 mx-auto text-muted-foreground" />
+                        <p className="mt-2 text-sm font-semibold">Subir {label}</p>
+                        <p className="text-xs text-muted-foreground">{dimensions}</p>
+                    </div>
+                )}
+            </div>
+            <input type="file" ref={fileInputRef} onChange={(e) => e.target.files && onUpload(e.target.files[0])} className="hidden" accept="image/*" />
+        </div>
+    );
+};
 
 function BlogHeaderEditor({ businessId }: { businessId: string }) {
     const { toast } = useToast();
     const firestore = useFirestore();
-    const [config, setConfig] = useState<Partial<BlogAppearanceConfig>>({ title: '', content: '', iconName: 'BookOpen' });
+    const [config, setConfig] = useState<Partial<BlogAppearanceConfig>>({ title: '', content: '', iconName: 'BookOpen', bannerUrl: null, iconUrl: null });
     const [isSaving, setIsSaving] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
+    const [uploadingField, setUploadingField] = useState<'bannerUrl' | 'iconUrl' | null>(null);
 
     const settingsDocRef = useMemoFirebase(() =>
         doc(firestore, `businesses/${businessId}/settings`, 'blog_appearance'),
@@ -48,6 +120,32 @@ function BlogHeaderEditor({ businessId }: { businessId: string }) {
         };
         fetchConfig();
     }, [settingsDocRef]);
+
+    const handleImageUpload = async (file: File, field: 'bannerUrl' | 'iconUrl') => {
+        setUploadingField(field);
+        try {
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            await new Promise<void>((resolve, reject) => {
+                reader.onloadend = async () => {
+                    const mediaDataUri = reader.result as string;
+                    try {
+                        const result = await uploadMedia({ mediaDataUri });
+                        setConfig(c => ({...c, [field]: result.secure_url}));
+                        toast({ title: 'Imagen subida con éxito' });
+                        resolve();
+                    } catch(e) {
+                        reject(e);
+                    }
+                };
+                reader.onerror = reject;
+            });
+        } catch(error: any) {
+             toast({ variant: 'destructive', title: 'Error al subir', description: error.message || 'No se pudo cargar la imagen.' });
+        } finally {
+            setUploadingField(null);
+        }
+    };
 
     const handleSave = async () => {
         setIsSaving(true);
@@ -69,7 +167,7 @@ function BlogHeaderEditor({ businessId }: { businessId: string }) {
         <Card>
             <CardHeader>
                 <CardTitle>Configuración de la Cabecera del Blog</CardTitle>
-                <CardDescription>Personaliza el título, descripción y el ícono que ven tus visitantes.</CardDescription>
+                <CardDescription>Personaliza el título, descripción y el icono que ven tus visitantes.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
                 <div>
@@ -83,8 +181,31 @@ function BlogHeaderEditor({ businessId }: { businessId: string }) {
                         onChange={value => setConfig(c => ({...c, content: value}))}
                     />
                 </div>
+                 <div>
+                    <MediaUploader
+                        label="Banner del Blog"
+                        mediaUrl={config.bannerUrl}
+                        onUpload={(file) => handleImageUpload(file, 'bannerUrl')}
+                        onRemove={() => setConfig(c => ({...c, bannerUrl: null}))}
+                        isUploading={uploadingField === 'bannerUrl'}
+                        dimensions="Recomendado: 1200x400px"
+                        aspectRatio="aspect-[3/1]"
+                    />
+                </div>
+                 <div>
+                    <MediaUploader
+                        label="Ícono del Blog (imagen)"
+                        mediaUrl={config.iconUrl}
+                        onUpload={(file) => handleImageUpload(file, 'iconUrl')}
+                        onRemove={() => setConfig(c => ({...c, iconUrl: null}))}
+                        isUploading={uploadingField === 'iconUrl'}
+                        dimensions="Recomendado: 128x128px"
+                        aspectRatio="aspect-square"
+                        isIcon={true}
+                    />
+                </div>
                 <div>
-                    <Label htmlFor="blog-icon">Nombre del Ícono (Lucide-React)</Label>
+                    <Label htmlFor="blog-icon">Nombre del Ícono (si no hay imagen)</Label>
                     <Input id="blog-icon" value={config.iconName || ''} onChange={e => setConfig(c => ({...c, iconName: e.target.value}))} placeholder="Ej: BookOpen" />
                      <p className="text-xs text-muted-foreground mt-1">Busca un nombre de ícono en lucide.dev. Si no se encuentra, se usará uno por defecto.</p>
                 </div>
