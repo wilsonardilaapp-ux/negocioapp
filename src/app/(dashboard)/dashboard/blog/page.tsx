@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useMemo, useState, useEffect, useRef } from 'react';
@@ -25,6 +26,7 @@ import { useToast } from '@/hooks/use-toast';
 import RichTextEditor from '@/components/editor/RichTextEditor';
 import { uploadMedia } from '@/ai/flows/upload-media-flow';
 import Image from 'next/image';
+import { cn } from '@/lib/utils';
 
 const MediaUploader = ({
     label,
@@ -51,32 +53,23 @@ const MediaUploader = ({
         <div className="space-y-2">
             <Label>{label}</Label>
             <div
-                className={`relative w-full border-2 border-dashed rounded-lg flex items-center justify-center text-center p-4 group ${aspectRatio}`}
+                className={cn(
+                  "relative w-full border-2 border-dashed rounded-lg flex items-center justify-center text-center p-4 group",
+                  mediaUrl ? (isIcon ? "w-24 h-24" : `${aspectRatio} max-w-[800px] mx-auto`) : (isIcon ? "w-24 h-24" : "h-20")
+                )}
                 onClick={() => !mediaUrl && fileInputRef.current?.click()}
                 >
                 {isUploading ? (
                     <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                 ) : mediaUrl ? (
                     <>
-                         {isIcon ? (
-                            <div className="relative w-16 h-16 mx-auto">
-                                <Image 
-                                    src={mediaUrl} 
-                                    alt={label} 
-                                    fill 
-                                    sizes="4rem"
-                                    className="object-contain" 
-                                />
-                            </div>
-                        ) : (
-                            <Image 
-                                src={mediaUrl} 
-                                alt={label} 
-                                fill 
-                                sizes="100%"
-                                className="object-contain rounded-md" 
-                            />
-                        )}
+                        <Image 
+                            src={mediaUrl} 
+                            alt={label} 
+                            fill 
+                            sizes={isIcon ? "96px" : "800px"}
+                            className="object-cover rounded-md"
+                        />
                         <div className="absolute top-1 right-1 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                             <Button variant="outline" size="icon" className="h-7 w-7 bg-background" onClick={() => fileInputRef.current?.click()}><Pencil className="h-4 w-4" /></Button>
                             <Button variant="destructive" size="icon" className="h-7 w-7" onClick={onRemove}><Trash2 className="h-4 w-4" /></Button>
