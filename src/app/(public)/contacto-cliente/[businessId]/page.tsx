@@ -60,22 +60,29 @@ export default function ContactoClientePage() {
     }, [user, reset]);
 
     React.useEffect(() => {
-      if (!firestore || !businessId) return;
+      if (!firestore) return;
 
       const getNavData = async () => {
         try {
-          const landingSnap = await getDoc(doc(firestore, "businesses", businessId, "landingPages", "main"));
-          if (landingSnap.exists()) {
-            const navData = (landingSnap.data() as LandingPageData).navigation;
-            setNavigation(navData);
+          // First, get the main business ID from global config, just like /servicios page
+          const configSnap = await getDoc(doc(firestore, "globalConfig", "system"));
+          const mainBusinessId = configSnap.exists() ? configSnap.data().mainBusinessId : null;
+
+          if (mainBusinessId) {
+            // Then, get the navigation data from that main business's landing page
+            const landingSnap = await getDoc(doc(firestore, "businesses", mainBusinessId, "landingPages", "main"));
+            if (landingSnap.exists()) {
+                const navData = (landingSnap.data() as LandingPageData).navigation;
+                setNavigation(navData);
+            }
           }
         } catch (error) {
-          console.error("Error fetching navigation data for client contact page:", error);
+          console.error("Error fetching main navigation data for client contact page:", error);
         }
       };
 
       getNavData();
-    }, [firestore, businessId]);
+    }, [firestore]);
 
 
     const onSubmit = async (data: ContactClientFormData) => {
