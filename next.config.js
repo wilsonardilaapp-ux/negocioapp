@@ -1,14 +1,6 @@
-
-import type { NextConfig } from 'next';
-
-const nextConfig: NextConfig = {
+/** @type {import('next').NextConfig} */
+const nextConfig = {
     experimental: {
-        // This option is used to exclude specific packages from the server-side bundle.
-        // The current build error "Cannot find module ... @opentelemetry.js" or "@firebase.js"
-        // suggests a problem with how Next.js is bundling these dependencies of Genkit.
-        // By marking them as external, we tell Next.js to use
-        // the version from node_modules directly at runtime on the server,
-        // which bypasses the bundling issue.
         serverComponentsExternalPackages: ['@opentelemetry/api', 'firebase-admin'],
     },
     webpack: (config, { isServer }) => {
@@ -49,7 +41,7 @@ const nextConfig: NextConfig = {
                 protocol: 'https',
                 hostname: 'img.freepik.com',
             },
-            {
+             {
                 protocol: 'https',
                 hostname: 'ing.freepik.com',
             },
@@ -69,4 +61,4 @@ const nextConfig: NextConfig = {
     },
 };
 
-export default nextConfig;
+module.exports = nextConfig;
