@@ -21,8 +21,8 @@ import { useSubscription } from '@/hooks/useSubscription';
 import BlogLimitBanner from './components/BlogLimitBanner';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
+import RichTextEditor from '@/components/editor/RichTextEditor';
 
 function BlogHeaderEditor({ businessId }: { businessId: string }) {
     const { toast } = useToast();
@@ -78,7 +78,10 @@ function BlogHeaderEditor({ businessId }: { businessId: string }) {
                 </div>
                 <div>
                     <Label htmlFor="blog-content">Descripción</Label>
-                    <Textarea id="blog-content" value={config.content || ''} onChange={e => setConfig(c => ({...c, content: e.target.value}))} />
+                    <RichTextEditor
+                        value={config.content || ''}
+                        onChange={value => setConfig(c => ({...c, content: value}))}
+                    />
                 </div>
                 <div>
                     <Label htmlFor="blog-icon">Nombre del Ícono (Lucide-React)</Label>
