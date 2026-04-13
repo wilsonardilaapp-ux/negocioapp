@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from "react";
@@ -5,18 +6,29 @@ import Link from "next/link";
 import { Logo } from "@/components/icons";
 import type { LandingPageData, NavLink } from "@/models/landing-page";
 
-// Helper function remains outside the component
 const getLinkUrl = (link: NavLink, currentBusinessId: string | null | undefined): string => {
+  // 1. Prioritize a specific, non-placeholder URL from the data
   if (link.url && link.url !== '#') {
     return link.url;
   }
+
+  // 2. Dynamically resolve common pages based on text content
   const text = link.text.toLowerCase();
-  if (text.includes('blog')) return '/blog';
-  if (text.includes('catálogo')) return currentBusinessId ? `/catalog/${currentBusinessId}` : '#';
-  if (text.includes('contacto')) return '/contacto';
-  if (text.includes('inicio')) return currentBusinessId ? `/landing/${currentBusinessId}` : '/';
+  
+  if (text.includes('inicio')) return '/';
+  if (text.includes('blog')) return currentBusinessId ? `/blog/${currentBusinessId}` : '/blog'; // The main /blog page will list all
+  if (text.includes('catálogo')) return currentBusinessId ? `/catalog/${currentBusinessId}` : '#'; // Catalog always needs a business ID
+  if (text.includes('contacto')) return currentBusinessId ? `/contacto-cliente/${currentBusinessId}` : '/contacto';
+  
+  // Platform-wide pages
+  if (text.includes('servicios')) return '/servicios';
+  if (text.includes('sobre nosotros')) return '/sobre-nosotros';
+  if (text.includes('precios')) return '/pricing';
+  
+  // 3. Final fallback
   return '#';
 };
+
 
 // Define props for the Header
 interface HeaderProps {
