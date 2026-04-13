@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from "react";
@@ -15,9 +14,9 @@ const getLinkUrl = (link: NavLink, currentBusinessId: string | null | undefined)
   // 2. Dynamically resolve common pages based on text content
   const text = link.text.toLowerCase();
   
-  if (text.includes('inicio')) return '/';
-  if (text.includes('blog')) return currentBusinessId ? `/blog/${currentBusinessId}` : '/blog'; // The main /blog page will list all
-  if (text.includes('catálogo')) return currentBusinessId ? `/catalog/${currentBusinessId}` : '#'; // Catalog always needs a business ID
+  if (text.includes('inicio')) return currentBusinessId ? `/landing/${currentBusinessId}` : '/';
+  if (text.includes('blog')) return currentBusinessId ? `/blog/${currentBusinessId}` : '/blog';
+  if (text.includes('catálogo')) return currentBusinessId ? `/catalog/${currentBusinessId}` : '#';
   if (text.includes('contacto')) return currentBusinessId ? `/contacto-cliente/${currentBusinessId}` : '/contacto';
   
   // Platform-wide pages
