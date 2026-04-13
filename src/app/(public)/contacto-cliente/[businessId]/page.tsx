@@ -1,34 +1,23 @@
 import { getAdminFirestore } from '@/firebase/server-init';
 import Header from "@/components/layout/header";
 import type { LandingPageData } from '@/models/landing-page';
-import ContactClientForm from './form'; // Import the new client component
+import ContactClientForm from './form';
 
 async function getPageData(businessId: string): Promise<{ businessId: string | null, navigation: LandingPageData['navigation'] | null }> {
+    if (!businessId) {
+        return { businessId: null, navigation: null };
+    }
     try {
         const db = await getAdminFirestore();
-        
-        // Use the passed businessId to fetch ITS navigation, not the main one.
-        // If it doesn't have one, we can fall back to the main one.
-        let navData: LandingPageData['navigation'] | null = null;
+        // Fetch the navigation directly from the specific business's landing page document.
         const landingSnap = await db.collection("businesses").doc(businessId).collection("landingPages").doc("main").get();
         
-        if (landingSnap.exists()) {
-             navData = (landingSnap.data() as LandingPageData).navigation;
-        } else {
-            // Fallback to main business navigation if the specific business doesn't have one
-            const configSnap = await db.collection("globalConfig").doc("system").get();
-            const mainBusinessId = configSnap.exists ? configSnap.data()?.mainBusinessId : null;
-            if (mainBusinessId) {
-                const mainLandingSnap = await db.collection("businesses").doc(mainBusinessId).collection("landingPages").doc("main").get();
-                 if (mainLandingSnap.exists()) {
-                    navData = (mainLandingSnap.data() as LandingPageData).navigation;
-                 }
-            }
-        }
+        // Use the property `.exists` because we are using the Admin SDK
+        const navigation = landingSnap.exists ? (landingSnap.data() as LandingPageData).navigation : null;
         
-        return { businessId, navigation: navData };
+        return { businessId, navigation };
     } catch (error) {
-        console.error("Error fetching header data:", error);
+        console.error(`Error fetching header data for business ${businessId}:`, error);
         return { businessId, navigation: null };
     }
 }
