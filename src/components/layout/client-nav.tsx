@@ -3,9 +3,10 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useUser, useCollection, useFirestore, useMemoFirebase } from "@/firebase";
-import { collection, query, where } from "firebase/firestore";
+import { collection, query, where, doc, writeBatch } from "firebase/firestore";
 import type { Module } from "@/models/module";
 import type { SystemService } from "@/models/system-service";
+import { useMemo, useEffect, useRef } from 'react';
 import {
   LayoutDashboard,
   FileText,
@@ -26,7 +27,6 @@ import {
   ScanLine,
 } from "lucide-react";
 import { MessageCircle as MessageCircleIcon } from "@/components/icons";
-import { useMemo } from 'react';
 
 import { SidebarMenu, SidebarMenuItem, SidebarMenuButton, useSidebar } from "@/components/ui/sidebar";
 
@@ -61,6 +61,8 @@ export function ClientNav() {
   const firestore = useFirestore();
   const { user } = useUser();
 
+  const hasHealedRef = useRef(false);
+
   const modulesQuery = useMemoFirebase(() => {
     if (!firestore || !user?.uid) return null;
     return collection(firestore, 'businesses', user.uid, 'modules');
@@ -73,6 +75,54 @@ export function ClientNav() {
 
   const { data: modules, isLoading: areModulesLoading } = useCollection<Module>(modulesQuery);
   const { data: services, isLoading: areServicesLoading } = useCollection<SystemService>(servicesQuery);
+
+  useEffect(() => {
+    if (hasHealedRef.current || areModulesLoading || !firestore || !user?.uid) {
+      return;
+    }
+
+    if (modules) {
+      hasHealedRef.current = true; 
+      const hasBlog = modules.some(m => m.id === 'blog');
+      const hasCatalogo = modules.some(m => m.id === 'catalogo');
+
+      if (!hasBlog || !hasCatalogo) {
+        const createMissingModules = async () => {
+          const batch = writeBatch(firestore);
+
+          if (!hasCatalogo) {
+            const catalogoModuleRef = doc(firestore, `businesses/${user.uid}/modules`, 'catalogo');
+            batch.set(catalogoModuleRef, {
+                id: 'catalogo',
+                name: 'Catálogo',
+                description: 'Módulo para gestionar el catálogo de productos.',
+                status: 'active',
+                createdAt: new Date().toISOString()
+            });
+          }
+
+          if (!hasBlog) {
+            const blogModuleRef = doc(firestore, `businesses/${user.uid}/modules`, 'blog');
+            batch.set(blogModuleRef, {
+                id: 'blog',
+                name: 'Blog',
+                description: 'Módulo para gestionar el blog.',
+                status: 'active',
+                createdAt: new Date().toISOString()
+            });
+          }
+
+          try {
+            await batch.commit();
+          } catch (error) {
+            console.error("Error during module self-healing:", error);
+          }
+        };
+
+        createMissingModules();
+      }
+    }
+  }, [modules, areModulesLoading, firestore, user?.uid]);
 
   const activeFeatures = useMemo(() => {
     const activeModules = modules?.filter(m => m.status === 'active').map(m => m.id) || [];
