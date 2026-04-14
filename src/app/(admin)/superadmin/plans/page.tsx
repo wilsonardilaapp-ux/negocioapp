@@ -1,9 +1,9 @@
-"use client";
+'use client';
 
 import { useState } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { PlusCircle, Package, Loader2 } from 'lucide-react';
+import { PlusCircle, Package, Loader2, RefreshCw } from 'lucide-react';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { collection, doc, writeBatch } from 'firebase/firestore';
 import type { SubscriptionPlan } from '@/models/subscription-plan';
@@ -39,8 +39,8 @@ export default function PlansPage() {
         });
         await batch.commit();
         toast({
-            title: 'Planes creados',
-            description: 'Los planes por defecto han sido creados en la base de datos.',
+            title: 'Planes por Defecto Restaurados',
+            description: 'Los planes en la base de datos han sido actualizados con los valores correctos.',
         });
     };
 
@@ -54,10 +54,16 @@ export default function PlansPage() {
                             Crea, edita y gestiona los planes que ofreces a tus clientes.
                         </CardDescription>
                     </div>
-                     <Button onClick={() => handleOpenDialog(null)}>
-                        <PlusCircle className="mr-2 h-4 w-4" />
-                        Crear Nuevo Plan
-                    </Button>
+                    <div className="flex items-center gap-2">
+                        <Button variant="outline" onClick={handleCreateDefaultPlans}>
+                            <RefreshCw className="mr-2 h-4 w-4" />
+                            Restaurar Planes
+                        </Button>
+                         <Button onClick={() => handleOpenDialog(null)}>
+                            <PlusCircle className="mr-2 h-4 w-4" />
+                            Crear Nuevo Plan
+                        </Button>
+                    </div>
                 </CardHeader>
             </Card>
 
