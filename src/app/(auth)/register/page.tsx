@@ -266,15 +266,22 @@ export default function RegisterPage() {
         batch.set(configRef, { mainBusinessId: newUser.uid }, { merge: true });
       }
 
-      // **INICIO DE LA CORRECCIÓN**
       // Asignar módulos por defecto a CUALQUIER usuario nuevo.
-      const defaultModulesForNewUser = ['catalogo', 'blog'];
-      defaultModulesForNewUser.forEach(moduleId => {
-          const moduleRef = doc(firestore, `businesses/${newUser.uid}/modules`, moduleId);
-          // Creamos el documento con status 'active' para que sea visible.
-          batch.set(moduleRef, { status: 'active', id: moduleId, name: moduleId });
+      const defaultModulesForNewUser = [
+        { id: 'catalogo', name: 'Catálogo', description: 'Módulo para gestionar el catálogo de productos.' },
+        { id: 'blog', name: 'Blog', description: 'Módulo para gestionar el blog.' },
+      ];
+      defaultModulesForNewUser.forEach(mod => {
+          const moduleRef = doc(firestore, `businesses/${newUser.uid}/modules`, mod.id);
+          // Creamos el documento con status 'active' y los campos requeridos
+          batch.set(moduleRef, { 
+              status: 'active', 
+              id: mod.id, 
+              name: mod.name,
+              description: mod.description,
+              createdAt: new Date().toISOString() 
+          });
       });
-      // **FIN DE LA CORRECCIÓN**
       
       // Solo el primer usuario inicializa las configuraciones globales.
       if (isFirst) {
