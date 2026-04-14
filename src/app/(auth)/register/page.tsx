@@ -266,33 +266,17 @@ export default function RegisterPage() {
         batch.set(configRef, { mainBusinessId: newUser.uid }, { merge: true });
       }
 
-      const landingPageDocRef = doc(firestore, 'businesses', newUser.uid, 'landingPages', 'main');
-      
-      const dynamicLinks: NavLink[] = [
-        { id: uuidv4(), text: 'Inicio', url: `/landing/${newUser.uid}`, openInNewTab: false, enabled: true },
-        { id: uuidv4(), text: 'Servicios', url: `#servicios`, openInNewTab: false, enabled: true },
-        { id: uuidv4(), text: 'Contacto', url: '/contact', openInNewTab: false, enabled: true },
-        { id: uuidv4(), text: 'Catálogo', url: `/catalog/${newUser.uid}`, openInNewTab: false, enabled: true },
-        { id: uuidv4(), text: 'Blog', url: '/blog', openInNewTab: false, enabled: true },
-      ];
-
-      batch.set(landingPageDocRef, {
-        ...initialLandingPageData,
-        navigation: { 
-          ...initialLandingPageData.navigation, 
-          businessName: businessData.name,
-          links: dynamicLinks
-        },
-        header: { ...initialLandingPageData.header, businessInfo: { ...initialLandingPageData.header.businessInfo, name: businessData.name, email: newUser.email || 'info@tunegocio.com' }},
-        form: { ...initialLandingPageData.form, destinationEmail: newUser.email || '' },
-        footer: { ...initialLandingPageData.footer, contactInfo: { ...initialLandingPageData.footer.contactInfo, email: newUser.email || 'info@tunegocio.com' }, copyright: { ...initialLandingPageData.footer.copyright, companyName: businessData.name }},
+      // **INICIO DE LA CORRECCIÓN**
+      // Asignar módulos por defecto a CUALQUIER usuario nuevo.
+      const defaultModulesForNewUser = ['catalogo', 'blog'];
+      defaultModulesForNewUser.forEach(moduleId => {
+          const moduleRef = doc(firestore, `businesses/${newUser.uid}/modules`, moduleId);
+          // Creamos el documento con status 'active' para que sea visible.
+          batch.set(moduleRef, { status: 'active', id: moduleId, name: moduleId });
       });
-
-      const paymentSettingsDocRef = doc(firestore, 'paymentSettings', newUser.uid);
-      const paymentSettingsData: PaymentSettings = { id: newUser.uid, userId: newUser.uid, ...initialPaymentSettings };
-      batch.set(paymentSettingsDocRef, paymentSettingsData);
+      // **FIN DE LA CORRECCIÓN**
       
-      // Only run initialization for the very first user (super_admin)
+      // Solo el primer usuario inicializa las configuraciones globales.
       if (isFirst) {
         const defaultModules: Omit<Module, 'id'>[] = [
           { name: 'Catálogo', description: 'Módulo para gestionar el catálogo de productos.', status: 'inactive', createdAt: new Date().toISOString() },
@@ -306,8 +290,10 @@ export default function RegisterPage() {
         
         defaultModules.forEach(mod => {
             let modId = slugify(mod.name);
-             if (mod.name.toLowerCase().includes('catálogo')) {
+            if (mod.name.toLowerCase().includes('catálogo')) {
                 modId = 'catalogo';
+            } else if (mod.name.includes('Blog')) {
+              modId = 'blog';
             } else if (mod.name.includes('Chatbot')) {
               modId = 'chatbot-integrado-con-whatsapp-para-soporte-y-ventas';
             } else if (mod.name.includes('Sugerencias')) {
@@ -342,6 +328,32 @@ export default function RegisterPage() {
         const productLimitData: SystemService = { id: 'product_limit', name: 'Limite de Productos', status: 'active', limit: 10, lastUpdate: new Date().toISOString() };
         batch.set(productLimitServiceRef, productLimitData, { merge: true });
       }
+
+      const landingPageDocRef = doc(firestore, 'businesses', newUser.uid, 'landingPages', 'main');
+      
+      const dynamicLinks: NavLink[] = [
+        { id: uuidv4(), text: 'Inicio', url: `/landing/${newUser.uid}`, openInNewTab: false, enabled: true },
+        { id: uuidv4(), text: 'Servicios', url: `#servicios`, openInNewTab: false, enabled: true },
+        { id: uuidv4(), text: 'Contacto', url: '/contact', openInNewTab: false, enabled: true },
+        { id: uuidv4(), text: 'Catálogo', url: `/catalog/${newUser.uid}`, openInNewTab: false, enabled: true },
+        { id: uuidv4(), text: 'Blog', url: '/blog', openInNewTab: false, enabled: true },
+      ];
+
+      batch.set(landingPageDocRef, {
+        ...initialLandingPageData,
+        navigation: { 
+          ...initialLandingPageData.navigation, 
+          businessName: businessData.name,
+          links: dynamicLinks
+        },
+        header: { ...initialLandingPageData.header, businessInfo: { ...initialLandingPageData.header.businessInfo, name: businessData.name, email: newUser.email || 'info@tunegocio.com' }},
+        form: { ...initialLandingPageData.form, destinationEmail: newUser.email || '' },
+        footer: { ...initialLandingPageData.footer, contactInfo: { ...initialLandingPageData.footer.contactInfo, email: newUser.email || 'info@tunegocio.com' }, copyright: { ...initialLandingPageData.footer.copyright, companyName: businessData.name }},
+      });
+
+      const paymentSettingsDocRef = doc(firestore, 'paymentSettings', newUser.uid);
+      const paymentSettingsData: PaymentSettings = { id: newUser.uid, userId: newUser.uid, ...initialPaymentSettings };
+      batch.set(paymentSettingsDocRef, paymentSettingsData);
       
       const coffeeOfferRef = doc(firestore, 'businesses', newUser.uid, 'chatbotConfig', 'main', 'knowledgeBase', 'oferta-cafe-arandanos');
       const coffeeOfferData: Omit<KnowledgeDocument, 'id'> = {
