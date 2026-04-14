@@ -64,6 +64,19 @@ export default function ServicesPage() {
         const serviceDocRef = doc(firestore, 'systemServices', newImageLimitService.id);
         setDocumentNonBlocking(serviceDocRef, newImageLimitService);
       }
+      
+      const productLimitServiceExists = services.some(s => s.id === 'product_limit');
+      if (!productLimitServiceExists) {
+        const newProductLimitService: SystemService = {
+          id: 'product_limit',
+          name: 'Limite de Productos',
+          limit: 50,
+          status: 'active',
+          lastUpdate: new Date().toISOString(),
+        };
+        const serviceDocRef = doc(firestore, 'systemServices', newProductLimitService.id);
+        setDocumentNonBlocking(serviceDocRef, newProductLimitService);
+      }
     }
   }, [services, isLoading, firestore]);
 

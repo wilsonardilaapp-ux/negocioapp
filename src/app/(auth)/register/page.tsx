@@ -266,24 +266,24 @@ export default function RegisterPage() {
         batch.set(configRef, { mainBusinessId: newUser.uid }, { merge: true });
       }
 
-      // Asignar módulos por defecto a CUALQUIER usuario nuevo.
-      const defaultModulesForNewUser = [
+      // Assign default modules to ANY new user.
+      const defaultModulesForNewUser: { id: string, name: string, description: string }[] = [
         { id: 'catalogo', name: 'Catálogo', description: 'Módulo para gestionar el catálogo de productos.' },
         { id: 'blog', name: 'Blog', description: 'Módulo para gestionar el blog.' },
       ];
+      
       defaultModulesForNewUser.forEach(mod => {
           const moduleRef = doc(firestore, `businesses/${newUser.uid}/modules`, mod.id);
-          // Creamos el documento con status 'active' y los campos requeridos
           batch.set(moduleRef, { 
-              status: 'active', 
               id: mod.id, 
               name: mod.name,
               description: mod.description,
+              status: 'active',
               createdAt: new Date().toISOString() 
           });
       });
       
-      // Solo el primer usuario inicializa las configuraciones globales.
+      // Only the first user initializes global settings.
       if (isFirst) {
         const defaultModules: Omit<Module, 'id'>[] = [
           { name: 'Catálogo', description: 'Módulo para gestionar el catálogo de productos.', status: 'inactive', createdAt: new Date().toISOString() },
@@ -330,10 +330,6 @@ export default function RegisterPage() {
                 updatedAt: new Date().toISOString(),
             }, { merge: true });
         });
-
-        const productLimitServiceRef = doc(firestore, 'systemServices', 'product_limit');
-        const productLimitData: SystemService = { id: 'product_limit', name: 'Limite de Productos', status: 'active', limit: 10, lastUpdate: new Date().toISOString() };
-        batch.set(productLimitServiceRef, productLimitData, { merge: true });
       }
 
       const landingPageDocRef = doc(firestore, 'businesses', newUser.uid, 'landingPages', 'main');
