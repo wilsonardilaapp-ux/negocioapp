@@ -1,3 +1,4 @@
+
 rules_version = '2';
 
 service cloud.firestore {
@@ -90,7 +91,8 @@ service cloud.firestore {
     }
 
     match /paymentSettings/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow get: if true;
+      allow write: if request.auth != null && request.auth.uid == userId;
     }
 
     // Businesses
@@ -159,8 +161,8 @@ service cloud.firestore {
       }
 
       match /shareConfig/{docId} {
-        // Read is handled by the collection group rule above.
-        // This rule only handles writes.
+        // Explicitly allow public reads on this path, in addition to the collection group rule.
+        allow read: if true;
         allow write: if isBusinessMember(businessId) || isSuperAdmin();
       }
 
