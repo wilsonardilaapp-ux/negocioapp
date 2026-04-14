@@ -80,22 +80,31 @@ export default function CatalogoPage() {
     const [isLoading, setIsLoading] = useState(true);
     const [moduleInactive, setModuleInactive] = useState(false);
 
-    const { user } = useUser();
+    const { user, isUserLoading } = useUser();
     const firestore = useFirestore();
     const { toast } = useToast();
 
     useEffect(() => {
-        if (!user || !firestore) {
+        if (isUserLoading || !user || !firestore) {
             return;
         }
 
         const fetchData = async () => {
             setIsLoading(true);
             try {
-                // 1. Fetch Module status first
-                const moduleRef = doc(firestore, 'modules', 'catalogo');
-                const moduleSnap = await getDoc(moduleRef);
-                const fetchedCatalogModule = moduleSnap.exists() ? { ...moduleSnap.data(), id: moduleSnap.id } as Module : null;
+                // 1. Fetch Module status first from the business's subcollection
+                const primaryModuleRef = doc(firestore, 'businesses', user.uid, 'modules', 'catalogo');
+                let fetchedCatalogModule: Module | null = null;
+                const primaryModuleSnap = await getDoc(primaryModuleRef);
+                 if (primaryModuleSnap.exists()) {
+                    fetchedCatalogModule = { ...primaryModuleSnap.data(), id: primaryModuleSnap.id } as Module;
+                } else {
+                    const fallbackModuleRef = doc(firestore, 'businesses', user.uid, 'modules', 'catalogo-de-productos');
+                    const fallbackModuleSnap = await getDoc(fallbackModuleRef);
+                    if (fallbackModuleSnap.exists()) {
+                        fetchedCatalogModule = { ...fallbackModuleSnap.data(), id: fallbackModuleSnap.id } as Module;
+                    }
+                }
 
                 if (!fetchedCatalogModule || fetchedCatalogModule.status === 'inactive') {
                     setModuleInactive(true);
@@ -122,7 +131,7 @@ export default function CatalogoPage() {
                     getDoc(imageLimitServiceRef),
                     getDoc(businessRef),
                     getDocs(productsRef),
-                    getDoc(headerConfigRef),
+                    getDoc(headerConfigSnap),
                 ]);
 
                 const fetchedBusiness = businessSnap.exists() ? businessSnap.data() as Business : null;
@@ -177,7 +186,7 @@ export default function CatalogoPage() {
         };
 
         fetchData();
-    }, [user, firestore, toast]);
+    }, [user, firestore, isUserLoading, toast]);
 
 
     const canCreateProduct = useMemo(() => {
@@ -380,7 +389,7 @@ export default function CatalogoPage() {
                         </ProductCard>
                     ))
                 ) : (
-                    <Card className="sm:col-span-2 md:col-span-3 lg:col-span-4">
+                    <Card className="sm:col-span-2 md:col-span-3 lg:grid-cols-4">
                         <CardContent className="h-[400px] flex flex-col items-center justify-center text-center gap-4">
                             <div className="p-4 bg-secondary rounded-full">
                                 <ShoppingBag className="h-12 w-12 text-muted-foreground" />
