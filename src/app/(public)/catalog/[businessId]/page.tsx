@@ -55,11 +55,21 @@ const isVideo = (url: string) => {
     return videoExtensions.some(ext => url.toLowerCase().includes(ext));
 };
 
-const MediaPreview = ({ item, alt, objectFit = 'cover' }: { item: MediaItem, alt: string, objectFit?: 'cover' | 'contain' }) => {
+const MediaPreview = ({ item, alt, objectFit = 'cover', priority = false }: { item: MediaItem, alt: string, objectFit?: 'cover' | 'contain', priority?: boolean }) => {
     if (item.type === 'video') {
         return <video src={item.url} className={cn('rounded-md object-cover w-full h-full')} autoPlay loop muted />;
     }
-    return <Image src={item.url} alt={alt} fill sizes="10rem" className={cn('rounded-md', objectFit === 'contain' ? 'object-contain' : 'object-cover')} />;
+    return (
+        <Image 
+            key={item.url} // Force re-render on URL change
+            src={item.url} 
+            alt={alt} 
+            fill 
+            sizes="(max-width: 768px) 100vw, 700px" // Provide accurate sizing info
+            className={cn('rounded-md', objectFit === 'contain' ? 'object-contain' : 'object-cover')} 
+            priority={priority} // Hint Next.js to load this image eagerly
+        />
+    );
 };
 
 const PublicProductCard = ({ product, onOpenModal }: { product: Product, onOpenModal: (product: Product) => void }) => {
@@ -227,7 +237,7 @@ const ProductViewModal = ({ product, isOpen, onOpenChange, businessPhone, busine
                         <div className="md:w-[55%] bg-muted/30 flex flex-col p-4 gap-3 md:overflow-y-auto">
                              <div className="relative w-full aspect-[4/3] md:aspect-square rounded-xl overflow-hidden border bg-white flex-shrink-0">
                                 {mainImage ? (
-                                    <MediaPreview item={mainImage} alt={product.name} objectFit="contain" />
+                                    <MediaPreview item={mainImage} alt={product.name} objectFit="contain" priority={true} />
                                 ) : (
                                     <div className="w-full h-full bg-muted flex items-center justify-center">
                                         <ImageIcon className="h-12 w-12 text-muted-foreground" />
