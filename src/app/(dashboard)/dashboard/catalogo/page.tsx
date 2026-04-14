@@ -120,19 +120,19 @@ export default function CatalogoPage() {
                 const productsRef = collection(firestore, 'businesses', user.uid, 'products');
                 const headerConfigRef = doc(firestore, 'businesses', user.uid, 'landingConfig', 'header');
 
-                const [
-                    productLimitSnap,
-                    imageLimitSnap,
-                    businessSnap,
-                    productsSnap,
-                    headerConfigSnap
-                ] = await Promise.all([
+                const promiseResults = await Promise.all([
                     getDoc(productLimitServiceRef),
                     getDoc(imageLimitServiceRef),
                     getDoc(businessRef),
                     getDocs(productsRef),
-                    getDoc(headerConfigSnap),
+                    getDoc(headerConfigRef),
                 ]);
+
+                const productLimitSnap = promiseResults[0];
+                const imageLimitSnap = promiseResults[1];
+                const businessSnap = promiseResults[2];
+                const productsSnap = promiseResults[3];
+                const headerConfigSnap = promiseResults[4];
 
                 const fetchedBusiness = businessSnap.exists() ? businessSnap.data() as Business : null;
                 const fetchedProducts = productsSnap.docs.map(d => ({ ...d.data(), id: d.id })) as Product[];
