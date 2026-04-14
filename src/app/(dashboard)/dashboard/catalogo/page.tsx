@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { PlusCircle, ShoppingBag, Edit, Trash2, Printer, FileDown, Info, Frown, Loader2 } from 'lucide-react';
@@ -23,14 +23,12 @@ import {
 } from "@/components/ui/alert-dialog";
 import type { LandingHeaderConfigData } from '@/models/landing-page';
 import { v4 as uuidv4 } from 'uuid';
-import { useUser, useFirestore, setDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase';
-import { doc, collection, getDocs, getDoc } from 'firebase/firestore';
-import type { SystemService } from '@/models/system-service';
+import { useUser, useFirestore, setDocumentNonBlocking, deleteDocumentNonBlocking, useDoc, useCollection, useMemoFirebase } from '@/firebase';
+import { doc, collection, getDoc } from 'firebase/firestore';
 import type { Module } from '@/models/module';
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
-import type { Business } from '@/models/business';
 import { useToast } from '@/hooks/use-toast';
-
+import { useSubscription } from '@/hooks/useSubscription';
 
 const initialHeaderConfig: LandingHeaderConfigData = {
     banner: {
@@ -64,150 +62,97 @@ export default function CatalogoPage() {
     const [editingProduct, setEditingProduct] = useState<Product | null>(null);
     const [productToDelete, setProductToDelete] = useState<Product | null>(null);
     
-    const [pageData, setPageData] = useState<{
-        products: Product[];
-        headerConfig: LandingHeaderConfigData;
-        productLimit: number;
-        imageLimit: number;
-        catalogModule: Module | null;
-    }>({
-        products: [],
-        headerConfig: initialHeaderConfig,
-        productLimit: 10,
-        imageLimit: 18,
-        catalogModule: null,
-    });
-    const [isLoading, setIsLoading] = useState(true);
+    // Simplified state
+    const [headerConfig, setHeaderConfig] = useState<LandingHeaderConfigData>(initialHeaderConfig);
     const [moduleInactive, setModuleInactive] = useState(false);
+    const [isInitialLoading, setInitialLoading] = useState(true);
 
     const { user, isUserLoading } = useUser();
     const firestore = useFirestore();
     const { toast } = useToast();
+    
+    // --- NEW: Use subscription hook for limits and plan info ---
+    const { 
+        canAddProducts, 
+        limits, 
+        isLoading: isSubscriptionLoading 
+    } = useSubscription();
 
+    // --- Hooks for fetching data ---
+    const productsQuery = useMemoFirebase(() => 
+        user ? collection(firestore, 'businesses', user.uid, 'products') : null, 
+    [firestore, user]);
+    const { data: products, isLoading: areProductsLoading } = useCollection<Product>(productsQuery);
+    
+    const catalogModuleRef = useMemoFirebase(() => 
+        user ? doc(firestore, 'businesses', user.uid, 'modules', 'catalogo') : null,
+    [firestore, user]);
+    
+    // --- Effect for module status and header config ---
     useEffect(() => {
-        if (isUserLoading || !user || !firestore) {
-            return;
-        }
+        if (isUserLoading || !user || !firestore) return;
 
-        const fetchData = async () => {
-            setIsLoading(true);
+        let isMounted = true;
+        const fetchConfig = async () => {
+            if (!isMounted) return;
+            setInitialLoading(true);
             try {
-                // 1. Fetch Module status first from the business's subcollection
-                const primaryModuleRef = doc(firestore, 'businesses', user.uid, 'modules', 'catalogo');
-                let fetchedCatalogModule: Module | null = null;
-                const primaryModuleSnap = await getDoc(primaryModuleRef);
-                 if (primaryModuleSnap.exists()) {
-                    fetchedCatalogModule = { ...primaryModuleSnap.data(), id: primaryModuleSnap.id } as Module;
-                } else {
-                    const fallbackModuleRef = doc(firestore, 'businesses', user.uid, 'modules', 'catalogo-de-productos');
-                    const fallbackModuleSnap = await getDoc(fallbackModuleRef);
-                    if (fallbackModuleSnap.exists()) {
-                        fetchedCatalogModule = { ...fallbackModuleSnap.data(), id: fallbackModuleSnap.id } as Module;
-                    }
-                }
-
-                if (!fetchedCatalogModule || fetchedCatalogModule.status === 'inactive') {
-                    setModuleInactive(true);
-                    setIsLoading(false);
+                // Check module status
+                const moduleSnap = await getDoc(catalogModuleRef!);
+                if (!moduleSnap.exists() || moduleSnap.data().status === 'inactive') {
+                    if (isMounted) setModuleInactive(true);
                     return;
                 }
-                setModuleInactive(false);
-
-                // 2. Fetch all other data concurrently after module check
-                const productLimitServiceRef = doc(firestore, 'systemServices', 'product_limit');
-                const imageLimitServiceRef = doc(firestore, 'systemServices', 'limite-de-imagenes-por-producto');
-                const businessRef = doc(firestore, 'businesses', user.uid);
-                const productsRef = collection(firestore, 'businesses', user.uid, 'products');
+                if (isMounted) setModuleInactive(false);
+                
+                // Fetch header config
                 const headerConfigRef = doc(firestore, 'businesses', user.uid, 'landingConfig', 'header');
-
-                const promiseResults = await Promise.all([
-                    getDoc(productLimitServiceRef),
-                    getDoc(imageLimitServiceRef),
-                    getDoc(businessRef),
-                    getDocs(productsRef),
-                    getDoc(headerConfigRef),
-                ]);
-
-                const productLimitSnap = promiseResults[0];
-                const imageLimitSnap = promiseResults[1];
-                const businessSnap = promiseResults[2];
-                const productsSnap = promiseResults[3];
-                const headerConfigSnap = promiseResults[4];
-
-                const fetchedBusiness = businessSnap.exists() ? businessSnap.data() as Business : null;
-                const fetchedProducts = productsSnap.docs.map(d => ({ ...d.data(), id: d.id })) as Product[];
+                const headerConfigSnap = await getDoc(headerConfigRef);
                 
-                const savedConf = headerConfigSnap.exists() ? headerConfigSnap.data() as LandingHeaderConfigData : null;
-                const carouselItems = (savedConf?.carouselItems && Array.isArray(savedConf.carouselItems) && savedConf.carouselItems.length > 0)
-                    ? savedConf.carouselItems
-                    : initialHeaderConfig.carouselItems;
-                const carouselWithIds = carouselItems.map(item => item && item.id ? item : { ...item, id: uuidv4() });
-                
-                const mergedConfigData = {
-                    ...initialHeaderConfig,
-                    ...(savedConf || {}),
-                    banner: { ...initialHeaderConfig.banner, ...(savedConf?.banner || {}) },
-                    businessInfo: { ...initialHeaderConfig.businessInfo, ...(savedConf?.businessInfo || {}) },
-                    socialLinks: { ...initialHeaderConfig.socialLinks, ...(savedConf?.socialLinks || {}) },
-                    carouselItems: carouselWithIds,
-                };
+                if (isMounted && headerConfigSnap.exists()) {
+                    const savedConf = headerConfigSnap.data() as LandingHeaderConfigData;
+                    const carouselItems = (savedConf?.carouselItems && Array.isArray(savedConf.carouselItems) && savedConf.carouselItems.length > 0)
+                        ? savedConf.carouselItems.map(item => item?.id ? item : { ...item, id: uuidv4() })
+                        : initialHeaderConfig.carouselItems;
 
-                const fetchedProductLimitService = productLimitSnap.exists() ? productLimitSnap.data() as SystemService : null;
-                const fetchedImageLimitService = imageLimitSnap.exists() ? imageLimitSnap.data() as SystemService : null;
-
-                let productLimitValue = 10;
-                if (fetchedBusiness?.productLimit && fetchedBusiness.productLimit !== 0) {
-                    productLimitValue = fetchedBusiness.productLimit;
-                } else if (fetchedProductLimitService?.status === 'active' && fetchedProductLimitService.limit > 0) {
-                    productLimitValue = fetchedProductLimitService.limit;
+                    setHeaderConfig({
+                        ...initialHeaderConfig,
+                        ...savedConf,
+                        banner: { ...initialHeaderConfig.banner, ...savedConf.banner },
+                        businessInfo: { ...initialHeaderConfig.businessInfo, ...savedConf.businessInfo },
+                        socialLinks: { ...initialHeaderConfig.socialLinks, ...savedConf.socialLinks },
+                        carouselItems,
+                    });
                 }
-                
-                let imageLimitValue = 18;
-                if (fetchedBusiness?.imageLimit && fetchedBusiness.imageLimit > 0) {
-                    imageLimitValue = fetchedBusiness.imageLimit;
-                } else if (fetchedImageLimitService?.status === 'active' && fetchedImageLimitService.limit > 0) {
-                    imageLimitValue = fetchedImageLimitService.limit;
-                }
-                
-                setPageData({
-                    products: fetchedProducts,
-                    headerConfig: mergedConfigData,
-                    productLimit: productLimitValue,
-                    imageLimit: imageLimitValue,
-                    catalogModule: fetchedCatalogModule,
-                });
-
-            } catch (e: any) {
-                console.error("Error fetching catalog page data:", e);
-                toast({ variant: "destructive", title: "Error", description: "No se pudieron cargar los datos del catálogo." });
+            } catch (e) {
+                console.error("Error fetching page config", e);
+                if (isMounted) toast({ variant: "destructive", title: "Error", description: "No se pudieron cargar los datos de configuración." });
             } finally {
-                setIsLoading(false);
+                if (isMounted) setInitialLoading(false);
             }
         };
 
-        fetchData();
-    }, [user, firestore, isUserLoading, toast]);
-
+        fetchConfig();
+        return () => { isMounted = false; };
+    }, [user, firestore, isUserLoading, toast, catalogModuleRef]);
+    
+    // --- Combined loading state ---
+    const isLoading = isUserLoading || isSubscriptionLoading || areProductsLoading || isInitialLoading;
+    const productCount = products?.length ?? 0;
+    const canCreate = canAddProducts(productCount);
 
     const canCreateProduct = useMemo(() => {
-        const productCount = pageData.products.length;
-        
-        if (pageData.productLimit === -1) {
-             return { allowed: true, reason: '' };
+        return {
+            allowed: canCreate,
+            reason: `Has alcanzado el límite de ${limits.products} productos para tu plan.`
         }
-        
-        if (productCount >= pageData.productLimit) {
-            return { allowed: false, reason: `Has alcanzado el límite de ${pageData.productLimit} productos.` };
-        }
-
-        return { allowed: true, reason: '' };
-    }, [pageData.productLimit, pageData.products]);
+    }, [canCreate, limits.products]);
     
-    const updatePublicCatalog = (productsToSave: Product[], configToSave: LandingHeaderConfigData) => {
+    const updatePublicCatalog = useCallback((productsToSave: Product[], configToSave: LandingHeaderConfigData) => {
         if (!firestore || !user) return;
         const publicCatalogRef = doc(firestore, 'businesses', user.uid, 'publicData', 'catalog');
         setDocumentNonBlocking(publicCatalogRef, { products: productsToSave, headerConfig: configToSave }, { merge: true });
-    };
+    }, [firestore, user]);
     
     
     const handleSaveProduct = async (productData: Omit<Product, 'id' | 'businessId'>) => {
@@ -219,26 +164,24 @@ export default function CatalogoPage() {
         }
         
         const dataToSave = { ...productData, businessId: user.uid };
-        let updatedProductId: string;
 
-        if (editingProduct && editingProduct.id) {
-            updatedProductId = editingProduct.id;
-            const productDocRef = doc(firestore, 'businesses', user.uid, 'products', updatedProductId);
-            setDocumentNonBlocking(productDocRef, dataToSave, { merge: true });
+        if (editingProduct) {
+            const productDocRef = doc(firestore, 'businesses', user.uid, 'products', editingProduct.id);
+            await setDocumentNonBlocking(productDocRef, dataToSave, { merge: true });
         } else {
             const newProductRef = doc(collection(firestore, 'businesses', user.uid, 'products'));
-            updatedProductId = newProductRef.id;
-            setDocumentNonBlocking(newProductRef, dataToSave);
+            await setDocumentNonBlocking(newProductRef, dataToSave);
         }
         
-        let updatedProductList;
-        if (editingProduct) {
-            updatedProductList = pageData.products.map(p => p.id === updatedProductId ? { ...dataToSave, id: updatedProductId } : p);
-        } else {
-            updatedProductList = [...pageData.products, { ...dataToSave, id: updatedProductId }];
-        }
-        setPageData(prev => ({ ...prev, products: updatedProductList }));
-        updatePublicCatalog(updatedProductList, pageData.headerConfig);
+        toast({ title: `Producto ${editingProduct ? 'actualizado' : 'creado'}`, description: `Se guardó "${dataToSave.name}"` });
+
+        // Let useCollection handle the product list update, but trigger public data sync
+        const currentProducts = products || [];
+        const newProductsList = editingProduct
+            ? currentProducts.map(p => p.id === editingProduct!.id ? { ...dataToSave, id: editingProduct!.id } : p)
+            : [...currentProducts, { ...dataToSave, id: 'temp-id' }]; 
+        
+        updatePublicCatalog(newProductsList as Product[], headerConfig);
 
         setIsFormOpen(false);
         setEditingProduct(null);
@@ -248,8 +191,8 @@ export default function CatalogoPage() {
         if (!firestore || !user) return;
         const headerConfigDocRef = doc(firestore, 'businesses', user.uid, 'landingConfig', 'header');
         setDocumentNonBlocking(headerConfigDocRef, config, { merge: true });
-        setPageData(prev => ({...prev, headerConfig: config}));
-        updatePublicCatalog(pageData.products, config);
+        setHeaderConfig(config);
+        updatePublicCatalog(products || [], config);
     };
 
     const handleEdit = (product: Product) => {
@@ -262,9 +205,8 @@ export default function CatalogoPage() {
         const productDocRef = doc(firestore, 'businesses', user.uid, 'products', productToDelete.id);
         await deleteDocumentNonBlocking(productDocRef);
 
-        const updatedProductList = pageData.products.filter(p => p.id !== productToDelete.id);
-        setPageData(prev => ({...prev, products: updatedProductList}));
-        updatePublicCatalog(updatedProductList, pageData.headerConfig);
+        const updatedProductList = (products || []).filter(p => p.id !== productToDelete.id);
+        updatePublicCatalog(updatedProductList, headerConfig);
         
         setProductToDelete(null);
     };
@@ -309,7 +251,7 @@ export default function CatalogoPage() {
 
     return (
         <div className="flex flex-col gap-6">
-            <CatalogHeaderForm data={pageData.headerConfig} setData={handleSaveHeader} />
+            <CatalogHeaderForm data={headerConfig} setData={handleSaveHeader} />
             
             <CatalogQRGenerator />
 
@@ -358,7 +300,7 @@ export default function CatalogoPage() {
                                     product={editingProduct} 
                                     onSave={handleSaveProduct} 
                                     onCancel={() => setIsFormOpen(false)}
-                                    imageLimit={pageData.imageLimit}
+                                    imageLimit={limits.products === -1 ? 50 : 18}
                                 />
                             </DialogContent>
                         </Dialog>
@@ -368,15 +310,15 @@ export default function CatalogoPage() {
                     <div className="flex items-center gap-2 rounded-lg border bg-secondary/50 p-3 text-sm">
                         <Info className="h-5 w-5 text-muted-foreground" />
                         <p className="text-muted-foreground">
-                            Límite de productos: <span className="font-bold">{pageData.products.length} / {pageData.productLimit === -1 ? '∞' : pageData.productLimit}</span>.
+                            Límite de productos: <span className="font-bold">{productCount} / {limits.products === -1 ? '∞' : limits.products}</span>.
                         </p>
                     </div>
                 </CardContent>
             </Card>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                {pageData.products && pageData.products.length > 0 ? (
-                    pageData.products.map(product => (
+                {products && products.length > 0 ? (
+                    products.map(product => (
                         <ProductCard key={product.id} product={product}>
                             <div className="flex gap-2">
                                 <Button variant="outline" size="sm" className="w-full" onClick={() => handleEdit(product)}>
