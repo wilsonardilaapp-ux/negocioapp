@@ -292,53 +292,56 @@ export default function RegisterPage() {
       const paymentSettingsData: PaymentSettings = { id: newUser.uid, userId: newUser.uid, ...initialPaymentSettings };
       batch.set(paymentSettingsDocRef, paymentSettingsData);
       
-      const defaultModules: Omit<Module, 'id'>[] = [
-        { name: 'Catálogo', description: 'Módulo para gestionar el catálogo de productos.', status: 'inactive', createdAt: new Date().toISOString() },
-        { name: 'Blog', description: 'Módulo para gestionar el blog', status: 'inactive', createdAt: new Date().toISOString() },
-        { name: 'Chatbot Integrado con WhatsApp', description: 'Asistente IA para WhatsApp y Web', status: 'inactive', createdAt: new Date().toISOString() },
-        { name: 'WHAPI (WhatsApp)', description: 'Integración con WHAPI para enviar mensajes de WhatsApp.', status: 'inactive', createdAt: new Date().toISOString() },
-        { name: 'Motor de Sugerencias Inteligentes', description: 'Motor para sugerir productos', status: 'inactive', createdAt: new Date().toISOString() },
-        { name: 'Google Analytics', description: 'Integración con Google Analytics', status: 'inactive', createdAt: new Date().toISOString() },
-        { name: 'Cloudinary', description: 'Almacenamiento de medios en la nube', status: 'inactive', createdAt: new Date().toISOString() },
-      ];
-      
-      defaultModules.forEach(mod => {
-          let modId = slugify(mod.name);
-           if (mod.name.toLowerCase().includes('catálogo')) {
-              modId = 'catalogo';
-          } else if (mod.name.includes('Chatbot')) {
-            modId = 'chatbot-integrado-con-whatsapp-para-soporte-y-ventas';
-          } else if (mod.name.includes('Sugerencias')) {
-            modId = 'motor-de-sugerencias-inteligentes';
-          } else if (mod.name.includes('Google Analytics')) {
-            modId = 'google-analytics';
-          } else if (mod.name === 'Cloudinary') {
-            modId = 'cloudinary';
-          }
-          const modRef = doc(firestore, 'modules', modId);
-          batch.set(modRef, { ...mod, id: modId }, { merge: true });
-      });
-      
-      const REQUIRED_INTEGRATIONS: Array<{ id: string; name: string }> = [
-        { id: 'cloudinary', name: 'Cloudinary' },
-        { id: 'chatbot-integrado-con-whatsapp-para-soporte-y-ventas', name: 'Chatbot IA (Google/OpenAI/Groq)' },
-        { id: 'whapi-whatsapp', name: 'WHAPI (WhatsApp)' },
-      ];
+      // Only run initialization for the very first user (super_admin)
+      if (isFirst) {
+        const defaultModules: Omit<Module, 'id'>[] = [
+          { name: 'Catálogo', description: 'Módulo para gestionar el catálogo de productos.', status: 'inactive', createdAt: new Date().toISOString() },
+          { name: 'Blog', description: 'Módulo para gestionar el blog', status: 'inactive', createdAt: new Date().toISOString() },
+          { name: 'Chatbot Integrado con WhatsApp', description: 'Asistente IA para WhatsApp y Web', status: 'inactive', createdAt: new Date().toISOString() },
+          { name: 'WHAPI (WhatsApp)', description: 'Integración con WHAPI para enviar mensajes de WhatsApp.', status: 'inactive', createdAt: new Date().toISOString() },
+          { name: 'Motor de Sugerencias Inteligentes', description: 'Motor para sugerir productos', status: 'inactive', createdAt: new Date().toISOString() },
+          { name: 'Google Analytics', description: 'Integración con Google Analytics', status: 'inactive', createdAt: new Date().toISOString() },
+          { name: 'Cloudinary', description: 'Almacenamiento de medios en la nube', status: 'inactive', createdAt: new Date().toISOString() },
+        ];
+        
+        defaultModules.forEach(mod => {
+            let modId = slugify(mod.name);
+             if (mod.name.toLowerCase().includes('catálogo')) {
+                modId = 'catalogo';
+            } else if (mod.name.includes('Chatbot')) {
+              modId = 'chatbot-integrado-con-whatsapp-para-soporte-y-ventas';
+            } else if (mod.name.includes('Sugerencias')) {
+              modId = 'motor-de-sugerencias-inteligentes';
+            } else if (mod.name.includes('Google Analytics')) {
+              modId = 'google-analytics';
+            } else if (mod.name === 'Cloudinary') {
+              modId = 'cloudinary';
+            }
+            const modRef = doc(firestore, 'modules', modId);
+            batch.set(modRef, { ...mod, id: modId }, { merge: true });
+        });
+        
+        const REQUIRED_INTEGRATIONS: Array<{ id: string; name: string }> = [
+          { id: 'cloudinary', name: 'Cloudinary' },
+          { id: 'chatbot-integrado-con-whatsapp-para-soporte-y-ventas', name: 'Chatbot IA (Google/OpenAI/Groq)' },
+          { id: 'whapi-whatsapp', name: 'WHAPI (WhatsApp)' },
+        ];
 
-      REQUIRED_INTEGRATIONS.forEach(int => {
-          const intRef = doc(firestore, 'integrations', int.id);
-          batch.set(intRef, {
-              id: int.id,
-              name: int.name,
-              fields: '{}',
-              status: 'inactive',
-              updatedAt: new Date().toISOString(),
-          }, { merge: true });
-      });
+        REQUIRED_INTEGRATIONS.forEach(int => {
+            const intRef = doc(firestore, 'integrations', int.id);
+            batch.set(intRef, {
+                id: int.id,
+                name: int.name,
+                fields: '{}',
+                status: 'inactive',
+                updatedAt: new Date().toISOString(),
+            }, { merge: true });
+        });
 
-      const productLimitServiceRef = doc(firestore, 'systemServices', 'product_limit');
-      const productLimitData: SystemService = { id: 'product_limit', name: 'Limite de Productos', status: 'active', limit: 10, lastUpdate: new Date().toISOString() };
-      batch.set(productLimitServiceRef, productLimitData, { merge: true });
+        const productLimitServiceRef = doc(firestore, 'systemServices', 'product_limit');
+        const productLimitData: SystemService = { id: 'product_limit', name: 'Limite de Productos', status: 'active', limit: 10, lastUpdate: new Date().toISOString() };
+        batch.set(productLimitServiceRef, productLimitData, { merge: true });
+      }
       
       const coffeeOfferRef = doc(firestore, 'businesses', newUser.uid, 'chatbotConfig', 'main', 'knowledgeBase', 'oferta-cafe-arandanos');
       const coffeeOfferData: Omit<KnowledgeDocument, 'id'> = {
