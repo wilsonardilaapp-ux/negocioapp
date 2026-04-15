@@ -303,6 +303,39 @@ export default function BusinessesPage() {
                 <div><p className="text-sm text-gray-500">Plan Actual</p><p className="font-medium">{selectedBusiness.planName}</p></div>
                 <div><p className="text-sm text-gray-500">Estado</p><StatusBadge status={selectedBusiness.status} /></div>
               </div>
+              
+              <div>
+                <h4 className="font-medium mb-3">Límites Personalizados</h4>
+                <div className="space-y-4 rounded-lg border p-4">
+                  <div>
+                    <Label htmlFor="productLimit">Límite de Productos</Label>
+                    <Input
+                      id="productLimit"
+                      type="number"
+                      placeholder="Vacío para usar límite del plan"
+                      value={selectedBusiness.productLimit ?? ''}
+                      onChange={e => setSelectedBusiness(prev => prev ? { ...prev, productLimit: e.target.value === '' ? undefined : Number(e.target.value) } : null)}
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Anula el límite de productos del plan solo para este cliente. -1 para ilimitado.
+                    </p>
+                  </div>
+                  <div>
+                    <Label htmlFor="imageLimit">Límite de Imágenes por Producto</Label>
+                    <Input
+                      id="imageLimit"
+                      type="number"
+                      placeholder="Vacío para usar límite global"
+                      value={selectedBusiness.imageLimit ?? ''}
+                      onChange={e => setSelectedBusiness(prev => prev ? { ...prev, imageLimit: e.target.value === '' ? undefined : Number(e.target.value) } : null)}
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Anula el límite global de imágenes por producto solo para este cliente.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
               <div>
                 <h4 className="font-medium mb-3">Módulos Asignados</h4>
                 <div className="grid grid-cols-2 gap-2">
@@ -322,36 +355,12 @@ export default function BusinessesPage() {
                 <div className="grid grid-cols-2 gap-2">
                   {(services || []).map(serviceItem => (
                     <div key={serviceItem.id} className={cn('flex items-center justify-between p-3 border rounded-lg cursor-pointer transition-colors', assignedServices.includes(serviceItem.id) ? 'border-primary bg-primary/5' : 'hover:bg-gray-50')} onClick={() => toggleServiceAssignment(serviceItem.id)}>
-                      <div><p className="text-sm font-medium">{serviceItem.name}</p><p className="text-xs text-gray-500">Límite: {serviceItem.limit}</p></div>
+                      <div><p className="text-sm font-medium">{serviceItem.name}</p><p className="text-xs text-gray-500">Límite Global: {serviceItem.limit}</p></div>
                       {assignedServices.includes(serviceItem.id) && <Check className="w-5 h-5 text-primary" />}
                     </div>
                   ))}
                 </div>
                 {services?.length === 0 && <p className="text-sm text-gray-500 text-center py-4">No hay servicios disponibles</p>}
-              </div>
-              <div>
-                <h4 className="font-medium mb-3">Límite de Imágenes por Producto</h4>
-                <Input
-                  type="number"
-                  placeholder="Usar límite global por defecto"
-                  value={selectedBusiness.imageLimit ?? ''}
-                  onChange={e => setSelectedBusiness(prev => prev ? { ...prev, imageLimit: e.target.value === '' ? undefined : Number(e.target.value) } : null)}
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  Define un límite específico para este negocio o déjalo vacío para usar el valor global.
-                </p>
-              </div>
-              <div>
-                <h4 className="font-medium mb-3">Límite de Productos</h4>
-                <Input
-                  type="number"
-                  placeholder="Usar límite global por defecto"
-                  value={selectedBusiness.productLimit ?? ''}
-                  onChange={e => setSelectedBusiness(prev => prev ? { ...prev, productLimit: e.target.value === '' ? undefined : Number(e.target.value) } : null)}
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  Define un límite de productos para este negocio. -1 para ilimitado.
-                </p>
               </div>
               <div>
                 <h4 className="font-medium mb-3">Cambiar Estado</h4>
@@ -368,5 +377,7 @@ export default function BusinessesPage() {
     </div>
   );
 }
+
+    
 
     
