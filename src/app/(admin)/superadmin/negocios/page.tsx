@@ -2,6 +2,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import { useUser, useFirestore, useCollection, useMemoFirebase, setDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase';
 import { collection, doc, writeBatch, getDocs } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -53,6 +54,7 @@ const StatusBadge = ({ status }: { status: EntityStatus | undefined }) => {
 };
 
 export default function BusinessesPage() {
+  const router = useRouter();
   // Data State
   const firestore = useFirestore();
   const { data: businesses, isLoading: businessesLoading } = useCollection<Business>(useMemoFirebase(() => collection(firestore, 'businesses'), [firestore]));
@@ -165,7 +167,7 @@ export default function BusinessesPage() {
   };
 
   const handleImpersonate = (business: Business) => {
-    alert(`Funcionalidad "Ingresar" a ${business.name} no implementada.`);
+    router.push(`/landing/${business.id}`);
   };
 
   return (
@@ -317,7 +319,7 @@ export default function BusinessesPage() {
                       onChange={e => setSelectedBusiness(prev => prev ? { ...prev, productLimit: e.target.value === '' ? undefined : Number(e.target.value) } : null)}
                     />
                     <p className="text-xs text-muted-foreground mt-1">
-                      Anula el límite de productos del plan solo para este cliente. -1 para ilimitado.
+                      Anula el límite de productos del plan solo para este cliente. Dejar vacío para usar el límite del plan. -1 para ilimitado.
                     </p>
                   </div>
                   <div>
@@ -330,7 +332,7 @@ export default function BusinessesPage() {
                       onChange={e => setSelectedBusiness(prev => prev ? { ...prev, imageLimit: e.target.value === '' ? undefined : Number(e.target.value) } : null)}
                     />
                     <p className="text-xs text-muted-foreground mt-1">
-                      Anula el límite global de imágenes por producto solo para este cliente.
+                      Anula el límite global de imágenes por producto solo para este cliente. Dejar vacío para usar el límite por defecto.
                     </p>
                   </div>
                 </div>
@@ -352,6 +354,7 @@ export default function BusinessesPage() {
               </div>
               <div>
                 <h4 className="font-medium mb-3">Servicios Adicionales</h4>
+                 <p className="text-xs text-muted-foreground mb-2">Activa servicios que no forman parte de un módulo, como límites especiales o accesos a APIs.</p>
                 <div className="grid grid-cols-2 gap-2">
                   {(services || []).map(serviceItem => (
                     <div key={serviceItem.id} className={cn('flex items-center justify-between p-3 border rounded-lg cursor-pointer transition-colors', assignedServices.includes(serviceItem.id) ? 'border-primary bg-primary/5' : 'hover:bg-gray-50')} onClick={() => toggleServiceAssignment(serviceItem.id)}>
@@ -377,7 +380,3 @@ export default function BusinessesPage() {
     </div>
   );
 }
-
-    
-
-    
