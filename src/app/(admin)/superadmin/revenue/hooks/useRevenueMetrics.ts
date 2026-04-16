@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -63,8 +62,8 @@ export function useRevenueMetrics(allPlans: SubscriptionPlan[] | null) {
 
             const activeSubsLastMonth = clients.filter(c => {
                 const sub = c.subscription;
-                if (!sub) return false;
-                const createdAt = sub.createdAt.toDate();
+                if (!sub || !sub.createdAt) return false;
+                const createdAt = (sub.createdAt as Timestamp).toDate();
                 return createdAt < startOfThisMonth && sub.status === 'active';
             });
 
@@ -78,11 +77,11 @@ export function useRevenueMetrics(allPlans: SubscriptionPlan[] | null) {
             const totalActiveClientsLastMonth = activeSubsLastMonth.length;
             const clientsGrowth = totalActiveClientsLastMonth > 0 ? ((totalActiveClients - totalActiveClientsLastMonth) / totalActiveClientsLastMonth) * 100 : totalActiveClients > 0 ? 100 : 0;
 
-            const newClientsThisMonth = clients.filter(c => c.subscription && c.subscription.createdAt.toDate() >= startOfThisMonth).length;
+            const newClientsThisMonth = clients.filter(c => c.subscription && c.subscription.createdAt && (c.subscription.createdAt as Timestamp).toDate() >= startOfThisMonth).length;
             
             const cancelationsThisMonth = clients.filter(c => {
                 const sub = c.subscription;
-                return sub?.status === 'canceled' && sub.updatedAt.toDate() >= startOfThisMonth;
+                return sub?.status === 'canceled' && sub.updatedAt && (sub.updatedAt as Timestamp).toDate() >= startOfThisMonth;
             }).length;
 
             const planDistribution = activeSubscriptions.reduce((acc, client) => {
@@ -105,17 +104,18 @@ export function useRevenueMetrics(allPlans: SubscriptionPlan[] | null) {
                 const endOfMonth = new Date(year, d.getMonth() + 1, 0, 23, 59, 59);
 
                 const newClientsInMonth = clients.filter(c => {
-                    const createdAt = c.subscription?.createdAt.toDate();
+                    const createdAt = c.subscription?.createdAt ? (c.subscription.createdAt as Timestamp).toDate() : null;
                     return createdAt && createdAt >= startOfMonth && createdAt <= endOfMonth;
                 }).length;
 
                 const mrrForMonth = clients
                     .filter(c => {
                         const sub = c.subscription;
-                        if (!sub) return false;
-                        const createdAt = sub.createdAt.toDate();
-                        // Active at end of month
-                        return createdAt <= endOfMonth && (sub.status === 'active' || (sub.status === 'canceled' && sub.updatedAt.toDate() > endOfMonth));
+                        if (!sub || !sub.createdAt) return false;
+                        const createdAt = (sub.createdAt as Timestamp).toDate();
+                        const updatedAt = sub.updatedAt ? (sub.updatedAt as Timestamp).toDate() : null;
+                        
+                        return createdAt <= endOfMonth && (sub.status === 'active' || (sub.status === 'canceled' && updatedAt && updatedAt > endOfMonth));
                     })
                     .reduce((acc, client) => {
                          const planId = client.subscription!.plan;
@@ -127,11 +127,11 @@ export function useRevenueMetrics(allPlans: SubscriptionPlan[] | null) {
             }
 
             const recentActivity = clients
-                .filter(c => c.subscription)
+                .filter(c => c.subscription && c.subscription.updatedAt) // Ensure updatedAt exists for sorting
                 .map(c => {
                     const sub = c.subscription!;
                     let action: RevenueMetrics['recentActivity'][0]['action'] = 'cambio_plan';
-                    if (sub.createdAt.toMillis() === sub.updatedAt.toMillis()) {
+                    if (sub.createdAt && sub.updatedAt && (sub.createdAt as Timestamp).toMillis() === (sub.updatedAt as Timestamp).toMillis()) {
                         action = 'nueva_suscripcion';
                     } else if (sub.status === 'canceled') {
                         action = 'cancelacion';
@@ -147,7 +147,7 @@ export function useRevenueMetrics(allPlans: SubscriptionPlan[] | null) {
                         email: c.email,
                         action,
                         plan: planDetails?.name || sub.plan,
-                        date: sub.updatedAt
+                        date: sub.updatedAt as Timestamp
                     };
                 })
                 .sort((a, b) => b.date.toMillis() - a.date.toMillis())
@@ -165,6 +165,7 @@ export function useRevenueMetrics(allPlans: SubscriptionPlan[] | null) {
                 recentActivity
             });
         } catch (e: any) {
+            console.error("Error calculating revenue metrics:", e);
             setError(e.message);
         } finally {
             setIsLoading(false);
