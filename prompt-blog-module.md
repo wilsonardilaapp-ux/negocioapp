@@ -139,4 +139,3 @@ Crea un archivo para las acciones del servidor que interactuarán con Firestore.
 *   El código completo para cada archivo creado o modificado.
 *   Asegura que el código sea de calidad de producción, sin errores de tipado y que siga la estructura del proyecto existente.
 *   No incluyas comentarios innecesarios, solo el código funcional.
-```
