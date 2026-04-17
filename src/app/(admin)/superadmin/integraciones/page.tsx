@@ -66,10 +66,10 @@ const CloudinaryForm = ({
   const [fields, setFields] = useState<CloudinaryFields>(() => {
     let parsed: Partial<CloudinaryFields> = {};
     try {
-      if (typeof integration.fields === 'string' && integration.fields.trim()) {
-        parsed = JSON.parse(integration.fields);
-      } else if (typeof integration.fields === 'object' && integration.fields !== null) {
+      if (typeof integration.fields === 'object' && integration.fields !== null) {
         parsed = integration.fields as Partial<CloudinaryFields>;
+      } else if (typeof integration.fields === 'string' && integration.fields.trim().startsWith('{')) {
+        parsed = JSON.parse(integration.fields);
       }
     } catch (e) { console.error('Cloudinary parse error', e); }
     return { cloud_name: parsed.cloud_name || '', api_key: parsed.api_key || '', api_secret: parsed.api_secret || '' };
@@ -135,10 +135,10 @@ const AIProviderForm = ({
   const [fields, setFields] = useState<AIProviderFields>(() => {
     let parsed: any = {};
     try {
-      if (typeof integration.fields === 'string' && integration.fields.trim()) {
-        parsed = JSON.parse(integration.fields);
-      } else if (typeof integration.fields === 'object' && integration.fields !== null) {
+      if (typeof integration.fields === 'object' && integration.fields !== null) {
         parsed = integration.fields;
+      } else if (typeof integration.fields === 'string' && integration.fields.trim().startsWith('{')) {
+        parsed = JSON.parse(integration.fields);
       }
     } catch (e) { console.error('AI parse error', e); }
     return {
@@ -215,10 +215,10 @@ const WhapiForm = ({
   const [fields, setFields] = useState<WhapiFields>(() => {
     let parsed: any = {};
     try {
-      if (typeof integration.fields === 'string' && integration.fields.trim()) {
-        parsed = JSON.parse(integration.fields);
-      } else if (typeof integration.fields === 'object' && integration.fields !== null) {
+      if (typeof integration.fields === 'object' && integration.fields !== null) {
         parsed = integration.fields;
+      } else if (typeof integration.fields === 'string' && integration.fields.trim().startsWith('{')) {
+        parsed = JSON.parse(integration.fields);
       }
     } catch (e) { console.error('Whapi parse error', e); }
     return { apiKey: parsed?.apiKey || '', instanceId: parsed?.instanceId || '' };
@@ -441,10 +441,10 @@ export default function IntegrationsPage() {
           let isConfigured = false;
           try {
             let fields: any = {};
-            if (typeof integration.fields === 'string' && integration.fields.trim()) {
-              fields = JSON.parse(integration.fields);
-            } else if (typeof integration.fields === 'object' && integration.fields !== null) {
+            if (typeof integration.fields === 'object' && integration.fields !== null) {
               fields = integration.fields;
+            } else if (typeof integration.fields === 'string' && integration.fields.trim().startsWith('{')) {
+              fields = JSON.parse(integration.fields);
             }
             if (integration.id === 'cloudinary') {
               isConfigured = !!(fields.cloud_name && fields.api_key && fields.api_secret);

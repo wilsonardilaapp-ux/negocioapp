@@ -89,17 +89,30 @@ async function getAIConfig(): Promise<{ provider: string; apiKey: string; model:
         const firestore = await getAdminFirestore();
         // Sintaxis Admin SDK
         const snap = await firestore.doc('integrations/chatbot-integrado-con-whatsapp-para-soporte-y-ventas').get();
-        if (!snap.exists) return { provider: 'openai', apiKey: '', model: 'gpt-4o-mini' };
+        if (!snap.exists) {
+            console.warn("Chatbot integration document not found. Falling back to default.");
+            return { provider: 'openai', apiKey: '', model: 'gpt-4o-mini' };
+        }
         
         const data = snap.data();
-        if (!data) return { provider: 'openai', apiKey: '', model: 'gpt-4o-mini' };
+        if (!data || !data.fields) {
+            console.warn("Chatbot integration document is empty or has no fields. Falling back to default.");
+            return { provider: 'openai', apiKey: '', model: 'gpt-4o-mini' };
+        }
         
-        let fields = typeof data.fields === 'string' ? JSON.parse(data.fields) : data.fields;
+        let fields: any = {};
+        if (typeof data.fields === 'string' && data.fields.trim().startsWith('{')) {
+            fields = JSON.parse(data.fields);
+        } else if (typeof data.fields === 'object') {
+            fields = data.fields;
+        }
         
         if (fields.openai?.apiKey) return { provider: 'openai', apiKey: fields.openai.apiKey, model: 'gpt-4o-mini' };
         if (fields.groq?.apiKey) return { provider: 'groq', apiKey: fields.groq.apiKey, model: 'llama-3.1-8b-instant' };
         if (fields.google?.apiKey) return { provider: 'googleai', apiKey: fields.google.apiKey, model: 'gemini-1.5-flash' };
-    } catch(e) {}
+    } catch(e: any) {
+        console.error("Error getting AI config from Firestore:", e.message);
+    }
     
     return { provider: 'openai', apiKey: '', model: '' };
 }

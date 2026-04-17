@@ -51,10 +51,10 @@ export async function uploadMedia(input: UploadMediaInput): Promise<{ secure_url
 
   let cloudinaryConfig: CloudinaryFields;
   try {
-    if (typeof integrationData.fields === 'string' && integrationData.fields.trim() !== '') {
-        cloudinaryConfig = JSON.parse(integrationData.fields);
-    } else if (typeof integrationData.fields === 'object' && integrationData.fields !== null) {
+    if (typeof integrationData.fields === 'object' && integrationData.fields !== null) {
         cloudinaryConfig = integrationData.fields as CloudinaryFields;
+    } else if (typeof integrationData.fields === 'string' && integrationData.fields.trim().startsWith('{')) {
+        cloudinaryConfig = JSON.parse(integrationData.fields);
     } else {
       throw new Error('Formato de credenciales inválido o vacío.');
     }
