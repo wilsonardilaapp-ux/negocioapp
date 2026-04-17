@@ -1,9 +1,11 @@
 
 'use client';
 
-import { useState, useTransition, useEffect, useMemo } from 'react';
+import { useState, useTransition, useEffect, useMemo, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
+import QRCode from "react-qr-code";
+import html2canvas from "html2canvas";
 import { updatePost } from '@/actions/blog';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
@@ -11,12 +13,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
-import { Save, Loader2, ArrowLeft, Bot, Copy, Check, Facebook, Twitter, Linkedin } from 'lucide-react';
+import { Save, Loader2, ArrowLeft, Bot, Copy, Check, Facebook, Twitter, Linkedin, Download, UploadCloud, Trash2 } from 'lucide-react';
 import RichTextEditor from '@/components/editor/RichTextEditor';
 import { useDoc, useFirestore, useMemoFirebase } from '@/firebase';
 import { doc } from 'firebase/firestore';
 import type { BlogPost } from '@/models/blog-post';
 import { WhatsAppIcon, XIcon, InstagramIcon, TikTokIcon, YoutubeIcon } from '@/components/icons';
+import { uploadMedia } from '@/ai/flows/upload-media-flow';
+import Image from 'next/image';
 
 export default function EditPostPage() {
     const router = useRouter();
@@ -24,7 +28,8 @@ export default function EditPostPage() {
     const { toast } = useToast();
     const [isPending, startTransition] = useTransition();
     const [copied, setCopied] = useState(false);
-    
+    const qrCodeRef = useRef<HTMLDivElement>(null);
+
     const firestore = useFirestore();
     const postId = params.id as string;
 
@@ -34,18 +39,26 @@ export default function EditPostPage() {
     }, [firestore, postId]);
 
     const { data: post, isLoading } = useDoc<BlogPost>(postDocRef);
-    
+
     const [content, setContent] = useState('');
+    const [imageUrl, setImageUrl] = useState('');
+    const [isUploading, setIsUploading] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
         if (post) {
             setContent(post.content || '');
+            setImageUrl(post.imageUrl || '');
         }
     }, [post]);
-    
+
     const publicUrl = useMemo(() => {
-        if (typeof window !== 'undefined' && post?.slug && post?.businessId) {
-            return `${window.location.origin}/blog/${post.businessId}/${post.slug}`;
+        if (typeof window !== 'undefined' && post?.slug) {
+            if (post.businessId) {
+                return `${window.location.origin}/blog/${post.businessId}/${post.slug}`;
+            }
+            // Fallback for global posts - assumes a route like /blog/{slug} might exist or be created
+            return `${window.location.origin}/blog/${post.slug}`;
         }
         return '';
     }, [post?.slug, post?.businessId]);
@@ -57,7 +70,46 @@ export default function EditPostPage() {
         toast({ title: 'Enlace copiado al portapapeles' });
         setTimeout(() => setCopied(false), 2500);
     };
-    
+
+    const handleDownloadQR = () => {
+        if (!qrCodeRef.current) return;
+        html2canvas(qrCodeRef.current, { backgroundColor: null }).then((canvas) => {
+            const dataUrl = canvas.toDataURL('image/png');
+            const link = document.createElement('a');
+            link.download = `qr-post-${post?.id || 'post'}.png`;
+            link.href = dataUrl;
+            link.click();
+        }).catch(function (error) {
+            console.error('Error generando QR:', error);
+            toast({
+              variant: 'destructive',
+              title: 'Error al descargar QR',
+              description: 'No se pudo generar la imagen del código QR.',
+            });
+        });
+    };
+
+    const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        setIsUploading(true);
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onloadend = async () => {
+            const mediaDataUri = reader.result as string;
+            try {
+                const result = await uploadMedia({ mediaDataUri });
+                setImageUrl(result.secure_url);
+                toast({ title: 'Imagen subida con éxito.' });
+            } catch (error: any) {
+                toast({ variant: 'destructive', title: 'Error al subir', description: error.message });
+            } finally {
+                setIsUploading(false);
+            }
+        };
+    };
+
     if (isLoading) {
         return <div className="flex items-center justify-center h-64"><Loader2 className="h-8 w-8 animate-spin" /> Cargando post...</div>
     }
@@ -70,13 +122,15 @@ export default function EditPostPage() {
         event.preventDefault();
         const formData = new FormData(event.currentTarget);
         formData.set('content', content);
-        formData.set('id', postId); // Asegurarnos de pasar el ID
+        formData.set('imageUrl', imageUrl);
+        formData.set('id', postId);
 
         startTransition(async () => {
             const result = await updatePost(formData);
             if (result.success) {
+                const destination = post.businessId ? '/dashboard/blog' : '/superadmin/blog';
                 toast({ title: 'Éxito', description: result.message });
-                router.push('/dashboard/blog');
+                router.push(destination);
             } else {
                 toast({ variant: 'destructive', title: 'Error', description: result.error });
             }
@@ -92,7 +146,7 @@ export default function EditPostPage() {
             </div>
             <div className="flex gap-2">
                  <Button type="button" variant="outline" asChild>
-                    <Link href="/dashboard/blog">
+                    <Link href={post.businessId ? '/dashboard/blog' : '/superadmin/blog'}>
                         <ArrowLeft className="mr-2 h-4 w-4" />
                         Cancelar
                     </Link>
@@ -147,47 +201,19 @@ export default function EditPostPage() {
                         </div>
                     </CardContent>
                 </Card>
-
+                
                 {publicUrl && (
                     <Card className="shadow-sm">
                         <CardHeader>
-                            <CardTitle className="text-base">Compartir en redes sociales</CardTitle>
+                            <CardTitle className="text-base">Código QR del Enlace Público</CardTitle>
                         </CardHeader>
-                        <CardContent className="grid grid-cols-2 gap-2">
-                            <Button asChild variant="outline" size="sm">
-                                <a href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(publicUrl)}`} target="_blank" rel="noopener noreferrer">
-                                    <Facebook className="mr-2" /> Facebook
-                                </a>
-                            </Button>
-                            <Button asChild variant="outline" size="sm">
-                                <a href={`https://api.whatsapp.com/send?text=${encodeURIComponent(publicUrl)}`} target="_blank" rel="noopener noreferrer">
-                                    <WhatsAppIcon className="mr-2" /> WhatsApp
-                                </a>
-                            </Button>
-                            <Button asChild variant="outline" size="sm">
-                                <a href={`https://twitter.com/intent/tweet?url=${encodeURIComponent(publicUrl)}`} target="_blank" rel="noopener noreferrer">
-                                    <XIcon className="mr-2" /> Twitter/X
-                                </a>
-                            </Button>
-                             <Button asChild variant="outline" size="sm">
-                                <a href={`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(publicUrl)}`} target="_blank" rel="noopener noreferrer">
-                                    <Linkedin className="mr-2" /> LinkedIn
-                                </a>
-                            </Button>
-                             <Button asChild variant="outline" size="sm">
-                                <a href="https://www.instagram.com" target="_blank" rel="noopener noreferrer">
-                                    <InstagramIcon className="mr-2" /> Instagram
-                                </a>
-                            </Button>
-                             <Button asChild variant="outline" size="sm">
-                                <a href="https://www.tiktok.com" target="_blank" rel="noopener noreferrer">
-                                    <TikTokIcon className="mr-2" /> TikTok
-                                </a>
-                            </Button>
-                             <Button asChild variant="outline" size="sm">
-                                <a href="https://www.youtube.com" target="_blank" rel="noopener noreferrer">
-                                    <YoutubeIcon className="mr-2" /> YouTube
-                                </a>
+                        <CardContent className="flex flex-col items-center gap-4">
+                            <div ref={qrCodeRef} className="bg-white p-4 rounded-md border">
+                                <QRCode value={publicUrl} size={150} />
+                            </div>
+                            <Button onClick={handleDownloadQR} className="w-full">
+                                <Download className="mr-2 h-4 w-4" />
+                                Descargar Código QR
                             </Button>
                         </CardContent>
                     </Card>
@@ -195,9 +221,30 @@ export default function EditPostPage() {
                 
                 <Card className="shadow-sm">
                     <CardHeader><CardTitle className="text-base">Imagen Destacada</CardTitle></CardHeader>
-                    <CardContent>
-                        <Label htmlFor="imageUrl">URL de la Imagen</Label>
-                        <Input id="imageUrl" name="imageUrl" defaultValue={post.imageUrl} required />
+                    <CardContent className="space-y-4">
+                        <div className="relative aspect-video w-full border-2 border-dashed rounded-lg flex items-center justify-center p-2 group bg-muted/50">
+                            {isUploading ? (
+                                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                            ) : imageUrl ? (
+                                <>
+                                    <Image src={imageUrl} alt="Imagen destacada" fill sizes="100%" className="object-contain rounded-md" />
+                                    <div className="absolute top-2 right-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <Button variant="destructive" size="icon" onClick={() => setImageUrl('')}><Trash2 className="h-4 w-4" /></Button>
+                                    </div>
+                                </>
+                            ) : (
+                                <div className="text-center cursor-pointer" onClick={() => fileInputRef.current?.click()}>
+                                    <UploadCloud className="h-8 w-8 mx-auto text-muted-foreground" />
+                                    <p className="mt-2 text-sm font-semibold">Subir imagen</p>
+                                    <p className="text-xs text-muted-foreground">O pega una URL abajo</p>
+                                </div>
+                            )}
+                        </div>
+                        <input type="file" ref={fileInputRef} onChange={handleImageUpload} className="hidden" accept="image/*" />
+                        <div>
+                            <Label htmlFor="imageUrl">URL de la Imagen</Label>
+                            <Input id="imageUrl" name="imageUrl" value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} placeholder="https://ejemplo.com/imagen.jpg" required />
+                        </div>
                     </CardContent>
                 </Card>
 
