@@ -1,7 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
     experimental: {
-        serverComponentsExternalPackages: ['@opentelemetry/api', 'firebase-admin'],
+        serverComponentsExternalPackages: ['@opentelemetry/api', 'firebase-admin', 'cloudinary'],
     },
     webpack: (config, { isServer }) => {
         if (isServer) {
