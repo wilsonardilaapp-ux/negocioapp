@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import * as QRCodeLib from 'qrcode';
 import {
   Card,
@@ -16,8 +16,14 @@ import { Printer, Loader2 } from 'lucide-react';
 import { InvoiceTemplate, mockOrder } from './InvoiceTemplate';
 import type { InvoiceSettings } from '@/models/invoice-settings';
 import { useToast } from '@/hooks/use-toast';
+import QRCode from 'react-qr-code';
 
-// Helper function to generate a fallback SVG QR code as a base64 data URL
+
+interface InvoicePreviewProps {
+  settings: InvoiceSettings;
+  setSettings: React.Dispatch<React.SetStateAction<InvoiceSettings>>;
+}
+
 const generateQRFallbackBase64 = (url: string): string => {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" 
     width="80" height="80" viewBox="0 0 80 80">
@@ -33,7 +39,8 @@ const generateQRFallbackBase64 = (url: string): string => {
 
 export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSettings }) => {
   const { toast } = useToast();
-
+  const qrCodeRef = useRef<HTMLDivElement>(null);
+  
   const handlePrint = async () => {
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
@@ -48,20 +55,22 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
     let qrCodeImage = '';
     const qrUrlToGenerate = settings.qr.url || 'https://www.google.com';
 
-    if (settings.qr.show && settings.qr.qrImageUrl) {
+    if (settings.qr.show) {
+      if (settings.qr.qrImageUrl) {
         qrCodeImage = settings.qr.qrImageUrl;
-    } else if (settings.qr.show && qrUrlToGenerate) {
+      } else {
         try {
-            qrCodeImage = await QRCodeLib.toDataURL(qrUrlToGenerate, {
-                width: 200,
-                margin: 1,
-                errorCorrectionLevel: 'H',
-                color: { dark: '#000000', light: '#FFFFFF' }
-            });
-        } catch (e) {
-            console.error("QRCode generation failed:", e);
-            qrCodeImage = generateQRFallbackBase64(qrUrlToGenerate);
+          qrCodeImage = await QRCodeLib.toDataURL(qrUrlToGenerate, {
+            width: 200,
+            margin: 1,
+            errorCorrectionLevel: 'H',
+            color: { dark: '#000000', light: '#FFFFFF' }
+          });
+        } catch (e2) {
+          console.error("QRCode lib falló:", e2);
+          qrCodeImage = generateQRFallbackBase64(qrUrlToGenerate);
         }
+      }
     }
     
     const isBold = (zone: keyof InvoiceSettings['bold']['zones']) => settings.bold.allBold || settings.bold.zones[zone];
@@ -81,45 +90,51 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
                             margin: 0;
                         }
                     }
+                    html, body {
+                        width: 100%;
+                        margin: 0;
+                        padding: 0;
+                    }
                     * { 
                         box-sizing: border-box;
-                        word-wrap: break-word;
-                        overflow-wrap: break-word;
                     }
-                    body { 
+                    body {
                         font-family: '${settings.style.font}', monospace;
                         font-size: ${printFontSize};
-                        width: 100%;
                         max-width: ${settings.style.paperSize === '80mm' ? '72mm' : '52mm'};
-                        margin: 0 auto; 
+                        margin: 0 auto;
                         padding: 2px 4px;
                         color: black;
                     }
                     .header, .footer, .text-center { text-align: center; }
                     .separator { border-top: 1px ${settings.style.separatorStyle} #000; margin: 4px 0; }
-                    .logo { display: block; margin: 12px auto 8px auto; max-width: ${settings.logo.size}; height: auto; }
-                    
+                    .logo { display: block; margin: 12px auto 8px auto; max-width: 80%; height: auto; }
                     .qr-container { display: flex; flex-direction: column; align-items: center; width: 100%; margin: 8px 0; }
                     .qr-label { text-align: center; margin-top: 4px; }
                     
-                    table, th, td { 
+                    table, thead, tbody, tr, th, td { 
                         font-family: inherit;
                         font-size: inherit;
                     }
                     table { width: 100%; border-collapse: collapse; table-layout: fixed; }
                     th { text-align: left; font-weight: bold; border-bottom: 1px ${settings.style.separatorStyle} #000; padding-bottom: 2px; }
-                    td { padding: 1px 0; vertical-align: top; overflow: hidden; }
-
-                    th:nth-child(1), td:nth-child(1) { width: 15%; padding-right: 2px; }
-                    th:nth-child(2), td:nth-child(2) { width: 50%; padding-right: 2px; }
-                    th:nth-child(3), td:nth-child(3) { width: 35%; text-align: right; }
+                    td { padding: 1px 2px; vertical-align: top; }
+                    
+                    th:nth-child(1), td:nth-child(1) { width: 15%; }
+                    th:nth-child(2), td:nth-child(2) { 
+                      width: 55%; 
+                      word-wrap: break-word;
+                      overflow-wrap: break-word;
+                    }
+                    th:nth-child(3), td:nth-child(3) { width: 30%; text-align: right; }
 
                     .total-row { font-weight: bold; font-size: ${totalFontSize}; }
+                    .text-right { text-align: right; }
                 </style>
             </head>
             <body>
                 <div style="${settings.bold.allBold ? 'font-weight: bold;' : ''}">
-                    ${settings.logo.url ? `<img src="${settings.logo.url}" class="logo" />` : ''}
+                    ${settings.logo.url ? `<img src="${settings.logo.url}" class="logo" alt="logo"/>` : ''}
                     <div class="header" style="${isBold('businessName') ? 'font-weight: bold;' : ''}">${settings.header.businessName}</div>
                     <div class="header" style="${isBold('address') ? 'font-weight: bold;' : ''}">${settings.header.address}</div>
                     <div class="header">${settings.header.phone}</div>
@@ -158,16 +173,17 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
                         <img 
                           src="${qrCodeImage}" 
                           alt="QR Code"
-                          width="80" 
-                          height="80"
-                          style="display:block; margin:0 auto; width:80px; height:80px; image-rendering: pixelated;"
+                          width="90"
+                          height="90"
+                          style="display:block; margin:0 auto; width:90px; height:90px; image-rendering: pixelated;"
                         />
                         <div class="qr-label" style="${isBold('qrText') ? 'font-weight: bold;' : ''}">
                           ${settings.qr.labelText}
                         </div>
                       </div>` : ''}
                     
-                    <div class="separator"></div>
+                    ${(settings.socialMedia.show) ? '<div class="separator"></div>' : ''}
+                    
                     <div class="footer">
                         <div style="${isBold('footer') ? 'font-weight: bold;' : ''}">${settings.footer.message}</div>
                         ${settings.footer.repeatBusinessName ? `<div style="${isBold('footer') ? 'font-weight: bold;' : ''}">${settings.header.businessName}</div>` : ''}
@@ -209,6 +225,9 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
         </div>
         <div className="bg-gray-200 p-4 rounded-md overflow-x-auto flex justify-center">
             <div id="invoice-preview-wrapper" className="origin-top scale-[1.15]">
+                 <div ref={qrCodeRef} style={{ position: 'absolute', left: '-9999px', top: 0 }}>
+                    {settings.qr.url && <QRCode value={settings.qr.url} size={200} level="H" />}
+                </div>
                 <InvoiceTemplate config={settings} order={mockOrder} />
             </div>
         </div>
