@@ -19,12 +19,13 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
     if (printWindow) {
       const printableContent = document.getElementById('invoice-preview')?.innerHTML;
       printWindow.document.write('<html><head><title>Factura</title>');
-      printWindow.document.write('<style>body { margin: 0; } @page { size: auto;  margin: 0mm; }</style>');
+      // CORRECCIÓN: Se añade box-sizing: border-box para que el padding se aplique correctamente.
+      printWindow.document.write('<style>body { margin: 0; } * { box-sizing: border-box; } @page { size: auto;  margin: 0mm; }</style>');
       printWindow.document.write('</head><body>');
       printWindow.document.write(printableContent || '');
       printWindow.document.write('</body></html>');
       printWindow.document.close();
-      printWindow.print();
+      printWindow.document.print();
     }
   };
 
