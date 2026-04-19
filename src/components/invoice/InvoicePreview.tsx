@@ -22,87 +22,107 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
 
   const handlePrint = async () => {
     const printWindow = window.open('', '_blank');
-    if (printWindow) {
-      let qrCodeImage = '';
-      if (settings.qr.show && settings.qr.url && qrCodeRef.current) {
+    if (!printWindow) {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'No se pudo abrir la ventana de impresión. Revisa los bloqueadores de pop-ups.',
+      });
+      return;
+    }
+
+    let qrCodeImage = '';
+    if (settings.qr.show && settings.qr.url && qrCodeRef.current) {
         try {
-          const canvas = await html2canvas(qrCodeRef.current, { backgroundColor: null, scale: 3 });
-          qrCodeImage = canvas.toDataURL('image/png');
+            const canvas = await html2canvas(qrCodeRef.current, { backgroundColor: null, scale: 3 });
+            qrCodeImage = canvas.toDataURL('image/png');
         } catch (e) {
-          console.error("No se pudo renderizar el QR a imagen", e);
-          toast({ variant: "destructive", title: "Error de QR", description: "No se pudo generar la imagen del QR para la impresión."});
+            console.error("No se pudo renderizar el QR a imagen", e);
+            toast({ variant: "destructive", title: "Error de QR", description: "No se pudo generar la imagen del QR para la impresión."});
         }
-      }
-      
-      const printableContent = `
+    }
+
+    const printableContent = `
         <html>
-          <head>
-            <title>Factura</title>
-            <style>
-              body { font-family: 'Courier New', monospace; font-size: 11px; width: ${settings.style.paperSize === '80mm' ? '72mm' : '52mm'}; margin: 0 auto; padding: 4px; box-sizing: border-box; color: black; }
-              .header, .footer, .text-center { text-align: center; }
-              .text-right { text-align: right; }
-              .separator { border-top: 1px dashed #000; margin: 6px 0; }
-              .logo { display: block; margin: 12px auto 8px auto; max-width: 80px; }
-              .qr-container { display: flex; flex-direction: column; align-items: center; width: 100%; margin: 8px 0; }
-              .qr-container img { width: 100px; height: 100px; }
-              .qr-label { text-align: center; margin-top: 4px; }
-              table { width: 100%; border-collapse: collapse; }
-              td, th { padding: 1px 0; }
-              .total-row { font-weight: bold; font-size: 14px; }
-              .item-row td { vertical-align: top; }
-            </style>
-          </head>
-          <body>
-            <div>
-              ${settings.logo.url ? `<img src="${settings.logo.url}" class="logo" style="width: ${settings.logo.size};" />` : ''}
-              <div class="header" style="${settings.bold.zones.businessName ? 'font-weight: bold;' : ''}">${settings.header.businessName}</div>
-              <div class="header" style="${settings.bold.zones.address ? 'font-weight: bold;' : ''}">${settings.header.address}</div>
-              <div class="header">${settings.header.phone}</div>
-              ${settings.header.nit ? `<div class="header" style="${settings.bold.zones.nit ? 'font-weight: bold;' : ''}">NIT: ${settings.header.nit}</div>` : ''}
-              <div class="separator"></div>
-              ${settings.fields.showInvoiceNumber ? `<div style="${settings.bold.zones.invoiceNumber ? 'font-weight: bold;' : ''}">Factura: ${mockOrder.invoiceNumber}</div>` : ''}
-              ${settings.fields.showDateTime ? `<div style="${settings.bold.zones.dateTime ? 'font-weight: bold;' : ''}">Fecha: ${mockOrder.dateTime}</div>` : ''}
-              <div class="separator"></div>
-              <div style="${settings.bold.zones.clientName ? 'font-weight: bold;' : ''}">Cliente: ${mockOrder.client.name}</div>
-              ${settings.fields.showClientPhone ? `<div style="${settings.bold.zones.clientPhone ? 'font-weight: bold;' : ''}">Tel: ${mockOrder.client.phone}</div>` : ''}
-              ${settings.fields.showClientAddress ? `<div style="${settings.bold.zones.clientAddress ? 'font-weight: bold;' : ''}">Dir: ${mockOrder.client.address}</div>` : ''}
-              <div class="separator"></div>
-              <table style="${settings.bold.zones.items ? 'font-weight: bold;' : ''}">
-                <thead><tr><th class="text-left">Cant</th><th class="text-left">Producto</th><th class="text-right">Total</th></tr></thead>
-                <tbody>${mockOrder.items.map(item => `<tr><td>${item.quantity}</td><td>${item.name}</td><td class="text-right">${(item.quantity * item.price).toLocaleString()}</td></tr>`).join('')}</tbody>
-              </table>
-              <div class="separator"></div>
-              <div class="text-right" style="${settings.bold.zones.subtotalFees ? 'font-weight: bold;' : ''}">
-                <div>Subtotal: ${mockOrder.subtotal.toLocaleString()}</div>
-                ${settings.fields.showDeliveryFee ? `<div>Domicilio: ${mockOrder.deliveryFee.toLocaleString()}</div>` : ''}
-                ${settings.fields.showPackaging ? `<div>Empaque: ${mockOrder.packaging.toLocaleString()}</div>` : ''}
-              </div>
-              <div class="separator"></div>
-              <div class="total-row text-right" style="${settings.bold.zones.total ? 'font-weight: bold;' : ''}">TOTAL: ${mockOrder.total.toLocaleString()}</div>
-              ${(settings.fields.showPaymentMethod || settings.fields.showEstimatedDelivery) ? '<div class="separator"></div>' : ''}
-              ${settings.fields.showPaymentMethod ? `<div style="${settings.bold.zones.paymentMethod ? 'font-weight: bold;' : ''}">Método de pago: ${mockOrder.paymentMethod}</div>` : ''}
-              ${settings.fields.showEstimatedDelivery ? `<div style="${settings.bold.zones.estimatedDelivery ? 'font-weight: bold;' : ''}">Tiempo de entrega: ${mockOrder.estimatedDelivery}</div>` : ''}
-              ${settings.promo.show && settings.promo.text ? `<div class="separator"></div><div class="text-center font-bold">${settings.promo.text}</div>` : ''}
-              ${settings.qr.show ? `<div class="qr-container">${qrCodeImage ? `<img src="${qrCodeImage}" alt="QR Code" />` : (settings.qr.url ? 'Generando QR...' : 'QR no configurado')}<div class="qr-label" style="${settings.bold.zones.qrText ? 'font-weight: bold;' : ''}">${settings.qr.labelText}</div></div>` : ''}
-              <div class="separator"></div>
-              <div class="footer">
-                <div style="${settings.bold.zones.footer ? 'font-weight: bold;' : ''}">${settings.footer.message}</div>
-                ${settings.footer.repeatBusinessName ? `<div style="${settings.bold.zones.footer ? 'font-weight: bold;' : ''}">${settings.header.businessName}</div>` : ''}
-              </div>
-            </div>
-          </body>
+            <head>
+                <title>Factura</title>
+                <style>
+                    * { 
+                        box-sizing: border-box; 
+                        font-family: '${settings.style.font}', monospace; 
+                    }
+                    body { 
+                        font-size: ${settings.style.fontSize};
+                        width: ${settings.style.paperSize === '80mm' ? '72mm' : '52mm'}; 
+                        margin: 0 auto; 
+                        padding: 4px;
+                        color: black; 
+                    }
+                    .header, .footer, .text-center { text-align: center; }
+                    .text-right { text-align: right; }
+                    .separator { border-top: 1px ${settings.style.separatorStyle} #000; margin: 4px 0; }
+                    .logo-container { display: flex; justify-content: ${settings.logo.position}; width: 100%; margin-top: 12px; margin-bottom: 8px; }
+                    .logo { max-width: ${settings.logo.size}; height: auto; }
+                    .qr-container { display: flex; flex-direction: column; align-items: center; width: 100%; margin: 8px 0; }
+                    .qr-container img { width: 80px; height: 80px; }
+                    .qr-label { text-align: center; margin-top: 4px; }
+                    table { width: 100%; border-collapse: collapse; }
+                    td, th { padding: 1px 0; }
+                    .total-row { font-weight: bold; font-size: 1.1em; }
+                    .item-row td { vertical-align: top; }
+                </style>
+            </head>
+            <body>
+                <div style="${settings.bold.allBold ? 'font-weight: bold;' : ''}">
+                    ${settings.logo.url ? `<div class="logo-container"><img src="${settings.logo.url}" class="logo" /></div>` : ''}
+                    <div class="header" style="${isBold('businessName') ? 'font-weight: bold;' : ''}">${settings.header.businessName}</div>
+                    <div class="header" style="${isBold('address') ? 'font-weight: bold;' : ''}">${settings.header.address}</div>
+                    <div class="header">${settings.header.phone}</div>
+                    ${settings.header.nit ? `<div class="header" style="${isBold('nit') ? 'font-weight: bold;' : ''}">NIT: ${settings.header.nit}</div>` : ''}
+                    <div class="separator"></div>
+                    ${settings.fields.showInvoiceNumber ? `<div style="${isBold('invoiceNumber') ? 'font-weight: bold;' : ''}">Factura: ${mockOrder.invoiceNumber}</div>` : ''}
+                    ${settings.fields.showDateTime ? `<div style="${isBold('dateTime') ? 'font-weight: bold;' : ''}">Fecha: ${mockOrder.dateTime}</div>` : ''}
+                    <div class="separator"></div>
+                    <div style="${isBold('clientName') ? 'font-weight: bold;' : ''}">Cliente: ${mockOrder.client.name}</div>
+                    ${settings.fields.showClientPhone ? `<div style="${isBold('clientPhone') ? 'font-weight: bold;' : ''}">Tel: ${mockOrder.client.phone}</div>` : ''}
+                    ${settings.fields.showClientAddress ? `<div style="${isBold('clientAddress') ? 'font-weight: bold;' : ''}">Dir: ${mockOrder.client.address}</div>` : ''}
+                    <div class="separator"></div>
+                    <table style="${isBold('items') ? 'font-weight: bold;' : ''}">
+                        <thead><tr><th class="text-left">Cant</th><th class="text-left">Producto</th><th class="text-right">Total</th></tr></thead>
+                        <tbody>${mockOrder.items.map(item => `<tr class="item-row"><td>${item.quantity}</td><td>${item.name}</td><td class="text-right">${(item.quantity * item.price).toLocaleString()}</td></tr>`).join('')}</tbody>
+                    </table>
+                    <div class="separator"></div>
+                    <div class="text-right" style="${isBold('subtotalFees') ? 'font-weight: bold;' : ''}">
+                        <div>Subtotal: ${mockOrder.subtotal.toLocaleString()}</div>
+                        ${settings.fields.showDeliveryFee ? `<div>Domicilio: ${mockOrder.deliveryFee.toLocaleString()}</div>` : ''}
+                        ${settings.fields.showPackaging ? `<div>Empaque: ${mockOrder.packaging.toLocaleString()}</div>` : ''}
+                    </div>
+                    <div class="separator"></div>
+                    <div class="total-row text-right" style="${isBold('total') ? 'font-weight: bold;' : ''}">TOTAL: ${mockOrder.total.toLocaleString()}</div>
+                    ${(settings.fields.showPaymentMethod || settings.fields.showEstimatedDelivery) ? '<div class="separator"></div>' : ''}
+                    ${settings.fields.showPaymentMethod ? `<div style="${isBold('paymentMethod') ? 'font-weight: bold;' : ''}">Método de pago: ${mockOrder.paymentMethod}</div>` : ''}
+                    ${settings.fields.showEstimatedDelivery ? `<div style="${isBold('estimatedDelivery') ? 'font-weight: bold;' : ''}">Tiempo de entrega: ${mockOrder.estimatedDelivery}</div>` : ''}
+                    ${settings.promo.show && settings.promo.text ? `<div class="separator"></div><div class="text-center font-bold">${settings.promo.text}</div>` : ''}
+                    ${settings.qr.show ? `<div class="qr-container">${qrCodeImage ? `<img src="${qrCodeImage}" alt="QR Code" />` : ''}<div class="qr-label" style="${isBold('qrText') ? 'font-weight: bold;' : ''}">${settings.qr.labelText}</div></div>` : ''}
+                    <div class="separator"></div>
+                    <div class="footer">
+                        <div style="${isBold('footer') ? 'font-weight: bold;' : ''}">${settings.footer.message}</div>
+                        ${settings.footer.repeatBusinessName ? `<div style="${isBold('footer') ? 'font-weight: bold;' : ''}">${settings.header.businessName}</div>` : ''}
+                    </div>
+                </div>
+            </body>
         </html>
-      `;
+    `;
 
       printWindow.document.write(printableContent);
       printWindow.document.close();
       setTimeout(() => {
         printWindow.print();
         printWindow.close();
-      }, 500); // Small delay for images to load
-    }
+      }, 500);
   };
+  
+   const isBold = (zone: keyof InvoiceSettings['bold']['zones']) => settings.bold.allBold || settings.bold.zones[zone];
 
   return (
     <Card className="sticky top-6">
