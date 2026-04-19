@@ -1,3 +1,4 @@
+
 'use client';
 import React, { useRef, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -9,7 +10,7 @@ import { InvoiceTemplate, mockOrder } from './InvoiceTemplate';
 import type { InvoiceSettings } from '@/models/invoice-settings';
 import html2canvas from 'html2canvas';
 import { useToast } from '@/hooks/use-toast';
-import QRCode from 'react-qr-code';
+import QRCode from 'qrcode';
 import { cn } from '@/lib/utils';
 
 
@@ -22,6 +23,18 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
   const { toast } = useToast();
   const qrCodeRef = useRef<HTMLDivElement>(null);
 
+  const generateQRFallbackBase64 = (url: string): string => {
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" 
+      width="80" height="80" viewBox="0 0 80 80">
+      <rect width="80" height="80" fill="white"/>
+      <text x="40" y="35" text-anchor="middle" 
+        font-size="8" fill="black">Escanear:</text>
+      <text x="40" y="50" text-anchor="middle" 
+        font-size="6" fill="black">${url.substring(0, 30)}</text>
+    </svg>`;
+    return `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(svg)))}`;
+  };
+  
   const handlePrint = async () => {
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
@@ -34,45 +47,19 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
     }
 
     let qrCodeImage = '';
-
-    const generateQRFallbackBase64 = (url: string): string => {
-        const svg = `<svg xmlns="http://www.w3.org/2000/svg" 
-          width="80" height="80" viewBox="0 0 80 80">
-          <rect width="80" height="80" fill="white"/>
-          <text x="40" y="35" text-anchor="middle" 
-            font-size="8" fill="black">Escanear:</text>
-          <text x="40" y="50" text-anchor="middle" 
-            font-size="6" fill="black">${url.substring(0, 30)}</text>
-        </svg>`;
-        return `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(svg)))}`;
-    };
     
-    // Attempt to generate QR code image
-    if (settings.qr.show && settings.qr.url) {
-        // 1. Try html2canvas
-        if (qrCodeRef.current) {
-            try {
-                const canvas = await html2canvas(qrCodeRef.current, { backgroundColor: '#ffffff', scale: 3, useCORS: true, logging: false });
-                qrCodeImage = canvas.toDataURL('image/png');
-            } catch (e) {
-                console.error("html2canvas failed, trying next method:", e);
-            }
-        }
-        
-        // 2. If html2canvas failed, try qrcode library
-        if (!qrCodeImage) {
-            try {
-                const QRCodeLib = await import('qrcode');
-                qrCodeImage = await QRCodeLib.toDataURL(settings.qr.url, {
-                    width: 120,
-                    margin: 1,
-                    color: { dark: '#000000', light: '#ffffff' }
-                });
-            } catch (e2) {
-                console.error("QRCode lib failed, using SVG fallback:", e2);
-                qrCodeImage = generateQRFallbackBase64(settings.qr.url);
-            }
-        }
+    // Si html2canvas falló, generar QR como canvas manualmente
+    if (!qrCodeImage && settings.qr.show && settings.qr.url) {
+      try {
+        qrCodeImage = await QRCode.toDataURL(settings.qr.url, {
+          width: 120,
+          margin: 1,
+          color: { dark: '#000000', light: '#ffffff' }
+        });
+      } catch (e2) {
+        console.error("QRCode lib failed, using SVG fallback:", e2);
+        qrCodeImage = generateQRFallbackBase64(settings.qr.url);
+      }
     }
 
     const isBold = (zone: keyof InvoiceSettings['bold']['zones']) => settings.bold.allBold || settings.bold.zones[zone];
@@ -84,29 +71,37 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
                 <style>
                     * { box-sizing: border-box; }
                     body { 
-                        font-family: '${settings.style.font}', monospace !important; 
-                        font-size: ${settings.style.fontSize} !important;
+                        font-family: '${settings.style.font}', monospace; 
+                        font-size: ${settings.style.fontSize};
                         width: ${settings.style.paperSize === '80mm' ? '72mm' : '52mm'}; 
                         margin: 0 auto; 
                         padding: 8px;
                         color: black; 
                     }
-                    .header, .footer, .text-center { text-align: center; }
-                    .text-right { text-align: right; }
-                    .separator { border-top: 1px ${settings.style.separatorStyle} #000; margin: 4px 0; }
-                    .logo-container { text-align: ${settings.logo.position}; width: 100%; }
-                    .logo { display: inline-block; margin: 12px 0 8px 0; max-width: ${settings.logo.size}; height: auto; }
-                    .qr-container { display: flex; flex-direction: column; align-items: center; width: 100%; margin: 8px 0; }
-                    .qr-container img { width: 80px; height: 80px; display: block; margin: 0 auto; }
-                    .qr-label { text-align: center; margin-top: 4px; }
-                    .total-row { font-weight: bold; font-size: 1.1em; }
                     table, thead, tbody, tr, th, td {
                         font-family: '${settings.style.font}', monospace !important;
                         font-size: ${settings.style.fontSize} !important;
                     }
+                    th {
+                        text-align: left;
+                        font-weight: bold;
+                        border-bottom: 1px ${settings.style.separatorStyle} #000;
+                        padding-bottom: 2px;
+                    }
+                    td { 
+                        padding: 1px 2px; 
+                        vertical-align: top; 
+                    }
+                    .header, .footer, .text-center { text-align: center; }
+                    .text-right { text-align: right; }
+                    .separator { border-top: 1px ${settings.style.separatorStyle} #000; margin: 4px 0; }
+                    .logo-container { text-align: ${settings.logo.position}; width: 100%; }
+                    .logo { display: block; margin: 12px auto 8px auto; max-width: ${settings.logo.size}; height: auto; }
+                    .qr-container { display: flex; flex-direction: column; align-items: center; width: 100%; margin: 8px 0; }
+                    .qr-container img { width: 80px; height: 80px; display:block; margin:0 auto; width:80px; height:80px;}
+                    .qr-label { text-align: center; margin-top: 4px; }
+                    .total-row { font-weight: bold; font-size: 1.1em; }
                     table { width: 100%; border-collapse: collapse; }
-                    th { text-align: left; font-weight: bold; border-bottom: 1px ${settings.style.separatorStyle} #000; padding-bottom: 2px; }
-                    td { padding: 1px 2px; vertical-align: top; }
                 </style>
             </head>
             <body>
