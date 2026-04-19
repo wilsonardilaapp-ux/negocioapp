@@ -1,5 +1,5 @@
 'use client';
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
@@ -10,6 +10,8 @@ import type { InvoiceSettings } from '@/models/invoice-settings';
 import html2canvas from 'html2canvas';
 import { useToast } from '@/hooks/use-toast';
 import QRCode from 'react-qr-code';
+import { cn } from '@/lib/utils';
+
 
 interface InvoicePreviewProps {
   settings: InvoiceSettings;
@@ -32,15 +34,21 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
     }
 
     let qrCodeImage = '';
-    if (settings.qr.show && settings.qr.url && qrCodeRef.current) {
-        try {
-            const canvas = await html2canvas(qrCodeRef.current, { backgroundColor: null, scale: 3 });
-            qrCodeImage = canvas.toDataURL('image/png');
-        } catch (e) {
-            console.error("No se pudo renderizar el QR a imagen", e);
-            toast({ variant: "destructive", title: "Error de QR", description: "No se pudo generar la imagen del QR para la impresión."});
-        }
+    if (settings.qr.show && qrCodeRef.current) {
+      try {
+        const canvas = await html2canvas(qrCodeRef.current, { backgroundColor: null, scale: 3 });
+        qrCodeImage = canvas.toDataURL('image/png');
+      } catch (e) {
+        console.error("No se pudo renderizar el QR a imagen", e);
+        toast({ variant: "destructive", title: "Error de QR", description: "No se pudo generar la imagen del QR para la impresión." });
+      }
     }
+
+    const qrFallbackUrl = settings.qr.url
+      ? `https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=${encodeURIComponent(settings.qr.url)}`
+      : '';
+
+    const isBold = (zone: keyof InvoiceSettings['bold']['zones']) => settings.bold.allBold || settings.bold.zones[zone];
 
     const printableContent = `
         <html>
@@ -49,10 +57,10 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
                 <style>
                     * { 
                         box-sizing: border-box; 
-                        font-family: '${settings.style.font}', monospace; 
                     }
                     body { 
-                        font-size: ${settings.style.fontSize};
+                        font-family: '${settings.style.font}', monospace !important; 
+                        font-size: ${settings.style.fontSize} !important;
                         width: ${settings.style.paperSize === '80mm' ? '72mm' : '52mm'}; 
                         margin: 0 auto; 
                         padding: 4px;
@@ -61,15 +69,18 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
                     .header, .footer, .text-center { text-align: center; }
                     .text-right { text-align: right; }
                     .separator { border-top: 1px ${settings.style.separatorStyle} #000; margin: 4px 0; }
-                    .logo-container { display: flex; justify-content: ${settings.logo.position}; width: 100%; margin-top: 12px; margin-bottom: 8px; }
-                    .logo { max-width: ${settings.logo.size}; height: auto; }
+                    .logo { display: block; margin: 12px auto 8px auto; max-width: ${settings.logo.size}; height: auto; }
                     .qr-container { display: flex; flex-direction: column; align-items: center; width: 100%; margin: 8px 0; }
-                    .qr-container img { width: 80px; height: 80px; }
+                    .qr-container img { width: 80px; height: 80px; display: block; margin: 0 auto; }
                     .qr-label { text-align: center; margin-top: 4px; }
                     table { width: 100%; border-collapse: collapse; }
-                    td, th { padding: 1px 0; }
+                    th { text-align: left; font-weight: bold; border-bottom: 1px ${settings.style.separatorStyle} #000; padding-bottom: 2px; }
+                    td { padding: 1px 2px; vertical-align: top; }
+                    table, thead, tbody, tr, th, td {
+                        font-family: '${settings.style.font}', monospace !important;
+                        font-size: ${settings.style.fontSize} !important;
+                    }
                     .total-row { font-weight: bold; font-size: 1.1em; }
-                    .item-row td { vertical-align: top; }
                 </style>
             </head>
             <body>
@@ -88,8 +99,8 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
                     ${settings.fields.showClientAddress ? `<div style="${isBold('clientAddress') ? 'font-weight: bold;' : ''}">Dir: ${mockOrder.client.address}</div>` : ''}
                     <div class="separator"></div>
                     <table style="${isBold('items') ? 'font-weight: bold;' : ''}">
-                        <thead><tr><th class="text-left">Cant</th><th class="text-left">Producto</th><th class="text-right">Total</th></tr></thead>
-                        <tbody>${mockOrder.items.map(item => `<tr class="item-row"><td>${item.quantity}</td><td>${item.name}</td><td class="text-right">${(item.quantity * item.price).toLocaleString()}</td></tr>`).join('')}</tbody>
+                        <thead><tr><th>Cant</th><th>Producto</th><th class="text-right">Total</th></tr></thead>
+                        <tbody>${mockOrder.items.map(item => `<tr><td>${item.quantity}</td><td>${item.name}</td><td class="text-right">${(item.quantity * item.price).toLocaleString()}</td></tr>`).join('')}</tbody>
                     </table>
                     <div class="separator"></div>
                     <div class="text-right" style="${isBold('subtotalFees') ? 'font-weight: bold;' : ''}">
@@ -103,7 +114,20 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
                     ${settings.fields.showPaymentMethod ? `<div style="${isBold('paymentMethod') ? 'font-weight: bold;' : ''}">Método de pago: ${mockOrder.paymentMethod}</div>` : ''}
                     ${settings.fields.showEstimatedDelivery ? `<div style="${isBold('estimatedDelivery') ? 'font-weight: bold;' : ''}">Tiempo de entrega: ${mockOrder.estimatedDelivery}</div>` : ''}
                     ${settings.promo.show && settings.promo.text ? `<div class="separator"></div><div class="text-center font-bold">${settings.promo.text}</div>` : ''}
-                    ${settings.qr.show ? `<div class="qr-container">${qrCodeImage ? `<img src="${qrCodeImage}" alt="QR Code" />` : ''}<div class="qr-label" style="${isBold('qrText') ? 'font-weight: bold;' : ''}">${settings.qr.labelText}</div></div>` : ''}
+                    
+                    ${settings.qr.show ? `
+                      <div class="qr-container">
+                        <img 
+                          src="${qrCodeImage || qrFallbackUrl}" 
+                          alt="QR Code" 
+                          width="80" 
+                          height="80"
+                        />
+                        <div class="qr-label" style="${isBold('qrText') ? 'font-weight: bold;' : ''}">
+                          ${settings.qr.labelText}
+                        </div>
+                      </div>` : ''}
+
                     <div class="separator"></div>
                     <div class="footer">
                         <div style="${isBold('footer') ? 'font-weight: bold;' : ''}">${settings.footer.message}</div>
@@ -121,8 +145,8 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
         printWindow.close();
       }, 500);
   };
-  
-   const isBold = (zone: keyof InvoiceSettings['bold']['zones']) => settings.bold.allBold || settings.bold.zones[zone];
+
+  const isBold = (zone: keyof InvoiceSettings['bold']['zones']) => settings.bold.allBold || settings.bold.zones[zone];
 
   return (
     <Card className="sticky top-6">
@@ -164,3 +188,5 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
     </Card>
   );
 };
+
+    
