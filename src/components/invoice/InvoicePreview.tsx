@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useRef, useState } from 'react';
@@ -33,6 +32,7 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
     return `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(svg)))}`;
   };
 
+
   const handlePrint = async () => {
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
@@ -45,16 +45,22 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
     }
 
     let qrCodeImage = '';
-    if (settings.qr.show && settings.qr.url) {
-      try {
-        qrCodeImage = await QRCode.toDataURL(settings.qr.url, {
-          width: 120,
-          margin: 1,
-          color: { dark: '#000000', light: '#ffffff' },
-        });
-      } catch (e) {
-        console.error("Fallo de la librería QRCode, usando SVG de respaldo:", e);
-        qrCodeImage = generateQRFallbackBase64(settings.qr.url);
+    const qrUrlToGenerate = settings.qr.url || 'https://www.google.com';
+
+    if (settings.qr.show && qrUrlToGenerate) {
+      if (settings.qr.qrImageUrl) {
+        qrCodeImage = settings.qr.qrImageUrl;
+      } else {
+        try {
+          qrCodeImage = await QRCode.toDataURL(qrUrlToGenerate, {
+            width: 120,
+            margin: 1,
+            color: { dark: '#000000', light: '#ffffff' },
+          });
+        } catch (e) {
+          console.error("QRCode lib failed:", e);
+          qrCodeImage = generateQRFallbackBase64(qrUrlToGenerate);
+        }
       }
     }
 
@@ -66,14 +72,16 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
                 <title>Factura</title>
                 <style>
                     * { 
-                      box-sizing: border-box; 
+                      box-sizing: border-box;
+                    }
+                    body, table, thead, tbody, tr, th, td { 
                       font-family: '${settings.style.font}', monospace !important;
                       font-size: ${settings.style.fontSize} !important;
                     }
                     body { 
                         width: ${settings.style.paperSize === '80mm' ? '72mm' : '52mm'}; 
                         margin: 0 auto; 
-                        padding: 4px;
+                        padding: 8px;
                         color: black; 
                     }
                     .header, .footer, .text-center { text-align: center; }
@@ -82,7 +90,6 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
                     .logo-container { display: flex; justify-content: ${settings.logo.position}; width: 100%; margin-top: 12px; margin-bottom: 8px; }
                     .logo { display: block; max-width: ${settings.logo.size}; height: auto; }
                     .qr-container { display: flex; flex-direction: column; align-items: center; width: 100%; margin: 8px 0; }
-                    .qr-container img { width: 80px; height: 80px; display:block; margin:0 auto; }
                     .qr-label { text-align: center; margin-top: 4px; }
                     table { width: 100%; border-collapse: collapse; }
                     th { text-align: left; font-weight: bold; border-bottom: 1px ${settings.style.separatorStyle} #000; padding-bottom: 2px; }
