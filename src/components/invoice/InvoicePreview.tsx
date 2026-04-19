@@ -1,6 +1,10 @@
+
 'use client';
 
 import React, { useRef, useState } from 'react';
+import QRCode from 'qrcode';
+import html2canvas from 'html2canvas';
+
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
@@ -9,8 +13,6 @@ import { Printer, Loader2 } from 'lucide-react';
 import { InvoiceTemplate, mockOrder } from './InvoiceTemplate';
 import type { InvoiceSettings } from '@/models/invoice-settings';
 import { useToast } from '@/hooks/use-toast';
-import QRCode from 'qrcode';
-import { cn } from '@/lib/utils';
 
 interface InvoicePreviewProps {
   settings: InvoiceSettings;
@@ -19,6 +21,7 @@ interface InvoicePreviewProps {
 
 export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSettings }) => {
   const { toast } = useToast();
+  const qrCodeRef = useRef<HTMLDivElement>(null);
 
   const handlePrint = async () => {
     const printWindow = window.open('', '_blank');
@@ -34,32 +37,27 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
     let qrCodeImage = '';
     const qrUrlToGenerate = settings.qr.url || 'https://www.google.com';
 
-    if (settings.qr.show && qrUrlToGenerate) {
-      if (settings.qr.qrImageUrl) {
+    // 1. Prioritize uploaded custom QR
+    if (settings.qr.show && settings.qr.qrImageUrl) {
         qrCodeImage = settings.qr.qrImageUrl;
-      } else {
-        try {
-          qrCodeImage = await QRCode.toDataURL(qrUrlToGenerate, {
-            width: 120,
-            margin: 1,
-            color: { dark: '#000000', light: '#ffffff' },
-          });
-        } catch (e) {
-          console.error("QRCode generation failed:", e);
-        }
+    } 
+    // 2. Fallback to generating QR from URL
+    else if (settings.qr.show && qrUrlToGenerate) {
+      try {
+        qrCodeImage = await QRCode.toDataURL(qrUrlToGenerate, {
+          width: 200, // Higher resolution for printing
+          margin: 1,
+          errorCorrectionLevel: 'H', // Higher error correction
+          color: { dark: '#000000', light: '#ffffff' },
+        });
+      } catch (e) {
+        console.error("QRCode generation failed:", e);
       }
     }
     
-    // CORRECTION: Use larger, more appropriate point sizes for printing.
-    const fontSizeMapping = {
-        '9px': '8pt',
-        '10px': '9pt', // A good default for thermal printers
-        '11px': '10pt',
-        '12px': '11pt'
-    };
-    const printFontSize = fontSizeMapping[settings.style.fontSize as keyof typeof fontSizeMapping] || '9pt'; // Default to 9pt
-
     const isBold = (zone: keyof InvoiceSettings['bold']['zones']) => settings.bold.allBold || settings.bold.zones[zone];
+    const fontSizeMapping = { '9px': '8pt', '10px': '9pt', '11px': '10pt', '12px': '11pt' };
+    const printFontSize = fontSizeMapping[settings.style.fontSize as keyof typeof fontSizeMapping] || '9pt';
 
     const printableContent = `
         <html>
@@ -71,45 +69,63 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
                             size: ${settings.style.paperSize === '80mm' ? '72mm' : '52mm'} auto;
                             margin: 0;
                         }
-                        html, body {
-                            margin: 0 !important;
-                            padding: 0 !important;
-                        }
                     }
                     * { 
                       box-sizing: border-box;
-                    }
-                    body {
+                      word-wrap: break-word;
+                      overflow-wrap: break-word;
                       font-family: '${settings.style.font}', monospace !important;
+                    }
+                    body { 
                       font-size: ${printFontSize} !important;
-                      width: ${settings.style.paperSize === '80mm' ? '72mm' : '52mm'}; 
+                      width: 100%;
+                      max-width: ${settings.style.paperSize === '80mm' ? '72mm' : '52mm'};
+                      margin: 0 auto; 
+                      padding: 2px 4px;
                       color: black;
-                      margin: 0 auto;
-                      padding: 4px;
                     }
                     table, thead, tbody, tr, th, td {
                         font-family: inherit !important;
                         font-size: inherit !important;
                     }
                     .header, .footer, .text-center { text-align: center; }
-                    .text-right { text-align: right; }
                     .separator { border-top: 1px ${settings.style.separatorStyle} #000; margin: 4px 0; }
-                    .logo-container { display: flex; justify-content: ${settings.logo.position}; width: 100%; margin: 12px 0 8px 0; }
+                    .logo-container { display: flex; justify-content: center; width: 100%; margin: 12px 0 8px 0; }
                     .logo { display: block; max-width: ${settings.logo.size}; height: auto; }
-                    .qr-container { display: flex; flex-direction: column; align-items: center; width: 100%; margin: 8px 0; }
-                    .qr-label { text-align: center; margin-top: 4px; }
-                    table { width: 100%; border-collapse: collapse; }
+                    
+                    .qr-container { 
+                      display: flex; 
+                      flex-direction: column;
+                      align-items: center; 
+                      width: 100%; 
+                      margin: 8px 0; 
+                    }
+                    .qr-label { 
+                      text-align: center; 
+                      margin-top: 4px; 
+                    }
+                    
+                    table { 
+                      width: 100%; 
+                      border-collapse: collapse;
+                      table-layout: fixed;
+                    }
                     th {
                         text-align: left;
                         font-weight: bold;
                         border-bottom: 1px ${settings.style.separatorStyle} #000;
                         padding-bottom: 2px;
                     }
+                    th:nth-child(1), td:nth-child(1) { width: 15%; }
+                    th:nth-child(2), td:nth-child(2) { width: 50%; }
+                    th:nth-child(3), td:nth-child(3) { width: 35%; text-align: right; }
+                    
                     td { 
-                        padding: 1px 2px; 
-                        vertical-align: top; 
+                      padding: 1px 2px; 
+                      vertical-align: top;
+                      overflow: hidden;
+                      word-wrap: break-word;
                     }
-                    .total-row { font-weight: bold; font-size: calc(${printFontSize} + 2pt); }
                 </style>
             </head>
             <body>
@@ -132,13 +148,13 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
                         <tbody>${mockOrder.items.map(item => `<tr><td>${item.quantity}</td><td>${item.name}</td><td class="text-right">${(item.quantity * item.price).toLocaleString()}</td></tr>`).join('')}</tbody>
                     </table>
                     <div class="separator"></div>
-                    <div class="text-right" style="${isBold('subtotalFees') ? 'font-weight: bold;' : ''}">
-                        <div>Subtotal: ${mockOrder.subtotal.toLocaleString()}</div>
-                        ${settings.fields.showDeliveryFee ? `<div>Domicilio: ${mockOrder.deliveryFee.toLocaleString()}</div>` : ''}
-                        ${settings.fields.showPackaging ? `<div>Empaque: ${mockOrder.packaging.toLocaleString()}</div>` : ''}
+                    <div style="width:100%; ${isBold('subtotalFees') ? 'font-weight:bold;' : ''}">
+                        <div style="display:flex; justify-content:space-between;"><span>Subtotal:</span><span>${mockOrder.subtotal.toLocaleString()}</span></div>
+                        ${settings.fields.showDeliveryFee ? `<div style="display:flex; justify-content:space-between;"><span>Domicilio:</span><span>${mockOrder.deliveryFee.toLocaleString()}</span></div>` : ''}
+                        ${settings.fields.showPackaging ? `<div style="display:flex; justify-content:space-between;"><span>Empaque:</span><span>${mockOrder.packaging.toLocaleString()}</span></div>` : ''}
                     </div>
                     <div class="separator"></div>
-                    <div class="total-row text-right" style="${isBold('total') ? 'font-weight: bold;' : ''}">TOTAL: ${mockOrder.total.toLocaleString()}</div>
+                    <div style="display:flex; justify-content:space-between; font-weight:bold; font-size:1.2em; width:100%; ${isBold('total') ? 'font-weight: bold;' : ''}"><span>TOTAL:</span><span>${mockOrder.total.toLocaleString()}</span></div>
                     ${(settings.fields.showPaymentMethod || settings.fields.showEstimatedDelivery) ? '<div class="separator"></div>' : ''}
                     ${settings.fields.showPaymentMethod ? `<div style="${isBold('paymentMethod') ? 'font-weight: bold;' : ''}">Método de pago: ${mockOrder.paymentMethod}</div>` : ''}
                     ${settings.fields.showEstimatedDelivery ? `<div style="${isBold('estimatedDelivery') ? 'font-weight: bold;' : ''}">Tiempo de entrega: ${mockOrder.estimatedDelivery}</div>` : ''}
@@ -149,9 +165,9 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
                         <img 
                           src="${qrCodeImage}" 
                           alt="QR Code"
-                          width="80" 
-                          height="80"
-                          style="display:block; margin:0 auto; width:80px; height:80px;"
+                          width="90" 
+                          height="90"
+                          style="display:block; margin:0 auto; width:90px; height:90px; image-rendering: pixelated;"
                         />
                         <div class="qr-label" style="${isBold('qrText') ? 'font-weight: bold;' : ''}">
                           ${settings.qr.labelText}
@@ -199,6 +215,9 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
         </div>
         <div className="bg-gray-200 p-4 rounded-md overflow-x-auto flex justify-center">
             <div id="invoice-preview-wrapper" className="origin-top scale-[1.15]">
+                <div ref={qrCodeRef} style={{ position: 'absolute', top: '-9999px', left: '-9999px' }}>
+                    <QRCode value={settings.qr.url || 'https://www.google.com'} size={200} level="H" />
+                </div>
                 <InvoiceTemplate config={settings} order={mockOrder} />
             </div>
         </div>
