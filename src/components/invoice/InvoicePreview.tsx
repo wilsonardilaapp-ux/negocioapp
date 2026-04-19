@@ -34,7 +34,7 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
     let qrCodeImage = '';
     const qrUrlToGenerate = settings.qr.url || 'https://www.google.com';
 
-    if (settings.qr.show) {
+    if (settings.qr.show && qrUrlToGenerate) {
       if (settings.qr.qrImageUrl) {
         qrCodeImage = settings.qr.qrImageUrl;
       } else {
@@ -45,19 +45,19 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
             color: { dark: '#000000', light: '#ffffff' },
           });
         } catch (e) {
-          console.error("QRCode lib failed:", e);
+          console.error("QRCode generation failed:", e);
         }
       }
     }
     
-    // Convert px to pt for printing
+    // CORRECTION: Use larger, more appropriate point sizes for printing.
     const fontSizeMapping = {
-        '9px': '7pt',
-        '10px': '8pt',
-        '11px': '9pt',
-        '12px': '10pt'
+        '9px': '8pt',
+        '10px': '9pt', // A good default for thermal printers
+        '11px': '10pt',
+        '12px': '11pt'
     };
-    const printFontSize = fontSizeMapping[settings.style.fontSize as keyof typeof fontSizeMapping] || '8pt';
+    const printFontSize = fontSizeMapping[settings.style.fontSize as keyof typeof fontSizeMapping] || '9pt'; // Default to 9pt
 
     const isBold = (zone: keyof InvoiceSettings['bold']['zones']) => settings.bold.allBold || settings.bold.zones[zone];
 
@@ -66,13 +66,39 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
             <head>
                 <title>Factura</title>
                 <style>
+                    @media print {
+                        @page {
+                            size: ${settings.style.paperSize === '80mm' ? '72mm' : '52mm'} auto;
+                            margin: 0;
+                        }
+                        html, body {
+                            margin: 0 !important;
+                            padding: 0 !important;
+                        }
+                    }
                     * { 
                       box-sizing: border-box;
                     }
-                    body, table, thead, tbody, tr, th, td { 
+                    body {
                       font-family: '${settings.style.font}', monospace !important;
                       font-size: ${printFontSize} !important;
+                      width: ${settings.style.paperSize === '80mm' ? '72mm' : '52mm'}; 
+                      color: black;
+                      margin: 0 auto;
+                      padding: 4px;
                     }
+                    table, thead, tbody, tr, th, td {
+                        font-family: inherit !important;
+                        font-size: inherit !important;
+                    }
+                    .header, .footer, .text-center { text-align: center; }
+                    .text-right { text-align: right; }
+                    .separator { border-top: 1px ${settings.style.separatorStyle} #000; margin: 4px 0; }
+                    .logo-container { display: flex; justify-content: ${settings.logo.position}; width: 100%; margin: 12px 0 8px 0; }
+                    .logo { display: block; max-width: ${settings.logo.size}; height: auto; }
+                    .qr-container { display: flex; flex-direction: column; align-items: center; width: 100%; margin: 8px 0; }
+                    .qr-label { text-align: center; margin-top: 4px; }
+                    table { width: 100%; border-collapse: collapse; }
                     th {
                         text-align: left;
                         font-weight: bold;
@@ -83,20 +109,7 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
                         padding: 1px 2px; 
                         vertical-align: top; 
                     }
-                    body { 
-                        width: ${settings.style.paperSize === '80mm' ? '72mm' : '52mm'}; 
-                        margin: 0 auto; 
-                        padding: 8px;
-                        color: black; 
-                    }
-                    .header, .footer, .text-center { text-align: center; }
-                    .text-right { text-align: right; }
-                    .separator { border-top: 1px ${settings.style.separatorStyle} #000; margin: 4px 0; }
-                    .logo-container { display: flex; justify-content: ${settings.logo.position}; width: 100%; margin-top: 12px; margin-bottom: 8px; }
-                    .logo { display: block; max-width: ${settings.logo.size}; height: auto; }
-                    .qr-container { display: flex; flex-direction: column; align-items: center; width: 100%; margin: 8px 0; }
-                    .qr-label { text-align: center; margin-top: 4px; }
-                    .total-row { font-weight: bold; font-size: 1.1em; }
+                    .total-row { font-weight: bold; font-size: calc(${printFontSize} + 2pt); }
                 </style>
             </head>
             <body>
@@ -155,13 +168,13 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
         </html>
     `;
 
-      printWindow.document.write(printableContent);
-      printWindow.document.close();
-      setTimeout(() => {
-        printWindow.focus();
-        printWindow.print();
-        printWindow.close();
-      }, 1500);
+    printWindow.document.write(printableContent);
+    printWindow.document.close();
+    setTimeout(() => {
+      printWindow.focus();
+      printWindow.print();
+      printWindow.close();
+    }, 1500);
   };
 
   return (
