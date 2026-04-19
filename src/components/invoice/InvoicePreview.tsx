@@ -34,19 +34,46 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
     }
 
     let qrCodeImage = '';
-    if (settings.qr.show && qrCodeRef.current) {
-      try {
-        const canvas = await html2canvas(qrCodeRef.current, { backgroundColor: null, scale: 3 });
-        qrCodeImage = canvas.toDataURL('image/png');
-      } catch (e) {
-        console.error("No se pudo renderizar el QR a imagen", e);
-        toast({ variant: "destructive", title: "Error de QR", description: "No se pudo generar la imagen del QR para la impresión." });
-      }
-    }
 
-    const qrFallbackUrl = settings.qr.url
-      ? `https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=${encodeURIComponent(settings.qr.url)}`
-      : '';
+    const generateQRFallbackBase64 = (url: string): string => {
+        const svg = `<svg xmlns="http://www.w3.org/2000/svg" 
+          width="80" height="80" viewBox="0 0 80 80">
+          <rect width="80" height="80" fill="white"/>
+          <text x="40" y="35" text-anchor="middle" 
+            font-size="8" fill="black">Escanear:</text>
+          <text x="40" y="50" text-anchor="middle" 
+            font-size="6" fill="black">${url.substring(0, 30)}</text>
+        </svg>`;
+        return `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(svg)))}`;
+    };
+    
+    // Attempt to generate QR code image
+    if (settings.qr.show && settings.qr.url) {
+        // 1. Try html2canvas
+        if (qrCodeRef.current) {
+            try {
+                const canvas = await html2canvas(qrCodeRef.current, { backgroundColor: '#ffffff', scale: 3, useCORS: true, logging: false });
+                qrCodeImage = canvas.toDataURL('image/png');
+            } catch (e) {
+                console.error("html2canvas failed, trying next method:", e);
+            }
+        }
+        
+        // 2. If html2canvas failed, try qrcode library
+        if (!qrCodeImage) {
+            try {
+                const QRCodeLib = await import('qrcode');
+                qrCodeImage = await QRCodeLib.toDataURL(settings.qr.url, {
+                    width: 120,
+                    margin: 1,
+                    color: { dark: '#000000', light: '#ffffff' }
+                });
+            } catch (e2) {
+                console.error("QRCode lib failed, using SVG fallback:", e2);
+                qrCodeImage = generateQRFallbackBase64(settings.qr.url);
+            }
+        }
+    }
 
     const isBold = (zone: keyof InvoiceSettings['bold']['zones']) => settings.bold.allBold || settings.bold.zones[zone];
 
@@ -55,32 +82,31 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
             <head>
                 <title>Factura</title>
                 <style>
-                    * { 
-                        box-sizing: border-box; 
-                    }
+                    * { box-sizing: border-box; }
                     body { 
                         font-family: '${settings.style.font}', monospace !important; 
                         font-size: ${settings.style.fontSize} !important;
                         width: ${settings.style.paperSize === '80mm' ? '72mm' : '52mm'}; 
                         margin: 0 auto; 
-                        padding: 4px;
+                        padding: 8px;
                         color: black; 
                     }
                     .header, .footer, .text-center { text-align: center; }
                     .text-right { text-align: right; }
                     .separator { border-top: 1px ${settings.style.separatorStyle} #000; margin: 4px 0; }
-                    .logo { display: block; margin: 12px auto 8px auto; max-width: ${settings.logo.size}; height: auto; }
+                    .logo-container { text-align: ${settings.logo.position}; width: 100%; }
+                    .logo { display: inline-block; margin: 12px 0 8px 0; max-width: ${settings.logo.size}; height: auto; }
                     .qr-container { display: flex; flex-direction: column; align-items: center; width: 100%; margin: 8px 0; }
                     .qr-container img { width: 80px; height: 80px; display: block; margin: 0 auto; }
                     .qr-label { text-align: center; margin-top: 4px; }
-                    table { width: 100%; border-collapse: collapse; }
-                    th { text-align: left; font-weight: bold; border-bottom: 1px ${settings.style.separatorStyle} #000; padding-bottom: 2px; }
-                    td { padding: 1px 2px; vertical-align: top; }
+                    .total-row { font-weight: bold; font-size: 1.1em; }
                     table, thead, tbody, tr, th, td {
                         font-family: '${settings.style.font}', monospace !important;
                         font-size: ${settings.style.fontSize} !important;
                     }
-                    .total-row { font-weight: bold; font-size: 1.1em; }
+                    table { width: 100%; border-collapse: collapse; }
+                    th { text-align: left; font-weight: bold; border-bottom: 1px ${settings.style.separatorStyle} #000; padding-bottom: 2px; }
+                    td { padding: 1px 2px; vertical-align: top; }
                 </style>
             </head>
             <body>
@@ -115,13 +141,14 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
                     ${settings.fields.showEstimatedDelivery ? `<div style="${isBold('estimatedDelivery') ? 'font-weight: bold;' : ''}">Tiempo de entrega: ${mockOrder.estimatedDelivery}</div>` : ''}
                     ${settings.promo.show && settings.promo.text ? `<div class="separator"></div><div class="text-center font-bold">${settings.promo.text}</div>` : ''}
                     
-                    ${settings.qr.show ? `
+                    ${settings.qr.show && qrCodeImage ? `
                       <div class="qr-container">
                         <img 
-                          src="${qrCodeImage || qrFallbackUrl}" 
-                          alt="QR Code" 
+                          src="${qrCodeImage}" 
+                          alt="QR Code"
                           width="80" 
                           height="80"
+                          style="display:block; margin:0 auto; width:80px; height:80px;"
                         />
                         <div class="qr-label" style="${isBold('qrText') ? 'font-weight: bold;' : ''}">
                           ${settings.qr.labelText}
@@ -143,7 +170,7 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
       setTimeout(() => {
         printWindow.print();
         printWindow.close();
-      }, 500);
+      }, 1500);
   };
 
   const isBold = (zone: keyof InvoiceSettings['bold']['zones']) => settings.bold.allBold || settings.bold.zones[zone];
@@ -171,12 +198,14 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
         <div className="bg-gray-200 p-4 rounded-md overflow-x-auto flex justify-center">
             <div id="invoice-preview-wrapper" className="origin-top scale-[1.15]">
                 {/* Hidden QR for canvas capture */}
-                <div style={{ position: 'absolute', left: '-9999px', top: '-9999px' }} ref={qrCodeRef}>
-                    {settings.qr.show && settings.qr.url && (
-                        <div className="bg-white p-1">
-                            <QRCode value={settings.qr.url} size={100} level="M" />
-                        </div>
-                    )}
+                <div style={{ position: 'absolute', left: '-9999px', top: '-9999px' }} >
+                    <div ref={qrCodeRef}>
+                        {settings.qr.show && settings.qr.url && (
+                            <div className="bg-white p-1">
+                                <QRCode value={settings.qr.url} size={100} level="M" />
+                            </div>
+                        )}
+                    </div>
                 </div>
                 <InvoiceTemplate config={settings} order={mockOrder} />
             </div>
@@ -188,5 +217,3 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
     </Card>
   );
 };
-
-    
