@@ -19,19 +19,6 @@ interface InvoicePreviewProps {
 
 export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSettings }) => {
   const { toast } = useToast();
-  
-  const generateQRFallbackBase64 = (url: string): string => {
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" 
-      width="80" height="80" viewBox="0 0 80 80">
-      <rect width="80" height="80" fill="white"/>
-      <text x="40" y="35" text-anchor="middle" 
-        font-size="8" fill="black">Escanear:</text>
-      <text x="40" y="50" text-anchor="middle" 
-        font-size="6" fill="black">${url.substring(0, 30)}</text>
-    </svg>`;
-    return `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(svg)))}`;
-  };
-
 
   const handlePrint = async () => {
     const printWindow = window.open('', '_blank');
@@ -47,7 +34,7 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
     let qrCodeImage = '';
     const qrUrlToGenerate = settings.qr.url || 'https://www.google.com';
 
-    if (settings.qr.show && qrUrlToGenerate) {
+    if (settings.qr.show) {
       if (settings.qr.qrImageUrl) {
         qrCodeImage = settings.qr.qrImageUrl;
       } else {
@@ -59,10 +46,18 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
           });
         } catch (e) {
           console.error("QRCode lib failed:", e);
-          qrCodeImage = generateQRFallbackBase64(qrUrlToGenerate);
         }
       }
     }
+    
+    // Convert px to pt for printing
+    const fontSizeMapping = {
+        '9px': '7pt',
+        '10px': '8pt',
+        '11px': '9pt',
+        '12px': '10pt'
+    };
+    const printFontSize = fontSizeMapping[settings.style.fontSize as keyof typeof fontSizeMapping] || '8pt';
 
     const isBold = (zone: keyof InvoiceSettings['bold']['zones']) => settings.bold.allBold || settings.bold.zones[zone];
 
@@ -76,7 +71,17 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
                     }
                     body, table, thead, tbody, tr, th, td { 
                       font-family: '${settings.style.font}', monospace !important;
-                      font-size: ${settings.style.fontSize} !important;
+                      font-size: ${printFontSize} !important;
+                    }
+                    th {
+                        text-align: left;
+                        font-weight: bold;
+                        border-bottom: 1px ${settings.style.separatorStyle} #000;
+                        padding-bottom: 2px;
+                    }
+                    td { 
+                        padding: 1px 2px; 
+                        vertical-align: top; 
                     }
                     body { 
                         width: ${settings.style.paperSize === '80mm' ? '72mm' : '52mm'}; 
@@ -91,9 +96,6 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
                     .logo { display: block; max-width: ${settings.logo.size}; height: auto; }
                     .qr-container { display: flex; flex-direction: column; align-items: center; width: 100%; margin: 8px 0; }
                     .qr-label { text-align: center; margin-top: 4px; }
-                    table { width: 100%; border-collapse: collapse; }
-                    th { text-align: left; font-weight: bold; border-bottom: 1px ${settings.style.separatorStyle} #000; padding-bottom: 2px; }
-                    td { padding: 1px 2px; vertical-align: top; }
                     .total-row { font-weight: bold; font-size: 1.1em; }
                 </style>
             </head>
@@ -156,6 +158,7 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
       printWindow.document.write(printableContent);
       printWindow.document.close();
       setTimeout(() => {
+        printWindow.focus();
         printWindow.print();
         printWindow.close();
       }, 1500);
