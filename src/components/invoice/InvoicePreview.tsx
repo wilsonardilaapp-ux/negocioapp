@@ -48,10 +48,10 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
             }
           />
         </div>
-        <div className="bg-gray-200 p-4 rounded-md overflow-x-auto">
-          <div id="invoice-preview">
-            <InvoiceTemplate config={settings} order={mockOrder} />
-          </div>
+        <div className="bg-gray-200 p-4 rounded-md overflow-x-auto flex justify-center">
+            <div id="invoice-preview" className="origin-top scale-[1.15]">
+                <InvoiceTemplate config={settings} order={mockOrder} />
+            </div>
         </div>
         <Button onClick={handlePrint} className="w-full">
           <Printer className="mr-2 h-4 w-4" /> Imprimir Prueba

@@ -69,7 +69,7 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ config, order,
     >
       <div className="text-center space-y-1">
         {config.logo.url && (
-          <div className={`flex justify-${config.logo.position}`}>
+          <div className={cn('flex w-full my-3', `justify-${config.logo.position}`)}>
             <img src={config.logo.url} alt="logo" style={{ width: config.logo.size }} />
           </div>
         )}
@@ -144,7 +144,9 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ config, order,
           {config.qr.qrImageUrl ? (
              <img src={config.qr.qrImageUrl} alt="QR Code" style={{ width: '100px', height: '100px' }} className="object-contain bg-white rounded-sm p-1" />
           ) : (
-            <QRCode value={config.qr.url || 'https://www.google.com'} size={100} />
+            <div className="bg-white p-1 rounded-sm">
+                <QRCode value={config.qr.url || 'https://www.google.com'} size={100} />
+            </div>
           )}
           <p className={cn(isBold('qrText') && 'font-bold')}>{config.qr.labelText}</p>
         </div>
