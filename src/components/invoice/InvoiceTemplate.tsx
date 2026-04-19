@@ -65,11 +65,11 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ config, order,
         fontClasses[config.style.font],
         className
       )}
-      style={{ fontSize: config.style.fontSize, paddingLeft: '8px', paddingRight: '8px' }}
+      style={{ fontSize: config.style.fontSize }}
     >
       <div className="text-center space-y-1">
         {config.logo.url && (
-          <div className={cn('flex w-full my-3', `justify-${config.logo.position}`)}>
+          <div className="logo-container" style={{ display: 'flex', justifyContent: config.logo.position, width: '100%', marginTop: '12px', marginBottom: '8px' }}>
             <img src={config.logo.url} alt="logo" style={{ width: config.logo.size }} />
           </div>
         )}
@@ -140,7 +140,7 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ config, order,
       )}
 
       {config.qr.show && (
-        <div className="flex flex-col items-center my-2 space-y-1">
+        <div className="qr-container flex flex-col items-center my-2 space-y-1">
           {config.qr.qrImageUrl ? (
              <img src={config.qr.qrImageUrl} alt="QR Code" style={{ width: '100px', height: '100px' }} className="object-contain bg-white rounded-sm p-1" />
           ) : (
