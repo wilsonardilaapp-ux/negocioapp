@@ -1,4 +1,3 @@
-
 'use client';
 
 import React from 'react';
@@ -61,12 +60,12 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ config, order,
   return (
     <div
       className={cn(
-        'bg-white text-black p-2 mx-auto overflow-hidden',
+        'bg-white text-black mx-auto overflow-hidden',
         paperWidthClasses[config.style.paperSize],
         fontClasses[config.style.font],
         className
       )}
-      style={{ fontSize: config.style.fontSize }}
+      style={{ fontSize: config.style.fontSize, paddingLeft: '8px', paddingRight: '8px' }}
     >
       <div className="text-center space-y-1">
         {config.logo.url && (
