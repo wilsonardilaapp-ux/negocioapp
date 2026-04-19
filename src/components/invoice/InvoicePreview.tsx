@@ -56,20 +56,15 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
     const qrUrlToGenerate = settings.qr.url || 'https://www.google.com';
 
     if (settings.qr.show) {
-      if (settings.qr.qrImageUrl) {
-        qrCodeImage = settings.qr.qrImageUrl;
-      } else {
-        try {
+       try {
           qrCodeImage = await QRCodeLib.toDataURL(qrUrlToGenerate, {
-            width: 200,
-            margin: 1,
-            errorCorrectionLevel: 'H',
-            color: { dark: '#000000', light: '#FFFFFF' }
+              width: 200,
+              margin: 1,
+              errorCorrectionLevel: 'H'
           });
-        } catch (e2) {
+      } catch (e2) {
           console.error("QRCode lib falló:", e2);
           qrCodeImage = generateQRFallbackBase64(qrUrlToGenerate);
-        }
       }
     }
     
@@ -84,57 +79,81 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
             <head>
                 <title>Factura</title>
                 <style>
-                    @media print {
-                        @page {
-                            size: ${settings.style.paperSize === '80mm' ? '72mm' : '52mm'};
-                            margin: 0;
-                        }
-                    }
-                    html, body {
-                        width: 100%;
-                        margin: 0;
-                        padding: 0;
-                    }
-                    * { 
-                        box-sizing: border-box;
-                    }
-                    body {
-                        font-family: '${settings.style.font}', monospace;
-                        font-size: ${printFontSize};
-                        max-width: ${settings.style.paperSize === '80mm' ? '72mm' : '52mm'};
-                        margin: 0 auto;
-                        padding: 2px 4px;
-                        color: black;
-                    }
-                    .header, .footer, .text-center { text-align: center; }
-                    .separator { border-top: 1px ${settings.style.separatorStyle} #000; margin: 4px 0; }
-                    .logo { display: block; margin: 12px auto 8px auto; max-width: 80%; height: auto; }
-                    .qr-container { display: flex; flex-direction: column; align-items: center; width: 100%; margin: 8px 0; }
-                    .qr-label { text-align: center; margin-top: 4px; }
-                    
-                    table, thead, tbody, tr, th, td { 
-                        font-family: inherit;
-                        font-size: inherit;
-                    }
-                    table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-                    th { text-align: left; font-weight: bold; border-bottom: 1px ${settings.style.separatorStyle} #000; padding-bottom: 2px; }
-                    td { padding: 1px 2px; vertical-align: top; }
-                    
-                    th:nth-child(1), td:nth-child(1) { width: 15%; }
-                    th:nth-child(2), td:nth-child(2) { 
-                      width: 55%; 
-                      word-wrap: break-word;
-                      overflow-wrap: break-word;
-                    }
-                    th:nth-child(3), td:nth-child(3) { width: 30%; text-align: right; }
-
-                    .total-row { font-weight: bold; font-size: ${totalFontSize}; }
-                    .text-right { text-align: right; }
+                  * { 
+                    box-sizing: border-box;
+                    margin: 0;
+                    padding: 0;
+                  }
+                  @media print {
+                    @page { margin: 2mm; }
+                  }
+                  html, body {
+                    width: ${settings.style.paperSize === '80mm' ? '72mm' : '52mm'};
+                    font-family: '${settings.style.font}', monospace;
+                    font-size: ${printFontSize};
+                    color: black;
+                    margin: 0 auto;
+                    padding: 2px 4px;
+                  }
+                  .header, .text-center { text-align: center; }
+                  .separator { 
+                    border-top: 1px ${settings.style.separatorStyle} #000; 
+                    margin: 3px 0; 
+                  }
+                  .logo { 
+                    display: block; 
+                    margin: 4px auto 4px auto; 
+                    max-width: 60px;
+                    max-height: 60px; 
+                    width: auto;
+                    height: auto;
+                  }
+                  .qr-container { 
+                    display: flex; 
+                    flex-direction: column; 
+                    align-items: center; 
+                    width: 100%; 
+                    margin: 4px 0; 
+                  }
+                  .qr-label { text-align: center; margin-top: 2px; }
+                  table, thead, tbody, tr, th, td { 
+                    font-family: inherit;
+                    font-size: inherit;
+                  }
+                  table { 
+                    width: 100%; 
+                    border-collapse: collapse; 
+                    table-layout: fixed; 
+                  }
+                  th { 
+                    text-align: left; 
+                    font-weight: bold; 
+                    border-bottom: 1px ${settings.style.separatorStyle} #000; 
+                    padding-bottom: 1px; 
+                  }
+                  td { padding: 1px 1px; vertical-align: top; }
+                  th:nth-child(1), td:nth-child(1) { width: 15%; }
+                  th:nth-child(2), td:nth-child(2) { 
+                    width: 55%; 
+                    word-wrap: break-word;
+                    overflow-wrap: break-word;
+                  }
+                  th:nth-child(3), td:nth-child(3) { 
+                    width: 30%; 
+                    text-align: right; 
+                  }
+                  .total-row { 
+                    font-weight: bold; 
+                    font-size: ${totalFontSize}; 
+                  }
+                  .text-right { text-align: right; }
+                  .footer { text-align: center; }
+                  div { line-height: 1.3; }
                 </style>
             </head>
             <body>
                 <div style="${settings.bold.allBold ? 'font-weight: bold;' : ''}">
-                    ${settings.logo.url ? `<img src="${settings.logo.url}" class="logo" alt="logo"/>` : ''}
+                    ${settings.logo.url ? `<img src="${settings.logo.url}" class="logo" alt="logo" style="display:block; margin:4px auto; max-width:60px; max-height:60px; width:auto; height:auto;"/>` : ''}
                     <div class="header" style="${isBold('businessName') ? 'font-weight: bold;' : ''}">${settings.header.businessName}</div>
                     <div class="header" style="${isBold('address') ? 'font-weight: bold;' : ''}">${settings.header.address}</div>
                     <div class="header">${settings.header.phone}</div>
@@ -173,9 +192,9 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
                         <img 
                           src="${qrCodeImage}" 
                           alt="QR Code"
-                          width="90"
-                          height="90"
-                          style="display:block; margin:0 auto; width:90px; height:90px; image-rendering: pixelated;"
+                          width="80" 
+                          height="80"
+                          style="display:block; margin:0 auto; width:80px; height:80px; image-rendering: pixelated;"
                         />
                         <div class="qr-label" style="${isBold('qrText') ? 'font-weight: bold;' : ''}">
                           ${settings.qr.labelText}
@@ -195,12 +214,22 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
 
     printWindow.document.write(printableContent);
     printWindow.document.close();
-    
-    setTimeout(() => {
+
+    printWindow.onload = () => {
+      setTimeout(() => {
         printWindow.focus();
         printWindow.print();
         printWindow.close();
-    }, 1500);
+      }, 800); 
+    };
+    
+    setTimeout(() => {
+      if (!printWindow.closed) {
+        printWindow.focus();
+        printWindow.print();
+        printWindow.close();
+      }
+    }, 2000);
   };
 
   return (
@@ -226,7 +255,7 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
         <div className="bg-gray-200 p-4 rounded-md overflow-x-auto flex justify-center">
             <div id="invoice-preview-wrapper" className="origin-top scale-[1.15]">
                  <div ref={qrCodeRef} style={{ position: 'absolute', left: '-9999px', top: 0 }}>
-                    {settings.qr.url && <QRCode value={settings.qr.url} size={200} level="H" />}
+                    {settings.qr.url && <QRCode value={settings.qr.url || 'https://www.google.com'} size={200} level="H" />}
                 </div>
                 <InvoiceTemplate config={settings} order={mockOrder} />
             </div>
