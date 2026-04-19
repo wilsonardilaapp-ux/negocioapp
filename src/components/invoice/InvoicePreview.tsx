@@ -1,5 +1,6 @@
 
 'use client';
+
 import React, { useRef, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
@@ -8,11 +9,9 @@ import { Button } from '@/components/ui/button';
 import { Printer, Loader2 } from 'lucide-react';
 import { InvoiceTemplate, mockOrder } from './InvoiceTemplate';
 import type { InvoiceSettings } from '@/models/invoice-settings';
-import html2canvas from 'html2canvas';
 import { useToast } from '@/hooks/use-toast';
 import QRCode from 'qrcode';
 import { cn } from '@/lib/utils';
-
 
 interface InvoicePreviewProps {
   settings: InvoiceSettings;
@@ -21,8 +20,7 @@ interface InvoicePreviewProps {
 
 export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSettings }) => {
   const { toast } = useToast();
-  const qrCodeRef = useRef<HTMLDivElement>(null);
-
+  
   const generateQRFallbackBase64 = (url: string): string => {
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" 
       width="80" height="80" viewBox="0 0 80 80">
@@ -34,7 +32,7 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
     </svg>`;
     return `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(svg)))}`;
   };
-  
+
   const handlePrint = async () => {
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
@@ -47,17 +45,15 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
     }
 
     let qrCodeImage = '';
-    
-    // Si html2canvas falló, generar QR como canvas manualmente
-    if (!qrCodeImage && settings.qr.show && settings.qr.url) {
+    if (settings.qr.show && settings.qr.url) {
       try {
         qrCodeImage = await QRCode.toDataURL(settings.qr.url, {
           width: 120,
           margin: 1,
-          color: { dark: '#000000', light: '#ffffff' }
+          color: { dark: '#000000', light: '#ffffff' },
         });
-      } catch (e2) {
-        console.error("QRCode lib failed, using SVG fallback:", e2);
+      } catch (e) {
+        console.error("Fallo de la librería QRCode, usando SVG de respaldo:", e);
         qrCodeImage = generateQRFallbackBase64(settings.qr.url);
       }
     }
@@ -69,39 +65,29 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
             <head>
                 <title>Factura</title>
                 <style>
-                    * { box-sizing: border-box; }
+                    * { 
+                      box-sizing: border-box; 
+                      font-family: '${settings.style.font}', monospace !important;
+                      font-size: ${settings.style.fontSize} !important;
+                    }
                     body { 
-                        font-family: '${settings.style.font}', monospace; 
-                        font-size: ${settings.style.fontSize};
                         width: ${settings.style.paperSize === '80mm' ? '72mm' : '52mm'}; 
                         margin: 0 auto; 
-                        padding: 8px;
+                        padding: 4px;
                         color: black; 
-                    }
-                    table, thead, tbody, tr, th, td {
-                        font-family: '${settings.style.font}', monospace !important;
-                        font-size: ${settings.style.fontSize} !important;
-                    }
-                    th {
-                        text-align: left;
-                        font-weight: bold;
-                        border-bottom: 1px ${settings.style.separatorStyle} #000;
-                        padding-bottom: 2px;
-                    }
-                    td { 
-                        padding: 1px 2px; 
-                        vertical-align: top; 
                     }
                     .header, .footer, .text-center { text-align: center; }
                     .text-right { text-align: right; }
                     .separator { border-top: 1px ${settings.style.separatorStyle} #000; margin: 4px 0; }
-                    .logo-container { text-align: ${settings.logo.position}; width: 100%; }
-                    .logo { display: block; margin: 12px auto 8px auto; max-width: ${settings.logo.size}; height: auto; }
+                    .logo-container { display: flex; justify-content: ${settings.logo.position}; width: 100%; margin-top: 12px; margin-bottom: 8px; }
+                    .logo { display: block; max-width: ${settings.logo.size}; height: auto; }
                     .qr-container { display: flex; flex-direction: column; align-items: center; width: 100%; margin: 8px 0; }
-                    .qr-container img { width: 80px; height: 80px; display:block; margin:0 auto; width:80px; height:80px;}
+                    .qr-container img { width: 80px; height: 80px; display:block; margin:0 auto; }
                     .qr-label { text-align: center; margin-top: 4px; }
-                    .total-row { font-weight: bold; font-size: 1.1em; }
                     table { width: 100%; border-collapse: collapse; }
+                    th { text-align: left; font-weight: bold; border-bottom: 1px ${settings.style.separatorStyle} #000; padding-bottom: 2px; }
+                    td { padding: 1px 2px; vertical-align: top; }
+                    .total-row { font-weight: bold; font-size: 1.1em; }
                 </style>
             </head>
             <body>
@@ -119,7 +105,7 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
                     ${settings.fields.showClientPhone ? `<div style="${isBold('clientPhone') ? 'font-weight: bold;' : ''}">Tel: ${mockOrder.client.phone}</div>` : ''}
                     ${settings.fields.showClientAddress ? `<div style="${isBold('clientAddress') ? 'font-weight: bold;' : ''}">Dir: ${mockOrder.client.address}</div>` : ''}
                     <div class="separator"></div>
-                    <table style="${isBold('items') ? 'font-weight: bold;' : ''}">
+                    <table>
                         <thead><tr><th>Cant</th><th>Producto</th><th class="text-right">Total</th></tr></thead>
                         <tbody>${mockOrder.items.map(item => `<tr><td>${item.quantity}</td><td>${item.name}</td><td class="text-right">${(item.quantity * item.price).toLocaleString()}</td></tr>`).join('')}</tbody>
                     </table>
@@ -168,8 +154,6 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
       }, 1500);
   };
 
-  const isBold = (zone: keyof InvoiceSettings['bold']['zones']) => settings.bold.allBold || settings.bold.zones[zone];
-
   return (
     <Card className="sticky top-6">
       <CardHeader>
@@ -192,16 +176,6 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
         </div>
         <div className="bg-gray-200 p-4 rounded-md overflow-x-auto flex justify-center">
             <div id="invoice-preview-wrapper" className="origin-top scale-[1.15]">
-                {/* Hidden QR for canvas capture */}
-                <div style={{ position: 'absolute', left: '-9999px', top: '-9999px' }} >
-                    <div ref={qrCodeRef}>
-                        {settings.qr.show && settings.qr.url && (
-                            <div className="bg-white p-1">
-                                <QRCode value={settings.qr.url} size={100} level="M" />
-                            </div>
-                        )}
-                    </div>
-                </div>
                 <InvoiceTemplate config={settings} order={mockOrder} />
             </div>
         </div>
