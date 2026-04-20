@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useRef, useState, useEffect } from 'react';
@@ -91,69 +92,51 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
     const fontSizeMapping: { [key: string]: string } = { '9px': '8pt', '10px': '9pt', '11px': '10pt', '12px': '11pt' };
     const printFontSize = fontSizeMapping[settings.style.fontSize as keyof typeof fontSizeMapping] || '9pt';
     
-    // ==========================================================
-    // UNIFIED LOGIC FOR TEXT ALIGNMENT
-    // ==========================================================
-    const LINE_CHARS = settings.style.paperSize === '80mm' ? 42 : 32;
+    // --- ITEMS CONTENT ---
+    const LINE_CHARS = 32;
+    const CANT_W = 3;
+    const PRICE_W = 9;
+    const PROD_W = LINE_CHARS - CANT_W - PRICE_W - 2;
 
     const rpad = (s: string, n: number): string => s.substring(0, n).padEnd(n, ' ');
     const lpad = (s: string, n: number): string => s.substring(0, n).padStart(n, ' ');
-    
-    // --- ITEMS (using HTML table for robustness) ---
-    const itemsTableContent = `
-        <table style="width:100%; border-collapse:collapse;">
-            <thead>
-                <tr>
-                    <th style="width:15%; white-space:nowrap; text-align:left; font-weight:bold; padding-bottom:1px; border-bottom:1px ${settings.style.separatorStyle} #000;">Cant</th>
-                    <th style="width:55%; word-wrap:break-word; text-align:left; font-weight:bold; padding-bottom:1px; border-bottom:1px ${settings.style.separatorStyle} #000;">Producto</th>
-                    <th style="width:30%; text-align:right; white-space:nowrap; padding-bottom:1px; border-bottom:1px ${settings.style.separatorStyle} #000;">Total</th>
-                </tr>
-            </thead>
-            <tbody>
-                ${mockOrder.items.map(item => `
-                    <tr>
-                        <td style="width:15%; vertical-align:top;">${item.quantity}</td>
-                        <td style="width:55%; word-wrap:break-word; overflow-wrap:break-word; vertical-align:top;">${item.name}</td>
-                        <td style="width:30%; text-align:right; white-space:nowrap; vertical-align:top;">
-                            ${(item.quantity * item.price).toLocaleString('es-CO')}
-                        </td>
-                    </tr>`).join('')}
-            </tbody>
-        </table>
-    `;
 
-    // --- SUBTOTALS and TOTAL (using PRE for perfect alignment) ---
-    const SUMMARY_LABEL_W = LINE_CHARS - 14;
-    const SUMMARY_VALUE_W = 14;
+    const itemsHeader = rpad('Can', CANT_W) + ' ' + rpad('Producto', PROD_W) + ' ' + lpad('Total', PRICE_W);
+    const itemsSeparator = '-'.repeat(LINE_CHARS);
 
-    const subtotalPreContent = (() => {
-      const subtotalLines: string[] = [];
-      subtotalLines.push(
-        rpad('Subtotal:', SUMMARY_LABEL_W) + 
-        lpad(mockOrder.subtotal.toLocaleString('es-CO'), SUMMARY_VALUE_W)
-      );
-      if (settings.fields.showDeliveryFee) {
-        subtotalLines.push(
-          rpad('Domicilio:', SUMMARY_LABEL_W) + 
-          lpad(mockOrder.deliveryFee.toLocaleString('es-CO'), SUMMARY_VALUE_W)
-        );
-      }
-      if (settings.fields.showPackaging) {
-        subtotalLines.push(
-          rpad('Empaque:', SUMMARY_LABEL_W) + 
-          lpad(mockOrder.packaging.toLocaleString('es-CO'), SUMMARY_VALUE_W)
-        );
-      }
-      return subtotalLines.join('\n');
-    })();
+    const itemsRows = mockOrder.items.map(item => {
+        const price = (item.quantity * item.price).toLocaleString('es-CO');
+        const qty = String(item.quantity);
+        const name = item.name;
+        const lineArr: string[] = [];
+        
+        lineArr.push(rpad(qty, CANT_W) + ' ' + rpad(name.substring(0, PROD_W), PROD_W) + ' ' + lpad(price, PRICE_W));
+        
+        let rest = name.substring(PROD_W);
+        while (rest.length > 0) {
+            lineArr.push(' '.repeat(CANT_W + 1) + rpad(rest.substring(0, PROD_W), PROD_W));
+            rest = rest.substring(PROD_W);
+        }
+        return lineArr.join('\n');
+    }).join('\n');
 
-    const totalPreContent = (() => {
-        return (
-          rpad('TOTAL:', SUMMARY_LABEL_W) + 
-          lpad(mockOrder.total.toLocaleString('es-CO'), SUMMARY_VALUE_W)
-        );
-    })();
-    
+    const itemsPreContent = [itemsHeader, itemsSeparator, itemsRows].join('\n');
+
+    // --- SUBTOTALS AND TOTAL CONTENT ---
+    const SUMMARY_VALUE_W = PRICE_W; // Align with item price column
+    const SUMMARY_LABEL_W = LINE_CHARS - SUMMARY_VALUE_W;
+
+    const subtotalLines: string[] = [];
+    subtotalLines.push(rpad('Subtotal:', SUMMARY_LABEL_W) + lpad(mockOrder.subtotal.toLocaleString('es-CO'), SUMMARY_VALUE_W));
+    if (settings.fields.showDeliveryFee) {
+        subtotalLines.push(rpad('Domicilio:', SUMMARY_LABEL_W) + lpad(mockOrder.deliveryFee.toLocaleString('es-CO'), SUMMARY_VALUE_W));
+    }
+    if (settings.fields.showPackaging) {
+        subtotalLines.push(rpad('Empaque:', SUMMARY_LABEL_W) + lpad(mockOrder.packaging.toLocaleString('es-CO'), SUMMARY_VALUE_W));
+    }
+    const subtotalPreContent = subtotalLines.join('\n');
+
+    const totalPreContent = rpad('TOTAL:', SUMMARY_LABEL_W) + lpad(mockOrder.total.toLocaleString('es-CO'), SUMMARY_VALUE_W);
 
     const printableContent = `
         <html>
@@ -208,22 +191,15 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
                     ${settings.fields.showClientAddress ? `<div style="${isBold('clientAddress') ? 'font-weight: bold;' : ''}">Dir: ${mockOrder.client.address}</div>` : ''}
                     <div class="separator"></div>
                     
-                    ${itemsTableContent}
+                    <pre style="font-family: 'Courier New', Courier, monospace; font-size: ${printFontSize}; margin: 0; padding: 0; white-space: pre; width: 100%; line-height: 1.4; ${isBold('items') ? 'font-weight:bold;' : ''}">${itemsPreContent}</pre>
 
                     <div class="separator"></div>
                     
-                    <pre style="font-family:'Courier New',monospace; 
-                      font-size:${printFontSize}; margin:0; padding:0;
-                      white-space:pre; width:100%;
-                      ${isBold('subtotalFees') ? 'font-weight:bold;' : ''}
-                    ">${subtotalPreContent}</pre>
+                    <pre style="font-family:'Courier New',monospace; font-size:${printFontSize}; margin:0; padding:0; white-space:pre; width:100%; ${isBold('subtotalFees') ? 'font-weight:bold;' : ''}">${subtotalPreContent}</pre>
 
                     <div class="separator"></div>
-
-                    <pre style="font-family:'Courier New',monospace;
-                      font-size:${printFontSize}; margin:0; padding:0;
-                      white-space:pre; width:100%; font-weight:bold;
-                    ">${totalPreContent}</pre>
+                    
+                    <pre style="font-family:'Courier New',monospace; font-size:${printFontSize}; margin:0; padding:0; white-space:pre; width:100%; font-weight:bold;">${totalPreContent}</pre>
                     
                     ${(settings.fields.showPaymentMethod || settings.fields.showEstimatedDelivery) ? '<div class="separator"></div>' : ''}
                     ${settings.fields.showPaymentMethod ? `<div style="${isBold('paymentMethod') ? 'font-weight: bold;' : ''}">Método de pago: ${mockOrder.paymentMethod}</div>` : ''}
@@ -263,7 +239,6 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
     printWindow.document.write(printableContent);
     printWindow.document.close();
 
-    // Esperar que imágenes carguen antes de imprimir
     printWindow.onload = () => {
       setTimeout(() => {
         if (!printWindow.closed) {
@@ -274,7 +249,6 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
       }, 800);
     };
 
-    // Fallback si onload no dispara
     setTimeout(() => {
       if (!printWindow.closed) {
         printWindow.focus();
