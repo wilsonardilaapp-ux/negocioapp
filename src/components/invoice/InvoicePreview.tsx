@@ -17,6 +17,10 @@ import { InvoiceTemplate, mockOrder } from './InvoiceTemplate';
 import type { InvoiceSettings } from '@/models/invoice-settings';
 import { useToast } from '@/hooks/use-toast';
 
+// Helper functions moved to the top-level scope
+const rpad = (s: string, n: number): string => s.substring(0, n).padEnd(n, ' ');
+const lpad = (s: string, n: number): string => s.substring(0, n).padStart(n, ' ');
+
 interface InvoicePreviewProps {
   settings: InvoiceSettings;
   setSettings: React.Dispatch<React.SetStateAction<InvoiceSettings>>;
@@ -82,36 +86,20 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
     
     const textScale = settings.style.textScale ?? 1;
 
-    // =============================================
-    // PASO 1: Ajustar LINE_CHARS según el ancho real en px
-    // =============================================
-    const WRAPPER_PX = settings.style.paperSize === '80mm' 
-    ? 216 : 160;
-  const fontSizePx: { [key: string]: number } = {
-    '9px': 5.5, '10px': 6, '11px': 6.5, '12px': 7
-  };
-  const charWidthPx = fontSizePx[
-    settings.style.fontSize as keyof typeof fontSizePx
-  ] ?? 6;
-  
-  // LINE_CHARS fijo basado en ancho físico del wrapper
-  // textScale NO reduce los chars disponibles
-  // solo comprime visualmente el texto con scaleX
-  const effectiveLineChars = Math.floor(
-    (WRAPPER_PX - 4) / charWidthPx
-  );
+    const WRAPPER_PX = settings.style.paperSize === '80mm' ? 216 : 160;
+    const fontSizePx: { [key: string]: number } = {
+        '9px': 5.5, '10px': 6, '11px': 6.5, '12px': 7
+    };
+    const charWidthPx = fontSizePx[settings.style.fontSize as keyof typeof fontSizePx] ?? 6;
 
-  // Mínimo garantizado para que PROD_W nunca sea negativo
-  const CANT_W = 3;
-  const PRICE_W = 9;
-  // Si effectiveLineChars es muy pequeño, usar mínimo 20
-  const safeLineChars = Math.max(effectiveLineChars, 20);
+    const effectiveLineChars = Math.floor((WRAPPER_PX - 4) / charWidthPx);
+    const safeLineChars = Math.max(effectiveLineChars, 20);
 
-    // =============================================
-    // PASO 2 y 3: Usar safeLineChars y safePROD_W
-    // =============================================
+    const CANT_W = 3;
+    const PRICE_W = 9;
     const PROD_W = safeLineChars - CANT_W - PRICE_W - 2;
     const safePROD_W = Math.max(PROD_W, 8);
+    
     const itemsHeader = rpad('Can', CANT_W) + ' ' + rpad('Producto', safePROD_W) + ' ' + lpad('Total', PRICE_W);
     const itemsSeparator = '-'.repeat(safeLineChars);
 
@@ -168,20 +156,18 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
                     font-size: ${printFontSize};
                     color: black;
                   }
-                  /* PASO 2: Estilos del Wrapper */
                   #ticket-wrapper {
                     width: ${settings.style.paperSize === '80mm' ? '216px' : '160px'};
                     margin: 0;
                     padding: 0;
                     overflow: hidden;
                   }
-                  pre { 
-                    font-family: '${settings.style.font}', 
-                      monospace !important; 
-                    font-size: inherit; 
-                    white-space: pre; 
-                    margin: 0; 
-                    padding: 0; 
+                  pre {
+                    font-family: '${settings.style.font}', monospace !important;
+                    font-size: inherit;
+                    white-space: pre;
+                    margin: 0;
+                    padding: 0;
                     width: 100%;
                     overflow: hidden;
                     line-height: 1.4;
@@ -217,7 +203,6 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
                     border-top: 1px ${settings.style.separatorStyle} #000; 
                     padding-top: 4px; 
                   }
-                  /* PASO 4: Media Query para impresión */
                   @media print {
                     @page { 
                       size: ${settings.style.paperSize === '80mm' ? '80mm' : '58mm'} auto;
