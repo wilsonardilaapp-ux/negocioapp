@@ -1,6 +1,7 @@
+
 'use client';
 
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState } from 'react';
 import * as QRCodeLib from 'qrcode';
 import QRCode from 'react-qr-code';
 import {
@@ -17,7 +18,6 @@ import { Printer, Loader2 } from 'lucide-react';
 import { InvoiceTemplate, mockOrder } from './InvoiceTemplate';
 import type { InvoiceSettings } from '@/models/invoice-settings';
 import { useToast } from '@/hooks/use-toast';
-
 
 const generateQRFallbackBase64 = (url: string): string => {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" 
@@ -59,9 +59,9 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
     if (settings.qr.show) {
        try {
           qrCodeImage = await QRCodeLib.toDataURL(qrUrlToGenerate, {
-              width: 200, // Generate a higher resolution QR
+              width: 200,
               margin: 1,
-              errorCorrectionLevel: 'H' // High error correction
+              errorCorrectionLevel: 'H'
           });
       } catch (e2) {
           console.error("QRCode lib falló:", e2);
@@ -84,17 +84,17 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
                     box-sizing: border-box;
                     margin: 0;
                     padding: 0;
-                    font-family: '${settings.style.font}', monospace; 
                   }
                   @media print {
                     @page { margin: 2mm; }
                   }
                   html, body {
                     width: ${settings.style.paperSize === '80mm' ? '72mm' : '52mm'};
+                    font-family: '${settings.style.font}', monospace;
                     font-size: ${printFontSize};
                     color: black;
                     margin: 0 auto;
-                    padding: 2px 4px;
+                    padding: 2px 2px;
                   }
                   .header, .text-center { text-align: center; }
                   .separator { 
@@ -133,19 +133,21 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
                     padding-bottom: 1px; 
                   }
                   td { padding: 1px 1px; vertical-align: top; }
-                  
-                  th:nth-child(1), td:nth-child(1) { width: 8%; }
+                  th:nth-child(1), td:nth-child(1) { 
+                    width: 8%; 
+                    white-space: nowrap;
+                  }
                   th:nth-child(2), td:nth-child(2) { 
-                    width: 62%; 
+                    width: 52%;
                     word-wrap: break-word;
                     overflow-wrap: break-word;
                   }
                   th:nth-child(3), td:nth-child(3) { 
-                    width: 30%; 
+                    width: 40%;
                     text-align: right;
                     white-space: nowrap;
+                    padding-right: 2px;
                   }
-                  
                   .total-row { 
                     font-weight: bold; 
                     font-size: ${totalFontSize}; 
@@ -196,9 +198,9 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
                         <img 
                           src="${qrCodeImage}" 
                           alt="QR Code"
-                          width="90" 
-                          height="90"
-                          style="display:block; margin:0 auto; width:90px; height:90px; image-rendering: pixelated;"
+                          width="80" 
+                          height="80"
+                          style="display:block; margin:0 auto; width:80px; height:80px; image-rendering: pixelated;"
                         />
                         <div class="qr-label" style="${isBold('qrText') ? 'font-weight: bold;' : ''}">
                           ${settings.qr.labelText}
