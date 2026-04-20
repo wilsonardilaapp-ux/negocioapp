@@ -91,15 +91,15 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
     const printFontSize = fontSizeMapping[settings.style.fontSize as keyof typeof fontSizeMapping] || '9pt';
     
     const textScale = settings.style.textScale ?? 1;
-    const LINE_CHARS = settings.style.paperSize === '80mm' ? 42 : 32;
-    const effectiveLineChars = Math.floor(LINE_CHARS / textScale);
+    const LINE_CHARS_BASE = settings.style.paperSize === '80mm' ? 42 : 32;
+    const effectiveLineChars = Math.floor(LINE_CHARS_BASE / textScale);
+
+    const CANT_W = 4;
+    const PRICE_W = 9;
+    const PROD_W = Math.max(10, effectiveLineChars - CANT_W - PRICE_W - 2);
 
     const rpad = (s: string, n: number): string => s.substring(0, n).padEnd(n, ' ');
     const lpad = (s: string, n: number): string => s.substring(0, n).padStart(n, ' ');
-
-    const CANT_W = 3;
-    const PRICE_W = 9;
-    const PROD_W = Math.max(10, effectiveLineChars - CANT_W - PRICE_W - 2);
 
     const itemsHeader = rpad('Can', CANT_W) + ' ' + rpad('Producto', PROD_W) + ' ' + lpad('Total', PRICE_W);
     const itemsSeparator = '-'.repeat(effectiveLineChars);
@@ -143,15 +143,14 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
                 <title>Factura</title>
                 <style>
                   body {
-                    width: ${settings.style.paperSize === '80mm' ? '76mm' : '56mm'};
                     font-family: '${settings.style.font}', monospace;
                     font-size: ${printFontSize};
                     color: black;
                     margin: 0;
-                    padding: 2px 0px 2px 2px;
+                    padding: 2px 0px 2px 0px;
                   }
                   .img-container img { max-width: 100%; height: auto; }
-                  pre { font-family: '${settings.style.font}', monospace !important; font-size: inherit; white-space: pre-wrap; word-wrap: break-word; margin: 0; padding: 0; width: 100%; }
+                  pre { font-family: '${settings.style.font}', monospace !important; font-size: inherit; white-space: pre; word-wrap: break-word; margin: 0; padding: 0; width: 100%; }
                   .text-center { text-align: center; }
                   .separator { border-top: 1px ${settings.style.separatorStyle} #000; margin: 3px 0; }
                   .logo { max-width:60px; max-height:60px; width:auto; height:auto; }
