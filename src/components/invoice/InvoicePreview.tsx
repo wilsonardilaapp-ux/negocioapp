@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useRef, useState, useEffect } from 'react';
@@ -99,26 +98,6 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
     const rpad = (s: string, n: number): string => s.substring(0, n).padEnd(n, ' ');
     const lpad = (s: string, n: number): string => s.substring(0, n).padStart(n, ' ');
 
-    const wordWrap = (text: string, maxWidth: number): string[] => {
-        const lines: string[] = [];
-        let currentLine = '';
-        const words = text.split(' ');
-        for (const word of words) {
-            if ((currentLine + ' ' + word).trim().length > maxWidth) {
-                if (currentLine.length > 0) lines.push(currentLine);
-                currentLine = word;
-                while (currentLine.length > maxWidth) {
-                    lines.push(currentLine.substring(0, maxWidth));
-                    currentLine = currentLine.substring(maxWidth);
-                }
-            } else {
-                currentLine = (currentLine + ' ' + word).trim();
-            }
-        }
-        if (currentLine.length > 0) lines.push(currentLine);
-        return lines;
-    };
-
     const itemsHeader = rpad('Can', CANT_W) + ' ' + rpad('Producto', PROD_W) + ' ' + lpad('Total', PRICE_W);
     const itemsSeparator = '-'.repeat(LINE_CHARS);
 
@@ -126,19 +105,28 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
         const price = (item.quantity * item.price).toLocaleString('es-CO');
         const qty = String(item.quantity);
         const name = item.name;
-        const nameLines = wordWrap(name, PROD_W);
-
-        const resultLines: string[] = [];
-        resultLines.push(rpad(qty, CANT_W) + ' ' + rpad(nameLines[0] || '', PROD_W) + ' ' + lpad(price, PRICE_W));
-        for (let i = 1; i < nameLines.length; i++) {
-            resultLines.push(' '.repeat(CANT_W + 1) + rpad(nameLines[i], PROD_W));
+        const lineArr: string[] = [];
+        
+        lineArr.push(
+            rpad(qty, CANT_W) + ' ' + 
+            rpad(name.substring(0, PROD_W), PROD_W) + ' ' + 
+            lpad(price, PRICE_W)
+        );
+        
+        let rest = name.substring(PROD_W);
+        while (rest.length > 0) {
+            lineArr.push(
+            ' '.repeat(CANT_W + 1) + 
+            rest.substring(0, PROD_W)
+            );
+            rest = rest.substring(PROD_W);
         }
-        return resultLines.join('\n');
+        return lineArr.join('\n');
     }).join('\n');
 
     const itemsPreContent = [itemsHeader, itemsSeparator, itemsRows].join('\n');
-
-    const SUMMARY_LABEL_W = LINE_CHARS - PRICE_W - 1;
+    
+    const SUMMARY_LABEL_W = LINE_CHARS - PRICE_W;
     const SUMMARY_VALUE_W = PRICE_W;
     
     const subtotalLines: string[] = [];
@@ -177,7 +165,6 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
                   .qr-label { text-align: center; margin-top: 2px; }
                   pre { font-family: 'Courier New', Courier, monospace !important; font-size: inherit; white-space: pre; margin: 0; padding: 0; width: 100%; }
                   .footer { text-align: center; }
-                  div { line-height: 1.3; }
                 </style>
             </head>
             <body>
@@ -207,7 +194,7 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
                     ${settings.fields.showClientAddress ? `<div style="${isBold('clientAddress') ? 'font-weight: bold;' : ''}">Dir: ${mockOrder.client.address}</div>` : ''}
                 </div>
                 
-                <pre style="font-family:'Courier New',monospace; font-size:${printFontSize}; margin:0; padding:0; white-space:pre; width:100%; line-height: 1.4; ${isBold('items') ? 'font-weight:bold;' : ''}">${itemsPreContent}</pre>
+                <pre style="font-family: 'Courier New', Courier, monospace; font-size: ${printFontSize}; margin: 0; padding: 0; white-space: pre; width: 100%; line-height: 1.4; ${isBold('items') ? 'font-weight:bold;' : ''}">${itemsPreContent}</pre>
 
                 <div class="text-scale"><div class="separator"></div></div>
                 
