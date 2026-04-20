@@ -1,6 +1,7 @@
+
 'use client';
 
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import * as QRCodeLib from 'qrcode';
 import QRCode from 'react-qr-code';
 import {
@@ -104,10 +105,6 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
                     margin: 4px 0; 
                   }
                   .qr-label { text-align: center; margin-top: 2px; }
-                  table, thead, tbody, tr, th, td { 
-                    font-family: inherit;
-                    font-size: inherit;
-                  }
                   table { 
                     width: 100%; 
                     border-collapse: collapse; 
@@ -121,16 +118,16 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
                   }
                   td { padding: 1px 1px; vertical-align: top; }
                   th:nth-child(1), td:nth-child(1) { 
-                    width: 8%; 
+                    width: 6%; 
                     white-space: nowrap;
                   }
                   th:nth-child(2), td:nth-child(2) { 
-                    width: 62%;
+                    width: 68%;
                     word-wrap: break-word;
                     overflow-wrap: break-word;
                   }
                   th:nth-child(3), td:nth-child(3) { 
-                    width: 30%;
+                    width: 26%;
                     text-align: right;
                     white-space: nowrap;
                     padding-right: 1px;
@@ -144,11 +141,10 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
                     margin: 0;
                     padding: 0;
                     white-space: pre-wrap;
+                    word-break: break-all;
                     width: 100%;
                   }
                   .text-right { text-align: right; }
-                  .footer { text-align: center; }
-                  div { line-height: 1.3; }
                 </style>
             </head>
             <body>
@@ -170,19 +166,17 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
                     <table style="${isBold('items') ? 'font-weight: bold;' : ''}">
                       <thead>
                         <tr>
-                          <th style="width:8%; white-space:nowrap;">Can</th>
-                          <th style="width:62%; word-wrap:break-word;">Producto</th>
-                          <th style="width:30%; text-align:right; white-space:nowrap;">Total</th>
+                          <th style="width:6%;">Can</th>
+                          <th style="width:68%; word-wrap:break-word; overflow-wrap:break-word;">Producto</th>
+                          <th style="width:26%; text-align:right; white-space:nowrap; padding-right:1px;">Total</th>
                         </tr>
                       </thead>
                       <tbody>
                         ${mockOrder.items.map(item => `
                           <tr>
-                            <td style="width:8%;">${item.quantity}</td>
-                            <td style="width:62%; word-wrap:break-word; 
-                                       overflow-wrap:break-word;">${item.name}</td>
-                            <td style="width:30%; text-align:right; 
-                                       white-space:nowrap;">
+                            <td style="width:6%;">${item.quantity}</td>
+                            <td style="width:68%; word-wrap:break-word; overflow-wrap:break-word;">${item.name}</td>
+                            <td style="width:26%; text-align:right; white-space:nowrap; padding-right:1px;">
                               ${(item.quantity * item.price).toLocaleString('es-CO')}
                             </td>
                           </tr>`).join('')}
@@ -219,11 +213,12 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
                       const labelCol = 10;
                       const valueCol = COL_TOTAL - labelCol;
                       const totalLine = 
-                        'TOTAL:'.padEnd(14) + mockOrder.total.toLocaleString('es-CO').padStart(14);
+                        'TOTAL:'.padEnd(labelCol, ' ') + 
+                        mockOrder.total.toLocaleString('es-CO').padStart(valueCol, ' ');
                       return `
                         <pre style="
-                          font-family: inherit;
-                          font-size: inherit;
+                          font-family: '${settings.style.font}', monospace;
+                          font-size: ${printFontSize};
                           font-weight: bold;
                           margin: 0;
                           padding: 0;
@@ -252,11 +247,34 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
                         </div>
                       </div>` : ''}
                     
-                    ${(settings.socialMedia.show) ? '<div class="separator"></div>' : ''}
+                    ${settings.socialMedia.show ? `
+                    <div class="separator"></div>
+                    <div class="text-center">
+                      ${settings.socialMedia.whatsapp ? 
+                        `<div>&#x1F4F1; WhatsApp: ${settings.socialMedia.whatsapp}</div>` 
+                        : ''}
+                      ${settings.socialMedia.instagram ? 
+                        `<div>&#x1F4F7; Instagram: ${settings.socialMedia.instagram}</div>` 
+                        : ''}
+                      ${settings.socialMedia.facebook ? 
+                        `<div>&#x1F426; Facebook: ${settings.socialMedia.facebook}</div>` 
+                        : ''}
+                    </div>` : ''}
                     
-                    <div class="footer">
-                        <div style="${isBold('footer') ? 'font-weight: bold;' : ''}">${settings.footer.message}</div>
-                        ${settings.footer.repeatBusinessName ? `<div style="${isBold('footer') ? 'font-weight: bold;' : ''}">${settings.header.businessName}</div>` : ''}
+                    <div class="footer" style="
+                        margin-top: 8px; 
+                        padding-bottom: 16px;
+                        border-top: 1px ${settings.style.separatorStyle} #000;
+                        padding-top: 4px;
+                      ">
+                        <div style="${isBold('footer') ? 'font-weight:bold;' : ''}">
+                          ${settings.footer.message}
+                        </div>
+                        ${settings.footer.repeatBusinessName ? `
+                          <div style="${isBold('footer') ? 'font-weight:bold;' : ''}">
+                            ${settings.header.businessName}
+                          </div>` : ''}
+                        <div style="margin-top: 8px;">&nbsp;</div>
                     </div>
                 </div>
             </body>
