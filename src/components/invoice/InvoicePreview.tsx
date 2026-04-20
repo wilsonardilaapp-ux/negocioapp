@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useRef, useState } from 'react';
@@ -25,7 +26,6 @@ interface InvoicePreviewProps {
 
 export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSettings }) => {
   const { toast } = useToast();
-  const qrCodeRef = useRef<HTMLDivElement>(null);
   
   const handlePrint = async () => {
     const printWindow = window.open('', '_blank');
@@ -42,23 +42,23 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
     const qrUrlToGenerate = settings.qr.url || 'https://www.google.com';
 
     if (settings.qr.show) {
-       try {
-          qrCodeImage = await QRCodeLib.toDataURL(qrUrlToGenerate, {
-              width: 200, // Increased resolution for better printing
-              margin: 1,
-              errorCorrectionLevel: 'H' // Higher error correction
-          });
+      try {
+        qrCodeImage = await QRCodeLib.toDataURL(qrUrlToGenerate, {
+          width: 200,
+          margin: 1,
+          errorCorrectionLevel: 'H',
+          color: { dark: '#000000', light: '#FFFFFF' },
+        });
       } catch (e2) {
-          console.error("QRCode lib falló:", e2);
-          // Fallback in case the library fails for any reason
-          qrCodeImage = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'; // Transparent 1x1 pixel
+        console.error("QRCode lib falló:", e2);
+        qrCodeImage = ''; // Fallback a no mostrar QR si la librería falla
       }
     }
     
     const isBold = (zone: keyof InvoiceSettings['bold']['zones']) => settings.bold.allBold || settings.bold.zones[zone];
     
     const fontSizeMapping: { [key: string]: string } = { '9px': '9pt', '10px': '10pt', '11px': '11pt', '12px': '12pt' };
-    const printFontSize = fontSizeMapping[settings.style.fontSize as keyof typeof fontSizeMapping] || '9pt';
+    const printFontSize = fontSizeMapping[settings.style.fontSize as keyof typeof fontSizeMapping] || '10pt';
     const totalFontSize = `${parseInt(printFontSize, 10) + 2}pt`;
 
     const printableContent = `
@@ -124,20 +124,22 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
                     white-space: nowrap;
                   }
                   th:nth-child(2), td:nth-child(2) { 
-                    width: 42%;
+                    width: 68%;
                     word-wrap: break-word;
                     overflow-wrap: break-word;
                   }
                   th:nth-child(3), td:nth-child(3) { 
-                    width: 50%;
+                    width: 26%;
                     text-align: right;
                     white-space: nowrap;
-                    padding-right: 2px;
+                    padding-right: 1px;
                   }
                   .total-row { 
                     font-weight: bold; 
                     font-size: ${totalFontSize}; 
                   }
+                  .text-right { text-align: right; }
+                  .footer { text-align: center; }
                   div { line-height: 1.3; }
                 </style>
             </head>
@@ -177,7 +179,7 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
                     
                     ${settings.promo.show && settings.promo.text ? `<div class="separator"></div><div class="text-center font-bold">${settings.promo.text}</div>` : ''}
                     
-                     ${settings.qr.show && qrCodeImage ? `
+                    ${settings.qr.show && qrCodeImage ? `
                       <div class="qr-container">
                         <img 
                           src="${qrCodeImage}" 
@@ -207,9 +209,11 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
 
     printWindow.onload = () => {
       setTimeout(() => {
-        printWindow.focus();
-        printWindow.print();
-        printWindow.close();
+        if (!printWindow.closed) {
+          printWindow.focus();
+          printWindow.print();
+          printWindow.close();
+        }
       }, 1500); 
     };
     
@@ -244,9 +248,6 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
         </div>
         <div className="bg-gray-200 p-4 rounded-md overflow-x-auto flex justify-center">
             <div id="invoice-preview-wrapper" className="origin-top scale-[1.15]">
-                 <div ref={qrCodeRef} style={{ position: 'absolute', left: '-9999px', top: 0 }}>
-                    <QRCode value={settings.qr.url || 'https://www.google.com'} size={200} level="H" />
-                </div>
                 <InvoiceTemplate config={settings} order={mockOrder} />
             </div>
         </div>
