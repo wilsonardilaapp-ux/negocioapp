@@ -75,16 +75,6 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
       }
     }
 
-  const barcodeHtml = settings.barcode?.show && barcodeImage
-    ? `<div class="img-container img-scale" style="text-align:center; margin:4px 0;">
-        <img
-          src="${barcodeImage}"
-          alt="Código de barras"
-          style="display:block; margin:0 auto; max-width:100%; height:auto;"
-        />
-       </div>`
-    : '';
-
     const isBold = (zone: keyof InvoiceSettings['bold']['zones']) => settings.bold.allBold || settings.bold.zones[zone];
 
     const fontSizeMapping: { [key: string]: string } = { '9px': '8pt', '10px': '9pt', '11px': '10pt', '12px': '11pt' };
@@ -142,33 +132,76 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
             <head>
                 <title>Factura</title>
                 <style>
+                  * { 
+                    box-sizing: border-box; 
+                    margin: 0; 
+                    padding: 0; 
+                  }
+                  html, body {
+                    margin: 0;
+                    padding: 0;
+                    background: white;
+                  }
                   body {
                     font-family: '${settings.style.font}', monospace;
                     font-size: ${printFontSize};
                     color: black;
+                  }
+                  #ticket-wrapper {
+                    width: ${settings.style.paperSize === '80mm' ? '216px' : '164px'};
                     margin: 0;
-                    padding: 0;
-                    width: ${settings.style.paperSize === '80mm' ? '76mm' : '56mm'};
-                    max-width: ${settings.style.paperSize === '80mm' ? '76mm' : '56mm'};
+                    padding: 2px 0 2px 2px;
+                    overflow: hidden;
                   }
-                  * {
-                    box-sizing: border-box;
-                  }
-                  .img-container { text-align: ${settings.logo.position}; }
-                  .img-scale {
-                    transform: scale(${settings.style.textScale ?? 1});
-                    transform-origin: center top;
-                    display: block;
-                  }
-                  pre { font-family: '${settings.style.font}', monospace !important; font-size: inherit; white-space: pre; word-wrap: break-word; margin: 0; padding: 0; width: 100%; }
                   .text-center { text-align: center; }
-                  .separator { border-top: 1px ${settings.style.separatorStyle} #000; margin: 3px 0; }
-                  .logo { max-width:60px; max-height:60px; width:auto; height:auto; }
-                  .qr-container { display: flex; flex-direction: column; align-items: center; width: 100%; margin: 4px 0; }
+                  .separator { 
+                    border-top: 1px ${settings.style.separatorStyle} #000; 
+                    margin: 3px 0; 
+                    width: 100%;
+                  }
+                  .logo { 
+                    max-width: 60px; 
+                    max-height: 60px; 
+                    width: auto; 
+                    height: auto; 
+                  }
+                  .qr-container { 
+                    display: flex; 
+                    flex-direction: column; 
+                    align-items: center; 
+                    width: 100%; 
+                    margin: 4px 0; 
+                  }
+                  pre { 
+                    font-family: '${settings.style.font}', 
+                      monospace !important; 
+                    font-size: inherit; 
+                    white-space: pre; 
+                    margin: 0; 
+                    padding: 0; 
+                    width: 100%;
+                    overflow: hidden;
+                  }
+                  .footer { 
+                    text-align: center; 
+                    margin-top: 8px; 
+                    padding-bottom: 16px; 
+                    border-top: 1px ${settings.style.separatorStyle} #000; 
+                    padding-top: 4px; 
+                  }
+                  @media print {
+                    @page { margin: 2mm; }
+                    html, body { margin: 0; padding: 0; }
+                    #ticket-wrapper { 
+                      width: 100%;
+                      padding: 0;
+                    }
+                  }
                 </style>
             </head>
             <body>
-                ${settings.logo.url ? `<div class="img-container img-scale"><img src="${settings.logo.url}" class="logo" alt="logo" style="width:${settings.logo.size}; display:inline-block;"/></div>` : ''}
+              <div id="ticket-wrapper">
+                ${settings.logo.url ? `<div style="text-align: ${settings.logo.position}; margin-bottom: 4px;"><img src="${settings.logo.url}" class="logo" alt="logo" style="width:${settings.logo.size}; display:inline-block;"/></div>` : ''}
 
                 <div class="text-center">
                     <div style="${isBold('businessName') ? 'font-weight: bold;' : ''}">${settings.header.businessName}</div>
@@ -177,7 +210,7 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
                     ${settings.header.nit ? `<div style="${isBold('nit') ? 'font-weight: bold;' : ''}">NIT: ${settings.header.nit}</div>` : ''}
                 </div>
                 
-                ${settings.barcode?.position === 'header' ? barcodeHtml : ''}
+                ${settings.barcode?.position === 'header' ? `<div style="text-align:center; margin:4px 0;"><img src="${barcodeImage}" alt="barcode"/></div>` : ''}
 
                 <div>
                   <div class="separator"></div>
@@ -209,15 +242,13 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
                 </div>
                 
                 ${settings.qr.show && qrCodeImage ? `
-                  <div class="img-container img-scale">
                       <div class="qr-container">
                         <img src="${qrCodeImage}" alt="QR Code" style="display:block; margin:0 auto; width:90px; height:90px; image-rendering: pixelated;"/>
                         <div class="qr-label" style="${isBold('qrText') ? 'font-weight: bold;' : ''}">${settings.qr.labelText}</div>
-                      </div>
-                  </div>`
+                      </div>`
                   : ''}
 
-                ${settings.barcode?.position === 'footer' ? barcodeHtml : ''}
+                ${settings.barcode?.position === 'footer' ? `<div style="text-align:center; margin:4px 0;"><img src="${barcodeImage}" alt="barcode"/></div>` : ''}
 
                 <div>
                   ${settings.socialMedia.show ? `<div class="separator"></div>` : ''}
@@ -227,12 +258,13 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
                     ${settings.socialMedia.show && settings.socialMedia.facebook ? `<div>&#x1F426; Facebook: ${settings.socialMedia.facebook}</div>` : ''}
                     ${settings.socialMedia.show && settings.socialMedia.website ? `<div>&#x1F310; Web: ${settings.socialMedia.website}</div>` : ''}
                   </div>
-                  <div class="footer" style="margin-top: 8px; padding-bottom: 16px; border-top: 1px ${settings.style.separatorStyle} #000; padding-top: 4px; text-align: center;">
+                  <div class="footer">
                       <div style="${isBold('footer') ? 'font-weight:bold;' : ''}">${settings.footer.message}</div>
                       ${settings.footer.repeatBusinessName ? `<div style="${isBold('footer') ? 'font-weight:bold;' : ''}">${settings.header.businessName}</div>` : ''}
                       <div style="margin-top: 8px;">&nbsp;</div>
                   </div>
                 </div>
+              </div>
             </body>
         </html>
     `;
