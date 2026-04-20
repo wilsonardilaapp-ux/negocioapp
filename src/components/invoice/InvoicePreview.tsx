@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useRef, useState } from 'react';
@@ -82,15 +83,6 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
                     margin: 0 auto;
                     padding: 2px 0px 2px 2px;
                   }
-                  pre {
-                    font-family: '${settings.style.font}', monospace;
-                    font-size: ${printFontSize};
-                    margin: 0;
-                    padding: 0;
-                    white-space: pre-wrap;
-                    word-break: break-all;
-                    width: 100%;
-                  }
                   .header, .text-center { text-align: center; }
                   .separator { 
                     border-top: 1px ${settings.style.separatorStyle} #000; 
@@ -112,9 +104,17 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
                     margin: 4px 0; 
                   }
                   .qr-label { text-align: center; margin-top: 2px; }
+                  pre {
+                    font-family: '${settings.style.font}', monospace;
+                    font-size: ${printFontSize};
+                    margin: 0;
+                    padding: 0;
+                    white-space: pre-wrap;
+                    word-break: break-all;
+                    width: 100%;
+                  }
                   .total-row { 
-                    font-weight: bold; 
-                    font-size: ${totalFontSize}; 
+                    font-weight: bold;
                   }
                   .text-right { text-align: right; }
                   .footer { text-align: center; }
@@ -163,15 +163,15 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
                             const restLines = name.substring(COL_PROD);
                             return padEnd(qty, COL_CANT) + ' ' + 
                                    padEnd(firstLine, COL_PROD) + ' ' + 
-                                   padStart(total, COL_TOTAL_VAL) + '\n' +
+                                   padStart(total, COL_TOTAL_VAL) + '\\n' +
                                    ' '.repeat(COL_CANT + 1) + restLines;
                           }
                           return padEnd(qty, COL_CANT) + ' ' + 
                                  padEnd(name, COL_PROD) + ' ' + 
                                  padStart(total, COL_TOTAL_VAL);
-                        }).join('\n');
+                        }).join('\\n');
                     
-                        return `<pre style="font-family: '${settings.style.font}', monospace; font-size: ${printFontSize}; margin: 0; padding: 0; white-space: pre-wrap; width: 100%; overflow: hidden;">${header}\n${separator}\n${rows}</pre>`;
+                        return `<pre style="font-family: '${settings.style.font}', monospace; font-size: ${printFontSize}; margin: 0; padding: 0; white-space: pre-wrap; width: 100%; overflow: hidden;">${header}\\n${separator}\\n${rows}</pre>`;
                       })()}
                     <div class="separator"></div>
                     ${(() => {
@@ -187,19 +187,38 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
                           padStart(mockOrder.subtotal.toLocaleString('es-CO'), valueCol);
                           
                         const deliveryLine = settings.fields.showDeliveryFee 
-                          ? '\n' + padEnd('Domicilio:', labelCol) + 
+                          ? '\\n' + padEnd('Domicilio:', labelCol) + 
                             padStart(mockOrder.deliveryFee.toLocaleString('es-CO'), valueCol)
                           : '';
                       
                         const packagingLine = settings.fields.showPackaging
-                          ? '\n' + padEnd('Empaque:', labelCol) + 
+                          ? '\\n' + padEnd('Empaque:', labelCol) + 
                             padStart(mockOrder.packaging.toLocaleString('es-CO'), valueCol)
                           : '';
                       
                         return `<pre style="font-family: '${settings.style.font}', monospace; font-size: ${printFontSize}; margin: 0; padding: 0; white-space: pre-wrap; width: 100%; ${isBold('subtotalFees') ? 'font-weight:bold;' : ''}">${subtotalLine}${deliveryLine}${packagingLine}</pre>`;
                     })()}
                     <div class="separator"></div>
-                    <div class="total-row" style="display:flex; justify-content:space-between; width:100%; ${isBold('total') ? 'font-weight: bold;' : ''}"><span>TOTAL:</span><span>${mockOrder.total.toLocaleString()}</span></div>
+                    ${(() => {
+                        const COL_TOTAL = 28;
+                        const labelCol = 10;
+                        const valueCol = COL_TOTAL - labelCol;
+                        const totalLine = 
+                          'TOTAL:'.padEnd(labelCol, ' ') + 
+                          mockOrder.total.toLocaleString('es-CO').padStart(valueCol, ' ');
+                        return `
+                          <pre style="
+                            font-family: '${settings.style.font}', monospace;
+                            font-size: ${printFontSize};
+                            font-weight: bold;
+                            margin: 0;
+                            padding: 0;
+                            white-space: pre;
+                            width: 100%;
+                            overflow: hidden;
+                          ">${totalLine}</pre>
+                        `;
+                      })()}
                     
                     ${(settings.fields.showPaymentMethod || settings.fields.showEstimatedDelivery) ? '<div class="separator"></div>' : ''}
                     ${settings.fields.showPaymentMethod ? `<div style="${isBold('paymentMethod') ? 'font-weight: bold;' : ''}">Método de pago: ${mockOrder.paymentMethod}</div>` : ''}
