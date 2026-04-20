@@ -3,7 +3,6 @@
 
 import React, { useRef, useState, useEffect } from 'react';
 import * as QRCodeLib from 'qrcode';
-import QRCode from 'react-qr-code';
 import {
   Card,
   CardContent,
@@ -60,7 +59,53 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
 
     const fontSizeMapping: { [key: string]: string } = { '9px': '8pt', '10px': '9pt', '11px': '10pt', '12px': '11pt' };
     const printFontSize = fontSizeMapping[settings.style.fontSize as keyof typeof fontSizeMapping] || '9pt';
-    const totalFontSize = `${parseInt(printFontSize) + 2}pt`;
+    
+    // --- CAMBIO 1: Construir el contenido de items como variable separada ---
+    const LINE_CHARS = 32;
+    const CANT_W = 3;
+    const PRICE_W = 9;
+    const PROD_W = LINE_CHARS - CANT_W - PRICE_W - 2;
+
+    const rpad = (s: string, n: number): string => s.substring(0, n).padEnd(n, ' ');
+    const lpad = (s: string, n: number): string => s.substring(0, n).padStart(n, ' ');
+    
+    const itemsHeader = rpad('Can', CANT_W) + ' ' + rpad('Producto', PROD_W) + ' ' + lpad('Total', PRICE_W);
+    const itemsSeparator = '-'.repeat(LINE_CHARS);
+
+    const itemsRows = mockOrder.items.map(item => {
+      const price = (item.quantity * item.price).toLocaleString('es-CO');
+      const qty = String(item.quantity);
+      const name = item.name;
+      const lineArr: string[] = [];
+      
+      lineArr.push(rpad(qty, CANT_W) + ' ' + rpad(name.substring(0, PROD_W), PROD_W) + ' ' + lpad(price, PRICE_W));
+      
+      let rest = name.substring(PROD_W);
+      while (rest.length > 0) {
+        lineArr.push(' '.repeat(CANT_W + 1) + rest.substring(0, PROD_W));
+        rest = rest.substring(PROD_W);
+      }
+      return lineArr.join('\n');
+    }).join('\n');
+
+    const itemsPreContent = [itemsHeader, itemsSeparator, itemsRows].join('\n');
+
+    // --- CAMBIO 3: Construir subtotales/total como variables separadas ---
+    const LABEL_W = 14;
+    const VALUE_W = LINE_CHARS - LABEL_W;
+
+    const subtotalLines: string[] = [];
+    subtotalLines.push(rpad('Subtotal:', LABEL_W) + lpad(mockOrder.subtotal.toLocaleString('es-CO'), VALUE_W));
+    if (settings.fields.showDeliveryFee) {
+        subtotalLines.push(rpad('Domicilio:', LABEL_W) + lpad(mockOrder.deliveryFee.toLocaleString('es-CO'), VALUE_W));
+    }
+    if (settings.fields.showPackaging) {
+        subtotalLines.push(rpad('Empaque:', LABEL_W) + lpad(mockOrder.packaging.toLocaleString('es-CO'), VALUE_W));
+    }
+    const subtotalPreContent = subtotalLines.join('\n');
+    
+    const totalPreContent = rpad('TOTAL:', LABEL_W) + lpad(mockOrder.total.toLocaleString('es-CO'), VALUE_W);
+
 
     const printableContent = `
         <html>
@@ -107,7 +152,7 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
                   }
                   .qr-label { text-align: center; margin-top: 2px; }
                   pre {
-                    font-family: 'Courier New', Courier, monospace !important;
+                    font-family: '${settings.style.font}', monospace !important;
                     font-size: inherit;
                     white-space: pre;
                     margin: 0;
@@ -138,113 +183,15 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
                     ${settings.fields.showClientAddress ? `<div style="${isBold('clientAddress') ? 'font-weight: bold;' : ''}">Dir: ${mockOrder.client.address}</div>` : ''}
                     <div class="separator"></div>
                     
-                    ${(() => {
-                        // 58mm a 9px monospace = ~32 chars por línea
-                        const LINE = 32;
-                        const CANT = 3;
-                        const PRICE = 9;
-                        const PROD = LINE - CANT - PRICE - 2; // 18 chars para producto
-
-                        const rpad = (s: string, n: number) => 
-                          s.substring(0, n).padEnd(n, ' ');
-                        const lpad = (s: string, n: number) => 
-                          s.substring(0, n).padStart(n, ' ');
-
-                        // Header
-                        const header = 
-                          rpad('Can', CANT) + ' ' + 
-                          rpad('Producto', PROD) + ' ' + 
-                          lpad('Total', PRICE);
-
-                        // Separator
-                        const sep = '-'.repeat(LINE);
-                        
-                        // Rows - manejar nombres largos
-                        const rows = mockOrder.items.map(item => {
-                          const price = (item.quantity * item.price)
-                            .toLocaleString('es-CO');
-                          const qty = String(item.quantity);
-                          const name = item.name;
-                          
-                          const lines: string[] = [];
-                          // Primera línea con precio
-                          lines.push(
-                            rpad(qty, CANT) + ' ' + 
-                            rpad(name.substring(0, PROD), PROD) + ' ' + 
-                            lpad(price, PRICE)
-                          );
-                          // Líneas adicionales si nombre es largo
-                          let remaining = name.substring(PROD);
-                          while (remaining.length > 0) {
-                            lines.push(
-                              ' '.repeat(CANT + 1) + 
-                              rpad(remaining.substring(0, PROD), PROD)
-                            );
-                            remaining = remaining.substring(PROD);
-                          }
-                          return lines.join('\\n');
-                        }).join('\\n');
-
-                        return `
-                      <pre style="
-                        font-family: 'Courier New', Courier, monospace;
-                        font-size: ${printFontSize};
-                        margin: 0;
-                        padding: 0;
-                        white-space: pre-wrap;
-                        width: 100%;
-                        line-height: 1.4;
-                        ${isBold('items') ? 'font-weight: bold;' : ''}
-                      ">${header}
-                      ${sep}
-                      ${rows}</pre>`;
-                      })()}
+                    <pre style="font-family: 'Courier New', Courier, monospace; font-size: ${printFontSize}; margin: 0; padding: 0; white-space: pre; width: 100%; line-height: 1.4; ${isBold('items') ? 'font-weight:bold;' : ''}">${itemsPreContent}</pre>
 
                     <div class="separator"></div>
                     
-                    ${(() => {
-                        const COL_TOTAL = 28;
-                        const padEnd = (str: string, len: number) => str.substring(0, len).padEnd(len, ' ');
-                        const padStart = (str: string, len: number) => str.substring(0, len).padStart(len, ' ');
-                        
-                        const labelCol = 14;
-                        const valueCol = COL_TOTAL - labelCol;
-                        
-                        const subtotalLine = padEnd('Subtotal:', labelCol) + padStart(mockOrder.subtotal.toLocaleString('es-CO'), valueCol);
-                          
-                        const deliveryLine = settings.fields.showDeliveryFee 
-                          ? '\\n' + padEnd('Domicilio:', labelCol) + padStart(mockOrder.deliveryFee.toLocaleString('es-CO'), valueCol)
-                          : '';
-                      
-                        const packagingLine = settings.fields.showPackaging
-                          ? '\\n' + padEnd('Empaque:', labelCol) + padStart(mockOrder.packaging.toLocaleString('es-CO'), valueCol)
-                          : '';
-                      
-                        return `<pre style="font-family: '${settings.style.font}', monospace; font-size: ${printFontSize}; margin: 0; padding: 0; white-space: pre-wrap; width: 100%; ${isBold('subtotalFees') ? 'font-weight:bold;' : ''}">${subtotalLine}${deliveryLine}${packagingLine}</pre>`;
-                    })()}
-
-                    <div class="separator"></div>
+                    <pre style="font-family:'Courier New',monospace; font-size:${printFontSize}; margin:0; padding:0; white-space:pre; width:100%; ${isBold('subtotalFees') ? 'font-weight:bold;' : ''}">${subtotalPreContent}</pre>
                     
-                    ${(() => {
-                      const COL_TOTAL = 28;
-                      const labelCol = 10;
-                      const valueCol = COL_TOTAL - labelCol;
-                      const totalLine = 
-                        'TOTAL:'.padEnd(labelCol, ' ') + 
-                        mockOrder.total.toLocaleString('es-CO').padStart(valueCol, ' ');
-                      return `
-                        <pre style="
-                          font-family: '${settings.style.font}', monospace;
-                          font-size: ${printFontSize};
-                          font-weight: bold;
-                          margin: 0;
-                          padding: 0;
-                          white-space: pre;
-                          width: 100%;
-                          overflow: hidden;
-                        ">${totalLine}</pre>
-                      `;
-                    })()}
+                    <div class="separator"></div>
+
+                    <pre style="font-family:'Courier New',monospace; font-size:${printFontSize}; margin:0; padding:0; white-space:pre; width:100%; font-weight:bold;">${totalPreContent}</pre>
                     
                     ${(settings.fields.showPaymentMethod || settings.fields.showEstimatedDelivery) ? '<div class="separator"></div>' : ''}
                     ${settings.fields.showPaymentMethod ? `<div style="${isBold('paymentMethod') ? 'font-weight: bold;' : ''}">Método de pago: ${mockOrder.paymentMethod}</div>` : ''}
@@ -254,11 +201,7 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
                     
                     ${settings.qr.show && qrCodeImage ? `
                       <div class="qr-container">
-                        <img 
-                          src="${qrCodeImage}" 
-                          alt="QR Code"
-                          style="display:block; margin:0 auto; width:90px; height:90px; image-rendering: pixelated;"
-                        />
+                        <img src="${qrCodeImage}" alt="QR Code" style="display:block; margin:0 auto; width:90px; height:90px; image-rendering: pixelated;"/>
                         <div class="qr-label" style="${isBold('qrText') ? 'font-weight: bold;' : ''}">
                           ${settings.qr.labelText}
                         </div>
@@ -267,30 +210,14 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
                     ${settings.socialMedia.show ? `
                     <div class="separator"></div>
                     <div class="text-center">
-                      ${settings.socialMedia.whatsapp ? 
-                        `<div>&#x1F4F1; WhatsApp: ${settings.socialMedia.whatsapp}</div>` 
-                        : ''}
-                      ${settings.socialMedia.instagram ? 
-                        `<div>&#x1F4F7; Instagram: ${settings.socialMedia.instagram}</div>` 
-                        : ''}
-                      ${settings.socialMedia.facebook ? 
-                        `<div>&#x1F426; Facebook: ${settings.socialMedia.facebook}</div>` 
-                        : ''}
+                      ${settings.socialMedia.whatsapp ? `<div>&#x1F4F1; WhatsApp: ${settings.socialMedia.whatsapp}</div>` : ''}
+                      ${settings.socialMedia.instagram ? `<div>&#x1F4F7; Instagram: ${settings.socialMedia.instagram}</div>` : ''}
+                      ${settings.socialMedia.facebook ? `<div>&#x1F426; Facebook: ${settings.socialMedia.facebook}</div>` : ''}
                     </div>` : ''}
                     
-                    <div class="footer" style="
-                        margin-top: 8px; 
-                        padding-bottom: 16px;
-                        border-top: 1px ${settings.style.separatorStyle} #000;
-                        padding-top: 4px;
-                      ">
-                        <div style="${isBold('footer') ? 'font-weight:bold;' : ''}">
-                          ${settings.footer.message}
-                        </div>
-                        ${settings.footer.repeatBusinessName ? `
-                          <div style="${isBold('footer') ? 'font-weight:bold;' : ''}">
-                            ${settings.header.businessName}
-                          </div>` : ''}
+                    <div class="footer" style="margin-top: 8px; padding-bottom: 16px; border-top: 1px ${settings.style.separatorStyle} #000; padding-top: 4px;">
+                        <div style="${isBold('footer') ? 'font-weight:bold;' : ''}">${settings.footer.message}</div>
+                        ${settings.footer.repeatBusinessName ? `<div style="${isBold('footer') ? 'font-weight:bold;' : ''}">${settings.header.businessName}</div>` : ''}
                         <div style="margin-top: 8px;">&nbsp;</div>
                     </div>
                 </div>
@@ -301,7 +228,6 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
     printWindow.document.write(printableContent);
     printWindow.document.close();
 
-    // Esperar que imágenes carguen antes de imprimir
     printWindow.onload = () => {
       setTimeout(() => {
         if (!printWindow.closed) {
@@ -309,10 +235,9 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
           printWindow.print();
           printWindow.close();
         }
-      }, 1500); // Increased delay
+      }, 1500);
     };
-
-    // Fallback si onload no dispara
+    
     setTimeout(() => {
       if (!printWindow.closed) {
         printWindow.focus();
@@ -354,5 +279,3 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
     </Card>
   );
 };
-
-    
