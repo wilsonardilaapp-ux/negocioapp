@@ -51,7 +51,7 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
         });
       } catch (e2) {
         console.error("QRCode lib falló:", e2);
-        qrCodeImage = ''; // Fallback a no mostrar QR si la librería falla
+        qrCodeImage = ''; 
       }
     }
     
@@ -75,12 +75,12 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
                     @page { margin: 2mm; }
                   }
                   html, body {
-                    width: ${settings.style.paperSize === '80mm' ? '72mm' : '52mm'};
+                    width: ${settings.style.paperSize === '80mm' ? '76mm' : '56mm'};
                     font-family: '${settings.style.font}', monospace;
                     font-size: ${printFontSize};
                     color: black;
                     margin: 0 auto;
-                    padding: 2px 2px;
+                    padding: 2px 0px 2px 2px;
                   }
                   .header, .text-center { text-align: center; }
                   .separator { 
@@ -124,12 +124,12 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
                     white-space: nowrap;
                   }
                   th:nth-child(2), td:nth-child(2) { 
-                    width: 68%;
+                    width: 62%;
                     word-wrap: break-word;
                     overflow-wrap: break-word;
                   }
                   th:nth-child(3), td:nth-child(3) { 
-                    width: 26%;
+                    width: 30%;
                     text-align: right;
                     white-space: nowrap;
                     padding-right: 1px;
