@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useRef, useState, useEffect } from 'react';
@@ -85,20 +86,28 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
     
     const textScale = settings.style.textScale ?? 1;
 
-    const WRAPPER_PX = settings.style.paperSize === '80mm' ? 216 : 160;
-    const fontSizePx: { [key: string]: number } = {
-        '9px': 5.5, '10px': 6, '11px': 6.5, '12px': 7
-    };
-    const charWidthPx = fontSizePx[settings.style.fontSize as keyof typeof fontSizePx] ?? 6;
-    
-    const effectiveLineChars = Math.floor(
-        (WRAPPER_PX - 4) / charWidthPx
-    );
+    const WRAPPER_PX = settings.style.paperSize === '80mm' 
+    ? 216 : 160;
+  const fontSizePx: { [key: string]: number } = {
+    '9px': 5.5, '10px': 6, '11px': 6.5, '12px': 7
+  };
+  const charWidthPx = fontSizePx[
+    settings.style.fontSize as keyof typeof fontSizePx
+  ] ?? 6;
+  
+  // LINE_CHARS fijo basado en ancho físico del wrapper
+  // textScale NO reduce los chars disponibles
+  // solo comprime visualmente el texto con scaleX
+  const effectiveLineChars = Math.floor(
+    (WRAPPER_PX - 4) / charWidthPx
+  );
 
-    const safeLineChars = Math.max(effectiveLineChars, 20);
+  // Mínimo garantizado para que PROD_W nunca sea negativo
+  const CANT_W = 3;
+  const PRICE_W = 9;
+  // Si effectiveLineChars es muy pequeño, usar mínimo 20
+  const safeLineChars = Math.max(effectiveLineChars, 20);
 
-    const CANT_W = 3;
-    const PRICE_W = 9;
     const PROD_W = safeLineChars - CANT_W - PRICE_W - 2;
     const safePROD_W = Math.max(PROD_W, 8);
     
@@ -163,9 +172,11 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
                   }
                   #ticket-wrapper {
                     width: ${settings.style.paperSize === '80mm' ? '216px' : '160px'};
-                    margin: 0 auto;
+                    margin: 0;
                     padding: 0;
                     overflow: hidden;
+                    transform: scaleX(${textScale});
+                    transform-origin: top center;
                   }
                   .text-center { text-align: center; }
                   .separator { 
@@ -187,8 +198,7 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
                     margin: 4px 0; 
                   }
                   pre { 
-                    font-family: '${settings.style.font}', 
-                      monospace !important; 
+                    font-family: '${settings.style.font}', monospace !important; 
                     font-size: inherit; 
                     white-space: pre; 
                     margin: 0; 
@@ -217,21 +227,20 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
                     html, body { 
                       margin: 0; 
                       padding: 0;
-                      width: auto;
-                      display: block;
+                      display: block; /* desactiva flex en impresión */
+                      overflow: hidden;
                     }
                     #ticket-wrapper { 
                       width: ${settings.style.paperSize === '80mm' ? '216px' : '160px'};
-                      padding: 0;
-                      margin: 0 auto;
+                      transform: scaleX(${textScale});
+                      transform-origin: top left;
                     }
                   }
                 </style>
             </head>
             <body>
               <div id="ticket-wrapper">
-                <div style="transform: scaleX(${textScale}); transform-origin: left top; display: block;">
-                  ${settings.logo.url ? `<div style="text-align: ${settings.logo.position}; margin-bottom: 4px; transform: scaleX(${1/textScale}); transform-origin: ${settings.logo.position} top;"><img src="${settings.logo.url}" class="logo" alt="logo" style="width:${settings.logo.size}; display:inline-block;"/></div>` : ''}
+                  ${settings.logo.url ? `<div style="text-align: ${settings.logo.position}; margin-bottom: 4px;"><img src="${settings.logo.url}" class="logo" alt="logo" style="width:${settings.logo.size}; display:inline-block;"/></div>` : ''}
 
                   <div class="text-center">
                       <div style="${isBold('businessName') ? 'font-weight: bold;' : ''}">${settings.header.businessName}</div>
@@ -239,11 +248,10 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
                       <div>${settings.header.phone}</div>
                       ${settings.header.nit ? `<div style="${isBold('nit') ? 'font-weight: bold;' : ''}">NIT: ${settings.header.nit}</div>` : ''}
                   </div>
-                </div>
                 
-                ${settings.barcode?.position === 'header' ? `<div style="text-align:center; margin:4px 0; transform: scale(${textScale}); transform-origin: center top;"><img src="${barcodeImage}" alt="barcode"/></div>` : ''}
+                ${settings.barcode?.position === 'header' ? `<div style="text-align:center; margin:4px 0;"><img src="${barcodeImage}" alt="barcode"/></div>` : ''}
 
-                <div style="transform: scaleX(${textScale}); transform-origin: left top; display: block;">
+                <div>
                     <div class="separator"></div>
                     <div style="margin: 3px 0;">
                         ${settings.fields.showInvoiceNumber ? `<div style="${isBold('invoiceNumber') ? 'font-weight: bold;' : ''}">Factura: ${mockOrder.invoiceNumber}</div>` : ''}
@@ -257,13 +265,13 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
                     </div>
                 </div>
 
-               <pre style="font-size: inherit; transform: scaleX(${textScale}); transform-origin: left top; display: block; line-height: 1.4;">${itemsPreContent}</pre>
+               <pre style="font-size: inherit; line-height: 1.4;">${itemsPreContent}</pre>
 
-               <div style="transform: scaleX(${textScale}); transform-origin: left top; display: block;">
+               <div>
                   <div class="separator"></div>
-                  <pre style="font-size: inherit; ${isBold('subtotalFees') ? 'font-weight:bold;' : ''}">${subtotalPreContent}</pre>
+                  <pre style="font-size: inherit; ${isBold('subtotalFees') ? 'font-weight:bold;' : ''}; line-height: 1.4;">${subtotalPreContent}</pre>
                   <div class="separator"></div>
-                  <pre style="font-size: inherit; font-weight:bold;">${totalPreContent}</pre>
+                  <pre style="font-size: inherit; font-weight:bold; line-height: 1.4;">${totalPreContent}</pre>
                   ${(settings.fields.showPaymentMethod || settings.fields.showEstimatedDelivery) ? '<div class="separator"></div>' : ''}
                   <div style="margin: 3px 0;">
                     ${settings.fields.showPaymentMethod ? `<div style="${isBold('paymentMethod') ? 'font-weight: bold;' : ''}">Método de pago: ${mockOrder.paymentMethod}</div>` : ''}
@@ -273,15 +281,17 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
                 </div>
                 
                 ${settings.qr.show && qrCodeImage ? `
-                      <div class="qr-container" style="transform: scale(${textScale}); transform-origin: center top;">
+                      <div class="qr-container">
                         <img src="${qrCodeImage}" alt="QR Code" style="display:block; margin:0 auto; width:90px; height:90px; image-rendering: pixelated;"/>
-                        <div class="qr-label" style="${isBold('qrText') ? 'font-weight: bold;' : ''}; transform: scaleX(${1/textScale});">${settings.qr.labelText}</div>
+                        <div>
+                            <div class="qr-label" style="${isBold('qrText') ? 'font-weight: bold;' : ''}">${settings.qr.labelText}</div>
+                        </div>
                       </div>`
                   : ''}
 
-                ${settings.barcode?.position === 'footer' ? `<div style="text-align:center; margin:4px 0; transform: scale(${textScale}); transform-origin: center top;"><img src="${barcodeImage}" alt="barcode"/></div>` : ''}
+                ${settings.barcode?.position === 'footer' ? `<div style="text-align:center; margin:4px 0;"><img src="${barcodeImage}" alt="barcode"/></div>` : ''}
 
-                <div style="transform: scaleX(${textScale}); transform-origin: left top; display: block;">
+                <div>
                   ${settings.socialMedia.show ? `<div class="separator"></div>` : ''}
                   <div class="text-center" style="margin: 3px 0; ${isBold('socialMedia') ? 'font-weight:bold;' : ''}">
                     ${settings.socialMedia.show && settings.socialMedia.whatsapp ? `<div>&#x1F4F1; WhatsApp: ${settings.socialMedia.whatsapp}</div>` : ''}
