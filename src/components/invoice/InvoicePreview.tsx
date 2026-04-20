@@ -18,8 +18,10 @@ import type { InvoiceSettings } from '@/models/invoice-settings';
 import { useToast } from '@/hooks/use-toast';
 import JsBarcode from 'jsbarcode';
 
+// These functions need to be at the module level
 const rpad = (s: string, n: number): string => s.substring(0, n).padEnd(n, ' ');
 const lpad = (s: string, n: number): string => s.substring(0, n).padStart(n, ' ');
+
 
 interface InvoicePreviewProps {
   settings: InvoiceSettings;
@@ -64,7 +66,7 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
         const canvas = document.createElement('canvas');
         JsBarcode(canvas, settings.barcode.value, {
           format: 'CODE128',
-          width: 1,
+          width: 1.5,
           height: 40,
           displayValue: settings.barcode.displayValue ?? true,
           fontSize: 10,
@@ -87,13 +89,18 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
 
     const WRAPPER_PX = settings.style.paperSize === '80mm' ? 216 : 160;
     const fontSizePx: { [key: string]: number } = {
-        '9px': 5.5, '10px': 6, '11px': 6.5, '12px': 7
+      '9px': 5.5, '10px': 6, '11px': 6.5, '12px': 7
     };
-    const charWidthPx = fontSizePx[settings.style.fontSize as keyof typeof fontSizePx] ?? 6;
+    const charWidthPx = fontSizePx[
+      settings.style.fontSize as keyof typeof fontSizePx
+    ] ?? 6;
     
-    const effectiveLineChars = Math.floor((WRAPPER_PX - 16) / charWidthPx);
-    const safeLineChars = Math.max(effectiveLineChars, 20);
+    const effectiveLineChars = Math.floor(
+      (WRAPPER_PX - 16) / charWidthPx
+    );
 
+    const safeLineChars = Math.max(effectiveLineChars, 20);
+    
     const CANT_W = 3;
     const PRICE_W = 9;
     
@@ -146,18 +153,18 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
                     margin: 0; 
                     padding: 0; 
                   }
-                  html {
-                    overflow: hidden;
+                  html, body {
+                    margin: 0;
+                    padding: 0;
+                    background: white;
                   }
                   body {
                     font-family: '${settings.style.font}', monospace;
                     font-size: ${printFontSize};
                     color: black;
-                    margin: 0;
-                    padding: 0;
-                    overflow: hidden;
                     display: flex;
                     justify-content: center;
+                    align-items: flex-start;
                   }
                   #ticket-wrapper {
                     width: ${settings.style.paperSize === '80mm' ? '216px' : '160px'};
@@ -207,7 +214,8 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
                   }
                   @media print {
                     @page { 
-                      size: ${settings.style.paperSize === '80mm' ? '80mm' : '58mm'} auto;
+                      size: ${settings.style.paperSize === '80mm' 
+                        ? '80mm' : '58mm'} auto;
                       margin: 0; 
                     }
                     html, body { 
