@@ -81,8 +81,19 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
     const printFontSize = fontSizeMapping[settings.style.fontSize as keyof typeof fontSizeMapping] || '9pt';
     
     const textScale = settings.style.textScale ?? 1;
-    const LINE_CHARS_BASE = settings.style.paperSize === '80mm' ? 42 : 32;
-    const effectiveLineChars = Math.floor(LINE_CHARS_BASE / textScale);
+
+    // =============================================
+    // PASO 1: Ajustar LINE_CHARS según el ancho real en px
+    // =============================================
+    const WRAPPER_PX = settings.style.paperSize === '80mm' ? 216 : 160;
+    const fontSizePx: { [key: string]: number } = {
+      '9px': 5.5, '10px': 6, '11px': 6.5, '12px': 7
+    };
+    const charWidthPx = fontSizePx[settings.style.fontSize] ?? 6;
+    const LINE_CHARS_BASE = Math.floor(
+      (WRAPPER_PX - 4) / charWidthPx / textScale
+    );
+    const effectiveLineChars = LINE_CHARS_BASE;
     
     const CANT_W = 3;
     const PRICE_W = 9;
@@ -148,10 +159,25 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
                     color: black;
                   }
                   #ticket-wrapper {
-                    width: ${settings.style.paperSize === '80mm' ? '216px' : '164px'};
+                    width: ${settings.style.paperSize === '80mm' ? '216px' : '160px'};
                     margin: 0;
-                    padding: 2px 0 2px 2px;
+                    padding: 0;
                     overflow: hidden;
+                  }
+                  pre {
+                    font-family: '${settings.style.font}', monospace !important;
+                    font-size: inherit;
+                    white-space: pre;
+                    margin: 0;
+                    padding: 0;
+                    width: 100%;
+                    overflow: hidden;
+                    line-height: 1.4;
+                  }
+                  div { 
+                    line-height: 1.4; 
+                    word-wrap: break-word;
+                    overflow-wrap: break-word;
                   }
                   .text-center { text-align: center; }
                   .separator { 
@@ -172,16 +198,6 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
                     width: 100%; 
                     margin: 4px 0; 
                   }
-                  pre { 
-                    font-family: '${settings.style.font}', 
-                      monospace !important; 
-                    font-size: inherit; 
-                    white-space: pre; 
-                    margin: 0; 
-                    padding: 0; 
-                    width: 100%;
-                    overflow: hidden;
-                  }
                   .footer { 
                     text-align: center; 
                     margin-top: 8px; 
@@ -190,10 +206,18 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
                     padding-top: 4px; 
                   }
                   @media print {
-                    @page { margin: 2mm; }
-                    html, body { margin: 0; padding: 0; }
+                    @page { 
+                      size: auto;
+                      margin: 1mm 0mm; 
+                    }
+                    html, body { 
+                      margin: 0; 
+                      padding: 0;
+                      width: auto;
+                    }
                     #ticket-wrapper { 
-                      width: 100%;
+                      width: ${settings.style.paperSize === '80mm' 
+                        ? '216px' : '160px'};
                       padding: 0;
                     }
                   }
@@ -226,13 +250,13 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
                   </div>
                 </div>
 
-               <pre style="line-height: 1.4; ${isBold('items') ? 'font-weight:bold;' : ''}">${itemsPreContent}</pre>
+               <pre>${itemsPreContent}</pre>
 
                <div>
                   <div class="separator"></div>
-                  <pre style="line-height: 1.4; ${isBold('subtotalFees') ? 'font-weight:bold;' : ''}">${subtotalPreContent}</pre>
+                  <pre style="${isBold('subtotalFees') ? 'font-weight:bold;' : ''}">${subtotalPreContent}</pre>
                   <div class="separator"></div>
-                  <pre style="line-height: 1.4; font-weight:bold;">${totalPreContent}</pre>
+                  <pre style="font-weight:bold;">${totalPreContent}</pre>
                   ${(settings.fields.showPaymentMethod || settings.fields.showEstimatedDelivery) ? '<div class="separator"></div>' : ''}
                   <div style="margin: 3px 0;">
                     ${settings.fields.showPaymentMethod ? `<div style="${isBold('paymentMethod') ? 'font-weight: bold;' : ''}">Método de pago: ${mockOrder.paymentMethod}</div>` : ''}
