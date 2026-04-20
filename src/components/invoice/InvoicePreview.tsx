@@ -90,16 +90,19 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
     const fontSizeMapping: { [key: string]: string } = { '9px': '8pt', '10px': '9pt', '11px': '10pt', '12px': '11pt' };
     const printFontSize = fontSizeMapping[settings.style.fontSize as keyof typeof fontSizeMapping] || '9pt';
     
+    const textScale = settings.style.textScale ?? 1;
     const LINE_CHARS = settings.style.paperSize === '80mm' ? 42 : 32;
-    const CANT_W = 2; // Reduced from 3
-    const PRICE_W = 8; // Reduced from 9
-    const PROD_W = LINE_CHARS - CANT_W - PRICE_W - 2; // Increased to 20
+    const effectiveLineChars = Math.floor(LINE_CHARS / textScale);
+
+    const CANT_W = 3;
+    const PRICE_W = 9;
+    const PROD_W = Math.max(10, effectiveLineChars - CANT_W - PRICE_W - 2);
 
     const rpad = (s: string, n: number): string => s.substring(0, n).padEnd(n, ' ');
     const lpad = (s: string, n: number): string => s.substring(0, n).padStart(n, ' ');
-    
+
     const itemsHeader = rpad('Can', CANT_W) + ' ' + rpad('Producto', PROD_W) + ' ' + lpad('Total', PRICE_W);
-    const itemsSeparator = '-'.repeat(LINE_CHARS);
+    const itemsSeparator = '-'.repeat(effectiveLineChars);
 
     const itemsRows = mockOrder.items.map(item => {
       const price = (item.quantity * item.price).toLocaleString('es-CO');
@@ -119,7 +122,7 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
     
     const itemsPreContent = [itemsHeader, itemsSeparator, itemsRows].join('\n');
     
-    const SUMMARY_LABEL_W = LINE_CHARS - PRICE_W - 1;
+    const SUMMARY_LABEL_W = effectiveLineChars - PRICE_W - 1;
     const SUMMARY_VALUE_W = PRICE_W;
     
     const subtotalLines: string[] = [];
@@ -139,8 +142,6 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
             <head>
                 <title>Factura</title>
                 <style>
-                  * { box-sizing: border-box; margin: 0; padding: 0; }
-                  @media print { @page { margin: 2mm; } }
                   body {
                     width: ${settings.style.paperSize === '80mm' ? '76mm' : '56mm'};
                     font-family: '${settings.style.font}', monospace;
@@ -150,9 +151,9 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
                     padding: 2px 0px 2px 2px;
                   }
                   .text-scale { transform: scaleX(${settings.style.textScale ?? 1}); transform-origin: left top; display: block; }
-                  .img-container { transform-origin: center top; display: block; }
-                  .img-scale { transform: scale(${settings.style.textScale ?? 1}); }
-                  pre { font-family: 'Courier New', Courier, monospace !important; font-size: inherit; white-space: pre; margin: 0; padding: 0; width: 100%; }
+                  .img-container { display: block; }
+                  .img-scale { transform: scale(${settings.style.textScale ?? 1}); transform-origin: center top; }
+                  pre { font-family: '${settings.style.font}', monospace !important; font-size: inherit; white-space: pre; margin: 0; padding: 0; width: 100%; }
                   .text-center { text-align: center; }
                   .separator { border-top: 1px ${settings.style.separatorStyle} #000; margin: 3px 0; }
                   .logo { max-width:60px; max-height:60px; width:auto; height:auto; }
