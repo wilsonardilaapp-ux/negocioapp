@@ -76,7 +76,7 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
     }
 
     const barcodeHtml = settings.barcode?.show && barcodeImage
-    ? `<div class="img-scale" style="text-align:center; margin:4px 0;">
+    ? `<div class="img-container" style="text-align:center; margin:4px 0;">
         <img
           src="${barcodeImage}"
           alt="Código de barras"
@@ -111,10 +111,7 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
         
         let rest = name.substring(PROD_W);
         while (rest.length > 0) {
-            lineArr.push(
-            ' '.repeat(CANT_W + 1) + 
-            rpad(rest.substring(0, PROD_W), PROD_W)
-            );
+            lineArr.push(' '.repeat(CANT_W + 1) + rpad(rest.substring(0, PROD_W), PROD_W));
             rest = rest.substring(PROD_W);
         }
         return lineArr.join('\n');
@@ -122,7 +119,7 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
 
     const itemsPreContent = [itemsHeader, itemsSeparator, itemsRows].join('\n');
     
-    const SUMMARY_LABEL_W = LINE_CHARS - PRICE_W - 1;
+    const SUMMARY_LABEL_W = PROD_W + CANT_W + 1; // Ajustado para alinear con la columna de producto
     const SUMMARY_VALUE_W = PRICE_W;
     
     const subtotalLines: string[] = [];
@@ -151,87 +148,82 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
                     color: black;
                     margin: 0;
                     padding: 2px 0px 2px 2px;
+                    transform: scaleX(${settings.style.textScale ?? 1});
+                    transform-origin: left top;
                   }
-                  .text-scale { transform: scaleX(${settings.style.textScale ?? 1}); transform-origin: left top; display: block; }
-                  .img-scale { transform: scale(${settings.style.textScale ?? 1}); transform-origin: center top; display: block; margin-left: auto; margin-right: auto; }
-                  .header, .text-center { text-align: center; }
+                  .img-container {
+                      transform: scaleX(calc(1 / ${settings.style.textScale ?? 1}));
+                      transform-origin: center;
+                  }
+                  pre { font-family: 'Courier New', Courier, monospace !important; font-size: inherit; white-space: pre; margin: 0; padding: 0; width: 100%; }
+                  .text-center { text-align: center; }
                   .separator { border-top: 1px ${settings.style.separatorStyle} #000; margin: 3px 0; }
                   .logo { max-width:60px; max-height:60px; width:auto; height:auto; }
                   .qr-container { display: flex; flex-direction: column; align-items: center; width: 100%; margin: 4px 0; }
-                  .qr-label { text-align: center; margin-top: 2px; }
-                  pre { font-family: 'Courier New', Courier, monospace !important; font-size: inherit; white-space: pre; margin: 0; padding: 0; width: 100%; }
                   .footer { text-align: center; }
                 </style>
             </head>
             <body>
-                ${settings.logo.url ? `<div class="img-scale" style="text-align: ${settings.logo.position};"><img src="${settings.logo.url}" class="logo" alt="logo" style="width:${settings.logo.size}; display:inline-block;"/></div>` : ''}
+                ${settings.logo.url ? `<div class="img-container" style="text-align: ${settings.logo.position};"><img src="${settings.logo.url}" class="logo" alt="logo" style="width:${settings.logo.size}; display:inline-block;"/></div>` : ''}
 
-                <div class="text-scale">
-                    <div class="header" style="${isBold('businessName') ? 'font-weight: bold;' : ''}">${settings.header.businessName}</div>
-                    <div class="header" style="${isBold('address') ? 'font-weight: bold;' : ''}">${settings.header.address}</div>
-                    <div class="header">${settings.header.phone}</div>
-                    ${settings.header.nit ? `<div class="header" style="${isBold('nit') ? 'font-weight: bold;' : ''}">NIT: ${settings.header.nit}</div>` : ''}
-                </div>
+                <div class="header" style="${isBold('businessName') ? 'font-weight: bold;' : ''}">${settings.header.businessName}</div>
+                <div class="header" style="${isBold('address') ? 'font-weight: bold;' : ''}">${settings.header.address}</div>
+                <div class="header">${settings.header.phone}</div>
+                ${settings.header.nit ? `<div class="header" style="${isBold('nit') ? 'font-weight: bold;' : ''}">NIT: ${settings.header.nit}</div>` : ''}
 
                 ${settings.barcode?.position === 'header' ? barcodeHtml : ''}
 
-                <div class="text-scale"><div class="separator"></div></div>
+                <div class="separator"></div>
 
-                <div class="text-scale">
-                    ${settings.fields.showInvoiceNumber ? `<div style="${isBold('invoiceNumber') ? 'font-weight: bold;' : ''}">Factura: ${mockOrder.invoiceNumber}</div>` : ''}
-                    ${settings.fields.showDateTime ? `<div style="${isBold('dateTime') ? 'font-weight: bold;' : ''}">Fecha: ${mockOrder.dateTime}</div>` : ''}
-                </div>
+                ${settings.fields.showInvoiceNumber ? `<div style="${isBold('invoiceNumber') ? 'font-weight: bold;' : ''}">Factura: ${mockOrder.invoiceNumber}</div>` : ''}
+                ${settings.fields.showDateTime ? `<div style="${isBold('dateTime') ? 'font-weight: bold;' : ''}">Fecha: ${mockOrder.dateTime}</div>` : ''}
                 
-                <div class="text-scale"><div class="separator"></div></div>
+                <div class="separator"></div>
                 
-                <div class="text-scale">
-                    <div style="${isBold('clientName') ? 'font-weight: bold;' : ''}">Cliente: ${mockOrder.client.name}</div>
-                    ${settings.fields.showClientPhone ? `<div style="${isBold('clientPhone') ? 'font-weight: bold;' : ''}">Tel: ${mockOrder.client.phone}</div>` : ''}
-                    ${settings.fields.showClientAddress ? `<div style="${isBold('clientAddress') ? 'font-weight: bold;' : ''}">Dir: ${mockOrder.client.address}</div>` : ''}
-                </div>
+                <div style="${isBold('clientName') ? 'font-weight: bold;' : ''}">Cliente: ${mockOrder.client.name}</div>
+                ${settings.fields.showClientPhone ? `<div style="${isBold('clientPhone') ? 'font-weight: bold;' : ''}">Tel: ${mockOrder.client.phone}</div>` : ''}
+                ${settings.fields.showClientAddress ? `<div style="${isBold('clientAddress') ? 'font-weight: bold;' : ''}">Dir: ${mockOrder.client.address}</div>` : ''}
                 
                 <pre style="font-family: 'Courier New', Courier, monospace; font-size: ${printFontSize}; margin: 0; padding: 0; white-space: pre; width: 100%; line-height: 1.4; ${isBold('items') ? 'font-weight:bold;' : ''}">${itemsPreContent}</pre>
 
-                <div class="text-scale"><div class="separator"></div></div>
+                <div class="separator"></div>
                 
                 <pre style="font-family:'Courier New',monospace; font-size:${printFontSize}; margin:0; padding:0; white-space:pre; width:100%; ${isBold('subtotalFees') ? 'font-weight:bold;' : ''}">${subtotalPreContent}</pre>
 
-                <div class="text-scale"><div class="separator"></div></div>
+                <div class="separator"></div>
                 
                 <pre style="font-family:'Courier New',monospace; font-size:${printFontSize}; margin:0; padding:0; white-space:pre; width:100%; font-weight:bold;">${totalPreContent}</pre>
 
-                <div class="text-scale">${(settings.fields.showPaymentMethod || settings.fields.showEstimatedDelivery) ? '<div class="separator"></div>' : ''}</div>
+                ${(settings.fields.showPaymentMethod || settings.fields.showEstimatedDelivery) ? '<div class="separator"></div>' : ''}
                 
-                <div class="text-scale">
-                    ${settings.fields.showPaymentMethod ? `<div style="${isBold('paymentMethod') ? 'font-weight: bold;' : ''}">Método de pago: ${mockOrder.paymentMethod}</div>` : ''}
-                    ${settings.fields.showEstimatedDelivery ? `<div style="${isBold('estimatedDelivery') ? 'font-weight: bold;' : ''}">Tiempo de entrega: ${mockOrder.estimatedDelivery}</div>` : ''}
-                </div>
+                ${settings.fields.showPaymentMethod ? `<div style="${isBold('paymentMethod') ? 'font-weight: bold;' : ''}">Método de pago: ${mockOrder.paymentMethod}</div>` : ''}
+                ${settings.fields.showEstimatedDelivery ? `<div style="${isBold('estimatedDelivery') ? 'font-weight: bold;' : ''}">Tiempo de entrega: ${mockOrder.estimatedDelivery}</div>` : ''}
                 
-                <div class="text-scale">${settings.promo.show && settings.promo.text ? `<div class="separator"></div><div class="text-center font-bold">${settings.promo.text}</div>` : ''}</div>
+                ${settings.promo.show && settings.promo.text ? `<div class="separator"></div><div class="text-center font-bold">${settings.promo.text}</div>` : ''}
                 
                 ${settings.qr.show && qrCodeImage ? `
-                  <div class="qr-container img-scale">
-                    <img src="${qrCodeImage}" alt="QR Code" style="display:block; margin:0 auto; width:90px; height:90px; image-rendering: pixelated;"/>
-                  </div>
-                  <div class="qr-label text-scale" style="${isBold('qrText') ? 'font-weight: bold;' : ''}">
-                      ${settings.qr.labelText}
+                  <div class="img-container">
+                      <div class="qr-container">
+                        <img src="${qrCodeImage}" alt="QR Code" style="display:block; margin:0 auto; width:90px; height:90px; image-rendering: pixelated;"/>
+                        <div class="qr-label" style="${isBold('qrText') ? 'font-weight: bold;' : ''}">
+                            ${settings.qr.labelText}
+                        </div>
+                      </div>
                   </div>`
                   : ''}
 
                 ${settings.barcode?.position === 'footer' ? barcodeHtml : ''}
 
                 ${settings.socialMedia.show ? `
-                    <div class="text-scale"><div class="separator"></div></div>
-                    <div class="text-scale">
-                        <div class="text-center" style="${isBold('socialMedia') ? 'font-weight:bold;' : ''}">
-                          ${settings.socialMedia.whatsapp ? `<div>&#x1F4F1; WhatsApp: ${settings.socialMedia.whatsapp}</div>` : ''}
-                          ${settings.socialMedia.instagram ? `<div>&#x1F4F7; Instagram: ${settings.socialMedia.instagram}</div>` : ''}
-                          ${settings.socialMedia.facebook ? `<div>&#x1F426; Facebook: ${settings.socialMedia.facebook}</div>` : ''}
-                          ${settings.socialMedia.website ? `<div>&#x1F310; Web: ${settings.socialMedia.website}</div>` : ''}
-                        </div>
+                    <div class="separator"></div>
+                    <div class="text-center" style="${isBold('socialMedia') ? 'font-weight:bold;' : ''}">
+                      ${settings.socialMedia.whatsapp ? `<div>&#x1F4F1; WhatsApp: ${settings.socialMedia.whatsapp}</div>` : ''}
+                      ${settings.socialMedia.instagram ? `<div>&#x1F4F7; Instagram: ${settings.socialMedia.instagram}</div>` : ''}
+                      ${settings.socialMedia.facebook ? `<div>&#x1F426; Facebook: ${settings.socialMedia.facebook}</div>` : ''}
+                      ${settings.socialMedia.website ? `<div>&#x1F310; Web: ${settings.socialMedia.website}</div>` : ''}
                     </div>` : ''}
                 
-                <div class="footer text-scale" style="margin-top: 8px; padding-bottom: 16px; border-top: 1px ${settings.style.separatorStyle} #000; padding-top: 4px;">
+                <div class="footer" style="margin-top: 8px; padding-bottom: 16px; border-top: 1px ${settings.style.separatorStyle} #000; padding-top: 4px;">
                     <div style="${isBold('footer') ? 'font-weight:bold;' : ''}">${settings.footer.message}</div>
                     ${settings.footer.repeatBusinessName ? `<div style="${isBold('footer') ? 'font-weight:bold;' : ''}">${settings.header.businessName}</div>` : ''}
                     <div style="margin-top: 8px;">&nbsp;</div>
