@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useRef, useState, useEffect } from 'react';
@@ -86,31 +85,23 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
     
     const textScale = settings.style.textScale ?? 1;
 
-    const WRAPPER_PX = settings.style.paperSize === '80mm' 
-    ? 216 : 160;
-  const fontSizePx: { [key: string]: number } = {
-    '9px': 5.5, '10px': 6, '11px': 6.5, '12px': 7
-  };
-  const charWidthPx = fontSizePx[
-    settings.style.fontSize as keyof typeof fontSizePx
-  ] ?? 6;
-  
-  // LINE_CHARS fijo basado en ancho físico del wrapper
-  // textScale NO reduce los chars disponibles
-  // solo comprime visualmente el texto con scaleX
-  const effectiveLineChars = Math.floor((WRAPPER_PX - 16) / charWidthPx);
+    const WRAPPER_PX = settings.style.paperSize === '80mm' ? 216 : 160;
+    const fontSizePx: { [key: string]: number } = {
+        '9px': 5.5, '10px': 6, '11px': 6.5, '12px': 7
+    };
+    const charWidthPx = fontSizePx[settings.style.fontSize as keyof typeof fontSizePx] ?? 6;
 
-  // Mínimo garantizado para que PROD_W nunca sea negativo
-  const CANT_W = 3;
-  const PRICE_W = 9;
-  // Si effectiveLineChars es muy pequeño, usar mínimo 20
-  const safeLineChars = Math.max(effectiveLineChars, 20);
+    const effectiveLineChars = Math.floor((WRAPPER_PX - 16) / charWidthPx);
 
-  const PROD_W = safeLineChars - CANT_W - PRICE_W - 2;
-  const safePROD_W = Math.max(PROD_W, 8);
+    const safeLineChars = Math.max(effectiveLineChars, 20);
+
+    const CANT_W = 3;
+    const PRICE_W = 9;
+    const PROD_W = safeLineChars - CANT_W - PRICE_W - 2;
+    const safePROD_W = Math.max(PROD_W, 8);
     
-  const itemsHeader = rpad('Can', CANT_W) + ' ' + rpad('Producto', safePROD_W) + ' ' + lpad('Total', PRICE_W);
-  const itemsSeparator = '-'.repeat(safeLineChars);
+    const itemsHeader = rpad('Can', CANT_W) + ' ' + rpad('Producto', safePROD_W) + ' ' + lpad('Total', PRICE_W);
+    const itemsSeparator = '-'.repeat(safeLineChars);
 
     const itemsRows = mockOrder.items.map(item => {
       const price = (item.quantity * item.price).toLocaleString('es-CO');
@@ -172,7 +163,7 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
                     width: ${settings.style.paperSize === '80mm' ? '216px' : '160px'};
                     margin: 0 auto;
                     padding: 0;
-                    overflow: hidden;
+                    zoom: ${textScale};
                   }
                   .text-center { text-align: center; }
                   .separator { 
@@ -222,12 +213,14 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
                     html, body { 
                       margin: 0; 
                       padding: 0;
+                      width: auto;
                       display: block;
                     }
                     #ticket-wrapper { 
                       width: ${settings.style.paperSize === '80mm' ? '216px' : '160px'};
                       padding: 0;
                       margin: 0 auto;
+                      zoom: ${textScale};
                     }
                   }
                 </style>
