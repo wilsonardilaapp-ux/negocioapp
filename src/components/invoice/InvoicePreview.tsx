@@ -48,7 +48,7 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
     if (settings.qr.show && !settings.qr.qrImageUrl) {
         try {
             qrCodeImage = await QRCodeLib.toDataURL(qrUrlToGenerate, {
-                width: 200,
+                width: 120, // CHANGED: Generate at a more appropriate size
                 margin: 1,
                 errorCorrectionLevel: 'H',
             });
@@ -87,30 +87,35 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
     
     const textScale = settings.style.textScale ?? 1;
 
-    const WRAPPER_PX = settings.style.paperSize === '80mm' ? 216 : 160;
-    const fontSizePx: { [key: string]: number } = {
-      '9px': 5.5, '10px': 6, '11px': 6.5, '12px': 7
-    };
-    const charWidthPx = fontSizePx[
-      settings.style.fontSize as keyof typeof fontSizePx
-    ] ?? 6;
-    
-    const effectiveLineChars = Math.floor(
-      (WRAPPER_PX - 16) / charWidthPx
-    );
+    const WRAPPER_PX = settings.style.paperSize === '80mm' 
+    ? 216 : 160;
+  const fontSizePx: { [key: string]: number } = {
+    '9px': 5.5, '10px': 6, '11px': 6.5, '12px': 7
+  };
+  const charWidthPx = fontSizePx[
+    settings.style.fontSize as keyof typeof fontSizePx
+  ] ?? 6;
+  
+  // LINE_CHARS fijo basado en ancho físico del wrapper
+  // textScale NO reduce los chars disponibles
+  // solo comprime visualmente el texto con scaleX
+  const effectiveLineChars = Math.floor(
+    (WRAPPER_PX - 16) / charWidthPx
+  );
 
-    const safeLineChars = Math.max(effectiveLineChars, 20);
+  // Mínimo garantizado para que PROD_W nunca sea negativo
+  const CANT_W = 3;
+  const PRICE_W = 9;
+  // Si effectiveLineChars es muy pequeño, usar mínimo 20
+  const safeLineChars = Math.max(effectiveLineChars, 20);
+  
+  const PROD_W = safeLineChars - CANT_W - PRICE_W - 2;
+  const safePROD_W = Math.max(PROD_W, 8);
     
-    const CANT_W = 3;
-    const PRICE_W = 9;
-    
-    const PROD_W = safeLineChars - CANT_W - PRICE_W - 2;
-    const safePROD_W = Math.max(PROD_W, 8);
-    
-    const itemsHeader = rpad('Can', CANT_W) + ' ' + rpad('Producto', safePROD_W) + ' ' + lpad('Total', PRICE_W);
-    const itemsSeparator = '-'.repeat(safeLineChars);
+  const itemsHeader = rpad('Can', CANT_W) + ' ' + rpad('Producto', safePROD_W) + ' ' + lpad('Total', PRICE_W);
+  const itemsSeparator = '-'.repeat(safeLineChars);
 
-    const itemsRows = mockOrder.items.map(item => {
+  const itemsRows = mockOrder.items.map(item => {
       const price = (item.quantity * item.price).toLocaleString('es-CO');
       const qty = String(item.quantity);
       const name = item.name;
@@ -129,7 +134,7 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
     const itemsPreContent = [itemsHeader, itemsSeparator, itemsRows].join('\n');
     
     const SUMMARY_VALUE_W = PRICE_W;
-    const SUMMARY_LABEL_W = safeLineChars - SUMMARY_VALUE_W;
+  const SUMMARY_LABEL_W = safeLineChars - SUMMARY_VALUE_W;
     
     const subtotalLines: string[] = [];
     subtotalLines.push(rpad('Subtotal:', SUMMARY_LABEL_W) + lpad(mockOrder.subtotal.toLocaleString('es-CO'), SUMMARY_VALUE_W));
@@ -153,18 +158,18 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
                     margin: 0; 
                     padding: 0; 
                   }
-                  html, body {
-                    margin: 0;
-                    padding: 0;
-                    background: white;
+                  html {
+                    overflow: hidden;
                   }
                   body {
                     font-family: '${settings.style.font}', monospace;
                     font-size: ${printFontSize};
                     color: black;
+                    margin: 0;
+                    padding: 0;
+                    overflow: hidden;
                     display: flex;
                     justify-content: center;
-                    align-items: flex-start;
                   }
                   #ticket-wrapper {
                     width: ${settings.style.paperSize === '80mm' ? '216px' : '160px'};
@@ -176,7 +181,7 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
                   .separator { 
                     border-top: 1px ${settings.style.separatorStyle} #000; 
                     margin: 3px 0; 
-                    width: 100%;
+                    width: 100%; 
                   }
                   .logo { 
                     max-width: 60px; 
@@ -222,12 +227,14 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
                       margin: 0; 
                       padding: 0;
                       width: auto;
-                      display: block;
+                      display: block; /* desactiva flex en impresión */
+                      overflow: hidden;
                     }
                     #ticket-wrapper { 
                       width: ${settings.style.paperSize === '80mm' ? '216px' : '160px'};
-                      zoom: ${textScale};
+                      padding: 0;
                       margin: 0 auto;
+                      zoom: ${textScale};
                     }
                   }
                 </style>
@@ -259,13 +266,13 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
                     </div>
                 </div>
 
-               <pre style="font-size: inherit; line-height: 1.4;">${itemsPreContent}</pre>
+               <pre style="font-size: inherit; line-height: 1.4; ${isBold('items') ? 'font-weight:bold;' : ''}">${itemsPreContent}</pre>
 
                <div>
                   <div class="separator"></div>
-                  <pre style="font-size: inherit; ${isBold('subtotalFees') ? 'font-weight:bold;' : ''}; line-height: 1.4;">${subtotalPreContent}</pre>
+                  <pre style="font-size: inherit; line-height: 1.4; ${isBold('subtotalFees') ? 'font-weight:bold;' : ''}">${subtotalPreContent}</pre>
                   <div class="separator"></div>
-                  <pre style="font-size: inherit; font-weight:bold; line-height: 1.4;">${totalPreContent}</pre>
+                  <pre style="font-size: inherit; line-height: 1.4; font-weight:bold;">${totalPreContent}</pre>
                   ${(settings.fields.showPaymentMethod || settings.fields.showEstimatedDelivery) ? '<div class="separator"></div>' : ''}
                   <div style="margin: 3px 0;">
                     ${settings.fields.showPaymentMethod ? `<div style="${isBold('paymentMethod') ? 'font-weight: bold;' : ''}">Método de pago: ${mockOrder.paymentMethod}</div>` : ''}
@@ -276,7 +283,7 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
                 
                 ${settings.qr.show && qrCodeImage ? `
                       <div class="qr-container">
-                        <img src="${qrCodeImage}" alt="QR Code" style="display:block; margin:0 auto; width:90px; height:90px; image-rendering: pixelated;"/>
+                        <img src="${qrCodeImage}" alt="QR Code" style="display:block; margin:0 auto; width:120px; height:120px;"/>
                         <div>
                             <div class="qr-label" style="${isBold('qrText') ? 'font-weight: bold;' : ''}">${settings.qr.labelText}</div>
                         </div>
