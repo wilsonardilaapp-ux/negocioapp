@@ -18,7 +18,7 @@ import type { InvoiceSettings } from '@/models/invoice-settings';
 import { useToast } from '@/hooks/use-toast';
 import JsBarcode from 'jsbarcode';
 
-// These functions need to be at the module level
+// These functions need to be at the module level to be accessible by the entire component
 const rpad = (s: string, n: number): string => s.substring(0, n).padEnd(n, ' ');
 const lpad = (s: string, n: number): string => s.substring(0, n).padStart(n, ' ');
 
@@ -48,9 +48,9 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
     if (settings.qr.show && !settings.qr.qrImageUrl) {
         try {
             qrCodeImage = await QRCodeLib.toDataURL(qrUrlToGenerate, {
-                width: 150,
-                margin: 2,
-                errorCorrectionLevel: 'M',
+                width: 300,
+                margin: 4,
+                errorCorrectionLevel: 'H',
                 color: {
                   dark: '#000000',
                   light: '#ffffff'
@@ -131,7 +131,7 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
     const itemsPreContent = [itemsHeader, itemsSeparator, itemsRows].join('\n');
     
     const SUMMARY_VALUE_W = PRICE_W;
-  const SUMMARY_LABEL_W = safeLineChars - SUMMARY_VALUE_W;
+    const SUMMARY_LABEL_W = safeLineChars - SUMMARY_VALUE_W;
     
     const subtotalLines: string[] = [];
     subtotalLines.push(rpad('Subtotal:', SUMMARY_LABEL_W) + lpad(mockOrder.subtotal.toLocaleString('es-CO'), SUMMARY_VALUE_W));
@@ -170,7 +170,7 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
                   }
                   #ticket-wrapper {
                     width: ${settings.style.paperSize === '80mm' ? '216px' : '160px'};
-                    margin: 0;
+                    margin: 0 auto;
                     padding: 0;
                     overflow: hidden;
                     zoom: ${textScale};
@@ -223,15 +223,13 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
                     html, body { 
                       margin: 0; 
                       padding: 0;
-                      width: auto;
                       display: block;
                       overflow: hidden;
                     }
                     #ticket-wrapper { 
                       width: ${settings.style.paperSize === '80mm' ? '216px' : '160px'};
-                      margin: 0 auto;
-                      padding: 0;
                       zoom: ${textScale};
+                      margin: 0 auto;
                     }
                   }
                 </style>
@@ -280,7 +278,7 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
                 
                 ${settings.qr.show && qrCodeImage ? `
                       <div class="qr-container">
-                        <img src="${qrCodeImage}" alt="QR Code" style="display:block; margin:0 auto; width:100px; height:100px; image-rendering: auto;"/>
+                        <img src="${qrCodeImage}" alt="QR Code" style="width:80%; max-width:140px; height:auto; display:block; margin:4px auto; image-rendering: pixelated;"/>
                         <div>
                             <div class="qr-label" style="${isBold('qrText') ? 'font-weight: bold;' : ''}">${settings.qr.labelText}</div>
                         </div>
