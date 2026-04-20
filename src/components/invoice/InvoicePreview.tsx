@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useRef, useState, useEffect } from 'react';
@@ -77,7 +76,7 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
     }
 
     const barcodeHtml = settings.barcode?.show && barcodeImage
-    ? `<div class="img-scale" style="text-align:center; margin:4px 0;">
+    ? `<div class="img-container" style="text-align:center; margin:4px 0;">
         <img
           src="${barcodeImage}"
           alt="Código de barras"
@@ -99,8 +98,8 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
     const PRICE_W = 9;
     const PROD_W = effectiveLineChars - CANT_W - PRICE_W - 2;
 
-    const rpad = (s: string, n: number): string => s.substring(0, n).padEnd(n, ' ');
-    const lpad = (s: string, n: number): string => s.substring(0, n).padStart(n, ' ');
+    const rpad = (s: string, n: number): string => String(s).substring(0, n).padEnd(n, ' ');
+    const lpad = (s: string, n: number): string => String(s).substring(0, n).padStart(n, ' ');
 
     const itemsHeader = rpad('Can', CANT_W) + ' ' + rpad('Producto', PROD_W) + ' ' + lpad('Total', PRICE_W);
     const itemsSeparator = '-'.repeat(effectiveLineChars);
@@ -123,8 +122,8 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
     
     const itemsPreContent = [itemsHeader, itemsSeparator, itemsRows].join('\n');
     
-    const SUMMARY_LABEL_W = effectiveLineChars - PRICE_W - 1;
     const SUMMARY_VALUE_W = PRICE_W;
+    const SUMMARY_LABEL_W = effectiveLineChars - SUMMARY_VALUE_W;
     
     const subtotalLines: string[] = [];
     subtotalLines.push(rpad('Subtotal:', SUMMARY_LABEL_W) + lpad(mockOrder.subtotal.toLocaleString('es-CO'), SUMMARY_VALUE_W));
@@ -157,14 +156,12 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
                   .separator { border-top: 1px ${settings.style.separatorStyle} #000; margin: 3px 0; }
                   .logo { max-width:60px; max-height:60px; width:auto; height:auto; }
                   .qr-container { display: flex; flex-direction: column; align-items: center; width: 100%; margin: 4px 0; }
-                  .img-scale { display: block; transform-origin: center top; transform: scale(${settings.style.textScale ?? 1}); }
-                  .text-scale { display: block; transform-origin: left top; }
                 </style>
             </head>
             <body>
-                ${settings.logo.url ? `<div class="img-container img-scale"><img src="${settings.logo.url}" class="logo" alt="logo" style="width:${settings.logo.size}; display:inline-block;"/></div>` : ''}
+                ${settings.logo.url ? `<div class="img-container"><img src="${settings.logo.url}" class="logo" alt="logo" style="width:${settings.logo.size}; display:inline-block;"/></div>` : ''}
 
-                <div class="text-center text-scale">
+                <div class="text-center">
                     <div style="${isBold('businessName') ? 'font-weight: bold;' : ''}">${settings.header.businessName}</div>
                     <div style="${isBold('address') ? 'font-weight: bold;' : ''}">${settings.header.address}</div>
                     <div>${settings.header.phone}</div>
@@ -173,7 +170,7 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
                 
                 ${settings.barcode?.position === 'header' ? barcodeHtml : ''}
 
-                <div class="text-scale">
+                <div>
                   <div class="separator"></div>
                   <div style="margin: 3px 0;">
                       ${settings.fields.showInvoiceNumber ? `<div style="${isBold('invoiceNumber') ? 'font-weight: bold;' : ''}">Factura: ${mockOrder.invoiceNumber}</div>` : ''}
@@ -187,9 +184,9 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
                   </div>
                 </div>
 
-               <pre class="text-scale" style="line-height: 1.4; ${isBold('items') ? 'font-weight:bold;' : ''}">${itemsPreContent}</pre>
+               <pre style="line-height: 1.4; ${isBold('items') ? 'font-weight:bold;' : ''}">${itemsPreContent}</pre>
 
-               <div class="text-scale">
+               <div>
                   <div class="separator"></div>
                   <pre style="line-height: 1.4; ${isBold('subtotalFees') ? 'font-weight:bold;' : ''}">${subtotalPreContent}</pre>
                   <div class="separator"></div>
@@ -203,7 +200,7 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
                 </div>
                 
                 ${settings.qr.show && qrCodeImage ? `
-                  <div class="img-container img-scale">
+                  <div class="img-container">
                       <div class="qr-container">
                         <img src="${qrCodeImage}" alt="QR Code" style="display:block; margin:0 auto; width:90px; height:90px; image-rendering: pixelated;"/>
                         <div class="qr-label" style="${isBold('qrText') ? 'font-weight: bold;' : ''}">${settings.qr.labelText}</div>
@@ -213,7 +210,7 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
 
                 ${settings.barcode?.position === 'footer' ? barcodeHtml : ''}
 
-                <div class="text-scale">
+                <div>
                   ${settings.socialMedia.show ? `<div class="separator"></div>` : ''}
                   <div class="text-center" style="margin: 3px 0; ${isBold('socialMedia') ? 'font-weight:bold;' : ''}">
                     ${settings.socialMedia.show && settings.socialMedia.whatsapp ? `<div>&#x1F4F1; WhatsApp: ${settings.socialMedia.whatsapp}</div>` : ''}
