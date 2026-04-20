@@ -60,11 +60,20 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
     const fontSizeMapping: { [key: string]: string } = { '9px': '8pt', '10px': '9pt', '11px': '10pt', '12px': '11pt' };
     const printFontSize = fontSizeMapping[settings.style.fontSize as keyof typeof fontSizeMapping] || '9pt';
     
+    // ==========================================================
+    // CONSTRUCCIÓN DE STRINGS DE TEXTO PLANO FUERA DEL HTML
+    // ==========================================================
+
+    const LINE_CHARS = settings.style.paperSize === '58mm' ? 32 : 48;
     const rpad = (s: string, n: number): string => s.substring(0, n).padEnd(n, ' ');
     const lpad = (s: string, n: number): string => s.substring(0, n).padStart(n, ' ');
 
-    const LINE_CHARS = 32;
-    const itemsHeader = rpad('Can', 3) + ' ' + rpad('Producto', 18) + ' ' + lpad('Total', 9);
+    // --- Bloque de Items ---
+    const CANT_W = 3;
+    const PRICE_W = 9;
+    const PROD_W = LINE_CHARS - CANT_W - PRICE_W - 2;
+
+    const itemsHeader = rpad('Can', CANT_W) + ' ' + rpad('Producto', PROD_W) + ' ' + lpad('Total', PRICE_W);
     const itemsSeparator = '-'.repeat(LINE_CHARS);
 
     const itemsRows = mockOrder.items.map(item => {
@@ -72,26 +81,57 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
       const qty = String(item.quantity);
       const name = item.name;
       const lineArr: string[] = [];
-      const PROD_W = 18;
       
-      lineArr.push(rpad(qty, 3) + ' ' + rpad(name.substring(0, PROD_W), PROD_W) + ' ' + lpad(price, 9));
-      
-      let rest = name.substring(PROD_W);
-      while (rest.length > 0) {
-        lineArr.push(' '.repeat(4) + rpad(rest.substring(0, PROD_W), PROD_W));
-        rest = rest.substring(PROD_W);
+      let remainingName = name;
+      let isFirstLine = true;
+
+      while(remainingName.length > 0) {
+        const lineName = remainingName.substring(0, PROD_W);
+        remainingName = remainingName.substring(PROD_W);
+
+        if (isFirstLine) {
+          // lines is not defined, assuming this should be lineArr.push
+          // lineArr.push(
+          //   rpad(qty, CANT_W) + ' ' + 
+          //   rpad(lineName, PROD_W) + ' ' + 
+          //   lpad(price, PRICE_W)
+          // );
+          // Assuming the original intended this to be:
+          lineArr.push(
+            rpad(qty, CANT_W) + ' ' + 
+            rpad(lineName, PROD_W) + ' ' + 
+            lpad(price, PRICE_W)
+          );
+          isFirstLine = false;
+        } else {
+          // lineArr.push(
+          //   ' '.repeat(CANT_W + 1) + 
+          //   rpad(lineName, PROD_W)
+          // );
+          // Assuming the original intended this to be:
+          lineArr.push(
+            ' '.repeat(CANT_W + 1) + 
+            rpad(lineName, PROD_W)
+          );
+        }
       }
       return lineArr.join('\n');
     }).join('\n');
     
     const itemsPreContent = [itemsHeader, itemsSeparator, itemsRows].join('\n');
 
-    const LABEL_W = 14;
+    // --- Bloque de Subtotales y Total ---
+    const LABEL_W = 18;
     const VALUE_W = LINE_CHARS - LABEL_W;
+
     const subtotalLines: string[] = [];
     subtotalLines.push(rpad('Subtotal:', LABEL_W) + lpad(mockOrder.subtotal.toLocaleString('es-CO'), VALUE_W));
-    if (settings.fields.showDeliveryFee) subtotalLines.push(rpad('Domicilio:', LABEL_W) + lpad(mockOrder.deliveryFee.toLocaleString('es-CO'), VALUE_W));
-    if (settings.fields.showPackaging) subtotalLines.push(rpad('Empaque:', LABEL_W) + lpad(mockOrder.packaging.toLocaleString('es-CO'), VALUE_W));
+    if (settings.fields.showDeliveryFee) {
+      subtotalLines.push(rpad('Domicilio:', LABEL_W) + lpad(mockOrder.deliveryFee.toLocaleString('es-CO'), VALUE_W));
+    }
+    if (settings.fields.showPackaging) {
+      subtotalLines.push(rpad('Empaque:', LABEL_W) + lpad(mockOrder.packaging.toLocaleString('es-CO'), VALUE_W));
+    }
     const subtotalPreContent = subtotalLines.join('\n');
     
     const totalPreContent = rpad('TOTAL:', LABEL_W) + lpad(mockOrder.total.toLocaleString('es-CO'), VALUE_W);
@@ -101,10 +141,15 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
             <head>
                 <title>Factura</title>
                 <style>
-                  * { box-sizing: border-box; margin: 0; padding: 0; }
-                  @media print { @page { margin: 2mm; } }
+                  * { 
+                    box-sizing: border-box;
+                    margin: 0;
+                    padding: 0;
+                  }
+                  @media print {
+                    @page { margin: 2mm; }
+                  }
                   html, body {
-                    width: ${settings.style.paperSize === '80mm' ? '76mm' : '56mm'};
                     font-family: '${settings.style.font}', monospace;
                     font-size: ${printFontSize};
                     color: black;
@@ -121,11 +166,10 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
                   }
                   .header, .text-center { text-align: center; }
                   .separator { border-top: 1px ${settings.style.separatorStyle} #000; margin: 3px 0; }
-                  .logo { display: block; margin: 4px auto 4px auto; max-width: 60px; max-height: 60px; width: auto; height: auto; }
+                  .logo { display:block; margin:4px auto; max-width:60px; max-height:60px; width:auto; height:auto; }
                   .qr-container { display: flex; flex-direction: column; align-items: center; width: 100%; margin: 4px 0; }
                   .qr-label { text-align: center; margin-top: 2px; }
                   .total-row { font-weight: bold; }
-                  .footer { text-align: center; }
                   div { line-height: 1.3; }
                 </style>
             </head>
@@ -241,3 +285,5 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
     </Card>
   );
 };
+
+    
