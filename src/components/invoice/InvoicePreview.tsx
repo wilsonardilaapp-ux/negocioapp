@@ -61,7 +61,7 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
         const canvas = document.createElement('canvas');
         JsBarcode(canvas, settings.barcode.value, {
           format: 'CODE128',
-          width: 1.5,
+          width: 1,
           height: 40,
           displayValue: settings.barcode.displayValue ?? true,
           fontSize: 10,
@@ -75,8 +75,8 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
       }
     }
 
-    const barcodeHtml = settings.barcode?.show && barcodeImage
-    ? `<div class="img-container" style="text-align:center; margin:4px 0;">
+  const barcodeHtml = settings.barcode?.show && barcodeImage
+    ? `<div class="img-container img-scale" style="text-align:center; margin:4px 0;">
         <img
           src="${barcodeImage}"
           alt="Código de barras"
@@ -122,8 +122,8 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
     
     const itemsPreContent = [itemsHeader, itemsSeparator, itemsRows].join('\n');
     
+    const SUMMARY_LABEL_W = effectiveLineChars - PRICE_W - 1;
     const SUMMARY_VALUE_W = PRICE_W;
-    const SUMMARY_LABEL_W = effectiveLineChars - SUMMARY_VALUE_W;
     
     const subtotalLines: string[] = [];
     subtotalLines.push(rpad('Subtotal:', SUMMARY_LABEL_W) + lpad(mockOrder.subtotal.toLocaleString('es-CO'), SUMMARY_VALUE_W));
@@ -148,9 +148,18 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
                     color: black;
                     margin: 0;
                     padding: 0;
+                    width: ${settings.style.paperSize === '80mm' ? '76mm' : '56mm'};
+                    max-width: ${settings.style.paperSize === '80mm' ? '76mm' : '56mm'};
+                  }
+                  * {
+                    box-sizing: border-box;
                   }
                   .img-container { text-align: ${settings.logo.position}; }
-                  .img-container img { max-width: 100%; height: auto; }
+                  .img-scale {
+                    transform: scale(${settings.style.textScale ?? 1});
+                    transform-origin: center top;
+                    display: block;
+                  }
                   pre { font-family: '${settings.style.font}', monospace !important; font-size: inherit; white-space: pre; word-wrap: break-word; margin: 0; padding: 0; width: 100%; }
                   .text-center { text-align: center; }
                   .separator { border-top: 1px ${settings.style.separatorStyle} #000; margin: 3px 0; }
@@ -159,7 +168,7 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
                 </style>
             </head>
             <body>
-                ${settings.logo.url ? `<div class="img-container"><img src="${settings.logo.url}" class="logo" alt="logo" style="width:${settings.logo.size}; display:inline-block;"/></div>` : ''}
+                ${settings.logo.url ? `<div class="img-container img-scale"><img src="${settings.logo.url}" class="logo" alt="logo" style="width:${settings.logo.size}; display:inline-block;"/></div>` : ''}
 
                 <div class="text-center">
                     <div style="${isBold('businessName') ? 'font-weight: bold;' : ''}">${settings.header.businessName}</div>
@@ -200,7 +209,7 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
                 </div>
                 
                 ${settings.qr.show && qrCodeImage ? `
-                  <div class="img-container">
+                  <div class="img-container img-scale">
                       <div class="qr-container">
                         <img src="${qrCodeImage}" alt="QR Code" style="display:block; margin:0 auto; width:90px; height:90px; image-rendering: pixelated;"/>
                         <div class="qr-label" style="${isBold('qrText') ? 'font-weight: bold;' : ''}">${settings.qr.labelText}</div>
