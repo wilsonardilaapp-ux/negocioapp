@@ -61,7 +61,7 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
         const canvas = document.createElement('canvas');
         JsBarcode(canvas, settings.barcode.value, {
           format: 'CODE128',
-          width: 1,
+          width: 1.5,
           height: 40,
           displayValue: settings.barcode.displayValue ?? true,
           fontSize: 10,
@@ -90,7 +90,7 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
     const fontSizeMapping: { [key: string]: string } = { '9px': '8pt', '10px': '9pt', '11px': '10pt', '12px': '11pt' };
     const printFontSize = fontSizeMapping[settings.style.fontSize as keyof typeof fontSizeMapping] || '9pt';
     
-    const LINE_CHARS = 32;
+    const LINE_CHARS = settings.style.paperSize === '80mm' ? 42 : 32;
     const CANT_W = 3;
     const PRICE_W = 9;
     const PROD_W = LINE_CHARS - CANT_W - PRICE_W - 2;
@@ -119,20 +119,20 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
 
     const itemsPreContent = [itemsHeader, itemsSeparator, itemsRows].join('\n');
 
-    const LABEL_W = LINE_CHARS - PRICE_W - 1;
-    const VALUE_W = PRICE_W;
-
+    const SUMMARY_LABEL_W = LINE_CHARS - PRICE_W - 1;
+    const SUMMARY_VALUE_W = PRICE_W;
+    
     const subtotalLines: string[] = [];
-    subtotalLines.push(rpad('Subtotal:', LABEL_W) + lpad(mockOrder.subtotal.toLocaleString('es-CO'), VALUE_W));
+    subtotalLines.push(rpad('Subtotal:', SUMMARY_LABEL_W) + lpad(mockOrder.subtotal.toLocaleString('es-CO'), SUMMARY_VALUE_W));
     if (settings.fields.showDeliveryFee) {
-        subtotalLines.push(rpad('Domicilio:', LABEL_W) + lpad(mockOrder.deliveryFee.toLocaleString('es-CO'), VALUE_W));
+        subtotalLines.push(rpad('Domicilio:', SUMMARY_LABEL_W) + lpad(mockOrder.deliveryFee.toLocaleString('es-CO'), SUMMARY_VALUE_W));
     }
     if (settings.fields.showPackaging) {
-        subtotalLines.push(rpad('Empaque:', LABEL_W) + lpad(mockOrder.packaging.toLocaleString('es-CO'), VALUE_W));
+        subtotalLines.push(rpad('Empaque:', SUMMARY_LABEL_W) + lpad(mockOrder.packaging.toLocaleString('es-CO'), SUMMARY_VALUE_W));
     }
     const subtotalPreContent = subtotalLines.join('\n');
 
-    const totalPreContent = rpad('TOTAL:', LABEL_W) + lpad(mockOrder.total.toLocaleString('es-CO'), VALUE_W);
+    const totalPreContent = rpad('TOTAL:', SUMMARY_LABEL_W) + lpad(mockOrder.total.toLocaleString('es-CO'), SUMMARY_VALUE_W);
 
     const printableContent = `
         <html>
@@ -199,18 +199,16 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
                     ${settings.fields.showClientPhone ? `<div style="${isBold('clientPhone') ? 'font-weight: bold;' : ''}">Tel: ${mockOrder.client.phone}</div>` : ''}
                     ${settings.fields.showClientAddress ? `<div style="${isBold('clientAddress') ? 'font-weight: bold;' : ''}">Dir: ${mockOrder.client.address}</div>` : ''}
                 </div>
+                
+                <pre style="font-family:'Courier New',monospace; font-size:${printFontSize}; margin:0; padding:0; white-space:pre; width:100%; line-height: 1.4; ${isBold('items') ? 'font-weight:bold;' : ''}">${itemsPreContent}</pre>
 
                 <div class="text-scale"><div class="separator"></div></div>
                 
-                <div class="text-scale"><pre>${itemsPreContent}</pre></div>
-                
-                <div class="text-scale"><div class="separator"></div></div>
-                
-                <div class="text-scale"><pre>${subtotalPreContent}</pre></div>
+                <pre style="font-family:'Courier New',monospace; font-size:${printFontSize}; margin:0; padding:0; white-space:pre; width:100%; ${isBold('subtotalFees') ? 'font-weight:bold;' : ''}">${subtotalPreContent}</pre>
 
                 <div class="text-scale"><div class="separator"></div></div>
                 
-                <div class="text-scale"><pre>${totalPreContent}</pre></div>
+                <pre style="font-family:'Courier New',monospace; font-size:${printFontSize}; margin:0; padding:0; white-space:pre; width:100%; font-weight:bold;">${totalPreContent}</pre>
 
                 <div class="text-scale">${(settings.fields.showPaymentMethod || settings.fields.showEstimatedDelivery) ? '<div class="separator"></div>' : ''}</div>
                 
@@ -232,16 +230,16 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
 
                 ${settings.barcode?.position === 'footer' ? barcodeHtml : ''}
 
-                <div class="text-scale">
-                  ${settings.socialMedia.show ? `
-                    <div class="separator"></div>
-                    <div class="text-center" style="${isBold('socialMedia') ? 'font-weight:bold;' : ''}">
-                      ${settings.socialMedia.whatsapp ? `<div>&#x1F4F1; WhatsApp: ${settings.socialMedia.whatsapp}</div>` : ''}
-                      ${settings.socialMedia.instagram ? `<div>&#x1F4F7; Instagram: ${settings.socialMedia.instagram}</div>` : ''}
-                      ${settings.socialMedia.facebook ? `<div>&#x1F426; Facebook: ${settings.socialMedia.facebook}</div>` : ''}
-                      ${settings.socialMedia.website ? `<div>&#x1F310; Web: ${settings.socialMedia.website}</div>` : ''}
+                ${settings.socialMedia.show ? `
+                    <div class="text-scale"><div class="separator"></div></div>
+                    <div class="text-scale">
+                        <div class="text-center" style="${isBold('socialMedia') ? 'font-weight:bold;' : ''}">
+                          ${settings.socialMedia.whatsapp ? `<div>&#x1F4F1; WhatsApp: ${settings.socialMedia.whatsapp}</div>` : ''}
+                          ${settings.socialMedia.instagram ? `<div>&#x1F4F7; Instagram: ${settings.socialMedia.instagram}</div>` : ''}
+                          ${settings.socialMedia.facebook ? `<div>&#x1F426; Facebook: ${settings.socialMedia.facebook}</div>` : ''}
+                          ${settings.socialMedia.website ? `<div>&#x1F310; Web: ${settings.socialMedia.website}</div>` : ''}
+                        </div>
                     </div>` : ''}
-                </div>
                 
                 <div class="footer text-scale" style="margin-top: 8px; padding-bottom: 16px; border-top: 1px ${settings.style.separatorStyle} #000; padding-top: 4px;">
                     <div style="${isBold('footer') ? 'font-weight:bold;' : ''}">${settings.footer.message}</div>
@@ -295,7 +293,7 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
           />
         </div>
         <div className="bg-gray-200 p-4 rounded-md overflow-x-auto flex justify-center">
-            <div id="invoice-preview-wrapper" className="origin-top scale-[1.15]">
+            <div id="invoice-preview-wrapper" className="origin-top">
                 <InvoiceTemplate config={settings} order={mockOrder} />
             </div>
         </div>
