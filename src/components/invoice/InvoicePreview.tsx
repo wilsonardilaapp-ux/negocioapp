@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useRef, useState } from 'react';
@@ -19,24 +18,10 @@ import { InvoiceTemplate, mockOrder } from './InvoiceTemplate';
 import type { InvoiceSettings } from '@/models/invoice-settings';
 import { useToast } from '@/hooks/use-toast';
 
-const generateQRFallbackBase64 = (url: string): string => {
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" 
-    width="80" height="80" viewBox="0 0 80 80">
-    <rect width="80" height="80" fill="white"/>
-    <text x="40" y="35" text-anchor="middle" 
-      font-size="8" fill="black">Escanear:</text>
-    <text x="40" y="50" text-anchor="middle" 
-      font-size="6" fill="black">${url.substring(0, 30)}</text>
-  </svg>`;
-  return `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(svg)))}`;
-};
-
-
 interface InvoicePreviewProps {
   settings: InvoiceSettings;
   setSettings: React.Dispatch<React.SetStateAction<InvoiceSettings>>;
 }
-
 
 export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSettings }) => {
   const { toast } = useToast();
@@ -59,13 +44,14 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
     if (settings.qr.show) {
        try {
           qrCodeImage = await QRCodeLib.toDataURL(qrUrlToGenerate, {
-              width: 200,
+              width: 200, // Increased resolution for better printing
               margin: 1,
-              errorCorrectionLevel: 'H'
+              errorCorrectionLevel: 'H' // Higher error correction
           });
       } catch (e2) {
           console.error("QRCode lib falló:", e2);
-          qrCodeImage = generateQRFallbackBase64(qrUrlToGenerate);
+          // Fallback in case the library fails for any reason
+          qrCodeImage = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'; // Transparent 1x1 pixel
       }
     }
     
@@ -138,12 +124,12 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
                     white-space: nowrap;
                   }
                   th:nth-child(2), td:nth-child(2) { 
-                    width: 52%;
+                    width: 42%;
                     word-wrap: break-word;
                     overflow-wrap: break-word;
                   }
                   th:nth-child(3), td:nth-child(3) { 
-                    width: 40%;
+                    width: 50%;
                     text-align: right;
                     white-space: nowrap;
                     padding-right: 2px;
@@ -152,8 +138,6 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
                     font-weight: bold; 
                     font-size: ${totalFontSize}; 
                   }
-                  .text-right { text-align: right; }
-                  .footer { text-align: center; }
                   div { line-height: 1.3; }
                 </style>
             </head>
@@ -198,9 +182,9 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
                         <img 
                           src="${qrCodeImage}" 
                           alt="QR Code"
-                          width="80" 
-                          height="80"
-                          style="display:block; margin:0 auto; width:80px; height:80px; image-rendering: pixelated;"
+                          width="90" 
+                          height="90"
+                          style="display:block; margin:0 auto; width:90px; height:90px; image-rendering: pixelated;"
                         />
                         <div class="qr-label" style="${isBold('qrText') ? 'font-weight: bold;' : ''}">
                           ${settings.qr.labelText}
@@ -261,7 +245,7 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
         <div className="bg-gray-200 p-4 rounded-md overflow-x-auto flex justify-center">
             <div id="invoice-preview-wrapper" className="origin-top scale-[1.15]">
                  <div ref={qrCodeRef} style={{ position: 'absolute', left: '-9999px', top: 0 }}>
-                    {settings.qr.url && <QRCode value={settings.qr.url || 'https://www.google.com'} size={200} level="H" />}
+                    <QRCode value={settings.qr.url || 'https://www.google.com'} size={200} level="H" />
                 </div>
                 <InvoiceTemplate config={settings} order={mockOrder} />
             </div>
