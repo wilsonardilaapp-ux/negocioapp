@@ -190,11 +190,11 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ config, order,
 
        <div style={{ transform: `scaleX(${config.style.textScale ?? 1})`, transformOrigin: 'left top', display: 'block' }}>
           <Separator style={config.style.separatorStyle} />
-           <pre className={cn('text-right w-full whitespace-pre my-2', isBold('subtotalFees') && 'font-bold')} style={{lineHeight: 1.4, fontSize: 'inherit' }}>
+           <pre className={cn('w-full whitespace-pre my-2', isBold('subtotalFees') && 'font-bold')} style={{lineHeight: 1.4, fontSize: 'inherit' }}>
               {subtotalPreContent}
            </pre>
           <Separator style={config.style.separatorStyle} />
-           <pre className="text-right w-full whitespace-pre my-2 font-bold" style={{lineHeight: 1.4, fontSize: 'inherit' }}>
+           <pre className="w-full whitespace-pre my-2 font-bold" style={{lineHeight: 1.4, fontSize: 'inherit' }}>
                {totalPreContent}
            </pre>
           {(config.fields.showPaymentMethod || config.fields.showEstimatedDelivery) && <Separator style={config.style.separatorStyle} />}

@@ -107,17 +107,13 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
         const name = item.name;
         const lineArr: string[] = [];
         
-        lineArr.push(
-            rpad(qty, CANT_W) + ' ' + 
-            rpad(name.substring(0, PROD_W), PROD_W) + ' ' + 
-            lpad(price, PRICE_W)
-        );
+        lineArr.push(rpad(qty, CANT_W) + ' ' + rpad(name.substring(0, PROD_W), PROD_W) + ' ' + lpad(price, PRICE_W));
         
         let rest = name.substring(PROD_W);
         while (rest.length > 0) {
             lineArr.push(
             ' '.repeat(CANT_W + 1) + 
-            rest.substring(0, PROD_W)
+            rpad(rest.substring(0, PROD_W), PROD_W)
             );
             rest = rest.substring(PROD_W);
         }
@@ -126,7 +122,7 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
 
     const itemsPreContent = [itemsHeader, itemsSeparator, itemsRows].join('\n');
     
-    const SUMMARY_LABEL_W = LINE_CHARS - PRICE_W;
+    const SUMMARY_LABEL_W = LINE_CHARS - PRICE_W - 1;
     const SUMMARY_VALUE_W = PRICE_W;
     
     const subtotalLines: string[] = [];
