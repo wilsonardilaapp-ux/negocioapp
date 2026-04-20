@@ -1,4 +1,3 @@
-
 'use client';
 
 import React from 'react';
@@ -68,84 +67,102 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ config, order,
       )}
       style={{
         fontSize: config.style.fontSize,
-        transform: `scaleX(${config.style.textScale ?? 1})`,
-        transformOrigin: 'left top',
       }}
     >
-      <div className="text-center space-y-1">
-        {config.logo.url && (
-          <div className="logo-container" style={{ display: 'flex', justifyContent: config.logo.position, width: '100%', marginTop: '12px', marginBottom: '8px' }}>
+      {config.logo.url && (
+        <div style={{ 
+            transform: `scale(${config.style.textScale ?? 1})`,
+            transformOrigin: 'center top',
+            display: 'flex', 
+            justifyContent: config.logo.position, 
+            width: '100%', 
+            marginTop: '12px', 
+            marginBottom: '8px' 
+        }}>
             <img src={config.logo.url} alt="logo" style={{ width: config.logo.size }} />
-          </div>
-        )}
-        <p className={cn(isBold('businessName') && 'font-bold')}>{config.header.businessName}</p>
-        <p className={cn(isBold('address') && 'font-bold')}>{config.header.address}</p>
-        <p>{config.header.phone}</p>
-        {config.header.nit && <p className={cn(isBold('nit') && 'font-bold')}>NIT: {config.header.nit}</p>}
-      </div>
-
-      <Separator style={config.style.separatorStyle} />
-
-      <div className="space-y-1 my-2">
-        {config.fields.showInvoiceNumber && <p className={cn(isBold('invoiceNumber') && 'font-bold')}>Factura: {order.invoiceNumber}</p>}
-        {config.fields.showDateTime && <p className={cn(isBold('dateTime') && 'font-bold')}>Fecha: {order.dateTime}</p>}
-      </div>
-
-      <Separator style={config.style.separatorStyle} />
-
-      <div className="space-y-1 my-2">
-        <p className={cn(isBold('clientName') && 'font-bold')}>Cliente: {order.client.name}</p>
-        {config.fields.showClientPhone && <p className={cn(isBold('clientPhone') && 'font-bold')}>Tel: {order.client.phone}</p>}
-        {config.fields.showClientAddress && <p className={cn(isBold('clientAddress') && 'font-bold')}>Dir: {order.client.address}</p>}
-      </div>
-
-      <Separator style={config.style.separatorStyle} />
-
-      <table className={cn('w-full my-2', isBold('items') && 'font-bold')}>
-        <thead>
-          <tr>
-            <th className="text-left">Cant</th>
-            <th className="text-left">Producto</th>
-            <th className="text-right">Total</th>
-          </tr>
-        </thead>
-        <tbody>
-          {order.items.map((item, i) => (
-            <tr key={i}>
-              <td className="align-top">{item.quantity}</td>
-              <td>{item.name}</td>
-              <td className="text-right align-top">{(item.quantity * item.price).toLocaleString()}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-
-      <Separator style={config.style.separatorStyle} />
-
-      <div className={cn('my-2 space-y-1 text-right', isBold('subtotalFees') && 'font-bold')}>
-        <p>Subtotal: {order.subtotal.toLocaleString()}</p>
-        {config.fields.showDeliveryFee && <p>Domicilio: {order.deliveryFee.toLocaleString()}</p>}
-        {config.fields.showPackaging && <p>Empaque: {order.packaging.toLocaleString()}</p>}
-      </div>
-
-      <Separator style={config.style.separatorStyle} />
-
-      <p className={cn('text-right text-lg my-2', isBold('total') && 'font-bold')}>
-        TOTAL: {order.total.toLocaleString()}
-      </p>
-
-      {config.fields.showPaymentMethod && <p className={cn('my-2', isBold('paymentMethod') && 'font-bold')}>Método de pago: {order.paymentMethod}</p>}
-      {config.fields.showEstimatedDelivery && <p className={cn('my-2', isBold('estimatedDelivery') && 'font-bold')}>Tiempo de entrega: {order.estimatedDelivery}</p>}
-
-      {config.promo.show && (
-        <>
-          <Separator style={config.style.separatorStyle} />
-          <p className="text-center my-2 font-bold">{config.promo.text}</p>
-        </>
+        </div>
       )}
 
+      <div style={{ transform: `scaleX(${config.style.textScale ?? 1})`, transformOrigin: 'left top', display: 'block' }}>
+          <div className="text-center space-y-1">
+            <p className={cn(isBold('businessName') && 'font-bold')}>{config.header.businessName}</p>
+            <p className={cn(isBold('address') && 'font-bold')}>{config.header.address}</p>
+            <p>{config.header.phone}</p>
+            {config.header.nit && <p className={cn(isBold('nit') && 'font-bold')}>NIT: {config.header.nit}</p>}
+          </div>
+      </div>
+      
+      {config.barcode?.show && config.barcode.position === 'header' && (
+        <div style={{ transform: `scale(${config.style.textScale ?? 1})`, transformOrigin: 'center top', display: 'block' }}>
+            {/* El barcode real se genera en la impresión, aquí solo un placeholder */}
+            <div className="text-center my-2 p-2 bg-gray-200 text-xs">[ Espacio para Código de Barras ]</div>
+        </div>
+      )}
+
+      <div style={{ transform: `scaleX(${config.style.textScale ?? 1})`, transformOrigin: 'left top', display: 'block' }}>
+          <Separator style={config.style.separatorStyle} />
+
+          <div className="space-y-1 my-2">
+            {config.fields.showInvoiceNumber && <p className={cn(isBold('invoiceNumber') && 'font-bold')}>Factura: {order.invoiceNumber}</p>}
+            {config.fields.showDateTime && <p className={cn(isBold('dateTime') && 'font-bold')}>Fecha: {order.dateTime}</p>}
+          </div>
+
+          <Separator style={config.style.separatorStyle} />
+
+          <div className="space-y-1 my-2">
+            <p className={cn(isBold('clientName') && 'font-bold')}>Cliente: {order.client.name}</p>
+            {config.fields.showClientPhone && <p className={cn(isBold('clientPhone') && 'font-bold')}>Tel: {order.client.phone}</p>}
+            {config.fields.showClientAddress && <p className={cn(isBold('clientAddress') && 'font-bold')}>Dir: {order.client.address}</p>}
+          </div>
+
+          <Separator style={config.style.separatorStyle} />
+
+          <table className={cn('w-full my-2', isBold('items') && 'font-bold')}>
+            <thead>
+              <tr>
+                <th className="text-left w-[8%]">Cant</th>
+                <th className="text-left w-[62%]">Producto</th>
+                <th className="text-right w-[30%]">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {order.items.map((item, i) => (
+                <tr key={i}>
+                  <td className="align-top">{item.quantity}</td>
+                  <td>{item.name}</td>
+                  <td className="text-right align-top">{(item.quantity * item.price).toLocaleString()}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          <Separator style={config.style.separatorStyle} />
+
+          <div className={cn('my-2 space-y-1 text-right', isBold('subtotalFees') && 'font-bold')}>
+            <p>Subtotal: {order.subtotal.toLocaleString()}</p>
+            {config.fields.showDeliveryFee && <p>Domicilio: {order.deliveryFee.toLocaleString()}</p>}
+            {config.fields.showPackaging && <p>Empaque: {order.packaging.toLocaleString()}</p>}
+          </div>
+
+          <Separator style={config.style.separatorStyle} />
+
+          <p className={cn('text-right text-lg my-2', isBold('total') && 'font-bold')}>
+            TOTAL: {order.total.toLocaleString()}
+          </p>
+
+          {config.fields.showPaymentMethod && <p className={cn('my-2', isBold('paymentMethod') && 'font-bold')}>Método de pago: {order.paymentMethod}</p>}
+          {config.fields.showEstimatedDelivery && <p className={cn('my-2', isBold('estimatedDelivery') && 'font-bold')}>Tiempo de entrega: {order.estimatedDelivery}</p>}
+
+          {config.promo.show && (
+            <>
+              <Separator style={config.style.separatorStyle} />
+              <p className="text-center my-2 font-bold">{config.promo.text}</p>
+            </>
+          )}
+      </div>
+
       {config.qr.show && (
-        <div className="qr-container flex flex-col items-center my-2 space-y-1">
+        <div className="qr-container flex flex-col items-center my-2 space-y-1" style={{ transform: `scale(${config.style.textScale ?? 1})`, transformOrigin: 'center top' }}>
           {config.qr.qrImageUrl ? (
              <img src={config.qr.qrImageUrl} alt="QR Code" style={{ width: '100px', height: '100px' }} className="object-contain bg-white rounded-sm p-1" />
           ) : (
@@ -153,23 +170,33 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ config, order,
                 <QRCode value={config.qr.url || 'https://www.google.com'} size={100} />
             </div>
           )}
-          <p className={cn(isBold('qrText') && 'font-bold')}>{config.qr.labelText}</p>
+           <div style={{ transform: `scaleX(${1 / (config.style.textScale ?? 1)})` }}>
+              <p className={cn('text-center text-xs mt-1', isBold('qrText') && 'font-bold')}>{config.qr.labelText}</p>
+          </div>
         </div>
       )}
 
-      {config.socialMedia.show && (
-        <div className={cn('flex justify-center items-center gap-2 my-2', isBold('socialMedia') && 'font-bold')}>
-          {config.socialMedia.instagram && <InstagramIcon className="h-4 w-4" />}
-          {config.socialMedia.facebook && <FacebookIcon className="h-4 w-4" />}
-          {config.socialMedia.whatsapp && <WhatsAppIcon className="h-4 w-4" />}
+      {config.barcode?.show && config.barcode.position === 'footer' && (
+        <div style={{ transform: `scale(${config.style.textScale ?? 1})`, transformOrigin: 'center top' }}>
+            <div className="text-center my-2 p-2 bg-gray-200 text-xs">[ Espacio para Código de Barras ]</div>
         </div>
       )}
 
-      <Separator style={config.style.separatorStyle} />
-      
-      <div className="text-center my-2 space-y-1">
-        <p className={cn(isBold('footer') && 'font-bold')}>{config.footer.message}</p>
-        {config.footer.repeatBusinessName && <p className={cn(isBold('footer') && 'font-bold')}>{config.header.businessName}</p>}
+      <div style={{ transform: `scaleX(${config.style.textScale ?? 1})`, transformOrigin: 'left top', display: 'block' }}>
+          {config.socialMedia.show && (
+            <div className={cn('flex justify-center items-center gap-2 my-2', isBold('socialMedia') && 'font-bold')}>
+              {config.socialMedia.instagram && <InstagramIcon className="h-4 w-4" />}
+              {config.socialMedia.facebook && <FacebookIcon className="h-4 w-4" />}
+              {config.socialMedia.whatsapp && <WhatsAppIcon className="h-4 w-4" />}
+            </div>
+          )}
+
+          <Separator style={config.style.separatorStyle} />
+          
+          <div className="text-center my-2 space-y-1">
+            <p className={cn(isBold('footer') && 'font-bold')}>{config.footer.message}</p>
+            {config.footer.repeatBusinessName && <p className={cn(isBold('footer') && 'font-bold')}>{config.header.businessName}</p>}
+          </div>
       </div>
     </div>
   );

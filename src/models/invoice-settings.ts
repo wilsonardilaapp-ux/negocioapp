@@ -1,4 +1,3 @@
-
 'use client';
 
 import { z } from 'zod';
@@ -45,7 +44,7 @@ export const InvoiceSettingsSchema = z.object({
     font: z.enum(['monospace', 'arial', 'sans-serif']),
     separatorStyle: z.enum(['dashed', 'solid', 'none']),
     fontSize: z.string(), // e.g., '10px'
-    textScale: z.number().min(0.7).max(1.3).optional(),
+    textScale: z.number().min(0.7).max(1.3),
   }),
   bold: z.object({
     allBold: z.boolean(),

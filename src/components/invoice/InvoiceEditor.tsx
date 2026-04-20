@@ -1,4 +1,3 @@
-
 'use client';
 import React, { useRef, useState } from 'react';
 import type { InvoiceSettings } from '@/models/invoice-settings';
@@ -255,52 +254,21 @@ export const InvoiceEditor: React.FC<InvoiceEditorProps> = ({ settings, setSetti
                     <Label className="text-foreground">Tamaño Texto</Label><Select onValueChange={(val) => handleUpdate('style', 'fontSize', val)} value={settings.style.fontSize}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="9px">9px</SelectItem><SelectItem value="10px">10px</SelectItem><SelectItem value="11px">11px</SelectItem><SelectItem value="12px">12px</SelectItem></SelectContent></Select>
                     <Label className="text-foreground">Separadores</Label><Select onValueChange={(val) => handleUpdate('style', 'separatorStyle', val)} value={settings.style.separatorStyle}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="dashed">Guiones</SelectItem><SelectItem value="solid">Línea Sólida</SelectItem><SelectItem value="none">Sin Separador</SelectItem></SelectContent></Select>
                     <div className="space-y-2 pt-2">
-                      <Label className="text-foreground">
-                        Escala del Texto ({Math.round(
-                          (settings.style.textScale ?? 1) * 100
-                        )}%)
-                      </Label>
-                      <input
-                        type="range"
-                        min="70"
-                        max="130"
-                        step="5"
-                        value={Math.round(
-                          (settings.style.textScale ?? 1) * 100
-                        )}
-                        onChange={(e) => handleUpdate(
-                          'style',
-                          'textScale',
-                          parseInt(e.target.value) / 100
-                        )}
-                        className="w-full accent-green-600"
-                      />
-                      <div className="flex gap-2 pt-1">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="flex-1"
-                          onClick={() => handleUpdate('style','textScale',0.8)}
-                        >
-                          Angosto
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="flex-1"
-                          onClick={() => handleUpdate('style','textScale',1.0)}
-                        >
-                          Normal
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="flex-1"
-                          onClick={() => handleUpdate('style','textScale',1.2)}
-                        >
-                          Ancho
-                        </Button>
-                      </div>
+                        <Label className="text-foreground">Escala del Texto ({Math.round((settings.style.textScale ?? 1) * 100)}%)</Label>
+                        <input
+                            type="range"
+                            min="70"
+                            max="130"
+                            step="5"
+                            value={Math.round((settings.style.textScale ?? 1) * 100)}
+                            onChange={(e) => handleUpdate('style', 'textScale', parseInt(e.target.value) / 100)}
+                            className="w-full accent-primary"
+                        />
+                        <div className="flex gap-2 pt-1">
+                            <Button variant="outline" size="sm" className="flex-1" onClick={() => handleUpdate('style','textScale',0.8)}>Angosto</Button>
+                            <Button variant="outline" size="sm" className="flex-1" onClick={() => handleUpdate('style','textScale',1.0)}>Normal</Button>
+                            <Button variant="outline" size="sm" className="flex-1" onClick={() => handleUpdate('style','textScale',1.2)}>Ancho</Button>
+                        </div>
                     </div>
                 </AccordionContent>
             </AccordionItem>
@@ -322,78 +290,33 @@ export const InvoiceEditor: React.FC<InvoiceEditorProps> = ({ settings, setSetti
             </AccordionItem>
 
             <AccordionItem value="item-10">
-              <AccordionTrigger className="text-foreground">
-                10. Código de Barras
-              </AccordionTrigger>
-              <AccordionContent className="space-y-4 p-2">
-                
-                <div className="flex items-center space-x-2">
-                  <Switch
-                    id="barcode-show"
-                    checked={settings.barcode?.show ?? false}
-                    onCheckedChange={(val) =>
-                      handleUpdate('barcode', 'show', val)}
-                  />
-                  <Label className="text-foreground" 
-                    htmlFor="barcode-show">
-                    Mostrar Código de Barras
-                  </Label>
-                </div>
-
-                <div className="space-y-1">
-                  <Label className="text-foreground">
-                    Valor del Código
-                  </Label>
-                  <Input
-                    className="placeholder:text-muted-foreground 
-                      text-foreground"
-                    placeholder="Ej: 7501234567890"
-                    value={settings.barcode?.value ?? ''}
-                    onChange={(e) =>
-                      handleUpdate('barcode', 'value', e.target.value)}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Ingresa el número a representar en el código de barras
-                  </p>
-                </div>
-
-                <div className="flex items-center space-x-2">
-                  <Switch
-                    id="barcode-display"
-                    checked={settings.barcode?.displayValue ?? true}
-                    onCheckedChange={(val) =>
-                      handleUpdate('barcode', 'displayValue', val)}
-                  />
-                  <Label className="text-foreground" 
-                    htmlFor="barcode-display">
-                    Mostrar número bajo el código
-                  </Label>
-                </div>
-
-                <div className="space-y-1">
-                  <Label className="text-foreground">Posición</Label>
-                  <Select
-                    onValueChange={(val) =>
-                      handleUpdate('barcode', 'position', val)}
-                    value={settings.barcode?.position ?? 'footer'}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Posición" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="header">
-                        Encabezado (tras NIT)
-                      </SelectItem>
-                      <SelectItem value="footer">
-                        Pie de factura (tras QR)
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-              </AccordionContent>
+                <AccordionTrigger className="text-foreground">10. Código de Barras</AccordionTrigger>
+                <AccordionContent className="space-y-4 p-2">
+                    <div className="flex items-center space-x-2">
+                        <Switch id="barcode-show" checked={settings.barcode?.show ?? false} onCheckedChange={(val) => handleUpdate('barcode', 'show', val)} />
+                        <Label className="text-foreground" htmlFor="barcode-show">Mostrar Código de Barras</Label>
+                    </div>
+                    <div className="space-y-1">
+                        <Label className="text-foreground">Valor del Código</Label>
+                        <Input className="placeholder:text-muted-foreground text-foreground" placeholder="Ej: 7501234567890" value={settings.barcode?.value ?? ''} onChange={(e) => handleUpdate('barcode', 'value', e.target.value)} />
+                        <p className="text-xs text-muted-foreground">Ingresa el número a representar en el código de barras</p>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                        <Switch id="barcode-display" checked={settings.barcode?.displayValue ?? true} onCheckedChange={(val) => handleUpdate('barcode', 'displayValue', val)} />
+                        <Label className="text-foreground" htmlFor="barcode-display">Mostrar número bajo el código</Label>
+                    </div>
+                    <div className="space-y-1">
+                        <Label className="text-foreground">Posición</Label>
+                        <Select onValueChange={(val) => handleUpdate('barcode', 'position', val)} value={settings.barcode?.position ?? 'footer'}>
+                            <SelectTrigger><SelectValue placeholder="Posición" /></SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="header">Encabezado (tras NIT)</SelectItem>
+                                <SelectItem value="footer">Pie de factura (tras QR)</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                </AccordionContent>
             </AccordionItem>
-
         </Accordion>
       </CardContent>
     </Card>
