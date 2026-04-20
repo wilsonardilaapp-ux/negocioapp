@@ -48,9 +48,13 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
     if (settings.qr.show && !settings.qr.qrImageUrl) {
         try {
             qrCodeImage = await QRCodeLib.toDataURL(qrUrlToGenerate, {
-                width: 256, // HIGHER RESOLUTION
-                margin: 1,
-                errorCorrectionLevel: 'H',
+                width: 150,
+                margin: 2,
+                errorCorrectionLevel: 'M',
+                color: {
+                  dark: '#000000',
+                  light: '#ffffff'
+                }
             });
         } catch (e2) {
             console.error("QRCode lib falló:", e2);
@@ -99,10 +103,9 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
         (WRAPPER_PX - 16) / charWidthPx
       );
     
+      const safeLineChars = Math.max(effectiveLineChars, 20);
       const CANT_W = 3;
       const PRICE_W = 9;
-      
-      const safeLineChars = Math.max(effectiveLineChars, 20);
       const PROD_W = safeLineChars - CANT_W - PRICE_W - 2;
       const safePROD_W = Math.max(PROD_W, 8);
     
@@ -152,23 +155,24 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
                     margin: 0; 
                     padding: 0; 
                   }
-                  html, body {
-                    margin: 0;
-                    padding: 0;
-                    background: white;
-                    display: flex;
-                    justify-content: center;
-                    align-items: flex-start;
+                  html {
+                    overflow: hidden;
                   }
                   body {
                     font-family: '${settings.style.font}', monospace;
                     font-size: ${printFontSize};
                     color: black;
+                    margin: 0;
+                    padding: 0;
+                    overflow: hidden;
+                    display: flex;
+                    justify-content: center;
                   }
                   #ticket-wrapper {
                     width: ${settings.style.paperSize === '80mm' ? '216px' : '160px'};
-                    margin: 0 auto;
+                    margin: 0;
                     padding: 0;
+                    overflow: hidden;
                     zoom: ${textScale};
                   }
                   .text-center { text-align: center; }
@@ -189,9 +193,6 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
                     align-items: center; 
                     width: 100%; 
                     margin: 4px 0; 
-                  }
-                  .qr-container img {
-                    image-rendering: pixelated;
                   }
                   pre { 
                     font-family: '${settings.style.font}', monospace !important;
@@ -224,11 +225,12 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
                       padding: 0;
                       width: auto;
                       display: block;
+                      overflow: hidden;
                     }
                     #ticket-wrapper { 
                       width: ${settings.style.paperSize === '80mm' ? '216px' : '160px'};
-                      padding: 0;
                       margin: 0 auto;
+                      padding: 0;
                       zoom: ${textScale};
                     }
                   }
@@ -265,9 +267,9 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
 
                <div>
                   <div class="separator"></div>
-                  <pre style="font-size: inherit; line-height: 1.4; ${isBold('subtotalFees') ? 'font-weight:bold;' : ''}">${subtotalPreContent}</pre>
+                  <pre class="${isBold('subtotalFees') ? 'font-bold' : ''}" style="font-size: inherit; line-height: 1.4; ">${subtotalPreContent}</pre>
                   <div class="separator"></div>
-                  <pre style="font-size: inherit; line-height: 1.4; font-weight:bold;">${totalPreContent}</pre>
+                  <pre class="font-bold" style="font-size: inherit; line-height: 1.4; ">${totalPreContent}</pre>
                   ${(settings.fields.showPaymentMethod || settings.fields.showEstimatedDelivery) ? '<div class="separator"></div>' : ''}
                   <div style="margin: 3px 0;">
                     ${settings.fields.showPaymentMethod ? `<div style="${isBold('paymentMethod') ? 'font-weight: bold;' : ''}">Método de pago: ${mockOrder.paymentMethod}</div>` : ''}
@@ -278,7 +280,7 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
                 
                 ${settings.qr.show && qrCodeImage ? `
                       <div class="qr-container">
-                        <img src="${qrCodeImage}" alt="QR Code" style="display:block; margin:0 auto; width:120px; height:120px; image-rendering: pixelated;"/>
+                        <img src="${qrCodeImage}" alt="QR Code" style="display:block; margin:0 auto; width:100px; height:100px; image-rendering: auto;"/>
                         <div>
                             <div class="qr-label" style="${isBold('qrText') ? 'font-weight: bold;' : ''}">${settings.qr.labelText}</div>
                         </div>
