@@ -1,4 +1,6 @@
 
+'use client';
+
 import { z } from 'zod';
 
 // Zod schema for validation
@@ -26,6 +28,7 @@ export const InvoiceSettingsSchema = z.object({
     instagram: z.string(),
     whatsapp: z.string(),
     facebook: z.string(),
+    website: z.string().optional(),
   }),
   fields: z.object({
     showInvoiceNumber: z.boolean(),
@@ -42,6 +45,7 @@ export const InvoiceSettingsSchema = z.object({
     font: z.enum(['monospace', 'arial', 'sans-serif']),
     separatorStyle: z.enum(['dashed', 'solid', 'none']),
     fontSize: z.string(), // e.g., '10px'
+    textScale: z.number().min(0.7).max(1.3).optional(),
   }),
   bold: z.object({
     allBold: z.boolean(),
@@ -71,6 +75,12 @@ export const InvoiceSettingsSchema = z.object({
   footer: z.object({
     message: z.string(),
     repeatBusinessName: z.boolean(),
+  }),
+  barcode: z.object({
+    show: z.boolean(),
+    value: z.string(),
+    displayValue: z.boolean(),
+    position: z.enum(['header', 'footer']),
   }),
 });
 
@@ -102,6 +112,7 @@ export const initialInvoiceSettings: InvoiceSettings = {
     instagram: "",
     whatsapp: "",
     facebook: "",
+    website: "",
   },
   fields: {
     showInvoiceNumber: true,
@@ -114,10 +125,11 @@ export const initialInvoiceSettings: InvoiceSettings = {
     showEstimatedDelivery: true,
   },
   style: {
-    paperSize: "80mm",
+    paperSize: "58mm",
     font: "monospace",
     separatorStyle: "dashed",
     fontSize: "10px",
+    textScale: 1.0,
   },
   bold: {
     allBold: false,
@@ -148,4 +160,10 @@ export const initialInvoiceSettings: InvoiceSettings = {
     message: "¡Gracias por su compra!",
     repeatBusinessName: true,
   },
+  barcode: {
+    show: false,
+    value: '',
+    displayValue: true,
+    position: 'footer'
+  }
 };

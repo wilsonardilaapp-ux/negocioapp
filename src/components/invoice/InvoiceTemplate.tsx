@@ -1,3 +1,4 @@
+
 'use client';
 
 import React from 'react';
@@ -65,7 +66,11 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ config, order,
         fontClasses[config.style.font],
         className
       )}
-      style={{ fontSize: config.style.fontSize }}
+      style={{
+        fontSize: config.style.fontSize,
+        transform: `scaleX(${config.style.textScale ?? 1})`,
+        transformOrigin: 'left top',
+      }}
     >
       <div className="text-center space-y-1">
         {config.logo.url && (
