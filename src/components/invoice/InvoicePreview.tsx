@@ -48,7 +48,7 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
     if (settings.qr.show && !settings.qr.qrImageUrl) {
         try {
             qrCodeImage = await QRCodeLib.toDataURL(qrUrlToGenerate, {
-                width: 120, // CHANGED: Generate at a more appropriate size
+                width: 256, // HIGHER RESOLUTION
                 margin: 1,
                 errorCorrectionLevel: 'H',
             });
@@ -158,18 +158,18 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
                     margin: 0; 
                     padding: 0; 
                   }
-                  html {
-                    overflow: hidden;
+                  html, body {
+                    margin: 0;
+                    padding: 0;
+                    background: white;
                   }
                   body {
                     font-family: '${settings.style.font}', monospace;
                     font-size: ${printFontSize};
                     color: black;
-                    margin: 0;
-                    padding: 0;
-                    overflow: hidden;
                     display: flex;
                     justify-content: center;
+                    align-items: flex-start;
                   }
                   #ticket-wrapper {
                     width: ${settings.style.paperSize === '80mm' ? '216px' : '160px'};
@@ -181,7 +181,7 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
                   .separator { 
                     border-top: 1px ${settings.style.separatorStyle} #000; 
                     margin: 3px 0; 
-                    width: 100%; 
+                    width: 100%;
                   }
                   .logo { 
                     max-width: 60px; 
@@ -195,6 +195,9 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
                     align-items: center; 
                     width: 100%; 
                     margin: 4px 0; 
+                  }
+                  .qr-container img {
+                    image-rendering: pixelated;
                   }
                   pre { 
                     font-family: '${settings.style.font}', monospace !important;
@@ -219,21 +222,19 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
                   }
                   @media print {
                     @page { 
-                      size: ${settings.style.paperSize === '80mm' 
-                        ? '80mm' : '58mm'} auto;
+                      size: ${settings.style.paperSize === '80mm' ? '80mm' : '58mm'} auto;
                       margin: 0; 
                     }
                     html, body { 
                       margin: 0; 
                       padding: 0;
                       width: auto;
-                      display: block; /* desactiva flex en impresión */
-                      overflow: hidden;
+                      display: block;
                     }
                     #ticket-wrapper { 
                       width: ${settings.style.paperSize === '80mm' ? '216px' : '160px'};
-                      padding: 0;
                       margin: 0 auto;
+                      padding: 0;
                       zoom: ${textScale};
                     }
                   }
@@ -250,7 +251,7 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
                       ${settings.header.nit ? `<div style="${isBold('nit') ? 'font-weight: bold;' : ''}">NIT: ${settings.header.nit}</div>` : ''}
                   </div>
                 
-                ${settings.barcode?.position === 'header' ? `<div style="text-align:center; margin:4px 0;"><img src="${barcodeImage}" alt="barcode"/></div>` : ''}
+                ${config.barcode?.position === 'header' ? `<div style="text-align:center; margin:4px 0;"><img src="${barcodeImage}" alt="barcode"/></div>` : ''}
 
                 <div>
                     <div class="separator"></div>
@@ -290,7 +291,7 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
                       </div>`
                   : ''}
 
-                ${settings.barcode?.position === 'footer' ? `<div style="text-align:center; margin:4px 0;"><img src="${barcodeImage}" alt="barcode"/></div>` : ''}
+                ${config.barcode?.position === 'footer' ? `<div style="text-align:center; margin:4px 0;"><img src="${barcodeImage}" alt="barcode"/></div>` : ''}
 
                 <div>
                   ${settings.socialMedia.show ? `<div class="separator"></div>` : ''}
