@@ -98,9 +98,7 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
   // LINE_CHARS fijo basado en ancho físico del wrapper
   // textScale NO reduce los chars disponibles
   // solo comprime visualmente el texto con scaleX
-  const effectiveLineChars = Math.floor(
-    (WRAPPER_PX - 4) / charWidthPx
-  );
+  const effectiveLineChars = Math.floor((WRAPPER_PX - 16) / charWidthPx);
 
   // Mínimo garantizado para que PROD_W nunca sea negativo
   const CANT_W = 3;
@@ -108,11 +106,11 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
   // Si effectiveLineChars es muy pequeño, usar mínimo 20
   const safeLineChars = Math.max(effectiveLineChars, 20);
 
-    const PROD_W = safeLineChars - CANT_W - PRICE_W - 2;
-    const safePROD_W = Math.max(PROD_W, 8);
+  const PROD_W = safeLineChars - CANT_W - PRICE_W - 2;
+  const safePROD_W = Math.max(PROD_W, 8);
     
-    const itemsHeader = rpad('Can', CANT_W) + ' ' + rpad('Producto', safePROD_W) + ' ' + lpad('Total', PRICE_W);
-    const itemsSeparator = '-'.repeat(safeLineChars);
+  const itemsHeader = rpad('Can', CANT_W) + ' ' + rpad('Producto', safePROD_W) + ' ' + lpad('Total', PRICE_W);
+  const itemsSeparator = '-'.repeat(safeLineChars);
 
     const itemsRows = mockOrder.items.map(item => {
       const price = (item.quantity * item.price).toLocaleString('es-CO');
@@ -172,11 +170,9 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
                   }
                   #ticket-wrapper {
                     width: ${settings.style.paperSize === '80mm' ? '216px' : '160px'};
-                    margin: 0;
+                    margin: 0 auto;
                     padding: 0;
                     overflow: hidden;
-                    transform: scaleX(${textScale});
-                    transform-origin: top center;
                   }
                   .text-center { text-align: center; }
                   .separator { 
@@ -198,13 +194,12 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
                     margin: 4px 0; 
                   }
                   pre { 
-                    font-family: '${settings.style.font}', monospace !important; 
-                    font-size: inherit; 
-                    white-space: pre; 
-                    margin: 0; 
-                    padding: 0; 
+                    font-family: '${settings.style.font}', monospace !important;
+                    font-size: inherit;
+                    white-space: pre;
+                    margin: 0;
+                    padding: 0;
                     width: 100%;
-                    overflow: hidden;
                     line-height: 1.4;
                   }
                   div { 
@@ -227,13 +222,12 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
                     html, body { 
                       margin: 0; 
                       padding: 0;
-                      display: block; /* desactiva flex en impresión */
-                      overflow: hidden;
+                      display: block;
                     }
                     #ticket-wrapper { 
                       width: ${settings.style.paperSize === '80mm' ? '216px' : '160px'};
-                      transform: scaleX(${textScale});
-                      transform-origin: top left;
+                      padding: 0;
+                      margin: 0 auto;
                     }
                   }
                 </style>
