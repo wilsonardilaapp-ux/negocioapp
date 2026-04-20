@@ -85,25 +85,35 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
     // =============================================
     // PASO 1: Ajustar LINE_CHARS según el ancho real en px
     // =============================================
-    const WRAPPER_PX = settings.style.paperSize === '80mm' ? 216 : 160;
-    const fontSizePx: { [key: string]: number } = {
-      '9px': 5.5, '10px': 6, '11px': 6.5, '12px': 7
-    };
-    const charWidthPx = fontSizePx[settings.style.fontSize] ?? 6;
-    const LINE_CHARS_BASE = Math.floor(
-      (WRAPPER_PX - 4) / charWidthPx / textScale
-    );
-    const effectiveLineChars = LINE_CHARS_BASE;
-    
-    const CANT_W = 3;
-    const PRICE_W = 9;
-    const PROD_W = effectiveLineChars - CANT_W - PRICE_W - 2;
+    const WRAPPER_PX = settings.style.paperSize === '80mm' 
+    ? 216 : 160;
+  const fontSizePx: { [key: string]: number } = {
+    '9px': 5.5, '10px': 6, '11px': 6.5, '12px': 7
+  };
+  const charWidthPx = fontSizePx[
+    settings.style.fontSize as keyof typeof fontSizePx
+  ] ?? 6;
+  
+  // LINE_CHARS fijo basado en ancho físico del wrapper
+  // textScale NO reduce los chars disponibles
+  // solo comprime visualmente el texto con scaleX
+  const effectiveLineChars = Math.floor(
+    (WRAPPER_PX - 4) / charWidthPx
+  );
 
-    const rpad = (s: string, n: number): string => String(s).substring(0, n).padEnd(n, ' ');
-    const lpad = (s: string, n: number): string => String(s).substring(0, n).padStart(n, ' ');
+  // Mínimo garantizado para que PROD_W nunca sea negativo
+  const CANT_W = 3;
+  const PRICE_W = 9;
+  // Si effectiveLineChars es muy pequeño, usar mínimo 20
+  const safeLineChars = Math.max(effectiveLineChars, 20);
 
-    const itemsHeader = rpad('Can', CANT_W) + ' ' + rpad('Producto', PROD_W) + ' ' + lpad('Total', PRICE_W);
-    const itemsSeparator = '-'.repeat(effectiveLineChars);
+    // =============================================
+    // PASO 2 y 3: Usar safeLineChars y safePROD_W
+    // =============================================
+    const PROD_W = safeLineChars - CANT_W - PRICE_W - 2;
+    const safePROD_W = Math.max(PROD_W, 8);
+    const itemsHeader = rpad('Can', CANT_W) + ' ' + rpad('Producto', safePROD_W) + ' ' + lpad('Total', PRICE_W);
+    const itemsSeparator = '-'.repeat(safeLineChars);
 
     const itemsRows = mockOrder.items.map(item => {
       const price = (item.quantity * item.price).toLocaleString('es-CO');
@@ -111,20 +121,20 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
       const name = item.name;
       const lineArr: string[] = [];
       
-      lineArr.push(rpad(qty, CANT_W) + ' ' + rpad(name.substring(0, PROD_W), PROD_W) + ' ' + lpad(price, PRICE_W));
+      lineArr.push(rpad(qty, CANT_W) + ' ' + rpad(name.substring(0, safePROD_W), safePROD_W) + ' ' + lpad(price, PRICE_W));
       
-      let rest = name.substring(PROD_W);
+      let rest = name.substring(safePROD_W);
       while (rest.length > 0) {
-        lineArr.push(' '.repeat(CANT_W + 1) + rpad(rest.substring(0, PROD_W), PROD_W));
-        rest = rest.substring(PROD_W);
+        lineArr.push(' '.repeat(CANT_W + 1) + rpad(rest.substring(0, safePROD_W), safePROD_W));
+        rest = rest.substring(safePROD_W);
       }
       return lineArr.join('\n');
     }).join('\n');
     
     const itemsPreContent = [itemsHeader, itemsSeparator, itemsRows].join('\n');
     
-    const SUMMARY_LABEL_W = effectiveLineChars - PRICE_W - 1;
     const SUMMARY_VALUE_W = PRICE_W;
+    const SUMMARY_LABEL_W = safeLineChars - SUMMARY_VALUE_W;
     
     const subtotalLines: string[] = [];
     subtotalLines.push(rpad('Subtotal:', SUMMARY_LABEL_W) + lpad(mockOrder.subtotal.toLocaleString('es-CO'), SUMMARY_VALUE_W));
@@ -158,18 +168,20 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
                     font-size: ${printFontSize};
                     color: black;
                   }
+                  /* PASO 2: Estilos del Wrapper */
                   #ticket-wrapper {
                     width: ${settings.style.paperSize === '80mm' ? '216px' : '160px'};
                     margin: 0;
                     padding: 0;
                     overflow: hidden;
                   }
-                  pre {
-                    font-family: '${settings.style.font}', monospace !important;
-                    font-size: inherit;
-                    white-space: pre;
-                    margin: 0;
-                    padding: 0;
+                  pre { 
+                    font-family: '${settings.style.font}', 
+                      monospace !important; 
+                    font-size: inherit; 
+                    white-space: pre; 
+                    margin: 0; 
+                    padding: 0; 
                     width: 100%;
                     overflow: hidden;
                     line-height: 1.4;
@@ -205,10 +217,11 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
                     border-top: 1px ${settings.style.separatorStyle} #000; 
                     padding-top: 4px; 
                   }
+                  /* PASO 4: Media Query para impresión */
                   @media print {
                     @page { 
-                      size: auto;
-                      margin: 1mm 0mm; 
+                      size: ${settings.style.paperSize === '80mm' ? '80mm' : '58mm'} auto;
+                      margin: 0; 
                     }
                     html, body { 
                       margin: 0; 
@@ -216,8 +229,7 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
                       width: auto;
                     }
                     #ticket-wrapper { 
-                      width: ${settings.style.paperSize === '80mm' 
-                        ? '216px' : '160px'};
+                      width: ${settings.style.paperSize === '80mm' ? '216px' : '160px'};
                       padding: 0;
                     }
                   }
@@ -225,38 +237,40 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
             </head>
             <body>
               <div id="ticket-wrapper">
-                ${settings.logo.url ? `<div style="text-align: ${settings.logo.position}; margin-bottom: 4px;"><img src="${settings.logo.url}" class="logo" alt="logo" style="width:${settings.logo.size}; display:inline-block;"/></div>` : ''}
+                <div style="transform: scaleX(${textScale}); transform-origin: left top; display: block;">
+                  ${settings.logo.url ? `<div style="text-align: ${settings.logo.position}; margin-bottom: 4px; transform: scaleX(${1/textScale}); transform-origin: ${settings.logo.position} top;"><img src="${settings.logo.url}" class="logo" alt="logo" style="width:${settings.logo.size}; display:inline-block;"/></div>` : ''}
 
-                <div class="text-center">
-                    <div style="${isBold('businessName') ? 'font-weight: bold;' : ''}">${settings.header.businessName}</div>
-                    <div style="${isBold('address') ? 'font-weight: bold;' : ''}">${settings.header.address}</div>
-                    <div>${settings.header.phone}</div>
-                    ${settings.header.nit ? `<div style="${isBold('nit') ? 'font-weight: bold;' : ''}">NIT: ${settings.header.nit}</div>` : ''}
+                  <div class="text-center">
+                      <div style="${isBold('businessName') ? 'font-weight: bold;' : ''}">${settings.header.businessName}</div>
+                      <div style="${isBold('address') ? 'font-weight: bold;' : ''}">${settings.header.address}</div>
+                      <div>${settings.header.phone}</div>
+                      ${settings.header.nit ? `<div style="${isBold('nit') ? 'font-weight: bold;' : ''}">NIT: ${settings.header.nit}</div>` : ''}
+                  </div>
                 </div>
                 
-                ${settings.barcode?.position === 'header' ? `<div style="text-align:center; margin:4px 0;"><img src="${barcodeImage}" alt="barcode"/></div>` : ''}
+                ${settings.barcode?.position === 'header' ? `<div style="text-align:center; margin:4px 0; transform: scale(${textScale}); transform-origin: center top;"><img src="${barcodeImage}" alt="barcode"/></div>` : ''}
 
-                <div>
-                  <div class="separator"></div>
-                  <div style="margin: 3px 0;">
-                      ${settings.fields.showInvoiceNumber ? `<div style="${isBold('invoiceNumber') ? 'font-weight: bold;' : ''}">Factura: ${mockOrder.invoiceNumber}</div>` : ''}
-                      ${settings.fields.showDateTime ? `<div style="${isBold('dateTime') ? 'font-weight: bold;' : ''}">Fecha: ${mockOrder.dateTime}</div>` : ''}
-                  </div>
-                  <div class="separator"></div>
-                  <div style="margin: 3px 0;">
-                      <div style="${isBold('clientName') ? 'font-weight: bold;' : ''}">Cliente: ${mockOrder.client.name}</div>
-                      ${settings.fields.showClientPhone ? `<div style="${isBold('clientPhone') ? 'font-weight: bold;' : ''}">Tel: ${mockOrder.client.phone}</div>` : ''}
-                      ${settings.fields.showClientAddress ? `<div style="${isBold('clientAddress') ? 'font-weight: bold;' : ''}">Dir: ${mockOrder.client.address}</div>` : ''}
-                  </div>
+                <div style="transform: scaleX(${textScale}); transform-origin: left top; display: block;">
+                    <div class="separator"></div>
+                    <div style="margin: 3px 0;">
+                        ${settings.fields.showInvoiceNumber ? `<div style="${isBold('invoiceNumber') ? 'font-weight: bold;' : ''}">Factura: ${mockOrder.invoiceNumber}</div>` : ''}
+                        ${settings.fields.showDateTime ? `<div style="${isBold('dateTime') ? 'font-weight: bold;' : ''}">Fecha: ${mockOrder.dateTime}</div>` : ''}
+                    </div>
+                    <div class="separator"></div>
+                    <div style="margin: 3px 0;">
+                        <div style="${isBold('clientName') ? 'font-weight: bold;' : ''}">Cliente: ${mockOrder.client.name}</div>
+                        ${settings.fields.showClientPhone ? `<div style="${isBold('clientPhone') ? 'font-weight: bold;' : ''}">Tel: ${mockOrder.client.phone}</div>` : ''}
+                        ${settings.fields.showClientAddress ? `<div style="${isBold('clientAddress') ? 'font-weight: bold;' : ''}">Dir: ${mockOrder.client.address}</div>` : ''}
+                    </div>
                 </div>
 
-               <pre>${itemsPreContent}</pre>
+               <pre style="font-size: inherit; transform: scaleX(${textScale}); transform-origin: left top; display: block; line-height: 1.4;">${itemsPreContent}</pre>
 
-               <div>
+               <div style="transform: scaleX(${textScale}); transform-origin: left top; display: block;">
                   <div class="separator"></div>
-                  <pre style="${isBold('subtotalFees') ? 'font-weight:bold;' : ''}">${subtotalPreContent}</pre>
+                  <pre style="font-size: inherit; ${isBold('subtotalFees') ? 'font-weight:bold;' : ''}">${subtotalPreContent}</pre>
                   <div class="separator"></div>
-                  <pre style="font-weight:bold;">${totalPreContent}</pre>
+                  <pre style="font-size: inherit; font-weight:bold;">${totalPreContent}</pre>
                   ${(settings.fields.showPaymentMethod || settings.fields.showEstimatedDelivery) ? '<div class="separator"></div>' : ''}
                   <div style="margin: 3px 0;">
                     ${settings.fields.showPaymentMethod ? `<div style="${isBold('paymentMethod') ? 'font-weight: bold;' : ''}">Método de pago: ${mockOrder.paymentMethod}</div>` : ''}
@@ -266,15 +280,15 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
                 </div>
                 
                 ${settings.qr.show && qrCodeImage ? `
-                      <div class="qr-container">
+                      <div class="qr-container" style="transform: scale(${textScale}); transform-origin: center top;">
                         <img src="${qrCodeImage}" alt="QR Code" style="display:block; margin:0 auto; width:90px; height:90px; image-rendering: pixelated;"/>
-                        <div class="qr-label" style="${isBold('qrText') ? 'font-weight: bold;' : ''}">${settings.qr.labelText}</div>
+                        <div class="qr-label" style="${isBold('qrText') ? 'font-weight: bold;' : ''}; transform: scaleX(${1/textScale});">${settings.qr.labelText}</div>
                       </div>`
                   : ''}
 
-                ${settings.barcode?.position === 'footer' ? `<div style="text-align:center; margin:4px 0;"><img src="${barcodeImage}" alt="barcode"/></div>` : ''}
+                ${settings.barcode?.position === 'footer' ? `<div style="text-align:center; margin:4px 0; transform: scale(${textScale}); transform-origin: center top;"><img src="${barcodeImage}" alt="barcode"/></div>` : ''}
 
-                <div>
+                <div style="transform: scaleX(${textScale}); transform-origin: left top; display: block;">
                   ${settings.socialMedia.show ? `<div class="separator"></div>` : ''}
                   <div class="text-center" style="margin: 3px 0; ${isBold('socialMedia') ? 'font-weight:bold;' : ''}">
                     ${settings.socialMedia.show && settings.socialMedia.whatsapp ? `<div>&#x1F4F1; WhatsApp: ${settings.socialMedia.whatsapp}</div>` : ''}
