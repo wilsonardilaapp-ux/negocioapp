@@ -2,6 +2,9 @@
 const nextConfig = {
     experimental: {
         serverComponentsExternalPackages: ['@opentelemetry/api', 'firebase-admin', 'cloudinary'],
+        serverActions: {
+            bodySizeLimit: '10mb',
+        },
     },
     webpack: (config, { isServer }) => {
         if (isServer) {
