@@ -34,8 +34,10 @@ const UploadMediaOutputSchema = z.object({
   secure_url: z.string().url(),
 });
 
-// This is the wrapper function that will be called from the client.
-// It securely injects credentials on the server side by fetching them from Firestore.
+/**
+ * Wrapper function that fetches credentials and calls the upload flow.
+ * Implements automatic WebP conversion for optimized SaaS performance.
+ */
 export async function uploadMedia(input: UploadMediaInput): Promise<{ secure_url: string }> {
   const firestore = await getAdminFirestore();
   const cloudinaryIntegrationDoc = await firestore.doc('integrations/cloudinary').get();
@@ -72,7 +74,6 @@ export async function uploadMedia(input: UploadMediaInput): Promise<{ secure_url
     throw new Error(`Las credenciales de Cloudinary están incompletas. Falta(n): ${missingFields.join(', ')}. Por favor, configúralas en el panel de Integraciones.`);
   }
 
-  // Combine client input with server-side config and call the internal flow
   return uploadMediaFlow({
     ...input,
     cloudinaryConfig,
@@ -87,13 +88,24 @@ const uploadMediaFlow = ai.defineFlow(
   },
   async ({ mediaDataUri, cloudinaryConfig }) => {
     try {
-      // Configure Cloudinary with the provided credentials
       cloudinary.config(cloudinaryConfig);
       
-      // Upload the media file from the data URI
-      const result = await cloudinary.uploader.upload(mediaDataUri, {
-        resource_type: "auto", // Automatically detect if it's an image or video
-      });
+      const isImage = mediaDataUri.startsWith('data:image/');
+      
+      // Configure upload with automatic optimization and WebP format for images
+      const uploadOptions: any = {
+        resource_type: "auto",
+        folder: "saas_uploads",
+      };
+
+      if (isImage) {
+        uploadOptions.format = 'webp';
+        uploadOptions.transformation = [
+          { quality: 'auto', fetch_format: 'auto' }
+        ];
+      }
+
+      const result = await cloudinary.uploader.upload(mediaDataUri, uploadOptions);
 
       if (!result.secure_url) {
         throw new Error('Cloudinary did not return a secure URL.');
@@ -106,7 +118,6 @@ const uploadMediaFlow = ai.defineFlow(
     } catch (error: any) {
       console.error('Error in uploadMediaFlow:', error);
       
-      // Provide a more user-friendly error message for common issues
       if (error.message?.includes('Invalid credentials') || error.message?.includes('Invalid API key')) {
           throw new Error('Las credenciales de Cloudinary no son válidas. Por favor, revísalas en el panel de integraciones.');
       }

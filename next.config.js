@@ -1,9 +1,10 @@
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
     experimental: {
         serverComponentsExternalPackages: ['@opentelemetry/api', 'firebase-admin', 'cloudinary'],
         serverActions: {
-            bodySizeLimit: '10mb',
+            bodySizeLimit: '50mb', // Increased limit to 50MB to handle high-resolution media uploads in the SaaS
         },
     },
     webpack: (config, { isServer }) => {
