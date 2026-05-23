@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useMemo } from 'react';
@@ -546,7 +545,7 @@ export default function LandingPageContent({ data, plans = [], businessId, logoU
       )}
 
       <a 
-        href={`https://wa.me/${(data.header?.socialLinks?.whatsapp || footer.contactInfo.phone)?.replace(/\D/g, '')}`} 
+        href={`https://wa.me/${(data.header?.socialLinks?.whatsapp || footer.contactInfo.phone || '').replace(/\D/g, '')}`} 
         target="_blank" 
         rel="noopener noreferrer"
         className="fixed bottom-8 right-8 z-50 bg-[#25D366] text-white p-4 rounded-full shadow-2xl hover:scale-110 transition-transform flex items-center justify-center"

@@ -216,7 +216,10 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
         await couponService.incrementUsage(appliedCoupon.id);
     }
 
-    const whatsappUrl = `https://wa.me/${businessInfo?.phone.replace(/\D/g, '')}?text=${encodeURIComponent(orderSummary)}`;
+    // SANITIZACIÓN CRÍTICA: Eliminar espacios y caracteres no numéricos del teléfono de destino
+    const targetPhone = (businessInfo?.phone || '').replace(/\D/g, '');
+    const whatsappUrl = `https://wa.me/${targetPhone}?text=${encodeURIComponent(orderSummary)}`;
+    
     window.open(whatsappUrl, '_blank');
     onOpenChange(false);
   };

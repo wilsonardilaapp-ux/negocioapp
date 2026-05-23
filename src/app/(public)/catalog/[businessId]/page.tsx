@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
@@ -392,7 +391,6 @@ export default function CatalogPage() {
         } else if (promo.type === 'fixed') {
             discountedPrice = Math.max(0, item.price - (promo.discountValue || 0));
         } else if (promo.type === 'bogo') {
-            // 2x1 logic: pay for 1 if you buy 2. Average price per unit is 50% for every pair.
             if (quantity >= 2) {
                 const pairs = Math.floor(quantity / 2);
                 const singles = quantity % 2;
@@ -526,7 +524,7 @@ const CatalogHeader = ({ config, cartItemCount, onCartClick }: CatalogHeaderProp
                     <div className="flex items-center gap-3">
                         {Object.entries(config.socialLinks).map(([k, v]) => v && <a key={k} href={v as string} target="_blank" className="text-muted-foreground hover:text-primary">{socialIcons[k]}</a>)}
                         <Button asChild size="sm">
-                            <a href={`https://wa.me/${config.businessInfo.phone.replace(/\D/g, '')}`} target="_blank">
+                            <a href={`https://wa.me/${(config.businessInfo.phone || '').replace(/\D/g, '')}`} target="_blank">
                                 <WhatsAppIcon className="mr-2 h-4 w-4" /> Contactar
                             </a>
                         </Button>
