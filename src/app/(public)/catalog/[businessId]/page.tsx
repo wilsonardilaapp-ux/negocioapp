@@ -42,7 +42,17 @@ const formatCurrency = (value: number) => {
     }).format(value);
 };
 
-export type CartItem = Product & { quantity: number };
+export interface AppliedPromotion {
+  type: '2x1' | 'percentage' | 'fixed';
+  originalPrice: number;
+  discountedPrice: number;
+  promotionId: string;
+}
+
+export type CartItem = Product & { 
+    quantity: number;
+    appliedPromotion?: AppliedPromotion;
+};
 
 type MediaItem = {
     url: string;
@@ -366,17 +376,69 @@ export default function CatalogPage() {
         initializePage();
     }, [firestore, slug, isNetworkEnabled]);
 
+    const getPromotionForItem = useCallback((item: Product, quantity: number): AppliedPromotion | undefined => {
+        const promo = activePromotions.find(p => 
+            p.isActive &&
+            (p.applicableTo === 'all_catalog' ||
+             (p.applicableTo === 'category' && p.categoryName === item.category) ||
+             (p.applicableTo === 'specific_item' && (p.itemId === item.id || p.itemName === item.name)))
+        );
+
+        if (!promo) return undefined;
+
+        let discountedPrice = item.price;
+        if (promo.type === 'percentage') {
+            discountedPrice = item.price * (1 - (promo.discountValue || 0) / 100);
+        } else if (promo.type === 'fixed') {
+            discountedPrice = Math.max(0, item.price - (promo.discountValue || 0));
+        } else if (promo.type === 'bogo') {
+            // 2x1 logic: pay for 1 if you buy 2. Average price per unit is 50% for every pair.
+            if (quantity >= 2) {
+                const pairs = Math.floor(quantity / 2);
+                const singles = quantity % 2;
+                const totalCost = (pairs * item.price) + (singles * item.price);
+                discountedPrice = totalCost / quantity;
+            }
+        }
+
+        if (discountedPrice === item.price) return undefined;
+
+        return {
+            type: promo.type === 'bogo' ? '2x1' : (promo.type === 'percentage' ? 'percentage' : 'fixed'),
+            originalPrice: item.price,
+            discountedPrice,
+            promotionId: promo.id
+        };
+    }, [activePromotions]);
+
     const handleAddToCart = (itemsToAdd: CartItem[]) => {
         setCart(prev => {
             const newCart = [...prev];
             itemsToAdd.forEach(newItem => {
                 const idx = newCart.findIndex(item => item.id === newItem.id);
-                if (idx > -1) newCart[idx].quantity += newItem.quantity;
-                else newCart.push(newItem);
+                if (idx > -1) {
+                    const newQty = newCart[idx].quantity + newItem.quantity;
+                    newCart[idx].quantity = newQty;
+                    newCart[idx].appliedPromotion = getPromotionForItem(newCart[idx], newQty);
+                } else {
+                    const appliedPromo = getPromotionForItem(newItem, newItem.quantity);
+                    newCart.push({ ...newItem, appliedPromotion: appliedPromo });
+                }
             });
             return newCart;
         });
         setIsPurchaseModalOpen(true);
+    };
+
+    const handleUpdateQuantity = (productId: string, newQuantity: number) => {
+        if (newQuantity < 1) return;
+        setCart(prev => prev.map(item => {
+            if (item.id === productId) {
+                const appliedPromo = getPromotionForItem(item, newQuantity);
+                return { ...item, quantity: newQuantity, appliedPromotion: appliedPromo };
+            }
+            return item;
+        }));
     };
 
     if (isLoading) return <div className="flex h-screen w-full items-center justify-center bg-background"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>;
@@ -422,7 +484,18 @@ export default function CatalogPage() {
                 )}
             </main>
             <ProductViewModal product={selectedProduct} isOpen={!!selectedProduct} onOpenChange={(o) => !o && setSelectedProduct(null)} businessPhone={headerConfig?.businessInfo.phone || ''} businessId={pageData.resolvedBusinessId} paymentSettings={pageData.paymentSettings} onAddToCart={handleAddToCart} />
-            {pageData.resolvedBusinessId && <PurchaseModal isOpen={isPurchaseModalOpen} onOpenChange={setIsPurchaseModalOpen} cartItems={cart} onRemoveItem={(id) => setCart(c => c.filter(i => i.id !== id))} onUpdateQuantity={(id, q) => setCart(c => c.map(i => i.id === id ? {...i, quantity: q} : i))} businessId={pageData.resolvedBusinessId} businessInfo={headerConfig?.businessInfo ?? null} paymentSettings={pageData.paymentSettings} />}
+            {pageData.resolvedBusinessId && (
+                <PurchaseModal 
+                    isOpen={isPurchaseModalOpen} 
+                    onOpenChange={setIsPurchaseModalOpen} 
+                    cartItems={cart} 
+                    onRemoveItem={(id) => setCart(c => c.filter(i => i.id !== id))} 
+                    onUpdateQuantity={handleUpdateQuantity} 
+                    businessId={pageData.resolvedBusinessId} 
+                    businessInfo={headerConfig?.businessInfo ?? null} 
+                    paymentSettings={pageData.paymentSettings} 
+                />
+            )}
             <footer className="w-full border-t bg-background"><div className="container flex items-center justify-center h-16 px-4 md:px-6"><p className="text-sm text-muted-foreground">© {new Date().getFullYear()} {headerConfig?.businessInfo.name || 'Negocio V03'}.</p></div></footer>
         </div>
     );

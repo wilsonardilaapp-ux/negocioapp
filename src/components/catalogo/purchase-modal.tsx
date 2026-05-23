@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -12,7 +12,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsTrigger, TabsList } from '@/components/ui/tabs';
 import { Card, CardContent } from '@/components/ui/card';
-import { ShoppingBag, Building2, HandCoins, Minus, Plus, Tag } from 'lucide-react';
+import { ShoppingBag, Building2, HandCoins, Minus, Plus, Tag, Trash2 } from 'lucide-react';
 import Image from 'next/image';
 import { useToast } from '@/hooks/use-toast';
 import type { PaymentSettings } from '@/models/payment-settings';
@@ -74,53 +74,260 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
   
   const packagingTotal = cartItems.reduce((sum, item) => sum + ((item.packagingCost ?? 0) * item.quantity), 0);
   const totalQuantity = cartItems.reduce((sum, item) => sum + item.quantity, 0);
-  const subtotalProducts = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  
+  // Calculate subtotal using discounted prices if available
+  const subtotalProducts = useMemo(() => {
+      return cartItems.reduce((sum, item) => {
+          const unitPrice = item.appliedPromotion?.discountedPrice ?? item.price;
+          return sum + (unitPrice * item.quantity);
+      }, 0);
+  }, [cartItems]);
+
   const subtotalBeforeVat = subtotalProducts + packagingTotal;
   const vatRate = businessInfo?.vatRate ?? 0;
   const total = subtotalBeforeVat * (1 + vatRate/100) + (tipoEntrega === 'domicilio' ? (businessInfo?.deliveryFee ?? 0) : 0);
 
-  const applicablePromo = activePromos.find(p => p.minQuantity !== undefined && totalQuantity >= p.minQuantity) ?? null;
+  // Global order-level promotion
+  const applicableGlobalPromo = activePromos.find(p => 
+      p.applicableTo === 'order' && 
+      p.minQuantity !== undefined && 
+      totalQuantity >= p.minQuantity
+  ) ?? null;
 
   const onSubmit = (data: z.infer<typeof purchaseSchema>) => {
-    const messageBody = `Pedido de ${data.fullName}\nTotal: ${formatCurrency(total)}\nPromo: ${applicablePromo?.title || 'Ninguna'}`;
-    const whatsappUrl = `https://wa.me/${businessInfo?.phone.replace(/\D/g, '')}?text=${encodeURIComponent(messageBody)}`;
+    let orderSummary = `*Nuevo Pedido*\n\n`;
+    orderSummary += `*Cliente:* ${data.fullName}\n`;
+    orderSummary += `*Teléfono:* ${data.whatsapp}\n`;
+    orderSummary += `*Entrega:* ${tipoEntrega === 'domicilio' ? 'Domicilio' : 'Recoger en tienda'}\n`;
+    if (data.address) orderSummary += `*Dirección:* ${data.address}\n`;
+    orderSummary += `\n*Items:*\n`;
+    
+    cartItems.forEach(item => {
+        const price = item.appliedPromotion?.discountedPrice ?? item.price;
+        orderSummary += `- ${item.quantity}x ${item.name} (${formatCurrency(price)} c/u)\n`;
+    });
+
+    orderSummary += `\n*Resumen:*\n`;
+    orderSummary += `Subtotal: ${formatCurrency(subtotalProducts)}\n`;
+    if (packagingTotal > 0) orderSummary += `Empaque: ${formatCurrency(packagingTotal)}\n`;
+    if (tipoEntrega === 'domicilio' && (businessInfo?.deliveryFee ?? 0) > 0) {
+        orderSummary += `Domicilio: ${formatCurrency(businessInfo?.deliveryFee ?? 0)}\n`;
+    }
+    orderSummary += `*TOTAL: ${formatCurrency(total)}*\n`;
+
+    if (applicableGlobalPromo) {
+        orderSummary += `\n*Promo Aplicada:* ${applicableGlobalPromo.title}`;
+    }
+
+    if (data.message) {
+        orderSummary += `\n\n*Nota:* ${data.message}`;
+    }
+
+    const whatsappUrl = `https://wa.me/${businessInfo?.phone.replace(/\D/g, '')}?text=${encodeURIComponent(orderSummary)}`;
     window.open(whatsappUrl, '_blank');
     onOpenChange(false);
   };
 
+  if (cartItems.length === 0) {
+      return (
+          <Dialog open={isOpen} onOpenChange={onOpenChange}>
+            <DialogContent>
+                <div className="flex flex-col items-center justify-center py-10 text-center">
+                    <ShoppingBag className="h-12 w-12 text-muted-foreground mb-4" />
+                    <p className="font-semibold">Tu carrito está vacío</p>
+                    <Button variant="outline" className="mt-4" onClick={() => onOpenChange(false)}>Volver al catálogo</Button>
+                </div>
+            </DialogContent>
+          </Dialog>
+      );
+  }
+
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Finalizar Compra</DialogTitle>
-          <DialogDescription>Revisa tu pedido y completa tus datos.</DialogDescription>
+      <DialogContent className="max-w-4xl max-h-[95vh] overflow-hidden flex flex-col p-0">
+        <DialogHeader className="p-6 pb-2">
+          <DialogTitle className="text-2xl flex items-center gap-2">
+            <ShoppingBag className="h-6 w-6" />
+            Finalizar Compra
+          </DialogTitle>
+          <DialogDescription>Revisa tu pedido y completa tus datos para el envío.</DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-          {applicablePromo && (
-            <div className="flex items-center gap-2 p-3 rounded-lg bg-green-50 border border-green-200 text-green-800">
+
+        <div className="flex-1 overflow-y-auto px-6 space-y-6">
+          {applicableGlobalPromo && (
+            <div className="flex items-center gap-3 p-3 rounded-lg bg-green-50 border border-green-200 text-green-800 animate-in fade-in slide-in-from-top-2">
               <Tag className="h-5 w-5" />
               <div>
-                <p className="font-bold">¡Promoción Aplicada!</p>
-                <p className="text-sm">{applicablePromo.title}: {applicablePromo.description}</p>
+                <p className="font-bold text-sm">¡Promoción Global Aplicada!</p>
+                <p className="text-xs">{applicableGlobalPromo.title}: {applicableGlobalPromo.description}</p>
               </div>
             </div>
           )}
-          <ScrollArea className="h-48 border rounded-md p-4">
-            {cartItems.map(item => (
-              <div key={item.id} className="flex justify-between py-2 border-b">
-                <span>{item.quantity}x {item.name}</span>
-                <span>{formatCurrency(item.price * item.quantity)}</span>
-              </div>
-            ))}
-          </ScrollArea>
-          <div className="grid gap-4">
-            <Input {...register('fullName')} placeholder="Nombre completo" />
-            <Input {...register('whatsapp')} placeholder="WhatsApp" />
-            <Textarea {...register('address')} placeholder="Dirección de entrega" />
+
+          <div className="space-y-4">
+            <h4 className="font-bold text-lg">Tu Pedido</h4>
+            <div className="border rounded-xl divide-y bg-muted/30 overflow-hidden">
+                {cartItems.map(item => (
+                <div key={item.id} className="flex items-center justify-between p-4 bg-white/50">
+                    <div className="flex-1 min-w-0 pr-4">
+                        <p className="font-bold text-sm truncate">{item.name}</p>
+                        <div className="flex items-center gap-2 mt-1">
+                            {item.appliedPromotion && (
+                                <span className="text-xs line-through text-muted-foreground">
+                                    {formatCurrency(item.price)}
+                                </span>
+                            )}
+                            <span className="text-sm font-black text-primary">
+                                {formatCurrency(item.appliedPromotion?.discountedPrice ?? item.price)}
+                            </span>
+                            {item.appliedPromotion?.type === '2x1' && (
+                                <Badge variant="secondary" className="text-[10px] h-4 px-1.5 bg-orange-100 text-orange-700 border-orange-200">2x1</Badge>
+                            )}
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                        <div className="flex items-center border rounded-lg bg-white overflow-hidden shadow-sm">
+                            <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="h-8 w-8 rounded-none border-r"
+                                onClick={() => onUpdateQuantity(item.id, Math.max(0, item.quantity - 1))}
+                            >
+                                <Minus className="h-3 w-3" />
+                            </Button>
+                            <span className="w-8 text-center text-sm font-bold">{item.quantity}</span>
+                            <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="h-8 w-8 rounded-none border-l"
+                                onClick={() => onUpdateQuantity(item.id, item.quantity + 1)}
+                            >
+                                <Plus className="h-3 w-3" />
+                            </Button>
+                        </div>
+                        <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-8 w-8 text-destructive hover:bg-destructive/10"
+                            onClick={() => onRemoveItem(item.id)}
+                        >
+                            <Trash2 className="h-4 w-4" />
+                        </Button>
+                    </div>
+                </div>
+                ))}
+            </div>
           </div>
-          <div className="text-xl font-bold text-right">Total: {formatCurrency(total)}</div>
-          <Button type="submit" className="w-full h-12" disabled={isSubmitting}>Confirmar Pedido</Button>
-        </form>
+
+          <form id="purchase-form" onSubmit={handleSubmit(onSubmit)} className="space-y-6 pb-6">
+            <div className="space-y-4">
+                <h4 className="font-bold text-lg">Tus Datos</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                        <Label>Nombre Completo *</Label>
+                        <Input {...register('fullName')} placeholder="Ej: Juan Pérez" className={cn(errors.fullName && "border-destructive")} />
+                        {errors.fullName && <p className="text-[10px] text-destructive">{errors.fullName.message}</p>}
+                    </div>
+                    <div className="space-y-2">
+                        <Label>WhatsApp / Teléfono *</Label>
+                        <Input {...register('whatsapp')} placeholder="Ej: 300 123 4567" className={cn(errors.whatsapp && "border-destructive")} />
+                        {errors.whatsapp && <p className="text-[10px] text-destructive">{errors.whatsapp.message}</p>}
+                    </div>
+                    <div className="space-y-2 md:col-span-2">
+                        <Label>Correo Electrónico *</Label>
+                        <Input {...register('email')} type="email" placeholder="juan@ejemplo.com" className={cn(errors.email && "border-destructive")} />
+                        {errors.email && <p className="text-[10px] text-destructive">{errors.email.message}</p>}
+                    </div>
+                </div>
+            </div>
+
+            <div className="space-y-4">
+                <h4 className="font-bold text-lg">Método de Entrega</h4>
+                <RadioGroup 
+                    defaultValue="domicilio" 
+                    onValueChange={(val: any) => setTipoEntrega(val)}
+                    className="grid grid-cols-2 gap-4"
+                >
+                    <Label
+                        htmlFor="domicilio"
+                        className={cn(
+                            "flex flex-col items-center justify-between rounded-xl border-2 border-muted bg-white p-4 hover:bg-muted/50 cursor-pointer transition-all",
+                            tipoEntrega === 'domicilio' && "border-primary bg-primary/5"
+                        )}
+                    >
+                        <RadioGroupItem value="domicilio" id="domicilio" className="sr-only" />
+                        <span className="text-sm font-bold">Domicilio</span>
+                        <span className="text-[10px] text-muted-foreground mt-1">Recibe en casa</span>
+                    </Label>
+                    <Label
+                        htmlFor="tienda"
+                        className={cn(
+                            "flex flex-col items-center justify-between rounded-xl border-2 border-muted bg-white p-4 hover:bg-muted/50 cursor-pointer transition-all",
+                            tipoEntrega === 'recoger_en_tienda' && "border-primary bg-primary/5"
+                        )}
+                    >
+                        <RadioGroupItem value="recoger_en_tienda" id="tienda" className="sr-only" />
+                        <span className="text-sm font-bold">Recoger</span>
+                        <span className="text-[10px] text-muted-foreground mt-1">En el local</span>
+                    </Label>
+                </RadioGroup>
+
+                {tipoEntrega === 'domicilio' && (
+                    <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
+                        <Label>Dirección de Entrega *</Label>
+                        <Textarea {...register('address')} placeholder="Barrio, Calle, Edificio..." />
+                    </div>
+                )}
+            </div>
+
+             <div className="space-y-4">
+                <h4 className="font-bold text-lg">Nota Adicional</h4>
+                <Textarea {...register('message')} placeholder="Instrucciones especiales para tu pedido..." />
+            </div>
+          </form>
+        </div>
+
+        <div className="p-6 border-t bg-muted/20">
+            <div className="space-y-2 mb-6">
+                <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Subtotal productos:</span>
+                    <span>{formatCurrency(subtotalProducts)}</span>
+                </div>
+                {packagingTotal > 0 && (
+                    <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Costo de empaque:</span>
+                        <span>{formatCurrency(packagingTotal)}</span>
+                    </div>
+                )}
+                {tipoEntrega === 'domicilio' && (businessInfo?.deliveryFee ?? 0) > 0 && (
+                    <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Costo de domicilio:</span>
+                        <span>{formatCurrency(businessInfo?.deliveryFee ?? 0)}</span>
+                    </div>
+                )}
+                <div className="flex justify-between items-center pt-2 border-t border-muted-foreground/20">
+                    <span className="font-bold text-lg">Total a pagar:</span>
+                    <span className="font-black text-2xl text-primary">{formatCurrency(total)}</span>
+                </div>
+            </div>
+            
+            <Button 
+                type="submit" 
+                form="purchase-form"
+                className="w-full h-14 text-lg font-bold shadow-lg shadow-primary/20" 
+                disabled={isSubmitting}
+            >
+                {isSubmitting ? (
+                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                ) : (
+                    <WhatsAppIcon className="mr-2 h-5 w-5" />
+                )}
+                Confirmar y Enviar Pedido
+            </Button>
+            <p className="text-[10px] text-center text-muted-foreground mt-4">
+                Serás redirigido a WhatsApp para finalizar el envío de tu pedido.
+            </p>
+        </div>
       </DialogContent>
     </Dialog>
   );
