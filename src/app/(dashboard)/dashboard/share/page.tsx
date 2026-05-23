@@ -1,7 +1,6 @@
-
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { Card, CardHeader, CardContent, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,25 +12,21 @@ import {
   Share2,
   Download,
   Copy,
-  Facebook,
-  Twitter,
   Check,
   Eye,
-  Settings,
-  Palette,
   Image as ImageIcon,
   Pencil,
   Trash2,
   Save,
   Loader2,
 } from 'lucide-react';
-import { useUser, useFirestore, useDoc, useMemoFirebase, setDocumentNonBlocking } from '@/firebase';
+import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { doc, setDoc } from 'firebase/firestore';
 import type { MenuShare, QRConfig } from '@/models/share';
 import { useToast } from '@/hooks/use-toast';
 import QRCode from "react-qr-code";
 import html2canvas from 'html2canvas';
-import { WhatsAppIcon } from '@/components/icons';
+import { WhatsAppIcon, TikTokIcon, XIcon, FacebookIcon } from '@/components/icons';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
@@ -167,17 +162,15 @@ export default function SharePage() {
   
   const { data: savedShareConfig, isLoading } = useDoc<MenuShare>(shareConfigRef);
   
-  // Sincronización robusta: Solo cargamos desde el servidor una vez al inicio
   useEffect(() => {
     if (isLoading || !user || hasLoadedInitial.current) return;
 
     if (savedShareConfig) {
-        // Combinamos valores del servidor con valores por defecto para asegurar integridad
         const mergedConfig: MenuShare = {
             ...savedShareConfig,
             id: savedShareConfig.id || 'main',
             businessId: savedShareConfig.businessId || user.uid,
-            useCustomSlug: savedShareConfig.useCustomSlug ?? false, // Forzar booleano
+            useCustomSlug: savedShareConfig.useCustomSlug ?? false,
             slug: savedShareConfig.slug || user.uid,
             qrConfig: {
                 ...defaultShareConfig.qrConfig,
@@ -191,7 +184,6 @@ export default function SharePage() {
         setShareConfig(mergedConfig);
         hasLoadedInitial.current = true;
     } else if (savedShareConfig === null) {
-      // Si no existe, inicializamos uno nuevo
       const newConfig: MenuShare = {
         id: 'main',
         businessId: user.uid,
@@ -218,7 +210,6 @@ export default function SharePage() {
         updatedAt: new Date().toISOString() 
       };
       
-      // Usamos setDoc directo para sobreescribir el documento completo con el estado actual
       await setDoc(shareConfigRef, dataToSave);
       
       toast({
@@ -320,7 +311,7 @@ export default function SharePage() {
                     <Label htmlFor="slug-input">Tu Alias de Negocio</Label>
                     <div className="flex items-center group">
                         <span className="p-2 bg-muted border border-r-0 rounded-l-md text-sm text-muted-foreground">
-                            {window.location.host}/catalog/
+                            {typeof window !== 'undefined' ? window.location.host : ''}/catalog/
                         </span>
                         <Input
                             id="slug-input"
