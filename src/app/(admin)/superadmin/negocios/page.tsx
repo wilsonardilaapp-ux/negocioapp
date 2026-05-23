@@ -24,9 +24,10 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { Check, Plus, Search, Building2, Eye, Puzzle, Tag } from 'lucide-react';
+import { Check, Plus, Search, Building2, Eye, Puzzle, Tag, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Label } from '@/components/ui/label';
+import { validateModuleExtra } from '@/utils/validateModuleExtra';
 
 // Import models
 import type { Business, EntityStatus } from '@/models/business';
@@ -73,6 +74,7 @@ export default function BusinessesPage() {
   const [showManageModal, setShowManageModal] = useState(false);
   const [selectedBusiness, setSelectedBusiness] = useState<Business | null>(null);
   const [assignedModules, setAssignedModules] = useState<string[]>([]);
+  const [moduleExtras, setModuleExtras] = useState<Record<string, number>>({});
   const [assignedServices, setAssignedServices] = useState<string[]>([]);
   
   const initialFormState = {
@@ -118,7 +120,19 @@ export default function BusinessesPage() {
     
     // Load assigned modules and services
     const modulesSnapshot = await getDocs(collection(firestore, `businesses/${business.id}/modules`));
-    setAssignedModules(modulesSnapshot.docs.filter(doc => doc.data().status === 'active').map(doc => doc.id));
+    const activeModuleIds: string[] = [];
+    const extras: Record<string, number> = {};
+    
+    modulesSnapshot.docs.forEach(doc => {
+      const data = doc.data();
+      if (data.status === 'active') {
+        activeModuleIds.push(doc.id);
+        extras[doc.id] = data.extra || 0;
+      }
+    });
+    
+    setAssignedModules(activeModuleIds);
+    setModuleExtras(extras);
 
     const servicesSnapshot = await getDocs(collection(firestore, `businesses/${business.id}/services`));
     setAssignedServices(servicesSnapshot.docs.filter(doc => doc.data().status === 'active').map(doc => doc.id));
@@ -128,6 +142,16 @@ export default function BusinessesPage() {
   
   const handleSaveManageBusiness = async () => {
     if (!selectedBusiness) return;
+    
+    // Validate module extras
+    for (const moduleId of assignedModules) {
+      const extra = moduleExtras[moduleId] || 0;
+      const validation = validateModuleExtra(selectedBusiness.planName, extra);
+      if (!validation.valid) {
+        alert(`Error en módulo ${moduleId}: ${validation.error}`);
+        return;
+      }
+    }
     
     // Prepare business document update
     const businessUpdateData: Partial<Business> = {
@@ -152,7 +176,10 @@ export default function BusinessesPage() {
     currentServices.forEach(doc => batch.update(doc.ref, { status: 'inactive' }));
     
     // Activate selected
-    assignedModules.forEach(id => batch.set(doc(firestore, `businesses/${selectedBusiness.id}/modules`, id), { status: 'active' }, { merge: true }));
+    assignedModules.forEach(id => {
+      const extra = moduleExtras[id] || 0;
+      batch.set(doc(firestore, `businesses/${selectedBusiness.id}/modules`, id), { status: 'active', extra }, { merge: true });
+    });
     assignedServices.forEach(id => batch.set(doc(firestore, `businesses/${selectedBusiness.id}/services`, id), { status: 'active' }, { merge: true }));
 
     await batch.commit();
@@ -161,8 +188,31 @@ export default function BusinessesPage() {
   };
   
   const toggleModuleAssignment = (moduleId: string) => {
-    setAssignedModules(prev => prev.includes(moduleId) ? prev.filter(id => id !== moduleId) : [...prev, moduleId]);
+    setAssignedModules(prev => {
+      const isRemoving = prev.includes(moduleId);
+      if (isRemoving) {
+        return prev.filter(id => id !== moduleId);
+      } else {
+        return [...prev, moduleId];
+      }
+    });
+    
+    if (assignedModules.includes(moduleId)) {
+      setModuleExtras(prev => {
+        const newExtras = { ...prev };
+        delete newExtras[moduleId];
+        return newExtras;
+      });
+    } else {
+      setModuleExtras(prev => ({ ...prev, [moduleId]: 0 }));
+    }
   };
+
+  const handleExtraChange = (moduleId: string, value: string) => {
+    const numericValue = parseInt(value, 10) || 0;
+    setModuleExtras(prev => ({ ...prev, [moduleId]: numericValue }));
+  };
+
   const toggleServiceAssignment = (serviceId: string) => {
     setAssignedServices(prev => prev.includes(serviceId) ? prev.filter(id => id !== serviceId) : [...prev, serviceId]);
   };
@@ -341,16 +391,53 @@ export default function BusinessesPage() {
 
               <div>
                 <h4 className="font-medium mb-3">Módulos Asignados</h4>
-                <div className="grid grid-cols-2 gap-2">
-                  {(modules || []).map(moduleItem => (
-                    <div key={moduleItem.id} className={cn('flex items-center justify-between p-3 border rounded-lg cursor-pointer transition-colors', assignedModules.includes(moduleItem.id) ? 'border-primary bg-primary/5' : 'hover:bg-gray-50', moduleItem.status === 'inactive' && 'opacity-60')} onClick={() => moduleItem.status !== 'inactive' && toggleModuleAssignment(moduleItem.id)}>
-                      <div className="flex items-center gap-2">
-                        <div className={cn('w-8 h-8 rounded flex items-center justify-center', assignedModules.includes(moduleItem.id) ? 'bg-primary/10' : 'bg-gray-100')}>{iconMap[moduleItem.id] || iconMap.default}</div>
-                        <div><p className="text-sm font-medium">{moduleItem.name}</p><p className="text-xs text-gray-500">{moduleItem.status}</p></div>
+                <div className="grid grid-cols-1 gap-2">
+                  {(modules || []).map(moduleItem => {
+                    const isActive = assignedModules.includes(moduleItem.id);
+                    const validation = validateModuleExtra(selectedBusiness.planName, moduleExtras[moduleItem.id] || 0);
+                    
+                    return (
+                      <div key={moduleItem.id} className={cn('flex flex-col p-3 border rounded-lg transition-colors', isActive ? 'border-primary bg-primary/5' : 'hover:bg-gray-50', moduleItem.status === 'inactive' && 'opacity-60')}>
+                        <div className="flex items-center justify-between cursor-pointer" onClick={() => moduleItem.status !== 'inactive' && toggleModuleAssignment(moduleItem.id)}>
+                          <div className="flex items-center gap-2">
+                            <div className={cn('w-8 h-8 rounded flex items-center justify-center', isActive ? 'bg-primary/10' : 'bg-gray-100')}>{iconMap[moduleItem.id] || iconMap.default}</div>
+                            <div><p className="text-sm font-medium">{moduleItem.name}</p><p className="text-xs text-gray-500">{moduleItem.status}</p></div>
+                          </div>
+                          {isActive && <Check className="w-5 h-5 text-primary" />}
+                        </div>
+                        
+                        {isActive && (
+                          <div className="mt-3 pt-3 border-t grid grid-cols-1 sm:grid-cols-3 items-end gap-4 animate-in fade-in slide-in-from-top-1 duration-200">
+                            <div>
+                              <Label className="text-[10px] uppercase font-bold text-muted-foreground">Base (Plan)</Label>
+                              <div className="h-9 flex items-center px-3 bg-muted rounded-md font-bold">{validation.baseLimit}</div>
+                            </div>
+                            <div>
+                              <Label className="text-[10px] uppercase font-bold text-muted-foreground">Unidades Extra</Label>
+                              <Input
+                                type="number"
+                                className={cn("h-9", !validation.valid && "border-destructive ring-destructive")}
+                                value={moduleExtras[moduleItem.id] ?? 0}
+                                onChange={(e) => handleExtraChange(moduleItem.id, e.target.value)}
+                              />
+                            </div>
+                            <div>
+                              <Label className="text-[10px] uppercase font-bold text-muted-foreground">Límite Real</Label>
+                              <div className={cn("h-9 flex items-center px-3 rounded-md font-bold", validation.valid ? "bg-primary/20 text-primary" : "bg-destructive/10 text-destructive")}>
+                                {validation.totalLimit}
+                              </div>
+                            </div>
+                            {!validation.valid && (
+                               <div className="sm:col-span-3 flex items-center gap-1.5 text-xs text-destructive font-semibold">
+                                 <AlertCircle className="w-3.5 h-3.5" />
+                                 {validation.error}
+                               </div>
+                            )}
+                          </div>
+                        )}
                       </div>
-                      {assignedModules.includes(moduleItem.id) && <Check className="w-5 h-5 text-primary" />}
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
               <div>
