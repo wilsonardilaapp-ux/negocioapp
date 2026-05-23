@@ -512,6 +512,12 @@ interface CatalogHeaderProps {
 const CatalogHeader = ({ config, cartItemCount, onCartClick }: CatalogHeaderProps) => {
     if (!config) return <div className="bg-card shadow-md p-4 text-center"><h1 className="text-2xl font-bold">Catálogo de Productos</h1></div>;
     const socialIcons: any = { tiktok: <TikTokIcon />, instagram: <InstagramIcon />, facebook: <FacebookIcon />, whatsapp: <WhatsAppIcon />, twitter: <XIcon />, };
+    
+    // SANITIZACIÓN CRÍTICA PARA PRODUCCIÓN:
+    // Asegurar que el número para el enlace directo de WhatsApp esté limpio.
+    const rawHeaderPhone = String(config.businessInfo.phone || '');
+    const cleanHeaderPhone = rawHeaderPhone.replace(/\D/g, '');
+
     return (
         <div className="w-full">
             {config.banner.mediaUrl && <div className="relative w-full h-[200px] sm:h-[280px] lg:h-[360px] xl:h-[420px]">{config.banner.mediaType === 'image' ? <Image src={config.banner.mediaUrl} alt="Banner" fill sizes="100vw" className="object-cover"/> : <video src={config.banner.mediaUrl} autoPlay loop muted controls className="w-full h-full object-cover" />}</div>}
@@ -524,7 +530,7 @@ const CatalogHeader = ({ config, cartItemCount, onCartClick }: CatalogHeaderProp
                     <div className="flex items-center gap-3">
                         {Object.entries(config.socialLinks).map(([k, v]) => v && <a key={k} href={v as string} target="_blank" className="text-muted-foreground hover:text-primary">{socialIcons[k]}</a>)}
                         <Button asChild size="sm">
-                            <a href={`https://wa.me/${(config.businessInfo.phone || '').replace(/\D/g, '')}`} target="_blank">
+                            <a href={`https://wa.me/${cleanHeaderPhone}`} target="_blank">
                                 <WhatsAppIcon className="mr-2 h-4 w-4" /> Contactar
                             </a>
                         </Button>

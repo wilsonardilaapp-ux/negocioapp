@@ -216,9 +216,13 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
         await couponService.incrementUsage(appliedCoupon.id);
     }
 
-    // SANITIZACIÓN CRÍTICA: Eliminar espacios y caracteres no numéricos del teléfono de destino
-    const targetPhone = (businessInfo?.phone || '').replace(/\D/g, '');
-    const whatsappUrl = `https://wa.me/${targetPhone}?text=${encodeURIComponent(orderSummary)}`;
+    // SANITIZACIÓN CRÍTICA PARA PRODUCCIÓN:
+    // 1. Convertir a String para manejar números almacenados en DB.
+    // 2. Eliminar TODOS los caracteres que no sean dígitos (\D) incluyendo espacios, +, y guiones.
+    const rawPhone = String(businessInfo?.phone || '');
+    const cleanPhone = rawPhone.replace(/\D/g, '');
+    
+    const whatsappUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(orderSummary)}`;
     
     window.open(whatsappUrl, '_blank');
     onOpenChange(false);
@@ -544,7 +548,7 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
                 )}
                 {vatRate > 0 && (
                     <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">I.V.A ({vatRate}%):</span>
+                        <span className="text-muted-foreground">I.V.A (${vatRate}%):</span>
                         <span>{formatCurrency(vatAmount)}</span>
                     </div>
                 )}
