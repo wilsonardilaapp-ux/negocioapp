@@ -1,3 +1,4 @@
+
 "use client";
 
 import Link from "next/link";
@@ -25,6 +26,7 @@ import {
   Mail,
   Bell,
   ScanLine,
+  Tag,
 } from "lucide-react";
 import { MessageCircle as MessageCircleIcon } from "@/components/icons";
 
@@ -36,6 +38,7 @@ const allNavItems = [
   { href: "/dashboard/catalogo", icon: ShoppingCart, label: "Catálogo", moduleId: 'catalogo' },
   { href: "/dashboard/share", icon: Share2, label: "Compartir Menú" },
   { href: "/dashboard/blog", icon: FileText, label: "Blog", moduleId: 'blog' },
+  { href: "/dashboard/promotions", icon: Tag, label: "Promociones" },
   { href: "/dashboard/messages", icon: Bell, label: "Notificaciones" },
   { href: "/dashboard/mensajes-clientes", icon: Mail, label: "Mensajes de Clientes" },
   { href: "/dashboard/contacto", icon: MessageSquare, label: "Soporte" },

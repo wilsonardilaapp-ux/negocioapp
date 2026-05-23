@@ -12,7 +12,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsTrigger, TabsList } from '@/components/ui/tabs';
 import { Card, CardContent } from '@/components/ui/card';
-import { ShoppingBag, Building2, HandCoins, Minus, Plus } from 'lucide-react';
+import { ShoppingBag, Building2, HandCoins, Minus, Plus, Tag } from 'lucide-react';
 import Image from 'next/image';
 import { useToast } from '@/hooks/use-toast';
 import type { PaymentSettings } from '@/models/payment-settings';
@@ -24,6 +24,8 @@ import type { CartItem } from '@/app/(public)/catalog/[businessId]/page';
 import { ScrollArea } from '../ui/scroll-area';
 import type { LandingHeaderConfigData } from '@/models/landing-page';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { promotionService } from '@/services/promotion-service';
+import type { Promotion } from '@/models/promotion';
 
 
 const purchaseSchema = z.object({
@@ -66,7 +68,16 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
   const { toast } = useToast();
   const firestore = useFirestore();
   const [tipoEntrega, setTipoEntrega] = useState<TipoEntrega>('domicilio');
+  const [activePromos, setActivePromotions] = useState<Promotion[]>([]);
   
+  useEffect(() => {
+    if (isOpen && businessId) {
+        promotionService.getActivePromotions(businessId).then(promos => {
+            setActivePromotions(promos.filter(p => p.showInCheckout));
+        });
+    }
+  }, [isOpen, businessId]);
+
   const availableMethods = Object.entries(paymentMethodsConfig)
         .map(([key, config]) => {
             const setting = paymentSettings?.[key as keyof PaymentSettings];
@@ -97,6 +108,7 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
   });
   
   const packagingTotal = cartItems.reduce((sum, item) => sum + ((item.packagingCost ?? 0) * item.quantity), 0);
+  const totalQuantity = cartItems.reduce((sum, item) => sum + item.quantity, 0);
   const subtotalProducts = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   const subtotalBeforeVat = subtotalProducts + packagingTotal;
   const vatRate = businessInfo?.vatRate ?? 0;
@@ -105,11 +117,11 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
   const costoEntrega = tipoEntrega === 'domicilio' ? deliveryFee : 0;
   const total = subtotalBeforeVat + vatAmount + costoEntrega;
 
+  const applicablePromo = activePromos.find(p => p.minQuantity !== undefined && totalQuantity >= p.minQuantity) ?? null;
+
   useEffect(() => {
-    // Reset selected tab when modal opens or available methods change
     if (isOpen) {
       setSelectedPaymentMethod(defaultTab);
-      // Reset delivery type to default when modal opens
       setTipoEntrega(deliveryFee > 0 ? 'domicilio' : 'recoger_en_tienda');
     }
   }, [isOpen, defaultTab, deliveryFee]);
@@ -161,11 +173,6 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
           title: "¡Pedido Registrado!",
           description: "Tu pedido ha sido enviado al vendedor y guardado. Serás redirigido a WhatsApp.",
       });
-    } else {
-        toast({
-            title: "Pedido listo para enviar",
-            description: "Serás redirigido a WhatsApp para completar tu pedido.",
-        });
     }
 
     const businessPhone = businessInfo?.phone || '';
@@ -194,6 +201,9 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
     }
 
     messageBody += `*TOTAL DEL PEDIDO: ${formatCurrency(total)}*\n\n`;
+    if (applicablePromo) {
+        messageBody += `*OFERTA APLICABLE:* 🎉 ${applicablePromo.title}\n\n`;
+    }
     messageBody += `*Mis Datos:*\n`;
     messageBody += `*Nombre:* ${data.fullName}\n`;
     messageBody += `*Email:* ${data.email}\n`;
@@ -257,6 +267,12 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
                                 </CardContent>
                             </ScrollArea>
                           <div className="p-4 bg-muted border-t space-y-1">
+                            {applicablePromo && (
+                              <div className="flex items-center gap-2 p-2 mb-3 rounded-md bg-green-50 border border-green-200 text-green-800 text-xs">
+                                <Tag className="h-4 w-4" />
+                                <span>🎉 {applicablePromo.title} — {applicablePromo.description}</span>
+                              </div>
+                            )}
                             <div className="flex justify-between text-sm text-muted-foreground">
                               <span>Subtotal productos:</span>
                               <span>{formatCurrency(subtotalProducts)}</span>

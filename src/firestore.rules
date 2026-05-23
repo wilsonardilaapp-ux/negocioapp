@@ -27,6 +27,33 @@ service cloud.firestore {
       return request.auth.uid == businessId || (userExists() && userData().businessId == businessId);
     }
 
+    function isOwner(businessId) {
+      return request.auth != null && (request.auth.uid == businessId || (userExists() && userData().businessId == businessId));
+    }
+
+    // Promotions Rules
+    match /promotions/{promotionId} {
+      // Lectura pública para promociones visibles en catálogo público
+      allow read: if resource.data.showInCatalog == true
+        || (request.auth != null && (
+          isSuperAdmin() ||
+          isOwner(resource.data.companyId)
+        ));
+
+      // Creación: el companyId del documento debe coincidir con el del usuario autenticado
+      allow create: if request.auth != null && (
+        isSuperAdmin() ||
+        userData().businessId == request.resource.data.companyId ||
+        request.auth.uid == request.resource.data.companyId
+      );
+
+      // Actualización y eliminación: solo el dueño del tenant o superadmin
+      allow update, delete: if request.auth != null && (
+        isSuperAdmin() ||
+        isOwner(resource.data.companyId)
+      );
+    }
+
     // This rule is necessary for resolving custom catalog slugs publicly.
     match /{path=**}/shareConfig/{docId} {
       allow read: if true;

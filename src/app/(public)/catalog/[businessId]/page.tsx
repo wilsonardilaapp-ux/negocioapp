@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useFirebase } from '@/firebase';
 import { doc, getDoc, collectionGroup, query, where, getDocs, limit } from 'firebase/firestore';
 import Image from 'next/image';
@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Badge } from '@/components/ui/badge';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
 import Autoplay from "embla-carousel-autoplay";
-import { Star, Loader2, PackageSearch, Mail, Printer, FileDown, Settings, Frown, ArrowRight, X, Image as ImageIcon } from 'lucide-react';
+import { Star, Loader2, PackageSearch, Mail, Printer, FileDown, Settings, Frown, ArrowRight, X, Image as ImageIcon, Tag } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Product } from '@/models/product';
 import type { Module } from '@/models/module';
@@ -32,6 +32,9 @@ import PublicNav from '@/components/layout/public-nav';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import type { Order, TipoEntrega } from '@/models/order';
+import { promotionService } from '@/services/promotion-service';
+import type { Promotion } from '@/models/promotion';
+import { format } from 'date-fns';
 
 const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('es-CO', {
@@ -399,6 +402,17 @@ const ActionButtons = ({ pageRef }: { pageRef: React.RefObject<HTMLDivElement> }
     );
 };
 
+function promoTypeLabel(type: Promotion['type']): string {
+  const labels: Record<Promotion['type'], string> = {
+    percentage: '% Descuento',
+    fixed: 'Valor Fijo',
+    bogo: '2x1 / BOGO',
+    free_item: 'Ítem Gratis',
+    bundle: 'Paquete',
+  };
+  return labels[type];
+}
+
 // Main Component
 export default function CatalogPage() {
     const { firestore, isNetworkEnabled } = useFirebase();
@@ -420,6 +434,7 @@ export default function CatalogPage() {
         landingPageData: null,
         catalogModule: null,
     });
+    const [activePromotions, setActivePromotions] = useState<Promotion[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
@@ -479,10 +494,11 @@ export default function CatalogPage() {
                 const paymentSettingsRef = doc(firestore, 'paymentSettings', businessId);
                 const landingPageRef = doc(firestore, `businesses/${businessId}/landingPages`, 'main');
                 
-                const [publicDataSnap, paymentSettingsSnap, landingPageSnap] = await Promise.all([
+                const [publicDataSnap, paymentSettingsSnap, landingPageSnap, promos] = await Promise.all([
                     getDoc(publicDataRef),
                     getDoc(paymentSettingsRef),
                     getDoc(landingPageRef),
+                    promotionService.getActivePromotions(businessId)
                 ]);
 
                 setPageData({
@@ -492,6 +508,7 @@ export default function CatalogPage() {
                     landingPageData: landingPageSnap.exists() ? landingPageSnap.data() as LandingPageData : null,
                     catalogModule: fetchedCatalogModule,
                 });
+                setActivePromotions(promos);
 
             } catch (e: any) {
                 console.error("Error inicializando la página del catálogo:", e);
@@ -597,6 +614,28 @@ export default function CatalogPage() {
             <CatalogHeader config={headerConfig} />
             
             <main className="container mx-auto max-w-[1400px] py-8 px-4 sm:px-6 lg:px-8 xl:px-12">
+                {activePromotions.filter(p => p.showInCatalog).length > 0 && (
+                  <section className="mb-6">
+                    <h2 className="text-lg font-bold mb-3 flex items-center gap-2">
+                      <Tag className="h-5 w-5 text-primary" /> Promociones
+                    </h2>
+                    <div className="flex gap-3 overflow-x-auto pb-2">
+                      {activePromotions.filter(p => p.showInCatalog).map(promo => (
+                        <Card key={promo.id} className="min-w-[220px] border-primary/30 bg-primary/5 flex-shrink-0">
+                          <CardContent className="p-3">
+                            <Badge className="mb-1">{promoTypeLabel(promo.type)}</Badge>
+                            <p className="font-semibold text-sm">{promo.title}</p>
+                            <p className="text-xs text-muted-foreground">{promo.description}</p>
+                            <p className="text-xs mt-1 text-primary">
+                              Válido hasta: {format(new Date(promo.validUntil), 'dd/MM/yyyy')}
+                            </p>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  </section>
+                )}
+
                 {isCatalogEmpty ? (
                     <Card className="sm:col-span-2 md:col-span-3 lg:grid-cols-4">
                         <CardContent className="h-[400px] flex flex-col items-center justify-center text-center gap-4">
