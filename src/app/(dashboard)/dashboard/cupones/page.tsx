@@ -29,6 +29,7 @@ import { PlusCircle, Edit, Trash2, Loader2, Ticket, CheckCircle, Clock, AlertCir
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import type { Coupon, CouponType, UsageLimitType } from '@/models/coupon';
+import { cn } from '@/lib/utils';
 
 const formatCurrency = (value: number) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(value);
 
