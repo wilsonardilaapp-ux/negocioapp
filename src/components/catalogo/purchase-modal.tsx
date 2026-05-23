@@ -218,9 +218,9 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
 
     // SANITIZACIÓN DEFINITIVA PARA PRODUCCIÓN:
     // 1. Forzar conversión a String para evitar errores con tipos numéricos de la DB.
-    // 2. Eliminar ABSOLUTAMENTE todos los caracteres no numéricos (espacios, +, -, etc) con \D.
+    // 2. Eliminar todos los caracteres no numéricos EXCEPTO el símbolo +, incluyendo espacios y guiones.
     const rawPhone = String(businessInfo?.phone || '');
-    const cleanPhone = rawPhone.replace(/\D/g, '');
+    const cleanPhone = rawPhone.replace(/[^\d+]/g, '');
     
     // Usar la URL de la API directa de WhatsApp para mayor compatibilidad
     const whatsappUrl = `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(orderSummary)}`;
@@ -560,8 +560,8 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
                     </div>
                 )}
                 {tipoEntrega === 'domicilio' && (businessInfo?.deliveryFee ?? 0) > 0 && (
-                    <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">Costo de domicilio:</span>
+                    <div className="flex justify-between text-sm text-primary font-bold">
+                        <span>Costo de domicilio:</span>
                         <span>{formatCurrency(businessInfo?.deliveryFee ?? 0)}</span>
                     </div>
                 )}
@@ -618,4 +618,3 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
     </Dialog>
   );
 }
-
