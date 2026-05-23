@@ -9,6 +9,7 @@ import type { Product } from '@/models/product';
 import type { BlogPost } from '@/models/blog-post';
 import type { LandingPageData } from '@/models/landing-page';
 import type { Order } from '@/models/order';
+import type { Business } from '@/models/business';
 
 // Tiempo máximo de espera antes de romper el loading infinito (ms)
 const LOADING_TIMEOUT_MS = 10_000;
@@ -25,6 +26,13 @@ export function useSubscription() {
     () => (user?.uid ? doc(firestore, `businesses/${user.uid}/subscription`, 'current') : null),
     [user?.uid, firestore]
   );
+  
+  // NEW: Business Reference to fetch extra limits
+  const businessRef = useMemoFirebase(
+    () => (user?.uid ? doc(firestore, 'businesses', user.uid) : null),
+    [user?.uid, firestore]
+  );
+
   const plansRef = useMemoFirebase(
     () => (firestore ? collection(firestore, 'plans') : null),
     [firestore]
@@ -51,6 +59,7 @@ export function useSubscription() {
 
   // Data fetching
   const { data: subscription, isLoading: isSubLoading, error: subError } = useDoc<Subscription>(subscriptionRef);
+  const { data: businessData, isLoading: isBusinessDataLoading } = useDoc<Business>(businessRef);
   const { data: allPlans, isLoading: arePlansLoading, error: plansError } = useCollection<SubscriptionPlan>(plansRef);
   const { data: products, isLoading: isProductsLoading, error: productsError } = useCollection<Product>(productsRef);
   const { data: blogPosts, isLoading: isBlogPostsLoading, error: blogPostsError } = useCollection<BlogPost>(blogPostsQuery);
@@ -63,6 +72,7 @@ export function useSubscription() {
   const rawIsLoading =
     isUserLoading ||
     isSubLoading ||
+    isBusinessDataLoading ||
     arePlansLoading ||
     isProductsLoading ||
     isBlogPostsLoading ||
@@ -89,15 +99,29 @@ export function useSubscription() {
     const planDetails = allPlans?.find(p => p.id === currentPlanId);
     const defaultLimits: PlanLimits = { products: 0, blogPosts: 0, landingPages: 0, coupons: 0, promotions: 0, orders: -1 };
 
+    // Get extra limits from business document
+    const extras = (businessData as any)?.limitesExtra || {};
+    const baseLimits = planDetails?.limits ?? defaultLimits;
+
+    // Merge logic: Base + Extra
+    const mergedLimits: PlanLimits = {
+        products: baseLimits.products === -1 ? -1 : (baseLimits.products + (extras.products || 0)),
+        blogPosts: baseLimits.blogPosts === -1 ? -1 : (baseLimits.blogPosts + (extras.blogPosts || 0)),
+        landingPages: baseLimits.landingPages === -1 ? -1 : (baseLimits.landingPages + (extras.landingPages || 0)),
+        promotions: baseLimits.promotions === -1 ? -1 : (baseLimits.promotions + (extras.promotions || 0)),
+        coupons: baseLimits.coupons === -1 ? -1 : (baseLimits.coupons + (extras.coupons || 0)),
+        orders: baseLimits.orders === -1 ? -1 : (baseLimits.orders + (extras.orders || 0)),
+    };
+
     return {
       plan: currentPlanId as 'free' | 'pro' | 'enterprise',
       isActive: subscription?.status === 'active',
-      limits: planDetails?.limits ?? defaultLimits,
+      limits: mergedLimits,
       isFree: currentPlanId === 'free',
       isPro: currentPlanId === 'pro',
       isEnterprise: currentPlanId === 'enterprise',
     };
-  }, [subscription, allPlans]);
+  }, [subscription, allPlans, businessData]);
 
   const productsCount = products?.length ?? 0;
   const blogPostsCount = blogPosts?.length ?? 0;

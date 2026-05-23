@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -275,7 +274,7 @@ export default function BusinessesPage() {
       if (isRemoving) {
         return prev.filter(id => id !== moduleId);
       } else {
-        return [...prev, id];
+        return [...prev, moduleId];
       }
     });
     
