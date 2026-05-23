@@ -5,6 +5,7 @@ export const PlanLimitsSchema = z.object({
   blogPosts: z.number({ description: "Número de posts de blog permitidos. -1 para ilimitado." }),
   landingPages: z.number({ description: "Número de landing pages permitidas. -1 para ilimitado." }),
   promotions: z.number({ description: "Número de promociones permitidas. -1 para ilimitado." }).default(0),
+  coupons: z.number({ description: "Número de cupones permitidos. -1 para ilimitado." }).default(0),
 });
 export type PlanLimits = z.infer<typeof PlanLimitsSchema>;
 
@@ -40,6 +41,7 @@ export const DefaultSubscriptionPlans: SubscriptionPlan[] = [
       blogPosts: 5,
       landingPages: 1,
       promotions: 2,
+      coupons: 2,
     }
   },
   {
@@ -61,6 +63,7 @@ export const DefaultSubscriptionPlans: SubscriptionPlan[] = [
       blogPosts: -1,
       landingPages: -1,
       promotions: -1,
+      coupons: -1,
     }
   },
   {
@@ -82,6 +85,7 @@ export const DefaultSubscriptionPlans: SubscriptionPlan[] = [
       blogPosts: -1,
       landingPages: -1,
       promotions: -1,
+      coupons: -1,
     }
   },
 ];
