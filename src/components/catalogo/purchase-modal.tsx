@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { ShoppingBag, Minus, Plus, Tag, Trash2, Loader2, Ticket, X, CheckCircle } from 'lucide-react';
+import { ShoppingBag, Minus, Plus, Tag, Trash2, Loader2, Ticket, X, CheckCircle, CreditCard, Building, Smartphone, HandCoins } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { PaymentSettings } from '@/models/payment-settings';
 import type { TipoEntrega } from '@/models/order';
@@ -25,6 +25,7 @@ import type { Promotion } from '@/models/promotion';
 import type { Coupon } from '@/models/coupon';
 import { WhatsAppIcon } from '@/components/icons';
 import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 const purchaseSchema = z.object({
   fullName: z.string().min(3, { message: 'El nombre es requerido.' }),
@@ -58,6 +59,7 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
   const firestore = useFirestore();
   const [tipoEntrega, setTipoEntrega] = useState<TipoEntrega>('domicilio');
   const [activePromos, setActivePromotions] = useState<Promotion[]>([]);
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>('');
   
   // Coupon state
   const [couponCode, setCouponCode] = useState('');
@@ -71,6 +73,17 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
         });
     }
   }, [isOpen, businessId]);
+
+  // Set default payment method when settings load
+  useEffect(() => {
+    if (paymentSettings) {
+        if (paymentSettings.nequi.enabled) setSelectedPaymentMethod('nequi');
+        else if (paymentSettings.bancolombia.enabled) setSelectedPaymentMethod('bancolombia');
+        else if (paymentSettings.daviplata.enabled) setSelectedPaymentMethod('daviplata');
+        else if (paymentSettings.breB.enabled) setSelectedPaymentMethod('breB');
+        else if (paymentSettings.pagoContraEntrega.enabled) setSelectedPaymentMethod('pagoContraEntrega');
+    }
+  }, [paymentSettings]);
 
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<z.infer<typeof purchaseSchema>>({
     resolver: zodResolver(purchaseSchema),
@@ -136,6 +149,28 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
     orderSummary += `*Teléfono:* ${data.whatsapp}\n`;
     orderSummary += `*Entrega:* ${tipoEntrega === 'domicilio' ? 'Domicilio' : 'Recoger en tienda'}\n`;
     if (data.address) orderSummary += `*Dirección:* ${data.address}\n`;
+    
+    // Add payment method info
+    let methodLabel = '';
+    let methodInfo = '';
+    if (selectedPaymentMethod === 'nequi') {
+        methodLabel = 'Nequi';
+        methodInfo = `Número: ${paymentSettings?.nequi.accountNumber}`;
+    } else if (selectedPaymentMethod === 'bancolombia') {
+        methodLabel = 'Bancolombia';
+        methodInfo = `Número: ${paymentSettings?.bancolombia.accountNumber}`;
+    } else if (selectedPaymentMethod === 'daviplata') {
+        methodLabel = 'Daviplata';
+        methodInfo = `Número: ${paymentSettings?.daviplata.accountNumber}`;
+    } else if (selectedPaymentMethod === 'breB') {
+        methodLabel = 'Bre-B';
+        methodInfo = `Llave: ${paymentSettings?.breB.keyValue}`;
+    } else if (selectedPaymentMethod === 'pagoContraEntrega') {
+        methodLabel = 'Pago contra entrega';
+    }
+    orderSummary += `*Medio de Pago:* ${methodLabel}\n`;
+    if (methodInfo) orderSummary += `*Info Pago:* ${methodInfo}\n`;
+
     orderSummary += `\n*Items:*\n`;
     
     cartItems.forEach(item => {
@@ -163,7 +198,6 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
         orderSummary += `\n\n*Nota:* ${data.message}`;
     }
 
-    // Atomic increment of coupon usage
     if (appliedCoupon) {
         await couponService.incrementUsage(appliedCoupon.id);
     }
@@ -225,9 +259,6 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
                             <span className="text-sm font-black text-primary">
                                 {formatCurrency(item.appliedPromotion?.discountedPrice ?? item.price)}
                             </span>
-                            {item.appliedPromotion?.type === '2x1' && (
-                                <Badge variant="secondary" className="text-[10px] h-4 px-1.5 bg-orange-100 text-orange-700 border-orange-200">2x1</Badge>
-                            )}
                         </div>
                     </div>
                     <div className="flex items-center gap-3">
@@ -296,23 +327,23 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
             </div>
           </div>
 
-          <form id="purchase-form" onSubmit={handleSubmit(onSubmit)} className="space-y-6 pb-6">
+          <form id="purchase-form" onSubmit={handleSubmit(onSubmit)} className="space-y-6">
             <div className="space-y-4">
                 <h4 className="font-bold text-lg">Tus Datos</h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
                         <Label>Nombre Completo *</Label>
-                        <Input {...register('fullName')} placeholder="Ej: Juan Pérez" className={cn(errors.fullName && "border-destructive")} />
+                        <Input {...register('fullName')} placeholder="Ej: Juan Pérez" />
                         {errors.fullName && <p className="text-[10px] text-destructive">{errors.fullName.message}</p>}
                     </div>
                     <div className="space-y-2">
                         <Label>WhatsApp / Teléfono *</Label>
-                        <Input {...register('whatsapp')} placeholder="Ej: 300 123 4567" className={cn(errors.whatsapp && "border-destructive")} />
+                        <Input {...register('whatsapp')} placeholder="Ej: 300 123 4567" />
                         {errors.whatsapp && <p className="text-[10px] text-destructive">{errors.whatsapp.message}</p>}
                     </div>
                     <div className="space-y-2 md:col-span-2">
                         <Label>Correo Electrónico *</Label>
-                        <Input {...register('email')} type="email" placeholder="juan@ejemplo.com" className={cn(errors.email && "border-destructive")} />
+                        <Input {...register('email')} type="email" placeholder="juan@ejemplo.com" />
                         {errors.email && <p className="text-[10px] text-destructive">{errors.email.message}</p>}
                     </div>
                 </div>
@@ -334,7 +365,6 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
                     >
                         <RadioGroupItem value="domicilio" id="domicilio" className="sr-only" />
                         <span className="text-sm font-bold">Domicilio</span>
-                        <span className="text-[10px] text-muted-foreground mt-1">Recibe en casa</span>
                     </Label>
                     <Label
                         htmlFor="tienda"
@@ -345,7 +375,6 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
                     >
                         <RadioGroupItem value="recoger_en_tienda" id="tienda" className="sr-only" />
                         <span className="text-sm font-bold">Recoger</span>
-                        <span className="text-[10px] text-muted-foreground mt-1">En el local</span>
                     </Label>
                 </RadioGroup>
 
@@ -356,12 +385,93 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
                     </div>
                 )}
             </div>
+          </form>
 
-             <div className="space-y-4">
+          {/* PAYMENT METHODS SECTION - RESTORED */}
+          <div className="space-y-4">
+                <h4 className="font-bold text-lg flex items-center gap-2">
+                    <CreditCard className="h-5 w-5" /> Medio de Pago
+                </h4>
+                <Tabs value={selectedPaymentMethod} onValueChange={setSelectedPaymentMethod} className="w-full">
+                    <TabsList className="grid grid-cols-2 sm:grid-cols-5 h-auto p-1 gap-1">
+                        {paymentSettings?.nequi.enabled && (
+                            <TabsTrigger value="nequi" className="flex flex-col gap-1 py-2">
+                                <Smartphone className="h-4 w-4" />
+                                <span className="text-[10px]">Nequi</span>
+                            </TabsTrigger>
+                        )}
+                        {paymentSettings?.bancolombia.enabled && (
+                            <TabsTrigger value="bancolombia" className="flex flex-col gap-1 py-2">
+                                <Building className="h-4 w-4" />
+                                <span className="text-[10px]">Bancolombia</span>
+                            </TabsTrigger>
+                        )}
+                         {paymentSettings?.daviplata.enabled && (
+                            <TabsTrigger value="daviplata" className="flex flex-col gap-1 py-2">
+                                <Smartphone className="h-4 w-4" />
+                                <span className="text-[10px]">Daviplata</span>
+                            </TabsTrigger>
+                        )}
+                        {paymentSettings?.breB.enabled && (
+                            <TabsTrigger value="breB" className="flex flex-col gap-1 py-2">
+                                <Building className="h-4 w-4" />
+                                <span className="text-[10px]">Bre-B</span>
+                            </TabsTrigger>
+                        )}
+                        {paymentSettings?.pagoContraEntrega.enabled && (
+                            <TabsTrigger value="pagoContraEntrega" className="flex flex-col gap-1 py-2">
+                                <HandCoins className="h-4 w-4" />
+                                <span className="text-[10px]">Efectivo</span>
+                            </TabsTrigger>
+                        )}
+                    </TabsList>
+                    
+                    <div className="mt-4 p-4 bg-muted/50 rounded-xl border">
+                        {selectedPaymentMethod === 'nequi' && (
+                            <div className="text-center space-y-2">
+                                <p className="font-bold text-sm">Transfiere a Nequi</p>
+                                <p className="text-lg font-black text-primary">{paymentSettings?.nequi.accountNumber}</p>
+                                <p className="text-xs text-muted-foreground">A nombre de: {paymentSettings?.nequi.holderName}</p>
+                            </div>
+                        )}
+                        {selectedPaymentMethod === 'bancolombia' && (
+                            <div className="text-center space-y-2">
+                                <p className="font-bold text-sm">Transfiere a Bancolombia</p>
+                                <p className="text-lg font-black text-primary">{paymentSettings?.bancolombia.accountNumber}</p>
+                                <p className="text-xs text-muted-foreground">A nombre de: {paymentSettings?.bancolombia.holderName}</p>
+                            </div>
+                        )}
+                        {selectedPaymentMethod === 'daviplata' && (
+                            <div className="text-center space-y-2">
+                                <p className="font-bold text-sm">Transfiere a Daviplata</p>
+                                <p className="text-lg font-black text-primary">{paymentSettings?.daviplata.accountNumber}</p>
+                                <p className="text-xs text-muted-foreground">A nombre de: {paymentSettings?.daviplata.holderName}</p>
+                            </div>
+                        )}
+                        {selectedPaymentMethod === 'breB' && (
+                            <div className="text-center space-y-2">
+                                <p className="font-bold text-sm">Transfiere por Bre-B</p>
+                                <p className="text-xs">Llave ({paymentSettings?.breB.keyType}):</p>
+                                <p className="text-lg font-black text-primary">{paymentSettings?.breB.keyValue}</p>
+                            </div>
+                        )}
+                        {selectedPaymentMethod === 'pagoContraEntrega' && (
+                            <div className="text-center space-y-2">
+                                <p className="font-bold text-sm">Pago en efectivo al recibir</p>
+                                <p className="text-xs text-muted-foreground">Prepara el monto exacto para agilizar la entrega.</p>
+                            </div>
+                        )}
+                        {!selectedPaymentMethod && (
+                            <p className="text-center text-sm text-muted-foreground">Selecciona un medio de pago para ver los detalles.</p>
+                        )}
+                    </div>
+                </Tabs>
+          </div>
+
+          <div className="space-y-4 pb-6">
                 <h4 className="font-bold text-lg">Nota Adicional</h4>
                 <Textarea {...register('message')} placeholder="Instrucciones especiales para tu pedido..." />
-            </div>
-          </form>
+          </div>
         </div>
 
         <div className="p-6 border-t bg-muted/20">
@@ -404,7 +514,7 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
                 type="submit" 
                 form="purchase-form"
                 className="w-full h-14 bg-primary text-white text-lg font-bold shadow-lg shadow-primary/20 rounded-xl flex items-center justify-center gap-2 hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" 
-                disabled={isSubmitting}
+                disabled={isSubmitting || !selectedPaymentMethod}
             >
                 {isSubmitting ? (
                     <Loader2 className="mr-2 h-5 w-5 animate-spin" />
