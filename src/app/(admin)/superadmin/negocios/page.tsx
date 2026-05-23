@@ -4,7 +4,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useUser, useFirestore, useCollection, useMemoFirebase, setDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase';
-import { collection, doc, writeBatch, getDocs } from 'firebase/firestore';
+import { collection, doc, writeBatch, getDocs, getDoc } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -127,8 +127,17 @@ export default function BusinessesPage() {
   };
 
   const openManageBusiness = async (business: Business) => {
+    // 0. Fetch the actual subscription from subcollection (Source of Truth)
+    const subSnap = await getDoc(doc(firestore, `businesses/${business.id}/subscription`, 'current'));
+    const subData = subSnap.exists() ? subSnap.data() as any : null;
+    const actualPlanId = subData?.plan || 'free';
+
+    // Find the current plan details in the global plans collection
+    const currentPlan = plans?.find(p => p.id === actualPlanId);
+
     setSelectedBusiness({ 
       ...business, 
+      planName: currentPlan?.name || business.planName || 'Free', // Sync displayed plan name
       imageLimit: business.imageLimit ?? undefined,
       productLimit: business.productLimit ?? undefined 
     });
@@ -152,45 +161,32 @@ export default function BusinessesPage() {
     const servicesSnapshot = await getDocs(collection(firestore, `businesses/${business.id}/services`));
     setAssignedServices(servicesSnapshot.docs.filter(doc => doc.data().status === 'active').map(doc => doc.id));
 
-    // 2. Load Plan Limits and Hierarchy - IMPROVED LOOKUP logic from useSubscription
-    if (plans && plans.length > 0) {
-      const bPlanName = (business.planName || '').toUpperCase();
+    // 2. Load Plan Limits and Hierarchy
+    if (currentPlan) {
+      setCurrentPlanLimits(currentPlan.limits);
       
-      // Try to find the plan by Name or ID (insensitively)
-      const currentPlan = plans.find(p => 
-        p.name.toUpperCase() === bPlanName || 
-        p.id.toUpperCase() === bPlanName ||
-        p.name.toUpperCase().includes(bPlanName)
-      );
-
-      if (currentPlan) {
-        setCurrentPlanLimits(currentPlan.limits);
+      // Hierarchical order
+      const tiers = ['FREE', 'BASIC', 'PRO', 'ENTERPRISE'];
+      // Normalize ID to check tier
+      const currentTierId = currentPlan.id.toUpperCase();
+      const tierIndex = tiers.findIndex(t => currentTierId.includes(t));
+      
+      if (tierIndex !== -1 && tierIndex < tiers.length - 1) {
+        const nextTierId = tiers[tierIndex + 1];
+        const nextPlan = plans?.find(p => p.id.toUpperCase().includes(nextTierId));
         
-        // Hierarchical order
-        const tiers = ['FREE', 'BASIC', 'PRO', 'ENTERPRISE'];
-        // Try to normalize the ID to one of the tiers
-        const currentTierId = currentPlan.id.toUpperCase();
-        const tierIndex = tiers.findIndex(t => currentTierId.includes(t));
-        
-        if (tierIndex !== -1 && tierIndex < tiers.length - 1) {
-          const nextTierId = tiers[tierIndex + 1];
-          // Find next plan that matches the next tier
-          const nextPlan = plans.find(p => p.id.toUpperCase().includes(nextTierId));
-          
-          if (nextPlan) {
-            setNextPlanLimits(nextPlan.limits);
-            setNextPlanName(nextPlan.name);
-          } else {
-            setNextPlanLimits(null);
-          }
+        if (nextPlan) {
+          setNextPlanLimits(nextPlan.limits);
+          setNextPlanName(nextPlan.name);
         } else {
           setNextPlanLimits(null);
         }
       } else {
-        // Fallback if plan not found in collection
-        setCurrentPlanLimits({});
         setNextPlanLimits(null);
       }
+    } else {
+      setCurrentPlanLimits({});
+      setNextPlanLimits(null);
     }
 
     // 3. Load existing LimitesExtra from Business document
@@ -279,7 +275,7 @@ export default function BusinessesPage() {
       if (isRemoving) {
         return prev.filter(id => id !== moduleId);
       } else {
-        return [...prev, moduleId];
+        return [...prev, id];
       }
     });
     
@@ -453,7 +449,7 @@ export default function BusinessesPage() {
               <div className="grid grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg">
                 <div><p className="text-sm text-gray-500">Propietario</p><p className="font-medium">{selectedBusiness.ownerName}</p></div>
                 <div><p className="text-sm text-gray-500">Email</p><p className="font-medium">{selectedBusiness.ownerEmail}</p></div>
-                <div><p className="text-sm text-gray-500">Plan Actual</p><p className="font-medium">{selectedBusiness.planName}</p></div>
+                <div><p className="text-sm text-gray-500">Plan Actual (Sincronizado)</p><p className="font-medium">{selectedBusiness.planName}</p></div>
                 <div><p className="text-sm text-gray-500">Estado</p><StatusBadge status={selectedBusiness.status} /></div>
               </div>
 
@@ -509,7 +505,6 @@ export default function BusinessesPage() {
                 </div>
               </div>
 
-              {/* NEW SECTION: Límites Extra del Plan */}
               <div className="border-t pt-6">
                 <h4 className="font-bold flex items-center gap-2 mb-4 text-lg">
                   <TrendingUp className="w-5 h-5 text-primary" />
