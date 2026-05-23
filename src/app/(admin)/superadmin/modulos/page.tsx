@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useTransition } from 'react';
@@ -57,6 +58,7 @@ const moduleSchema = z.object({
 const DEFAULT_MODULES: { name: string; description: string; limit: number; }[] = [
     { name: 'Catálogo', description: 'Módulo para gestionar el catálogo de productos.', limit: 50 },
     { name: 'Blog', description: 'Módulo para gestionar el blog', limit: 10 },
+    { name: 'Promociones', description: 'Módulo para gestionar ofertas y descuentos.', limit: -1 },
     { name: 'Chatbot Integrado con WhatsApp', description: 'Asistente IA para WhatsApp y Web', limit: -1 },
     { name: 'Motor de Sugerencias Inteligentes', description: 'Motor para sugerir productos', limit: -1 },
     { name: 'Google Analytics', description: 'Integración con Google Analytics', limit: -1 },

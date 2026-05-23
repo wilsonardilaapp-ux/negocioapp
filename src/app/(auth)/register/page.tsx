@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useRouter, useSearchParams } from "next/navigation";
@@ -270,6 +271,7 @@ export default function RegisterPage() {
       const defaultModulesForNewUser: { id: string, name: string, description: string }[] = [
         { id: 'catalogo', name: 'Catálogo', description: 'Módulo para gestionar el catálogo de productos.' },
         { id: 'blog', name: 'Blog', description: 'Módulo para gestionar el blog.' },
+        { id: 'promotions', name: 'Promociones', description: 'Módulo para gestionar ofertas y descuentos.' },
       ];
       
       defaultModulesForNewUser.forEach(mod => {
@@ -288,6 +290,7 @@ export default function RegisterPage() {
         const defaultModules: Omit<Module, 'id'>[] = [
           { name: 'Catálogo', description: 'Módulo para gestionar el catálogo de productos.', status: 'inactive', createdAt: new Date().toISOString() },
           { name: 'Blog', description: 'Módulo para gestionar el blog', status: 'inactive', createdAt: new Date().toISOString() },
+          { name: 'Promociones', description: 'Módulo para gestionar ofertas y descuentos.', status: 'inactive', createdAt: new Date().toISOString() },
           { name: 'Chatbot Integrado con WhatsApp', description: 'Asistente IA para WhatsApp y Web', status: 'inactive', createdAt: new Date().toISOString() },
           { name: 'WHAPI (WhatsApp)', description: 'Integración con WHAPI para enviar mensajes de WhatsApp.', status: 'inactive', createdAt: new Date().toISOString() },
           { name: 'Motor de Sugerencias Inteligentes', description: 'Motor para sugerir productos', status: 'inactive', createdAt: new Date().toISOString() },
@@ -301,6 +304,8 @@ export default function RegisterPage() {
                 modId = 'catalogo';
             } else if (mod.name.includes('Blog')) {
               modId = 'blog';
+            } else if (mod.name.includes('Promociones')) {
+              modId = 'promotions';
             } else if (mod.name.includes('Chatbot')) {
               modId = 'chatbot-integrado-con-whatsapp-para-soporte-y-ventas';
             } else if (mod.name.includes('Sugerencias')) {
