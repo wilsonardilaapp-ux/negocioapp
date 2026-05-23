@@ -24,10 +24,10 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { Check, Plus, Search, Building2, Eye, Puzzle, Tag, AlertCircle } from 'lucide-react';
+import { Check, Plus, Search, Building2, Eye, Puzzle, Tag, AlertCircle, TrendingUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Label } from '@/components/ui/label';
-import { validateModuleExtra } from '@/utils/validateModuleExtra';
+import { validateModuleExtra, validateLimitesExtra } from '@/utils/validateModuleExtra';
 
 // Import models
 import type { Business, EntityStatus } from '@/models/business';
@@ -73,9 +73,24 @@ export default function BusinessesPage() {
   const [showBusinessModal, setShowBusinessModal] = useState(false);
   const [showManageModal, setShowManageModal] = useState(false);
   const [selectedBusiness, setSelectedBusiness] = useState<Business | null>(null);
+  
+  // Modules State
   const [assignedModules, setAssignedModules] = useState<string[]>([]);
   const [moduleExtras, setModuleExtras] = useState<Record<string, number>>({});
   const [assignedServices, setAssignedServices] = useState<string[]>([]);
+
+  // NEW: Limits Extra State
+  const [limitesExtra, setLimitesExtra] = useState<Record<string, number>>({
+    products: 0,
+    blogPosts: 0,
+    landingPages: 0,
+    promotions: 0,
+    coupons: 0,
+    orders: 0,
+  });
+  const [currentPlanLimits, setCurrentPlanLimits] = useState<Record<string, number>>({});
+  const [nextPlanLimits, setNextPlanLimits] = useState<Record<string, number> | null>(null);
+  const [nextPlanName, setNextPlanName] = useState<string>('');
   
   const initialFormState = {
     name: '', ownerName: '', ownerEmail: '', phone: '', address: '', planId: '', status: 'active' as EntityStatus
@@ -118,7 +133,7 @@ export default function BusinessesPage() {
       productLimit: business.productLimit ?? undefined 
     });
     
-    // Load assigned modules and services
+    // 1. Load assigned modules and services
     const modulesSnapshot = await getDocs(collection(firestore, `businesses/${business.id}/modules`));
     const activeModuleIds: string[] = [];
     const extras: Record<string, number> = {};
@@ -136,6 +151,46 @@ export default function BusinessesPage() {
 
     const servicesSnapshot = await getDocs(collection(firestore, `businesses/${business.id}/services`));
     setAssignedServices(servicesSnapshot.docs.filter(doc => doc.data().status === 'active').map(doc => doc.id));
+
+    // 2. NEW: Load Plan Limits and Hierarchy
+    const currentPlan = plans?.find(p => p.name === business.planName);
+    if (currentPlan) {
+      setCurrentPlanLimits(currentPlan.limits);
+      
+      // Hierarchical order
+      const tiers = ['FREE', 'BASIC', 'PRO', 'ENTERPRISE'];
+      const currentTier = currentPlan.id.toUpperCase();
+      const nextTierId = tiers[tiers.indexOf(currentTier) + 1];
+      
+      if (nextTierId) {
+        const nextPlan = plans?.find(p => p.id.toUpperCase() === nextTierId);
+        if (nextPlan) {
+          setNextPlanLimits(nextPlan.limits);
+          setNextPlanName(nextPlan.name);
+        } else {
+          setNextPlanLimits(null);
+        }
+      } else {
+        setNextPlanLimits(null);
+      }
+    }
+
+    // 3. NEW: Load existing LimitesExtra from Business document
+    // We assume the business object might already have it or we fetch it fresh if needed
+    // In our case, it's safer to use the 'business' object passed or fetch it from firestore
+    const businessDoc = businesses?.find(b => b.id === business.id) as any;
+    if (businessDoc?.limitesExtra) {
+      setLimitesExtra({
+        products: businessDoc.limitesExtra.products || 0,
+        blogPosts: businessDoc.limitesExtra.blogPosts || 0,
+        landingPages: businessDoc.limitesExtra.landingPages || 0,
+        promotions: businessDoc.limitesExtra.promotions || 0,
+        coupons: businessDoc.limitesExtra.coupons || 0,
+        orders: businessDoc.limitesExtra.orders || 0,
+      });
+    } else {
+      setLimitesExtra({ products: 0, blogPosts: 0, landingPages: 0, promotions: 0, coupons: 0, orders: 0 });
+    }
     
     setShowManageModal(true);
   };
@@ -143,7 +198,7 @@ export default function BusinessesPage() {
   const handleSaveManageBusiness = async () => {
     if (!selectedBusiness) return;
     
-    // Validate module extras
+    // 1. Validate module extras (Original logic)
     for (const moduleId of assignedModules) {
       const extra = moduleExtras[moduleId] || 0;
       const validation = validateModuleExtra(selectedBusiness.planName, extra);
@@ -152,19 +207,34 @@ export default function BusinessesPage() {
         return;
       }
     }
+
+    // 2. NEW: Validate Plan Limits Extra
+    const validation = validateLimitesExtra(
+      nextPlanName || 'Superior',
+      currentPlanLimits,
+      nextPlanLimits,
+      limitesExtra
+    );
+
+    if (!validation.valid) {
+      const errorMsg = Object.values(validation.errors).join('\n');
+      alert(`Error en Límites Extra:\n${errorMsg}`);
+      return;
+    }
     
     // Prepare business document update
-    const businessUpdateData: Partial<Business> = {
+    const businessUpdateData: any = {
       status: selectedBusiness.status,
       imageLimit: selectedBusiness.imageLimit && Number(selectedBusiness.imageLimit) > 0 
         ? Number(selectedBusiness.imageLimit) 
         : null,
       productLimit: selectedBusiness.productLimit && Number(selectedBusiness.productLimit) > 0 
         ? Number(selectedBusiness.productLimit) 
-        : null
+        : null,
+      limitesExtra: limitesExtra // Save new limits extra
     };
 
-    // Update business status and imageLimit
+    // Update business document
     await updateDocumentNonBlocking(doc(firestore, `businesses/${selectedBusiness.id}`), businessUpdateData);
     
     // Deactivate all first, then activate selected in a batch
@@ -213,6 +283,11 @@ export default function BusinessesPage() {
     setModuleExtras(prev => ({ ...prev, [moduleId]: numericValue }));
   };
 
+  const handleLimiteExtraChange = (key: string, value: string) => {
+    const numericValue = Math.max(0, parseInt(value, 10) || 0);
+    setLimitesExtra(prev => ({ ...prev, [key]: numericValue }));
+  };
+
   const toggleServiceAssignment = (serviceId: string) => {
     setAssignedServices(prev => prev.includes(serviceId) ? prev.filter(id => id !== serviceId) : [...prev, serviceId]);
   };
@@ -220,6 +295,15 @@ export default function BusinessesPage() {
   const handleImpersonate = (business: Business) => {
     router.push(`/landing/${business.id}`);
   };
+
+  const limiteFields = [
+    { key: 'products', label: 'Productos' },
+    { key: 'blogPosts', label: 'Posts Blog' },
+    { key: 'landingPages', label: 'Landing Pages' },
+    { key: 'promotions', label: 'Promociones' },
+    { key: 'coupons', label: 'Cupones' },
+    { key: 'orders', label: 'Pedidos/mes' },
+  ];
 
   return (
     <div className="space-y-6">
@@ -356,38 +440,6 @@ export default function BusinessesPage() {
                 <div><p className="text-sm text-gray-500">Plan Actual</p><p className="font-medium">{selectedBusiness.planName}</p></div>
                 <div><p className="text-sm text-gray-500">Estado</p><StatusBadge status={selectedBusiness.status} /></div>
               </div>
-              
-              <div>
-                <h4 className="font-medium mb-3">Límites Personalizados</h4>
-                <div className="space-y-4 rounded-lg border p-4">
-                  <div>
-                    <Label htmlFor="productLimit">Límite de Productos</Label>
-                    <Input
-                      id="productLimit"
-                      type="number"
-                      placeholder="Vacío para usar límite del plan"
-                      value={selectedBusiness.productLimit ?? ''}
-                      onChange={e => setSelectedBusiness(prev => prev ? { ...prev, productLimit: e.target.value === '' ? undefined : Number(e.target.value) } : null)}
-                    />
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Anula el límite de productos del plan solo para este cliente. Dejar vacío para usar el límite del plan. -1 para ilimitado.
-                    </p>
-                  </div>
-                  <div>
-                    <Label htmlFor="imageLimit">Límite de Imágenes por Producto</Label>
-                    <Input
-                      id="imageLimit"
-                      type="number"
-                      placeholder="Vacío para usar límite global"
-                      value={selectedBusiness.imageLimit ?? ''}
-                      onChange={e => setSelectedBusiness(prev => prev ? { ...prev, imageLimit: e.target.value === '' ? undefined : Number(e.target.value) } : null)}
-                    />
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Anula el límite global de imágenes por producto solo para este cliente. Dejar vacío para usar el límite por defecto.
-                    </p>
-                  </div>
-                </div>
-              </div>
 
               <div>
                 <h4 className="font-medium mb-3">Módulos Asignados</h4>
@@ -440,9 +492,68 @@ export default function BusinessesPage() {
                   })}
                 </div>
               </div>
+
+              {/* NEW SECTION: Límites Extra del Plan */}
+              <div className="border-t pt-6">
+                <h4 className="font-bold flex items-center gap-2 mb-4 text-lg">
+                  <TrendingUp className="w-5 h-5 text-primary" />
+                  Límites Extra del Plan
+                </h4>
+                <p className="text-xs text-muted-foreground mb-4">
+                  Define recursos adicionales que anulan los límites base del plan contratado.
+                </p>
+                <div className="space-y-4">
+                  {limiteFields.map((field) => {
+                    const base = currentPlanLimits[field.key] || 0;
+                    const extra = limitesExtra[field.key] || 0;
+                    const total = base + extra;
+                    const nextLimit = nextPlanLimits?.[field.key];
+                    const isOverLimit = nextLimit !== undefined && nextLimit !== -1 && total >= nextLimit;
+
+                    return (
+                      <div key={field.key} className="grid grid-cols-1 sm:grid-cols-4 items-end gap-3 p-3 border rounded-lg bg-white shadow-sm">
+                        <div className="sm:col-span-1">
+                          <Label className="text-sm font-bold">{field.label}</Label>
+                        </div>
+                        <div>
+                          <Label className="text-[10px] uppercase text-muted-foreground">Base</Label>
+                          <div className="h-9 flex items-center px-3 bg-muted rounded-md font-medium text-sm">
+                            {base === -1 ? '∞' : base}
+                          </div>
+                        </div>
+                        <div>
+                          <Label className="text-[10px] uppercase text-muted-foreground">Extra</Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            className={cn("h-9", isOverLimit && "border-destructive ring-destructive")}
+                            value={limitesExtra[field.key] || 0}
+                            onChange={(e) => handleLimiteExtraChange(field.key, e.target.value)}
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-[10px] uppercase text-muted-foreground">Total Real</Label>
+                          <div className={cn(
+                            "h-9 flex items-center px-3 rounded-md font-bold text-sm",
+                            isOverLimit ? "bg-destructive/10 text-destructive" : "bg-primary/10 text-primary"
+                          )}>
+                            {total}
+                          </div>
+                        </div>
+                        {isOverLimit && (
+                          <div className="sm:col-span-4 flex items-center gap-1.5 text-[10px] text-destructive font-bold uppercase mt-1">
+                            <AlertCircle className="w-3 h-3" />
+                            {field.label}: el total ({total}) no puede igualar ni superar el límite de {nextPlanName} ({nextLimit})
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
               <div>
                 <h4 className="font-medium mb-3">Servicios Adicionales</h4>
-                 <p className="text-xs text-muted-foreground mb-2">Activa servicios que no forman parte de un módulo, como límites especiales o accesos a APIs.</p>
                 <div className="grid grid-cols-2 gap-2">
                   {(services || []).map(serviceItem => (
                     <div key={serviceItem.id} className={cn('flex items-center justify-between p-3 border rounded-lg cursor-pointer transition-colors', assignedServices.includes(serviceItem.id) ? 'border-primary bg-primary/5' : 'hover:bg-gray-50')} onClick={() => toggleServiceAssignment(serviceItem.id)}>
@@ -451,7 +562,6 @@ export default function BusinessesPage() {
                     </div>
                   ))}
                 </div>
-                {services?.length === 0 && <p className="text-sm text-gray-500 text-center py-4">No hay servicios disponibles</p>}
               </div>
               <div>
                 <h4 className="font-medium mb-3">Cambiar Estado</h4>
