@@ -159,6 +159,7 @@ export default function SharePage() {
   const [copied, setCopied] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const qrCodeRef = useRef<HTMLDivElement>(null);
+  const hasInitialized = useRef(false);
 
   const shareConfigRef = useMemoFirebase(() => 
     user ? doc(firestore, `businesses/${user.uid}/shareConfig`, 'main') : null,
@@ -167,7 +168,10 @@ export default function SharePage() {
   
   const { data: savedShareConfig, isLoading } = useDoc<MenuShare>(shareConfigRef);
   
+  // Initialize state from server only once to avoid race conditions
   useEffect(() => {
+    if (isLoading || !user || hasInitialized.current) return;
+
     if (savedShareConfig) {
         const mergedConfig = {
             ...defaultShareConfig,
@@ -178,7 +182,8 @@ export default function SharePage() {
             },
         };
         setShareConfig(mergedConfig);
-    } else if (user && !isLoading) {
+        hasInitialized.current = true;
+    } else {
       // Create a default config if one doesn't exist
       const newConfig: MenuShare = {
         id: 'main',
@@ -192,23 +197,24 @@ export default function SharePage() {
       if (shareConfigRef) {
         setDocumentNonBlocking(shareConfigRef, newConfig);
       }
+      hasInitialized.current = true;
     }
   }, [savedShareConfig, isLoading, user, shareConfigRef]);
 
-  const handleConfigSave = (newConfig: Partial<MenuShare>) => {
-    if (!shareConfig || !shareConfigRef) return;
-    const updatedConfig = { ...shareConfig, ...newConfig, updatedAt: new Date().toISOString() };
-    setShareConfig(updatedConfig);
-    setDocumentNonBlocking(shareConfigRef, updatedConfig, { merge: true });
-    // Keep internal toast for immediate feedback
-    toast({ title: 'Cambio registrado' });
+  const handleLocalChange = (newConfig: Partial<MenuShare>) => {
+    if (!shareConfig) return;
+    setShareConfig(prev => prev ? { ...prev, ...newConfig } : null);
   };
   
   const handleManualSave = async () => {
     if (!shareConfig || !shareConfigRef) return;
     setIsSaving(true);
     try {
-      await setDocumentNonBlocking(shareConfigRef, shareConfig, { merge: true });
+      const dataToSave = { 
+        ...shareConfig, 
+        updatedAt: new Date().toISOString() 
+      };
+      await setDocumentNonBlocking(shareConfigRef, dataToSave, { merge: true });
       toast({
         title: '¡Éxito!',
         description: 'La configuración de compartir se ha guardado correctamente.',
@@ -225,12 +231,7 @@ export default function SharePage() {
   };
 
   const handleQRConfigChange = (newQRConfig: QRConfig) => {
-    if (!shareConfig) return;
-    const updatedConfig = { ...shareConfig, qrConfig: newQRConfig, updatedAt: new Date().toISOString() };
-    setShareConfig(updatedConfig);
-    if(shareConfigRef) {
-        setDocumentNonBlocking(shareConfigRef, { qrConfig: newQRConfig, updatedAt: new Date().toISOString() }, { merge: true });
-    }
+    handleLocalChange({ qrConfig: newQRConfig });
   };
 
   const getCatalogUrl = () => {
@@ -275,7 +276,8 @@ export default function SharePage() {
             const mediaDataUri = reader.result as string;
             try {
                 const result = await uploadMedia({ mediaDataUri });
-                handleConfigSave({ socialPreviewImageUrl: result.secure_url });
+                handleLocalChange({ socialPreviewImageUrl: result.secure_url });
+                toast({ title: "Imagen subida localmente", description: "Presiona Guardar para aplicar permanentemente." });
             } catch (error: any) {
                 toast({ variant: 'destructive', title: "Error al subir", description: error.message });
             }
@@ -305,10 +307,12 @@ export default function SharePage() {
     window.open(url, '_blank');
   };
 
-  if (isLoading || !shareConfig) {
+  if (isLoading && !shareConfig) {
     return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin" /></div>;
   }
   
+  if (!shareConfig) return null;
+
   const { qrConfig } = shareConfig;
 
   return (
@@ -339,10 +343,10 @@ export default function SharePage() {
                 </div>
                 <Switch
                     id="custom-slug-switch"
-                    checked={shareConfig.useCustomSlug}
+                    checked={shareConfig.useCustomSlug || false}
                     onCheckedChange={(checked) => {
                         const newSlug = checked ? (shareConfig.slug === user?.uid ? '' : shareConfig.slug) : user?.uid;
-                        handleConfigSave({ useCustomSlug: checked, slug: newSlug || user?.uid });
+                        handleLocalChange({ useCustomSlug: checked, slug: newSlug || user?.uid });
                     }}
                 />
             </div>
@@ -356,7 +360,7 @@ export default function SharePage() {
                             className="rounded-l-none rounded-r-none"
                             value={shareConfig.slug === user?.uid ? '' : shareConfig.slug}
                             placeholder="tu-negocio"
-                            onChange={(e) => handleConfigSave({ slug: e.target.value })}
+                            onChange={(e) => handleLocalChange({ slug: e.target.value })}
                         />
                          <Button variant="outline" size="icon" className="rounded-l-none border-l-0" onClick={handleCopyLink}>
                             {copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
@@ -378,7 +382,7 @@ export default function SharePage() {
               <SocialPreviewImageUploader
                   imageUrl={shareConfig.socialPreviewImageUrl}
                   onUpload={handleSocialImageUpload}
-                  onRemove={() => handleConfigSave({ socialPreviewImageUrl: null })}
+                  onRemove={() => handleLocalChange({ socialPreviewImageUrl: null })}
               />
             </div>
             <div>
@@ -386,8 +390,8 @@ export default function SharePage() {
                 <Textarea
                     id="social-message"
                     placeholder="¡Hola! Te invito a ver nuestro menú digital ✨"
-                    value={shareConfig.socialShareMessage}
-                    onChange={(e) => handleConfigSave({ socialShareMessage: e.target.value })}
+                    value={shareConfig.socialShareMessage || ''}
+                    onChange={(e) => handleLocalChange({ socialShareMessage: e.target.value })}
                 />
                 <p className="text-xs text-muted-foreground mt-1">Este mensaje se incluirá al compartir por WhatsApp.</p>
             </div>
@@ -402,7 +406,7 @@ export default function SharePage() {
             <Tabs defaultValue="qr">
                 <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="qr"><QrCode className="w-4 h-4 mr-2" />Código QR</TabsTrigger>
-                <TabsTrigger value="link"><Link2 className="w-4 h-4 mr-2" />Enlace</TabsTrigger>
+                <TabsTrigger value="link"><Link2 className="h-4 w-4 mr-2" />Enlace</TabsTrigger>
                 <TabsTrigger value="social"><Share2 className="w-4 h-4 mr-2" />Redes Sociales</TabsTrigger>
                 </TabsList>
                 <TabsContent value="qr" className="mt-4">
