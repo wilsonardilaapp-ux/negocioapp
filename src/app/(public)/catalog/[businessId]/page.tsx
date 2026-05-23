@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Badge } from '@/components/ui/badge';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
 import Autoplay from "embla-carousel-autoplay";
-import { Star, Loader2, PackageSearch, Mail, Printer, FileDown, Settings, Frown, ArrowRight, X, Image as ImageIcon, Tag } from 'lucide-react';
+import { Star, Loader2, PackageSearch, Mail, Printer, FileDown, Settings, Frown, ArrowRight, X, Image as ImageIcon, Tag, ShoppingCart } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Product } from '@/models/product';
 import type { Module } from '@/models/module';
@@ -450,7 +450,11 @@ export default function CatalogPage() {
     return (
         <div id="catalog-page-root" ref={pageRef} className="bg-muted/40">
             <PublicNav navigation={pageData.landingPageData?.navigation} businessId={pageData.resolvedBusinessId ?? undefined} />
-            <CatalogHeader config={headerConfig} />
+            <CatalogHeader 
+                config={headerConfig} 
+                cartItemCount={cart.reduce((acc, item) => acc + item.quantity, 0)}
+                onCartClick={() => setIsPurchaseModalOpen(true)}
+            />
             <main className="container mx-auto max-w-[1400px] py-8 px-4 sm:px-6 lg:px-8 xl:px-12">
                 {activePromotions.filter(p => p.showInCatalog).length > 0 && (
                   <section className="mb-8">
@@ -501,13 +505,46 @@ export default function CatalogPage() {
     );
 }
 
-const CatalogHeader = ({ config }: { config: LandingHeaderConfigData | null }) => {
+interface CatalogHeaderProps {
+  config: LandingHeaderConfigData | null;
+  cartItemCount: number;
+  onCartClick: () => void;
+}
+
+const CatalogHeader = ({ config, cartItemCount, onCartClick }: CatalogHeaderProps) => {
     if (!config) return <div className="bg-card shadow-md p-4 text-center"><h1 className="text-2xl font-bold">Catálogo de Productos</h1></div>;
     const socialIcons: any = { tiktok: <TikTokIcon />, instagram: <InstagramIcon />, facebook: <FacebookIcon />, whatsapp: <WhatsAppIcon />, twitter: <XIcon />, };
     return (
         <div className="w-full">
             {config.banner.mediaUrl && <div className="relative w-full h-[200px] sm:h-[280px] lg:h-[360px] xl:h-[420px]">{config.banner.mediaType === 'image' ? <Image src={config.banner.mediaUrl} alt="Banner" fill sizes="100vw" className="object-cover"/> : <video src={config.banner.mediaUrl} autoPlay loop muted controls className="w-full h-full object-cover" />}</div>}
-            <div className="bg-card shadow-md p-4"><div className="container mx-auto flex flex-col md:flex-row justify-between items-center gap-4"><div className="text-center md:text-left"><h1 className="text-xl md:text-3xl font-bold">{config.businessInfo.name}</h1><p className="text-sm text-muted-foreground">{config.businessInfo.address}</p></div><div className="flex items-center gap-3">{Object.entries(config.socialLinks).map(([k, v]) => v && <a key={k} href={v as string} target="_blank" className="text-muted-foreground hover:text-primary">{socialIcons[k]}</a>)}<Button asChild size="sm"><a href={`https://wa.me/${config.businessInfo.phone.replace(/\D/g, '')}`} target="_blank"><WhatsAppIcon className="mr-2 h-4 w-4" /> Contactar</a></Button></div></div></div>
+            <div className="bg-card shadow-md p-4">
+                <div className="container mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
+                    <div className="text-center md:text-left">
+                        <h1 className="text-xl md:text-3xl font-bold">{config.businessInfo.name}</h1>
+                        <p className="text-sm text-muted-foreground">{config.businessInfo.address}</p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                        {Object.entries(config.socialLinks).map(([k, v]) => v && <a key={k} href={v as string} target="_blank" className="text-muted-foreground hover:text-primary">{socialIcons[k]}</a>)}
+                        <Button asChild size="sm">
+                            <a href={`https://wa.me/${config.businessInfo.phone.replace(/\D/g, '')}`} target="_blank">
+                                <WhatsAppIcon className="mr-2 h-4 w-4" /> Contactar
+                            </a>
+                        </Button>
+                        <button
+                          onClick={onCartClick}
+                          className="relative flex items-center justify-center p-2 rounded-full hover:bg-muted transition-colors ml-2"
+                          aria-label="Ver carrito"
+                        >
+                          <ShoppingCart className="h-6 w-6 text-foreground" />
+                          {cartItemCount > 0 && (
+                            <span className="absolute -top-1 -right-1 bg-primary text-primary-foreground text-[10px] font-bold rounded-full h-5 w-5 flex items-center justify-center border-2 border-card">
+                              {cartItemCount > 99 ? '99+' : cartItemCount}
+                            </span>
+                          )}
+                        </button>
+                    </div>
+                </div>
+            </div>
         </div>
     );
 }
