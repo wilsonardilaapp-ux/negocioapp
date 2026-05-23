@@ -544,11 +544,11 @@ export default function LandingPageContent({ data, plans = [], businessId, logoU
         </footer>
       )}
 
-      {/* SANITIZACIÓN CRÍTICA PARA PRODUCCIÓN:
+      {/* SANITIZACIÓN DEFINITIVA PARA PRODUCCIÓN:
           Asegurar que el número para el botón flotante de WhatsApp esté limpio (sin espacios ni símbolos).
       */}
       <a 
-        href={`https://wa.me/${String(data.header?.socialLinks?.whatsapp || footer.contactInfo.phone || '').replace(/\D/g, '')}`} 
+        href={`https://api.whatsapp.com/send?phone=${String(data.header?.socialLinks?.whatsapp || footer.contactInfo.phone || '').replace(/\D/g, '')}`} 
         target="_blank" 
         rel="noopener noreferrer"
         className="fixed bottom-8 right-8 z-50 bg-[#25D366] text-white p-4 rounded-full shadow-2xl hover:scale-110 transition-transform flex items-center justify-center"
@@ -558,3 +558,4 @@ export default function LandingPageContent({ data, plans = [], businessId, logoU
     </div>
   );
 }
+

@@ -30,7 +30,8 @@ export default function ContactoAdminPage() {
     resolver: zodResolver(contactAdminSchema),
   });
   
-  const SUPPORT_PHONE_NUMBER = '+573017395484'; // Número de soporte de destino
+  // Número de soporte sanitizado (solo dígitos) para envío directo
+  const SUPPORT_PHONE_NUMBER = '573017395484'; 
 
   const onSubmit = async (data: ContactAdminFormData) => {
     if (!firestore || !user || !profile) {
@@ -59,9 +60,9 @@ export default function ContactoAdminPage() {
         description: 'Tu mensaje ha sido guardado y se abrirá en WhatsApp.',
       });
 
-      // Abrir WhatsApp con el mensaje pre-llenado
+      // Abrir WhatsApp con el mensaje pre-llenado usando la API directa
       const whatsappMessage = `*Asunto:* ${data.subject}\n\n*Mensaje:*\n${data.body}\n\n--- Enviado por: ${profile.name} (${user.email}) ---`;
-      const whatsappUrl = `https://wa.me/${SUPPORT_PHONE_NUMBER}?text=${encodeURIComponent(whatsappMessage)}`;
+      const whatsappUrl = `https://api.whatsapp.com/send?phone=${SUPPORT_PHONE_NUMBER}&text=${encodeURIComponent(whatsappMessage)}`;
       window.open(whatsappUrl, '_blank');
 
       reset();
@@ -112,3 +113,4 @@ export default function ContactoAdminPage() {
     </Card>
   );
 }
+

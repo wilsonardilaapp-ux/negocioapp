@@ -513,8 +513,9 @@ const CatalogHeader = ({ config, cartItemCount, onCartClick }: CatalogHeaderProp
     if (!config) return <div className="bg-card shadow-md p-4 text-center"><h1 className="text-2xl font-bold">Catálogo de Productos</h1></div>;
     const socialIcons: any = { tiktok: <TikTokIcon />, instagram: <InstagramIcon />, facebook: <FacebookIcon />, whatsapp: <WhatsAppIcon />, twitter: <XIcon />, };
     
-    // SANITIZACIÓN CRÍTICA PARA PRODUCCIÓN:
-    // Asegurar que el número para el enlace directo de WhatsApp esté limpio.
+    // SANITIZACIÓN DEFINITIVA PARA PRODUCCIÓN:
+    // 1. Forzar conversión a String para evitar errores con tipos numéricos de la DB.
+    // 2. Eliminar ABSOLUTAMENTE todos los caracteres que no sean dígitos (\D) incluyendo espacios, +, y guiones.
     const rawHeaderPhone = String(config.businessInfo.phone || '');
     const cleanHeaderPhone = rawHeaderPhone.replace(/\D/g, '');
 
@@ -530,7 +531,7 @@ const CatalogHeader = ({ config, cartItemCount, onCartClick }: CatalogHeaderProp
                     <div className="flex items-center gap-3">
                         {Object.entries(config.socialLinks).map(([k, v]) => v && <a key={k} href={v as string} target="_blank" className="text-muted-foreground hover:text-primary">{socialIcons[k]}</a>)}
                         <Button asChild size="sm">
-                            <a href={`https://wa.me/${cleanHeaderPhone}`} target="_blank">
+                            <a href={`https://api.whatsapp.com/send?phone=${cleanHeaderPhone}`} target="_blank">
                                 <WhatsAppIcon className="mr-2 h-4 w-4" /> Contactar
                             </a>
                         </Button>
@@ -552,3 +553,4 @@ const CatalogHeader = ({ config, cartItemCount, onCartClick }: CatalogHeaderProp
         </div>
     );
 }
+

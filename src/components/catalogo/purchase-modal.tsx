@@ -216,13 +216,14 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
         await couponService.incrementUsage(appliedCoupon.id);
     }
 
-    // SANITIZACIÓN CRÍTICA PARA PRODUCCIÓN:
-    // 1. Convertir a String para manejar números almacenados en DB.
-    // 2. Eliminar TODOS los caracteres que no sean dígitos (\D) incluyendo espacios, +, y guiones.
+    // SANITIZACIÓN DEFINITIVA PARA PRODUCCIÓN:
+    // 1. Forzar conversión a String para evitar errores con tipos numéricos de la DB.
+    // 2. Eliminar ABSOLUTAMENTE todos los caracteres no numéricos (espacios, +, -, etc) con \D.
     const rawPhone = String(businessInfo?.phone || '');
     const cleanPhone = rawPhone.replace(/\D/g, '');
     
-    const whatsappUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(orderSummary)}`;
+    // Usar la URL de la API directa de WhatsApp para mayor compatibilidad
+    const whatsappUrl = `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(orderSummary)}`;
     
     window.open(whatsappUrl, '_blank');
     onOpenChange(false);
@@ -617,3 +618,4 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
     </Dialog>
   );
 }
+
