@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { ShoppingBag, Minus, Plus, Tag, Trash2, Loader2, Ticket, X, CheckCircle, CreditCard, Building, Smartphone, HandCoins } from 'lucide-react';
+import { ShoppingBag, Minus, Plus, Tag, Trash2, Loader2, Ticket, X, CheckCircle, CreditCard, Building, Smartphone, HandCoins, Copy, Check } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { PaymentSettings } from '@/models/payment-settings';
 import type { TipoEntrega } from '@/models/order';
@@ -26,6 +26,7 @@ import type { Coupon } from '@/models/coupon';
 import { WhatsAppIcon } from '@/components/icons';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import Image from 'next/image';
 
 const purchaseSchema = z.object({
   fullName: z.string().min(3, { message: 'El nombre es requerido.' }),
@@ -60,6 +61,7 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
   const [tipoEntrega, setTipoEntrega] = useState<TipoEntrega>('domicilio');
   const [activePromos, setActivePromotions] = useState<Promotion[]>([]);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>('');
+  const [copied, setCopied] = useState(false);
   
   // Coupon state
   const [couponCode, setCouponCode] = useState('');
@@ -141,6 +143,14 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
   const handleRemoveCoupon = () => {
     setAppliedCoupon(null);
     setCouponCode('');
+  };
+
+  const handleCopy = (text: string) => {
+    if (!text) return;
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    toast({ title: 'Copiado al portapapeles' });
+    setTimeout(() => setCopied(false), 2000);
   };
 
   const onSubmit = async (data: z.infer<typeof purchaseSchema>) => {
@@ -387,7 +397,6 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
             </div>
           </form>
 
-          {/* PAYMENT METHODS SECTION - RESTORED */}
           <div className="space-y-4">
                 <h4 className="font-bold text-lg flex items-center gap-2">
                     <CreditCard className="h-5 w-5" /> Medio de Pago
@@ -428,31 +437,71 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
                     
                     <div className="mt-4 p-4 bg-muted/50 rounded-xl border">
                         {selectedPaymentMethod === 'nequi' && (
-                            <div className="text-center space-y-2">
+                            <div className="text-center space-y-4">
                                 <p className="font-bold text-sm">Transfiere a Nequi</p>
-                                <p className="text-lg font-black text-primary">{paymentSettings?.nequi.accountNumber}</p>
+                                <div className="flex items-center justify-center gap-2">
+                                    <p className="text-xl font-black text-primary">{paymentSettings?.nequi.accountNumber}</p>
+                                    <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => handleCopy(paymentSettings?.nequi.accountNumber || '')}>
+                                        {copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
+                                    </Button>
+                                </div>
                                 <p className="text-xs text-muted-foreground">A nombre de: {paymentSettings?.nequi.holderName}</p>
+                                {paymentSettings?.nequi.qrImageUrl && (
+                                    <div className="relative aspect-square w-48 mx-auto border rounded-xl overflow-hidden bg-white shadow-sm">
+                                        <Image src={paymentSettings.nequi.qrImageUrl} alt="QR Nequi" fill className="object-contain p-2" />
+                                    </div>
+                                )}
                             </div>
                         )}
                         {selectedPaymentMethod === 'bancolombia' && (
-                            <div className="text-center space-y-2">
+                            <div className="text-center space-y-4">
                                 <p className="font-bold text-sm">Transfiere a Bancolombia</p>
-                                <p className="text-lg font-black text-primary">{paymentSettings?.bancolombia.accountNumber}</p>
+                                <div className="flex items-center justify-center gap-2">
+                                    <p className="text-xl font-black text-primary">{paymentSettings?.bancolombia.accountNumber}</p>
+                                    <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => handleCopy(paymentSettings?.bancolombia.accountNumber || '')}>
+                                        {copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
+                                    </Button>
+                                </div>
                                 <p className="text-xs text-muted-foreground">A nombre de: {paymentSettings?.bancolombia.holderName}</p>
+                                {paymentSettings?.bancolombia.qrImageUrl && (
+                                    <div className="relative aspect-square w-48 mx-auto border rounded-xl overflow-hidden bg-white shadow-sm">
+                                        <Image src={paymentSettings.bancolombia.qrImageUrl} alt="QR Bancolombia" fill className="object-contain p-2" />
+                                    </div>
+                                )}
                             </div>
                         )}
                         {selectedPaymentMethod === 'daviplata' && (
-                            <div className="text-center space-y-2">
+                            <div className="text-center space-y-4">
                                 <p className="font-bold text-sm">Transfiere a Daviplata</p>
-                                <p className="text-lg font-black text-primary">{paymentSettings?.daviplata.accountNumber}</p>
+                                <div className="flex items-center justify-center gap-2">
+                                    <p className="text-xl font-black text-primary">{paymentSettings?.daviplata.accountNumber}</p>
+                                    <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => handleCopy(paymentSettings?.daviplata.accountNumber || '')}>
+                                        {copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
+                                    </Button>
+                                </div>
                                 <p className="text-xs text-muted-foreground">A nombre de: {paymentSettings?.daviplata.holderName}</p>
+                                {paymentSettings?.daviplata.qrImageUrl && (
+                                    <div className="relative aspect-square w-48 mx-auto border rounded-xl overflow-hidden bg-white shadow-sm">
+                                        <Image src={paymentSettings.daviplata.qrImageUrl} alt="QR Daviplata" fill className="object-contain p-2" />
+                                    </div>
+                                )}
                             </div>
                         )}
                         {selectedPaymentMethod === 'breB' && (
-                            <div className="text-center space-y-2">
+                            <div className="text-center space-y-4">
                                 <p className="font-bold text-sm">Transfiere por Bre-B</p>
                                 <p className="text-xs">Llave ({paymentSettings?.breB.keyType}):</p>
-                                <p className="text-lg font-black text-primary">{paymentSettings?.breB.keyValue}</p>
+                                <div className="flex items-center justify-center gap-2">
+                                    <p className="text-xl font-black text-primary">{paymentSettings?.breB.keyValue}</p>
+                                    <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => handleCopy(paymentSettings?.breB.keyValue || '')}>
+                                        {copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
+                                    </Button>
+                                </div>
+                                {paymentSettings?.breB.qrImageUrl && (
+                                    <div className="relative aspect-square w-48 mx-auto border rounded-xl overflow-hidden bg-white shadow-sm">
+                                        <Image src={paymentSettings.breB.qrImageUrl} alt="QR Bre-B" fill className="object-contain p-2" />
+                                    </div>
+                                )}
                             </div>
                         )}
                         {selectedPaymentMethod === 'pagoContraEntrega' && (
