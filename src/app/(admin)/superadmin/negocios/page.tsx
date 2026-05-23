@@ -24,7 +24,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { Check, Plus, Search, Building2, Eye, Puzzle } from 'lucide-react';
+import { Check, Plus, Search, Building2, Eye, Puzzle, Tag } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Label } from '@/components/ui/label';
 
@@ -37,6 +37,7 @@ import type { Module } from '@/models/module';
 const iconMap: { [key: string]: React.ReactNode } = {
   catalogo: <Building2 className="w-4 h-4" />,
   'chatbot-integrado-con-whatsapp-para-soporte-y-ventas': <Building2 className="w-4 h-4" />,
+  promotions: <Tag className="w-4 h-4" />,
   default: <Puzzle className="w-4 h-4" />,
 };
 

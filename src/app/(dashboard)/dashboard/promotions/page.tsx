@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useTransition, useEffect } from 'react';
+import { useState } from 'react';
 import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { usePromotions } from '@/hooks/use-promotions';
 import { promotionService, CreatePromotionInput } from '@/services/promotion-service';
@@ -33,44 +33,30 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import type { Promotion } from '@/models/promotion';
 import type { Module } from '@/models/module';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc } from 'firebase/firestore';
+import { useSubscription } from '@/hooks/useSubscription';
 
 export default function PromotionsPage() {
   const { user } = useUser();
   const firestore = useFirestore();
   const { promotions, isLoading: arePromosLoading } = usePromotions();
   const { toast } = useToast();
+  const { limits, isLoading: isSubscriptionLoading } = useSubscription();
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingPromo, setEditingPromo] = useState<Promotion | null>(null);
-  const [isModuleLoading, setModuleLoading] = useState(true);
-  const [moduleInactive, setModuleInactive] = useState(false);
 
-  // Check if promotions module is assigned to this business
-  useEffect(() => {
-    if (!user || !firestore) return;
+  // Check global module status (SaaS-wide toggle)
+  const globalModuleRef = useMemoFirebase(() => 
+    !firestore ? null : doc(firestore, 'modules', 'promotions'), 
+  [firestore]);
+  const { data: globalModule, isLoading: isGlobalLoading } = useDoc<Module>(globalModuleRef);
 
-    const checkModuleStatus = async () => {
-        setModuleLoading(true);
-        try {
-            const moduleRef = doc(firestore, `businesses/${user.uid}/modules`, 'promotions');
-            const moduleSnap = await getDoc(moduleRef);
-            
-            if (!moduleSnap.exists() || moduleSnap.data().status === 'inactive') {
-                setModuleInactive(true);
-            } else {
-                setModuleInactive(false);
-            }
-        } catch (error) {
-            console.error("Error checking promotions module status:", error);
-            setModuleInactive(true);
-        } finally {
-            setModuleLoading(false);
-        }
-    };
-
-    checkModuleStatus();
-  }, [user, firestore]);
+  // Business-specific assignment check (Manual assignment by superadmin)
+  const businessModuleRef = useMemoFirebase(() => 
+    !firestore || !user ? null : doc(firestore, `businesses/${user.uid}/modules`, 'promotions'), 
+  [firestore, user]);
+  const { data: businessModule, isLoading: isBusinessModuleLoading } = useDoc<Module>(businessModuleRef);
 
   const handleToggleActive = async (id: string, current: boolean) => {
     try {
@@ -112,9 +98,20 @@ export default function PromotionsPage() {
     return colors[type];
   };
 
-  if (isModuleLoading || arePromosLoading) {
-    return <div className="flex items-center justify-center h-64"><Loader2 className="animate-spin" /></div>;
+  const isLoading = isGlobalLoading || isBusinessModuleLoading || isSubscriptionLoading || arePromosLoading;
+
+  if (isLoading) {
+    return <div className="flex items-center justify-center h-64"><Loader2 className="animate-spin h-8 w-8 text-primary" /></div>;
   }
+
+  // A business has access if:
+  // 1. The module is active globally.
+  // 2. AND (They have a manual assignment OR their plan allows promotions).
+  const isModuleActiveGlobally = globalModule?.status === 'active';
+  const isAssignedToBusiness = businessModule?.status === 'active';
+  const hasPlanPermission = limits.promotions !== 0; // -1 (unlimited) or > 0
+
+  const moduleInactive = !isModuleActiveGlobally || (!isAssignedToBusiness && !hasPlanPermission);
 
   if (moduleInactive) {
     return (
@@ -126,12 +123,14 @@ export default function PromotionsPage() {
                 <Frown className="h-12 w-12 text-muted-foreground" />
                 <h3 className="text-xl font-semibold">Funcionalidad no disponible</h3>
                 <p className="text-muted-foreground max-w-sm">
-                    El módulo de "Promociones" no está activo en tu cuenta. Por favor, contacta al administrador de la plataforma para más información sobre cómo habilitarlo.
+                    El módulo de "Promociones" no está activo en tu cuenta o plan. Por favor, contacta al administrador de la plataforma para más información sobre cómo habilitarlo.
                 </p>
             </CardContent>
         </Card>
     );
   }
+
+  const promoLimitReached = limits.promotions !== -1 && promotions.length >= limits.promotions;
 
   return (
     <div className="flex flex-col gap-6">
@@ -141,10 +140,17 @@ export default function PromotionsPage() {
             <CardTitle>Promociones</CardTitle>
             <CardDescription>Crea y gestiona las promociones de tu negocio.</CardDescription>
           </div>
-          <Button onClick={() => { setEditingPromo(null); setIsDialogOpen(true); }}>
+          <Button onClick={() => { setEditingPromo(null); setIsDialogOpen(true); }} disabled={promoLimitReached}>
             <PlusCircle className="mr-2 h-4 w-4" /> Nueva Promoción
           </Button>
         </CardHeader>
+        {promoLimitReached && (
+          <CardContent>
+            <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-md text-xs text-yellow-800">
+               Has alcanzado el límite de {limits.promotions} promociones de tu plan. Actualiza tu plan para crear más.
+            </div>
+          </CardContent>
+        )}
       </Card>
 
       <Tabs defaultValue="all">

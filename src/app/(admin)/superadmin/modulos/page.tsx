@@ -55,15 +55,15 @@ const moduleSchema = z.object({
   ),
 });
 
-const DEFAULT_MODULES: { name: string; description: string; limit: number; }[] = [
-    { name: 'Catálogo', description: 'Módulo para gestionar el catálogo de productos.', limit: 50 },
-    { name: 'Blog', description: 'Módulo para gestionar el blog', limit: 10 },
-    { name: 'Promociones', description: 'Módulo para gestionar ofertas y descuentos.', limit: -1 },
-    { name: 'Chatbot Integrado con WhatsApp', description: 'Asistente IA para WhatsApp y Web', limit: -1 },
-    { name: 'Motor de Sugerencias Inteligentes', description: 'Motor para sugerir productos', limit: -1 },
-    { name: 'Google Analytics', description: 'Integración con Google Analytics', limit: -1 },
-    { name: 'Cloudinary', description: 'Almacenamiento de medios en la nube', limit: -1 },
-    { name: 'Pistola Escáner', description: 'Gestión de dispositivos de escaneo de códigos de barras.', limit: -1 },
+const DEFAULT_MODULES: { name: string; description: string; limit: number; idOverride?: string }[] = [
+    { name: 'Catálogo', description: 'Módulo para gestionar el catálogo de productos.', limit: 50, idOverride: 'catalogo' },
+    { name: 'Blog', description: 'Módulo para gestionar el blog', limit: 10, idOverride: 'blog' },
+    { name: 'Promociones', description: 'Módulo para gestionar ofertas y descuentos.', limit: -1, idOverride: 'promotions' },
+    { name: 'Chatbot Integrado con WhatsApp', description: 'Asistente IA para WhatsApp y Web', limit: -1, idOverride: 'chatbot-integrado-con-whatsapp-para-soporte-y-ventas' },
+    { name: 'Motor de Sugerencias Inteligentes', description: 'Motor para sugerir productos', limit: -1, idOverride: 'motor-de-sugerencias-inteligentes' },
+    { name: 'Google Analytics', description: 'Integración con Google Analytics', limit: -1, idOverride: 'google-analytics' },
+    { name: 'Cloudinary', description: 'Almacenamiento de medios en la nube', limit: -1, idOverride: 'cloudinary' },
+    { name: 'Pistola Escáner', description: 'Gestión de dispositivos de escaneo de códigos de barras.', limit: -1, idOverride: 'pistola-escaner' },
 ];
 
 const slugify = (text: string) => 
@@ -94,13 +94,15 @@ export default function ModulesPage() {
       
       const checkAndCreateModules = async () => {
           for (const defaultModule of DEFAULT_MODULES) {
-              const modId = slugify(defaultModule.name);
+              const modId = defaultModule.idOverride || slugify(defaultModule.name);
               const exists = modules.some(m => m.id === modId);
               if (!exists) {
                   console.log(`Module "${defaultModule.name}" missing, creating...`);
                   await saveModule({
                       id: modId,
-                      ...defaultModule
+                      name: defaultModule.name,
+                      description: defaultModule.description,
+                      limit: defaultModule.limit
                   });
               }
           }
