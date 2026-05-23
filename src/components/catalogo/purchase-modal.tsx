@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -151,7 +152,8 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
 
   const handleCopy = (text: string) => {
     if (!text) return;
-    navigator.clipboard.writeText(text);
+    const cleanText = String(text).replace(/\D/g, '');
+    navigator.clipboard.writeText(cleanText);
     setCopied(true);
     toast({ title: 'Copiado al portapapeles' });
     setTimeout(() => setCopied(false), 2000);
@@ -169,16 +171,16 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
     let methodInfo = '';
     if (selectedPaymentMethod === 'nequi') {
         methodLabel = 'Nequi';
-        methodInfo = `Número: ${paymentSettings?.nequi.accountNumber}`;
+        methodInfo = `Número: ${String(paymentSettings?.nequi.accountNumber || '').replace(/\D/g, '')}`;
     } else if (selectedPaymentMethod === 'bancolombia') {
         methodLabel = 'Bancolombia';
-        methodInfo = `Número: ${paymentSettings?.bancolombia.accountNumber}`;
+        methodInfo = `Número: ${String(paymentSettings?.bancolombia.accountNumber || '').replace(/\D/g, '')}`;
     } else if (selectedPaymentMethod === 'daviplata') {
         methodLabel = 'Daviplata';
-        methodInfo = `Número: ${paymentSettings?.daviplata.accountNumber}`;
+        methodInfo = `Número: ${String(paymentSettings?.daviplata.accountNumber || '').replace(/\D/g, '')}`;
     } else if (selectedPaymentMethod === 'breB') {
         methodLabel = 'Bre-B';
-        methodInfo = `Llave: ${paymentSettings?.breB.keyValue}`;
+        methodInfo = `Llave: ${String(paymentSettings?.breB.keyValue || '').replace(/\D/g, '')}`;
     } else if (selectedPaymentMethod === 'pagoContraEntrega') {
         methodLabel = 'Pago contra entrega';
     }
@@ -217,8 +219,7 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
     }
 
     // SANITIZACIÓN DEFINITIVA PARA PRODUCCIÓN:
-    // Se eliminan TODOS los caracteres no numéricos (incluyendo espacios y el símbolo +)
-    const rawPhone = String(businessInfo?.phone || '');
+    const rawPhone = String(businessInfo?.phone || '3228831634');
     const cleanPhone = rawPhone.replace(/\D/g, '');
     
     // Usar la URL de la API directa de WhatsApp para mayor compatibilidad
@@ -451,7 +452,7 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
                             <div className="text-center space-y-4">
                                 <p className="font-bold text-sm">Transfiere a Nequi</p>
                                 <div className="flex items-center justify-center gap-2">
-                                    <p className="text-xl font-black text-primary">{paymentSettings?.nequi.accountNumber}</p>
+                                    <p className="text-xl font-black text-primary">{String(paymentSettings?.nequi.accountNumber || '').replace(/\D/g, '')}</p>
                                     <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => handleCopy(paymentSettings?.nequi.accountNumber || '')}>
                                         {copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
                                     </Button>
@@ -468,7 +469,7 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
                             <div className="text-center space-y-4">
                                 <p className="font-bold text-sm">Transfiere a Bancolombia</p>
                                 <div className="flex items-center justify-center gap-2">
-                                    <p className="text-xl font-black text-primary">{paymentSettings?.bancolombia.accountNumber}</p>
+                                    <p className="text-xl font-black text-primary">{String(paymentSettings?.bancolombia.accountNumber || '').replace(/\D/g, '')}</p>
                                     <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => handleCopy(paymentSettings?.bancolombia.accountNumber || '')}>
                                         {copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
                                     </Button>
@@ -485,7 +486,7 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
                             <div className="text-center space-y-4">
                                 <p className="font-bold text-sm">Transfiere a Daviplata</p>
                                 <div className="flex items-center justify-center gap-2">
-                                    <p className="text-xl font-black text-primary">{paymentSettings?.daviplata.accountNumber}</p>
+                                    <p className="text-xl font-black text-primary">{String(paymentSettings?.daviplata.accountNumber || '').replace(/\D/g, '')}</p>
                                     <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => handleCopy(paymentSettings?.daviplata.accountNumber || '')}>
                                         {copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
                                     </Button>
@@ -503,7 +504,7 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
                                 <p className="font-bold text-sm">Transfiere por Bre-B</p>
                                 <p className="text-xs">Llave ({paymentSettings?.breB.keyType}):</p>
                                 <div className="flex items-center justify-center gap-2">
-                                    <p className="text-xl font-black text-primary">{paymentSettings?.breB.keyValue}</p>
+                                    <p className="text-xl font-black text-primary">{String(paymentSettings?.breB.keyValue || '').replace(/\D/g, '')}</p>
                                     <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => handleCopy(paymentSettings?.breB.keyValue || '')}>
                                         {copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
                                     </Button>

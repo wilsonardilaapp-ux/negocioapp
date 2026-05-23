@@ -105,7 +105,7 @@ const initialLandingPageData: LandingPageData = {
     businessInfo: {
       name: 'Tu Negocio',
       address: 'Calle Falsa 123',
-      phone: '+57 300 123 4567',
+      phone: '3228831634',
       email: 'info@tunegocio.com',
     },
     socialLinks: {
@@ -125,7 +125,7 @@ const initialLandingPageData: LandingPageData = {
     enabled: true,
     contactInfo: {
       address: 'Calle Falsa 123, Ciudad, País',
-      phone: '+57 300 123 4567',
+      phone: '3228831634',
       email: 'contacto@empresa.com',
       hours: 'Lunes a Viernes, 9am - 6pm',
     },

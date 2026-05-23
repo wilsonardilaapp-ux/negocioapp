@@ -1,3 +1,4 @@
+
 import { getLandingData } from '@/lib/get-landing-data';
 import LandingEditorClient from './EditorClient';
 import type { LandingPageData } from '@/models/landing-page';
