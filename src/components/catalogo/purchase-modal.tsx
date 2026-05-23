@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { ShoppingBag, Minus, Plus, Tag, Trash2, Loader2, Ticket, X } from 'lucide-react';
+import { ShoppingBag, Minus, Plus, Tag, Trash2, Loader2, Ticket, X, CheckCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { PaymentSettings } from '@/models/payment-settings';
 import type { TipoEntrega } from '@/models/order';
@@ -400,10 +400,10 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
                 </div>
             </div>
             
-            <Button 
+            <button 
                 type="submit" 
                 form="purchase-form"
-                className="w-full h-14 text-lg font-bold shadow-lg shadow-primary/20" 
+                className="w-full h-14 bg-primary text-white text-lg font-bold shadow-lg shadow-primary/20 rounded-xl flex items-center justify-center gap-2 hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" 
                 disabled={isSubmitting}
             >
                 {isSubmitting ? (
@@ -412,7 +412,7 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
                     <WhatsAppIcon className="mr-2 h-5 w-5" />
                 )}
                 Confirmar y Enviar Pedido
-            </Button>
+            </button>
             <p className="text-[10px] text-center text-muted-foreground mt-4">
                 Serás redirigido a WhatsApp para finalizar el envío de tu pedido.
             </p>
