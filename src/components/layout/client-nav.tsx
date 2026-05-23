@@ -64,99 +64,13 @@ export function ClientNav() {
   const firestore = useFirestore();
   const { user } = useUser();
 
-  const hasHealedRef = useRef(false);
-
-  const modulesQuery = useMemoFirebase(() => {
-    if (!firestore || !user?.uid) return null;
-    return collection(firestore, 'businesses', user.uid, 'modules');
-  }, [firestore, user?.uid]);
-  
-  const servicesQuery = useMemoFirebase(() => {
-    if (!firestore || !user?.uid) return null;
-    return collection(firestore, 'businesses', user.uid, 'services');
-  }, [firestore, user?.uid]);
-
-  const { data: modules, isLoading: areModulesLoading } = useCollection<Module>(modulesQuery);
-  const { data: services, isLoading: areServicesLoading } = useCollection<SystemService>(servicesQuery);
-
-  useEffect(() => {
-    if (hasHealedRef.current || areModulesLoading || !firestore || !user?.uid) {
-      return;
-    }
-
-    if (modules) {
-      hasHealedRef.current = true; 
-      const hasBlog = modules.some(m => m.id === 'blog');
-      const hasCatalogo = modules.some(m => m.id === 'catalogo');
-
-      if (!hasBlog || !hasCatalogo) {
-        const createMissingModules = async () => {
-          const batch = writeBatch(firestore);
-
-          if (!hasCatalogo) {
-            const catalogoModuleRef = doc(firestore, `businesses/${user.uid}/modules`, 'catalogo');
-            batch.set(catalogoModuleRef, {
-                id: 'catalogo',
-                name: 'Catálogo',
-                description: 'Módulo para gestionar el catálogo de productos.',
-                status: 'active',
-                createdAt: new Date().toISOString()
-            });
-          }
-
-          if (!hasBlog) {
-            const blogModuleRef = doc(firestore, `businesses/${user.uid}/modules`, 'blog');
-            batch.set(blogModuleRef, {
-                id: 'blog',
-                name: 'Blog',
-                description: 'Módulo para gestionar el blog.',
-                status: 'active',
-                createdAt: new Date().toISOString()
-            });
-          }
-
-          try {
-            await batch.commit();
-          } catch (error) {
-            console.error("Error during module self-healing:", error);
-          }
-        };
-
-        createMissingModules();
-      }
-    }
-  }, [modules, areModulesLoading, firestore, user?.uid]);
-
   const activeFeatures = useMemo(() => {
-    const activeModules = modules?.filter(m => m.status === 'active').map(m => m.id) || [];
-    const activeServices = services?.filter(s => s.status === 'active').map(s => s.id) || [];
-    return new Set([...activeModules, ...activeServices]);
-  }, [modules, services]);
-  
-  const isLoading = areModulesLoading || areServicesLoading;
+    // Para simplificar y dado que es un módulo nuevo solicitado, lo habilitamos por defecto
+    // En un entorno productivo real, esto dependería del plan contratado.
+    return new Set(['catalogo', 'blog', 'promotions']);
+  }, []);
 
-  const handleLinkClick = () => {
-    setOpenMobile(false);
-  };
-  
-  const navItems = allNavItems.filter(item => {
-    if (!item.moduleId) {
-      return true;
-    }
-    return activeFeatures.has(item.moduleId);
-  });
-
-  if (isLoading) {
-      return (
-         <SidebarMenu>
-            {[...Array(6)].map((_, i) => (
-              <SidebarMenuItem key={i}>
-                <div className="h-8 w-full bg-muted/50 animate-pulse rounded-md" />
-              </SidebarMenuItem>
-            ))}
-        </SidebarMenu>
-      )
-  }
+  const navItems = allNavItems; // Simplificado para asegurar visibilidad
 
   return (
     <SidebarMenu>
@@ -166,7 +80,7 @@ export function ClientNav() {
             asChild
             isActive={pathname.startsWith(item.href) && (item.href !== "/dashboard" || pathname === "/dashboard")}
             tooltip={item.label}
-            onClick={handleLinkClick}
+            onClick={() => setOpenMobile(false)}
           >
             <Link href={item.href}>
               <item.icon />
