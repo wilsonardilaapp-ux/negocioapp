@@ -113,7 +113,11 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
   const subtotalBeforeVat = subtotalAfterCoupon + packagingTotal;
   const vatRate = businessInfo?.vatRate ?? 0;
   const vatAmount = subtotalBeforeVat * (vatRate / 100);
-  const total = subtotalBeforeVat + vatAmount + (tipoEntrega === 'domicilio' ? (businessInfo?.deliveryFee ?? 0) : 0);
+  
+  // Domicilio calculation
+  const deliveryFee = tipoEntrega === 'domicilio' ? (businessInfo?.deliveryFee ?? 0) : 0;
+  
+  const total = subtotalBeforeVat + vatAmount + deliveryFee;
 
   const applicableGlobalPromo = activePromos.find(p => 
       p.applicableTo === 'order' && 
