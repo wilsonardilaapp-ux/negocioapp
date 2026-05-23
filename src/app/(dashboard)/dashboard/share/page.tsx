@@ -21,12 +21,13 @@ import {
   Image as ImageIcon,
   Pencil,
   Trash2,
+  Save,
+  Loader2,
 } from 'lucide-react';
 import { useUser, useFirestore, useDoc, useMemoFirebase, setDocumentNonBlocking } from '@/firebase';
 import { doc } from 'firebase/firestore';
 import type { MenuShare, QRConfig } from '@/models/share';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2 } from 'lucide-react';
 import QRCode from "react-qr-code";
 import html2canvas from 'html2canvas';
 import { WhatsAppIcon } from '@/components/icons';
@@ -156,6 +157,7 @@ export default function SharePage() {
   
   const [shareConfig, setShareConfig] = useState<MenuShare | null>(null);
   const [copied, setCopied] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const qrCodeRef = useRef<HTMLDivElement>(null);
 
   const shareConfigRef = useMemoFirebase(() => 
@@ -198,9 +200,30 @@ export default function SharePage() {
     const updatedConfig = { ...shareConfig, ...newConfig, updatedAt: new Date().toISOString() };
     setShareConfig(updatedConfig);
     setDocumentNonBlocking(shareConfigRef, updatedConfig, { merge: true });
-    toast({ title: 'Configuración guardada' });
+    // Keep internal toast for immediate feedback
+    toast({ title: 'Cambio registrado' });
   };
   
+  const handleManualSave = async () => {
+    if (!shareConfig || !shareConfigRef) return;
+    setIsSaving(true);
+    try {
+      await setDocumentNonBlocking(shareConfigRef, shareConfig, { merge: true });
+      toast({
+        title: '¡Éxito!',
+        description: 'La configuración de compartir se ha guardado correctamente.',
+      });
+    } catch (error) {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'No se pudo guardar la configuración.',
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const handleQRConfigChange = (newQRConfig: QRConfig) => {
     if (!shareConfig) return;
     const updatedConfig = { ...shareConfig, qrConfig: newQRConfig, updatedAt: new Date().toISOString() };
@@ -291,9 +314,15 @@ export default function SharePage() {
   return (
     <div className="space-y-6">
       <Card>
-        <CardHeader>
-          <CardTitle>Compartir Menú</CardTitle>
-          <CardDescription>Facilita a tus clientes el acceso a tu catálogo de productos.</CardDescription>
+        <CardHeader className="flex flex-row justify-between items-center">
+          <div className="space-y-1">
+            <CardTitle>Compartir Menú</CardTitle>
+            <CardDescription>Facilita a tus clientes el acceso a tu catálogo de productos.</CardDescription>
+          </div>
+          <Button onClick={handleManualSave} disabled={isSaving}>
+            {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+            Guardar Cambios
+          </Button>
         </CardHeader>
       </Card>
 
