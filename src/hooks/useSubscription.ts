@@ -80,7 +80,7 @@ export function useSubscription() {
   const { plan, isActive, limits, isFree, isPro, isEnterprise } = useMemo(() => {
     const currentPlanId = subscription?.plan ?? 'free';
     const planDetails = allPlans?.find(p => p.id === currentPlanId);
-    const defaultLimits: PlanLimits = { products: 0, blogPosts: 0, landingPages: 0 };
+    const defaultLimits: PlanLimits = { products: 0, blogPosts: 0, landingPages: 0, coupons: 0, promotions: 0 };
 
     return {
       plan: currentPlanId as 'free' | 'pro' | 'enterprise',

@@ -25,21 +25,27 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue 
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Edit, Trash2, Loader2, Ticket, CheckCircle, Clock, AlertCircle } from 'lucide-react';
+import { PlusCircle, Edit, Trash2, Loader2, Ticket, Clock, AlertTriangle, Lock } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import type { Coupon, CouponType, UsageLimitType } from '@/models/coupon';
 import { cn } from '@/lib/utils';
+import { useSubscription } from '@/hooks/useSubscription';
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import Link from 'next/link';
 
 const formatCurrency = (value: number) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(value);
 
 export default function CuponesPage() {
   const { user } = useUser();
-  const { coupons, isLoading } = useCoupons();
+  const { coupons, isLoading: isCouponsLoading } = useCoupons();
+  const { limits, plan, isFree, isLoading: isSubLoading } = useSubscription();
   const { toast } = useToast();
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingCoupon, setEditingCoupon] = useState<Coupon | null>(null);
+
+  const isLoading = isCouponsLoading || isSubLoading;
 
   const handleToggleActive = async (id: string, current: boolean) => {
     try {
@@ -63,6 +69,9 @@ export default function CuponesPage() {
     return <div className="flex items-center justify-center h-64"><Loader2 className="animate-spin h-8 w-8 text-primary" /></div>;
   }
 
+  const couponLimitReached = limits.coupons !== -1 && coupons.length >= limits.coupons;
+  const showLimitWarning = isFree && limits.coupons !== -1 && (coupons.length / limits.coupons) >= 0.8;
+
   return (
     <div className="flex flex-col gap-6">
       <Card>
@@ -71,11 +80,48 @@ export default function CuponesPage() {
             <CardTitle>Gestión de Cupones</CardTitle>
             <CardDescription>Crea códigos de descuento para fidelizar a tus clientes.</CardDescription>
           </div>
-          <Button onClick={() => { setEditingCoupon(null); setIsDialogOpen(true); }}>
+          <Button 
+            onClick={() => { setEditingCoupon(null); setIsDialogOpen(true); }}
+            disabled={couponLimitReached}
+          >
             <PlusCircle className="mr-2 h-4 w-4" /> Nuevo Cupón
           </Button>
         </CardHeader>
       </Card>
+
+      {couponLimitReached && (
+        <Alert variant="destructive" className="flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <Lock className="h-6 w-6" />
+            <div>
+              <AlertTitle>Límite de cupones alcanzado</AlertTitle>
+              <AlertDescription>
+                Has usado {coupons.length}/{limits.coupons} cupones de tu plan {plan.toUpperCase()}. Actualiza tu plan para seguir creando.
+              </AlertDescription>
+            </div>
+          </div>
+          <Button asChild>
+            <Link href="/dashboard/subscription">Actualizar a PRO →</Link>
+          </Button>
+        </Alert>
+      )}
+
+      {showLimitWarning && !couponLimitReached && (
+        <Alert variant="default" className="flex flex-col sm:flex-row items-center justify-between gap-4 border-yellow-500 text-yellow-700 [&>svg]:text-yellow-500">
+          <div className="flex items-center gap-3">
+            <AlertTriangle className="h-6 w-6" />
+            <div>
+              <AlertTitle>Casi en tu límite de cupones</AlertTitle>
+              <AlertDescription>
+                Has usado {coupons.length} de {limits.coupons} cupones de tu plan {plan.toUpperCase()}. Considera actualizar tu plan.
+              </AlertDescription>
+            </div>
+          </div>
+          <Button asChild variant="outline">
+            <Link href="/dashboard/subscription">Ver planes →</Link>
+          </Button>
+        </Alert>
+      )}
 
       <Card>
         <Table>
@@ -183,13 +229,26 @@ export default function CuponesPage() {
         isOpen={isDialogOpen} 
         onClose={() => setIsDialogOpen(false)} 
         coupon={editingCoupon} 
-        businessId={user?.uid!} 
+        businessId={user?.uid!}
+        canCreate={!couponLimitReached}
       />
     </div>
   );
 }
 
-function CouponDialog({ isOpen, onClose, coupon, businessId }: { isOpen: boolean, onClose: () => void, coupon: Coupon | null, businessId: string }) {
+function CouponDialog({ 
+  isOpen, 
+  onClose, 
+  coupon, 
+  businessId,
+  canCreate 
+}: { 
+  isOpen: boolean, 
+  onClose: () => void, 
+  coupon: Coupon | null, 
+  businessId: string,
+  canCreate: boolean
+}) {
   const { toast } = useToast();
   
   const initialDefaults = {
@@ -220,6 +279,11 @@ function CouponDialog({ isOpen, onClose, coupon, businessId }: { isOpen: boolean
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!coupon && !canCreate) {
+      toast({ variant: 'destructive', title: 'Límite alcanzado', description: 'No puedes crear más cupones con tu plan actual.' });
+      return;
+    }
 
     if (!formData.codigo?.trim() || formData.valor! <= 0) {
         toast({ variant: 'destructive', title: 'Error', description: 'El código y el valor son obligatorios.' });
@@ -315,7 +379,9 @@ function CouponDialog({ isOpen, onClose, coupon, businessId }: { isOpen: boolean
           </div>
 
           <DialogFooter className="pt-4">
-            <Button type="submit" className="w-full">Guardar Cupón</Button>
+            <Button type="submit" className="w-full" disabled={!coupon && !canCreate}>
+              {coupon ? 'Guardar Cambios' : 'Crear Cupón'}
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>
