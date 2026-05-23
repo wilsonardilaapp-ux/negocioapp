@@ -558,6 +558,32 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
                     <span className="font-black text-2xl text-primary">{formatCurrency(total)}</span>
                 </div>
             </div>
+
+            <div className="flex gap-3 mb-4">
+                <Button 
+                    type="button" 
+                    variant="outline" 
+                    className="flex-1 h-12 font-bold border-2" 
+                    onClick={() => {
+                        // Surgical clearing by removing each item
+                        cartItems.forEach(item => onRemoveItem(item.id));
+                        onOpenChange(false);
+                        toast({ title: "Carrito vaciado" });
+                    }}
+                >
+                    <Trash2 className="mr-2 h-5 w-5" />
+                    Limpiar
+                </Button>
+                <Button 
+                    type="button" 
+                    variant="outline" 
+                    className="flex-1 h-12 font-bold border-2"
+                    onClick={() => onOpenChange(false)}
+                >
+                    <ShoppingBag className="mr-2 h-5 w-5" />
+                    Seguir Comprando
+                </Button>
+            </div>
             
             <button 
                 type="submit" 
