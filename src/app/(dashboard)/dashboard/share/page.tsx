@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
@@ -25,13 +26,12 @@ import {
   Loader2,
 } from 'lucide-react';
 import { useUser, useFirestore, useDoc, useMemoFirebase, setDocumentNonBlocking } from '@/firebase';
-import { doc } from 'firebase/firestore';
+import { doc, setDoc } from 'firebase/firestore';
 import type { MenuShare, QRConfig } from '@/models/share';
 import { useToast } from '@/hooks/use-toast';
 import QRCode from "react-qr-code";
 import html2canvas from 'html2canvas';
 import { WhatsAppIcon } from '@/components/icons';
-import { Slider } from '@/components/ui/slider';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
@@ -108,7 +108,7 @@ const SocialPreviewImageUploader = ({ imageUrl, onUpload, onRemove }: {
         const file = event.target.files?.[0];
         if (!file) return;
 
-        if (file.size > 5 * 1024 * 1024) { // 5MB limit
+        if (file.size > 5 * 1024 * 1024) {
             toast({
                 variant: "destructive",
                 title: "Archivo muy grande",
@@ -149,7 +149,6 @@ const SocialPreviewImageUploader = ({ imageUrl, onUpload, onRemove }: {
     );
 };
 
-
 export default function SharePage() {
   const { user } = useUser();
   const firestore = useFirestore();
@@ -159,7 +158,7 @@ export default function SharePage() {
   const [copied, setCopied] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const qrCodeRef = useRef<HTMLDivElement>(null);
-  const hasInitialized = useRef(false);
+  const hasLoadedInitial = useRef(false);
 
   const shareConfigRef = useMemoFirebase(() => 
     user ? doc(firestore, `businesses/${user.uid}/shareConfig`, 'main') : null,
@@ -168,23 +167,31 @@ export default function SharePage() {
   
   const { data: savedShareConfig, isLoading } = useDoc<MenuShare>(shareConfigRef);
   
-  // Initialize state from server only once to avoid race conditions
+  // Sincronización robusta: Solo cargamos desde el servidor una vez al inicio
   useEffect(() => {
-    if (isLoading || !user || hasInitialized.current) return;
+    if (isLoading || !user || hasLoadedInitial.current) return;
 
     if (savedShareConfig) {
-        const mergedConfig = {
-            ...defaultShareConfig,
+        // Combinamos valores del servidor con valores por defecto para asegurar integridad
+        const mergedConfig: MenuShare = {
             ...savedShareConfig,
+            id: savedShareConfig.id || 'main',
+            businessId: savedShareConfig.businessId || user.uid,
+            useCustomSlug: savedShareConfig.useCustomSlug ?? false, // Forzar booleano
+            slug: savedShareConfig.slug || user.uid,
             qrConfig: {
                 ...defaultShareConfig.qrConfig,
                 ...(savedShareConfig.qrConfig || {}),
             },
+            socialShareMessage: savedShareConfig.socialShareMessage || defaultShareConfig.socialShareMessage,
+            isActive: savedShareConfig.isActive ?? true,
+            createdAt: savedShareConfig.createdAt || new Date().toISOString(),
+            updatedAt: savedShareConfig.updatedAt || new Date().toISOString(),
         };
         setShareConfig(mergedConfig);
-        hasInitialized.current = true;
-    } else {
-      // Create a default config if one doesn't exist
+        hasLoadedInitial.current = true;
+    } else if (savedShareConfig === null) {
+      // Si no existe, inicializamos uno nuevo
       const newConfig: MenuShare = {
         id: 'main',
         businessId: user.uid,
@@ -194,55 +201,47 @@ export default function SharePage() {
         updatedAt: new Date().toISOString(),
       };
       setShareConfig(newConfig);
-      if (shareConfigRef) {
-        setDocumentNonBlocking(shareConfigRef, newConfig);
-      }
-      hasInitialized.current = true;
+      hasLoadedInitial.current = true;
     }
-  }, [savedShareConfig, isLoading, user, shareConfigRef]);
+  }, [savedShareConfig, isLoading, user]);
 
-  const handleLocalChange = (newConfig: Partial<MenuShare>) => {
-    if (!shareConfig) return;
-    setShareConfig(prev => prev ? { ...prev, ...newConfig } : null);
+  const handleLocalChange = (newValues: Partial<MenuShare>) => {
+    setShareConfig(prev => prev ? { ...prev, ...newValues } : null);
   };
   
   const handleManualSave = async () => {
-    if (!shareConfig || !shareConfigRef) return;
+    if (!shareConfig || !shareConfigRef || !firestore) return;
     setIsSaving(true);
     try {
       const dataToSave = { 
         ...shareConfig, 
         updatedAt: new Date().toISOString() 
       };
-      await setDocumentNonBlocking(shareConfigRef, dataToSave, { merge: true });
+      
+      // Usamos setDoc directo para sobreescribir el documento completo con el estado actual
+      await setDoc(shareConfigRef, dataToSave);
+      
       toast({
-        title: '¡Éxito!',
-        description: 'La configuración de compartir se ha guardado correctamente.',
+        title: '¡Cambios Guardados!',
+        description: 'La configuración de tu enlace personalizado ha sido actualizada.',
       });
-    } catch (error) {
+    } catch (error: any) {
+      console.error("Error al guardar configuración de compartir:", error);
       toast({
         variant: 'destructive',
-        title: 'Error',
-        description: 'No se pudo guardar la configuración.',
+        title: 'Error al guardar',
+        description: 'No se pudo persistir la configuración. Intenta de nuevo.',
       });
     } finally {
       setIsSaving(false);
     }
   };
 
-  const handleQRConfigChange = (newQRConfig: QRConfig) => {
-    handleLocalChange({ qrConfig: newQRConfig });
-  };
-
-  const getCatalogUrl = () => {
-    if (typeof window !== 'undefined' && shareConfig?.slug) {
-      const slug = shareConfig.useCustomSlug ? shareConfig.slug : user?.uid;
-      return `${window.location.origin}/catalog/${slug}`;
-    }
-    return '';
-  };
-
-  const menuUrl = getCatalogUrl();
+  const menuUrl = useMemo(() => {
+    if (typeof window === 'undefined' || !shareConfig || !user) return '';
+    const slugToUse = shareConfig.useCustomSlug ? (shareConfig.slug || '') : user.uid;
+    return `${window.location.origin}/catalog/${slugToUse}`;
+  }, [shareConfig, user]);
 
   const handleCopyLink = async () => {
     await navigator.clipboard.writeText(menuUrl);
@@ -254,66 +253,33 @@ export default function SharePage() {
   const downloadQR = () => {
     if (!qrCodeRef.current) return;
     html2canvas(qrCodeRef.current, { backgroundColor: null }).then((canvas) => {
-        const dataUrl = canvas.toDataURL('image/png');
         const link = document.createElement('a');
-        link.download = 'qr-catalogo.png';
-        link.href = dataUrl;
+        link.download = 'qr-menu-digital.png';
+        link.href = canvas.toDataURL('image/png');
         link.click();
-    }).catch(function (error) {
-        console.error('Error generando QR:', error);
-        toast({
-          variant: 'destructive',
-          title: 'Error al descargar QR',
-          description: 'No se pudo generar la imagen del código QR.',
-        });
-      });
+    });
   };
 
-    const handleSocialImageUpload = async (file: File) => {
-        const reader = new FileReader();
-        reader.readAsDataURL(file);
-        reader.onloadend = async () => {
-            const mediaDataUri = reader.result as string;
-            try {
-                const result = await uploadMedia({ mediaDataUri });
-                handleLocalChange({ socialPreviewImageUrl: result.secure_url });
-                toast({ title: "Imagen subida localmente", description: "Presiona Guardar para aplicar permanentemente." });
-            } catch (error: any) {
-                toast({ variant: 'destructive', title: "Error al subir", description: error.message });
-            }
-        };
+  const handleSocialImageUpload = async (file: File) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onloadend = async () => {
+        const mediaDataUri = reader.result as string;
+        try {
+            const result = await uploadMedia({ mediaDataUri });
+            handleLocalChange({ socialPreviewImageUrl: result.secure_url });
+            toast({ title: "Imagen subida", description: "Recuerda presionar Guardar Cambios para finalizar." });
+        } catch (error: any) {
+            toast({ variant: 'destructive', title: "Error al subir", description: error.message });
+        }
     };
-    
-    const handleShareSocialWhatsApp = () => {
-        const text = encodeURIComponent(shareConfig?.socialShareMessage || `¡Mira nuestro menú digital! ${menuUrl}`);
-        const whatsappUrl = `https://wa.me/?text=${text}`;
-        window.open(whatsappUrl, '_blank');
-    };
-  
-  const handleShare = (platform: 'facebook' | 'twitter' | 'whatsapp') => {
-    let url = '';
-    const text = encodeURIComponent(`¡Mira nuestro catálogo de productos!: ${menuUrl}`);
-    switch(platform) {
-        case 'facebook':
-            url = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(menuUrl)}`;
-            break;
-        case 'twitter':
-             url = `https://twitter.com/intent/tweet?url=${encodeURIComponent(menuUrl)}&text=${encodeURIComponent('¡Mira nuestro catálogo de productos!')}`;
-            break;
-        case 'whatsapp':
-            url = `https://api.whatsapp.com/send?text=${text}`;
-            break;
-    }
-    window.open(url, '_blank');
   };
 
   if (isLoading && !shareConfig) {
     return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin" /></div>;
   }
   
-  if (!shareConfig) return null;
-
-  const { qrConfig } = shareConfig;
+  if (!shareConfig || !user) return null;
 
   return (
     <div className="space-y-6">
@@ -321,9 +287,9 @@ export default function SharePage() {
         <CardHeader className="flex flex-row justify-between items-center">
           <div className="space-y-1">
             <CardTitle>Compartir Menú</CardTitle>
-            <CardDescription>Facilita a tus clientes el acceso a tu catálogo de productos.</CardDescription>
+            <CardDescription>Gestiona el acceso público a tu catálogo digital.</CardDescription>
           </div>
-          <Button onClick={handleManualSave} disabled={isSaving}>
+          <Button onClick={handleManualSave} disabled={isSaving} className="bg-primary hover:bg-primary/90">
             {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
             Guardar Cambios
           </Button>
@@ -333,40 +299,41 @@ export default function SharePage() {
       <Card>
         <CardHeader>
             <CardTitle className="flex items-center gap-2"><Link2 className="h-5 w-5" /> URL Personalizada</CardTitle>
-            <CardDescription>Crea un enlace corto y memorable para tu menú.</CardDescription>
+            <CardDescription>Activa y define tu alias para un enlace más profesional.</CardDescription>
         </CardHeader>
-        <CardContent>
-            <div className="flex items-center justify-between rounded-lg border p-4">
-                <div>
-                    <Label htmlFor="custom-slug-switch">Usar alias personalizado</Label>
-                    <p className="text-sm text-muted-foreground">Activa para crear una URL corta para tu menú</p>
+        <CardContent className="space-y-4">
+            <div className="flex items-center justify-between rounded-lg border p-4 bg-muted/30">
+                <div className="space-y-0.5">
+                    <Label htmlFor="custom-slug-switch" className="text-base">Usar alias personalizado</Label>
+                    <p className="text-sm text-muted-foreground">Permite que tus clientes usen un nombre fácil en lugar de tu ID.</p>
                 </div>
                 <Switch
                     id="custom-slug-switch"
-                    checked={shareConfig.useCustomSlug || false}
+                    checked={shareConfig.useCustomSlug === true}
                     onCheckedChange={(checked) => {
-                        const newSlug = checked ? (shareConfig.slug === user?.uid ? '' : shareConfig.slug) : user?.uid;
-                        handleLocalChange({ useCustomSlug: checked, slug: newSlug || user?.uid });
+                        handleLocalChange({ useCustomSlug: checked });
                     }}
                 />
             </div>
             {shareConfig.useCustomSlug && (
-                <div className="mt-4">
-                    <Label htmlFor="slug-input">Tu alias</Label>
-                    <div className="flex items-center">
-                        <span className="p-2 bg-muted border border-r-0 rounded-l-md text-sm text-muted-foreground">{window.location.origin.replace(/https?:\/\//, '')}/catalog/</span>
+                <div className="space-y-2 animate-in fade-in slide-in-from-top-2 duration-300">
+                    <Label htmlFor="slug-input">Tu Alias de Negocio</Label>
+                    <div className="flex items-center group">
+                        <span className="p-2 bg-muted border border-r-0 rounded-l-md text-sm text-muted-foreground">
+                            {window.location.host}/catalog/
+                        </span>
                         <Input
                             id="slug-input"
-                            className="rounded-l-none rounded-r-none"
-                            value={shareConfig.slug === user?.uid ? '' : shareConfig.slug}
-                            placeholder="tu-negocio"
-                            onChange={(e) => handleLocalChange({ slug: e.target.value })}
+                            className="rounded-none focus-visible:ring-0 focus-visible:ring-offset-0"
+                            value={shareConfig.slug === user.uid ? '' : shareConfig.slug}
+                            placeholder="nombre-de-tu-negocio"
+                            onChange={(e) => handleLocalChange({ slug: e.target.value.toLowerCase().replace(/\s+/g, '-') })}
                         />
                          <Button variant="outline" size="icon" className="rounded-l-none border-l-0" onClick={handleCopyLink}>
                             {copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
-                            <span className="sr-only">Copiar URL</span>
                         </Button>
                     </div>
+                    <p className="text-xs text-muted-foreground">Solo letras, números y guiones.</p>
                 </div>
             )}
         </CardContent>
@@ -375,28 +342,31 @@ export default function SharePage() {
       <Card>
         <CardHeader>
             <CardTitle className="flex items-center gap-2"><Share2 className="h-5 w-5" /> Vista Previa Social</CardTitle>
-            <CardDescription>Personaliza cómo se ve tu menú al compartirlo en redes sociales.</CardDescription>
+            <CardDescription>Cómo se verá tu catálogo al compartirlo en WhatsApp o redes.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-            <div className="max-w-lg mx-auto">
+            <div className="max-w-md mx-auto">
               <SocialPreviewImageUploader
                   imageUrl={shareConfig.socialPreviewImageUrl}
                   onUpload={handleSocialImageUpload}
                   onRemove={() => handleLocalChange({ socialPreviewImageUrl: null })}
               />
             </div>
-            <div>
-                <Label htmlFor="social-message">Mensaje personalizado</Label>
+            <div className="space-y-2">
+                <Label htmlFor="social-message">Mensaje Predeterminado</Label>
                 <Textarea
                     id="social-message"
                     placeholder="¡Hola! Te invito a ver nuestro menú digital ✨"
                     value={shareConfig.socialShareMessage || ''}
                     onChange={(e) => handleLocalChange({ socialShareMessage: e.target.value })}
+                    rows={3}
                 />
-                <p className="text-xs text-muted-foreground mt-1">Este mensaje se incluirá al compartir por WhatsApp.</p>
             </div>
-            <Button className="w-full bg-green-500 hover:bg-green-600" onClick={handleShareSocialWhatsApp}>
-                <WhatsAppIcon className="h-5 w-5 mr-2" /> Compartir en WhatsApp
+            <Button className="w-full bg-green-600 hover:bg-green-700" onClick={() => {
+                const text = encodeURIComponent(`${shareConfig.socialShareMessage || '¡Mira mi catálogo!'} ${menuUrl}`);
+                window.open(`https://wa.me/?text=${text}`, '_blank');
+            }}>
+                <WhatsAppIcon className="h-5 w-5 mr-2" /> Compartir por WhatsApp
             </Button>
         </CardContent>
       </Card>
@@ -411,51 +381,57 @@ export default function SharePage() {
                 </TabsList>
                 <TabsContent value="qr" className="mt-4">
                     <Card>
-                        <CardContent className="pt-6 flex flex-col items-center">
-                          <div ref={qrCodeRef} style={{ background: qrConfig.backgroundColor, padding: '16px', display: 'inline-block', borderRadius: '8px' }}>
+                        <CardContent className="pt-6 flex flex-col items-center gap-4">
+                          <div ref={qrCodeRef} style={{ background: shareConfig.qrConfig.backgroundColor, padding: '16px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
                             <QRCode
                               value={menuUrl}
-                              size={256}
-                              bgColor={qrConfig.backgroundColor}
-                              fgColor={qrConfig.foregroundColor}
-                              level={qrConfig.errorCorrectionLevel}
+                              size={220}
+                              bgColor={shareConfig.qrConfig.backgroundColor}
+                              fgColor={shareConfig.qrConfig.foregroundColor}
+                              level={shareConfig.qrConfig.errorCorrectionLevel}
                             />
                           </div>
-                           <div className="flex gap-2 mt-4">
-                            <Button onClick={downloadQR}><Download className="w-4 h-4 mr-2" /> Descargar PNG</Button>
-                          </div>
+                          <Button onClick={downloadQR} variant="secondary"><Download className="mr-2 h-4 w-4" /> Descargar Imagen QR</Button>
                         </CardContent>
                     </Card>
                 </TabsContent>
                 <TabsContent value="link" className="mt-4">
                     <Card>
-                        <CardHeader><CardTitle>Enlace Directo</CardTitle></CardHeader>
+                        <CardHeader><CardTitle>Enlace del Catálogo</CardTitle></CardHeader>
                         <CardContent className="space-y-4">
                             <div className="flex gap-2">
-                                <Input value={menuUrl} readOnly />
-                                <Button onClick={handleCopyLink}>
-                                {copied ? <Check className="w-4 h-4 mr-2" /> : <Copy className="w-4 h-4 mr-2" />}
-                                {copied ? 'Copiado' : 'Copiar'}
+                                <Input value={menuUrl} readOnly className="bg-muted" />
+                                <Button onClick={handleCopyLink} variant="outline">
+                                    {copied ? <Check className="h-4 w-4 mr-2" /> : <Copy className="h-4 w-4 mr-2" />}
+                                    {copied ? 'Copiado' : 'Copiar'}
                                 </Button>
                             </div>
-                            <Button onClick={() => window.open(menuUrl, '_blank')}><Eye className="w-4 h-4 mr-2" /> Abrir Menú</Button>
+                            <Button className="w-full" variant="default" onClick={() => window.open(menuUrl, '_blank')}>
+                                <Eye className="w-4 h-4 mr-2" /> Previsualizar como Cliente
+                            </Button>
                         </CardContent>
                     </Card>
                 </TabsContent>
                  <TabsContent value="social" className="mt-4">
                     <Card>
-                         <CardHeader><CardTitle>Compartir en Redes</CardTitle></CardHeader>
-                         <CardContent className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                            <Button className="bg-green-500 hover:bg-green-600" onClick={() => handleShare('whatsapp')}><WhatsAppIcon className="w-4 h-4 mr-2" /> WhatsApp</Button>
-                            <Button className="bg-blue-600 hover:bg-blue-700" onClick={() => handleShare('facebook')}><Facebook className="w-4 h-4 mr-2" /> Facebook</Button>
-                            <Button className="bg-sky-500 hover:bg-sky-600" onClick={() => handleShare('twitter')}><Twitter className="w-4 h-4 mr-2" /> Twitter</Button>
+                         <CardHeader><CardTitle>Compartir Ahora</CardTitle></CardHeader>
+                         <CardContent className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            <Button className="bg-[#1877F2] hover:bg-[#166fe5]" onClick={() => window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(menuUrl)}`, '_blank')}>
+                                <FacebookIcon className="h-4 w-4 mr-2" /> Facebook
+                            </Button>
+                            <Button className="bg-black hover:bg-zinc-800" onClick={() => window.open(`https://twitter.com/intent/tweet?url=${encodeURIComponent(menuUrl)}`, '_blank')}>
+                                <XIcon className="h-4 w-4 mr-2" /> Twitter / X
+                            </Button>
+                            <Button variant="outline" className="border-primary text-primary" onClick={handleCopyLink}>
+                                <Copy className="h-4 w-4 mr-2" /> Copiar Link
+                            </Button>
                          </CardContent>
                     </Card>
                 </TabsContent>
             </Tabs>
         </div>
         <div className="lg:col-span-1">
-            <QRCodeCustomizer config={qrConfig} setConfig={handleQRConfigChange} />
+            <QRCodeCustomizer config={shareConfig.qrConfig} setConfig={(newQR) => handleLocalChange({ qrConfig: newQR })} />
         </div>
       </div>
     </div>
