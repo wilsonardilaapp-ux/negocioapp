@@ -1,9 +1,8 @@
-
 "use client";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useUser, useCollection, useFirestore, useMemoFirebase } from "@/firebase";
+import { useUser, useFirestore, useMemoFirebase } from "@/firebase";
 import { collection, query, where, doc, writeBatch } from "firebase/firestore";
 import type { Module } from "@/models/module";
 import type { SystemService } from "@/models/system-service";
@@ -27,6 +26,7 @@ import {
   Bell,
   ScanLine,
   Tag,
+  Ticket,
 } from "lucide-react";
 import { MessageCircle as MessageCircleIcon } from "@/components/icons";
 
@@ -39,6 +39,7 @@ const allNavItems = [
   { href: "/dashboard/share", icon: Share2, label: "Compartir Menú" },
   { href: "/dashboard/blog", icon: FileText, label: "Blog", moduleId: 'blog' },
   { href: "/dashboard/promotions", icon: Tag, label: "Promociones" },
+  { href: "/dashboard/cupones", icon: Ticket, label: "Cupones" },
   { href: "/dashboard/messages", icon: Bell, label: "Notificaciones" },
   { href: "/dashboard/mensajes-clientes", icon: Mail, label: "Mensajes de Clientes" },
   { href: "/dashboard/contacto", icon: MessageSquare, label: "Soporte" },
@@ -65,12 +66,10 @@ export function ClientNav() {
   const { user } = useUser();
 
   const activeFeatures = useMemo(() => {
-    // Para simplificar y dado que es un módulo nuevo solicitado, lo habilitamos por defecto
-    // En un entorno productivo real, esto dependería del plan contratado.
     return new Set(['catalogo', 'blog', 'promotions']);
   }, []);
 
-  const navItems = allNavItems; // Simplificado para asegurar visibilidad
+  const navItems = allNavItems;
 
   return (
     <SidebarMenu>

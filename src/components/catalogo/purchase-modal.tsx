@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { ShoppingBag, Minus, Plus, Tag, Trash2, Loader2 } from 'lucide-react';
+import { ShoppingBag, Minus, Plus, Tag, Trash2, Loader2, Ticket, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { PaymentSettings } from '@/models/payment-settings';
 import type { TipoEntrega } from '@/models/order';
@@ -20,7 +20,9 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import type { LandingHeaderConfigData } from '@/models/landing-page';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { promotionService } from '@/services/promotion-service';
+import { couponService } from '@/services/coupon-service';
 import type { Promotion } from '@/models/promotion';
+import type { Coupon } from '@/models/coupon';
 import { WhatsAppIcon } from '@/components/icons';
 import { Badge } from '@/components/ui/badge';
 
@@ -57,6 +59,11 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
   const [tipoEntrega, setTipoEntrega] = useState<TipoEntrega>('domicilio');
   const [activePromos, setActivePromotions] = useState<Promotion[]>([]);
   
+  // Coupon state
+  const [couponCode, setCouponCode] = useState('');
+  const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null);
+  const [isValidatingCoupon, setIsValidatingCoupon] = useState(false);
+
   useEffect(() => {
     if (isOpen && businessId) {
         promotionService.getActivePromotions(businessId).then(promos => {
@@ -72,7 +79,6 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
   const packagingTotal = cartItems.reduce((sum, item) => sum + ((item.packagingCost ?? 0) * item.quantity), 0);
   const totalQuantity = cartItems.reduce((sum, item) => sum + item.quantity, 0);
   
-  // Calculate subtotal using discounted prices if available
   const subtotalProducts = useMemo(() => {
       return cartItems.reduce((sum, item) => {
           const unitPrice = item.appliedPromotion?.discountedPrice ?? item.price;
@@ -80,19 +86,51 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
       }, 0);
   }, [cartItems]);
 
-  const subtotalBeforeVat = subtotalProducts + packagingTotal;
+  const discountFromCoupon = useMemo(() => {
+    if (!appliedCoupon) return 0;
+    if (appliedCoupon.tipo === 'porcentaje') {
+        return subtotalProducts * (appliedCoupon.valor / 100);
+    }
+    return Math.min(appliedCoupon.valor, subtotalProducts);
+  }, [appliedCoupon, subtotalProducts]);
+
+  const subtotalAfterCoupon = subtotalProducts - discountFromCoupon;
+  const subtotalBeforeVat = subtotalAfterCoupon + packagingTotal;
   const vatRate = businessInfo?.vatRate ?? 0;
   const vatAmount = subtotalBeforeVat * (vatRate / 100);
   const total = subtotalBeforeVat + vatAmount + (tipoEntrega === 'domicilio' ? (businessInfo?.deliveryFee ?? 0) : 0);
 
-  // Global order-level promotion
   const applicableGlobalPromo = activePromos.find(p => 
       p.applicableTo === 'order' && 
       p.minQuantity !== undefined && 
       totalQuantity >= p.minQuantity
   ) ?? null;
 
-  const onSubmit = (data: z.infer<typeof purchaseSchema>) => {
+  const handleApplyCoupon = async () => {
+    if (!couponCode.trim()) return;
+    setIsValidatingCoupon(true);
+    try {
+        const result = await couponService.validateCoupon(businessId, couponCode, subtotalProducts);
+        if (result.success && result.coupon) {
+            setAppliedCoupon(result.coupon);
+            toast({ title: 'Cupón aplicado', description: `Se ha aplicado un descuento de ${result.coupon.tipo === 'porcentaje' ? `${result.coupon.valor}%` : formatCurrency(result.coupon.valor)}.` });
+        } else {
+            toast({ variant: 'destructive', title: 'Cupón inválido', description: result.error });
+            setAppliedCoupon(null);
+        }
+    } catch (e) {
+        toast({ variant: 'destructive', title: 'Error', description: 'Ocurrió un error al validar el cupón.' });
+    } finally {
+        setIsValidatingCoupon(false);
+    }
+  };
+
+  const handleRemoveCoupon = () => {
+    setAppliedCoupon(null);
+    setCouponCode('');
+  };
+
+  const onSubmit = async (data: z.infer<typeof purchaseSchema>) => {
     let orderSummary = `*Nuevo Pedido*\n\n`;
     orderSummary += `*Cliente:* ${data.fullName}\n`;
     orderSummary += `*Teléfono:* ${data.whatsapp}\n`;
@@ -107,6 +145,9 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
 
     orderSummary += `\n*Resumen:*\n`;
     orderSummary += `Subtotal: ${formatCurrency(subtotalProducts)}\n`;
+    if (discountFromCoupon > 0 && appliedCoupon) {
+        orderSummary += `Descuento Cupón (${appliedCoupon.codigo}): -${formatCurrency(discountFromCoupon)}\n`;
+    }
     if (vatAmount > 0) orderSummary += `I.V.A (${vatRate}%): ${formatCurrency(vatAmount)}\n`;
     if (packagingTotal > 0) orderSummary += `Empaque: ${formatCurrency(packagingTotal)}\n`;
     if (tipoEntrega === 'domicilio' && (businessInfo?.deliveryFee ?? 0) > 0) {
@@ -120,6 +161,11 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
 
     if (data.message) {
         orderSummary += `\n\n*Nota:* ${data.message}`;
+    }
+
+    // Atomic increment of coupon usage
+    if (appliedCoupon) {
+        await couponService.incrementUsage(appliedCoupon.id);
     }
 
     const whatsappUrl = `https://wa.me/${businessInfo?.phone.replace(/\D/g, '')}?text=${encodeURIComponent(orderSummary)}`;
@@ -218,6 +264,38 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
             </div>
           </div>
 
+          <div className="space-y-4">
+            <h4 className="font-bold text-lg flex items-center gap-2"><Ticket className="h-5 w-5" /> ¿Tienes un cupón?</h4>
+            <div className="flex gap-2">
+                <div className="relative flex-1">
+                    <Input 
+                        placeholder="Ingresa tu código" 
+                        value={couponCode} 
+                        onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                        disabled={!!appliedCoupon || isValidatingCoupon}
+                        className="font-bold uppercase tracking-wider"
+                    />
+                    {appliedCoupon && (
+                        <button 
+                            onClick={handleRemoveCoupon}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-destructive"
+                        >
+                            <X className="h-4 w-4" />
+                        </button>
+                    )}
+                </div>
+                {!appliedCoupon ? (
+                    <Button onClick={handleApplyCoupon} disabled={isValidatingCoupon || !couponCode.trim()}>
+                        {isValidatingCoupon ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Aplicar'}
+                    </Button>
+                ) : (
+                    <Badge variant="outline" className="border-green-200 bg-green-50 text-green-700 h-10 px-4">
+                        <CheckCircle className="h-4 w-4 mr-2" /> Aplicado
+                    </Badge>
+                )}
+            </div>
+          </div>
+
           <form id="purchase-form" onSubmit={handleSubmit(onSubmit)} className="space-y-6 pb-6">
             <div className="space-y-4">
                 <h4 className="font-bold text-lg">Tus Datos</h4>
@@ -292,6 +370,12 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
                     <span className="text-muted-foreground">Subtotal productos:</span>
                     <span>{formatCurrency(subtotalProducts)}</span>
                 </div>
+                {appliedCoupon && (
+                    <div className="flex justify-between text-sm text-green-600 font-bold animate-in fade-in slide-in-from-right-2">
+                        <span>Descuento Cupón ({appliedCoupon.codigo}):</span>
+                        <span>-{formatCurrency(discountFromCoupon)}</span>
+                    </div>
+                )}
                 {vatRate > 0 && (
                     <div className="flex justify-between text-sm">
                         <span className="text-muted-foreground">I.V.A ({vatRate}%):</span>
