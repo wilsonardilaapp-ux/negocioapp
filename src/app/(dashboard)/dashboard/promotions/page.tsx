@@ -46,7 +46,7 @@ export default function PromotionsPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingPromo, setEditingPromo] = useState<Promotion | null>(null);
 
-  // Check global module status (SaaS-wide toggle)
+  // Check global module status (SaaS-wide toggle) - Standardized to 'promotions'
   const globalModuleRef = useMemoFirebase(() => 
     !firestore ? null : doc(firestore, 'modules', 'promotions'), 
   [firestore]);
@@ -105,11 +105,13 @@ export default function PromotionsPage() {
   }
 
   // A business has access if:
-  // 1. The module is active globally.
+  // 1. The module is active globally (Standard ID 'promotions').
   // 2. AND (They have a manual assignment OR their plan allows promotions).
   const isModuleActiveGlobally = globalModule?.status === 'active';
   const isAssignedToBusiness = businessModule?.status === 'active';
-  const hasPlanPermission = limits.promotions !== 0; // -1 (unlimited) or > 0
+  
+  // Logic: if limit is -1 (unlimited) or greater than 0, they have permission.
+  const hasPlanPermission = limits.promotions !== 0;
 
   const moduleInactive = !isModuleActiveGlobally || (!isAssignedToBusiness && !hasPlanPermission);
 

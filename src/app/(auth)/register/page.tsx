@@ -268,7 +268,6 @@ export default function RegisterPage() {
       }
 
       // Assign default modules to ANY new user.
-      // NOTE: Promotions is excluded from here as only Super Admin can assign it manually.
       const defaultModulesForNewUser: { id: string, name: string, description: string }[] = [
         { id: 'catalogo', name: 'Catálogo', description: 'Módulo para gestionar el catálogo de productos.' },
         { id: 'blog', name: 'Blog', description: 'Módulo para gestionar el blog.' },
@@ -509,7 +508,7 @@ export default function RegisterPage() {
               name="password"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Contraseña</FormLabel>
+                  <FormLabel>Contraseña</Label>
                   <div className="relative">
                     <FormControl>
                       <Input

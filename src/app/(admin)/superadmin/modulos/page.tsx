@@ -23,7 +23,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from "@/hooks/use-toast";
-import { PlusCircle, Trash2, Box, FileText, Edit, Loader2 } from 'lucide-react';
+import { PlusCircle, Trash2, Box, FileText, Edit, Loader2, Tag } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
