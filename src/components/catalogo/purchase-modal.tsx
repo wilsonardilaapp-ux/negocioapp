@@ -82,7 +82,8 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
 
   const subtotalBeforeVat = subtotalProducts + packagingTotal;
   const vatRate = businessInfo?.vatRate ?? 0;
-  const total = subtotalBeforeVat * (1 + vatRate/100) + (tipoEntrega === 'domicilio' ? (businessInfo?.deliveryFee ?? 0) : 0);
+  const vatAmount = subtotalBeforeVat * (vatRate / 100);
+  const total = subtotalBeforeVat + vatAmount + (tipoEntrega === 'domicilio' ? (businessInfo?.deliveryFee ?? 0) : 0);
 
   // Global order-level promotion
   const applicableGlobalPromo = activePromos.find(p => 
@@ -106,6 +107,7 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
 
     orderSummary += `\n*Resumen:*\n`;
     orderSummary += `Subtotal: ${formatCurrency(subtotalProducts)}\n`;
+    if (vatAmount > 0) orderSummary += `I.V.A (${vatRate}%): ${formatCurrency(vatAmount)}\n`;
     if (packagingTotal > 0) orderSummary += `Empaque: ${formatCurrency(packagingTotal)}\n`;
     if (tipoEntrega === 'domicilio' && (businessInfo?.deliveryFee ?? 0) > 0) {
         orderSummary += `Domicilio: ${formatCurrency(businessInfo?.deliveryFee ?? 0)}\n`;
@@ -290,6 +292,12 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
                     <span className="text-muted-foreground">Subtotal productos:</span>
                     <span>{formatCurrency(subtotalProducts)}</span>
                 </div>
+                {vatRate > 0 && (
+                    <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">I.V.A ({vatRate}%):</span>
+                        <span>{formatCurrency(vatAmount)}</span>
+                    </div>
+                )}
                 {packagingTotal > 0 && (
                     <div className="flex justify-between text-sm">
                         <span className="text-muted-foreground">Costo de empaque:</span>
