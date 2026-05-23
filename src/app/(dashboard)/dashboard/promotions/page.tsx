@@ -1,8 +1,8 @@
 
 'use client';
 
-import { useState, useTransition } from 'react';
-import { useUser } from '@/firebase';
+import { useState, useTransition, useEffect } from 'react';
+import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { usePromotions } from '@/hooks/use-promotions';
 import { promotionService, CreatePromotionInput } from '@/services/promotion-service';
 import { 
@@ -28,18 +28,49 @@ import {
 } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Edit, Trash2, Loader2, Tag } from 'lucide-react';
+import { PlusCircle, Edit, Trash2, Loader2, Tag, Frown } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import type { Promotion } from '@/models/promotion';
+import type { Module } from '@/models/module';
+import { doc, getDoc } from 'firebase/firestore';
 
 export default function PromotionsPage() {
   const { user } = useUser();
-  const { promotions, isLoading } = usePromotions();
+  const firestore = useFirestore();
+  const { promotions, isLoading: arePromosLoading } = usePromotions();
   const { toast } = useToast();
+  
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingPromo, setEditingPromo] = useState<Promotion | null>(null);
-  const [isPending, startTransition] = useTransition();
+  const [isModuleLoading, setModuleLoading] = useState(true);
+  const [moduleInactive, setModuleInactive] = useState(false);
+
+  // Check if promotions module is assigned to this business
+  useEffect(() => {
+    if (!user || !firestore) return;
+
+    const checkModuleStatus = async () => {
+        setModuleLoading(true);
+        try {
+            const moduleRef = doc(firestore, `businesses/${user.uid}/modules`, 'promotions');
+            const moduleSnap = await getDoc(moduleRef);
+            
+            if (!moduleSnap.exists() || moduleSnap.data().status === 'inactive') {
+                setModuleInactive(true);
+            } else {
+                setModuleInactive(false);
+            }
+        } catch (error) {
+            console.error("Error checking promotions module status:", error);
+            setModuleInactive(true);
+        } finally {
+            setModuleLoading(false);
+        }
+    };
+
+    checkModuleStatus();
+  }, [user, firestore]);
 
   const handleToggleActive = async (id: string, current: boolean) => {
     try {
@@ -81,8 +112,25 @@ export default function PromotionsPage() {
     return colors[type];
   };
 
-  if (isLoading) {
+  if (isModuleLoading || arePromosLoading) {
     return <div className="flex items-center justify-center h-64"><Loader2 className="animate-spin" /></div>;
+  }
+
+  if (moduleInactive) {
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle>Módulo de Promociones Desactivado</CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-col items-center justify-center text-center gap-4 min-h-[400px]">
+                <Frown className="h-12 w-12 text-muted-foreground" />
+                <h3 className="text-xl font-semibold">Funcionalidad no disponible</h3>
+                <p className="text-muted-foreground max-w-sm">
+                    El módulo de "Promociones" no está activo en tu cuenta. Por favor, contacta al administrador de la plataforma para más información sobre cómo habilitarlo.
+                </p>
+            </CardContent>
+        </Card>
+    );
   }
 
   return (
