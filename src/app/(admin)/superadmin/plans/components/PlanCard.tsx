@@ -77,6 +77,7 @@ export default function PlanCard({ plan, onEdit }: PlanCardProps) {
                         <li className="flex justify-between"><span>Landing Pages:</span> <span className="font-medium">{plan.limits.landingPages === -1 ? <InfinityIcon className="h-4 w-4"/> : plan.limits.landingPages}</span></li>
                         <li className="flex justify-between"><span>Promociones:</span> <span className="font-medium">{plan.limits.promotions === -1 ? <InfinityIcon className="h-4 w-4"/> : plan.limits.promotions}</span></li>
                         <li className="flex justify-between"><span>Cupones:</span> <span className="font-medium">{plan.limits.coupons === -1 ? <InfinityIcon className="h-4 w-4"/> : (plan.limits.coupons ?? 0)}</span></li>
+                        <li className="flex justify-between"><span>Pedidos:</span> <span className="font-medium">{plan.limits.orders === -1 ? <InfinityIcon className="h-4 w-4"/> : (plan.limits.orders ?? 0)}</span></li>
                     </ul>
                 </div>
             </CardContent>

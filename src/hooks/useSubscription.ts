@@ -8,6 +8,7 @@ import type { SubscriptionPlan, PlanLimits } from '@/models/subscription-plan';
 import type { Product } from '@/models/product';
 import type { BlogPost } from '@/models/blog-post';
 import type { LandingPageData } from '@/models/landing-page';
+import type { Order } from '@/models/order';
 
 // Tiempo máximo de espera antes de romper el loading infinito (ms)
 const LOADING_TIMEOUT_MS = 10_000;
@@ -43,6 +44,10 @@ export function useSubscription() {
     () => (user?.uid ? collection(firestore, `businesses/${user.uid}/landingPages`) : null),
     [user?.uid, firestore]
   );
+  const ordersRef = useMemoFirebase(
+    () => (user?.uid ? collection(firestore, `businesses/${user.uid}/orders`) : null),
+    [user?.uid, firestore]
+  );
 
   // Data fetching
   const { data: subscription, isLoading: isSubLoading, error: subError } = useDoc<Subscription>(subscriptionRef);
@@ -50,8 +55,9 @@ export function useSubscription() {
   const { data: products, isLoading: isProductsLoading, error: productsError } = useCollection<Product>(productsRef);
   const { data: blogPosts, isLoading: isBlogPostsLoading, error: blogPostsError } = useCollection<BlogPost>(blogPostsQuery);
   const { data: landingPages, isLoading: isLandingPagesLoading, error: landingPagesError } = useCollection<LandingPageData>(landingPagesRef);
+  const { data: orders, isLoading: isOrdersLoading, error: ordersError } = useCollection<Order>(ordersRef);
 
-  const error = subError || plansError || productsError || blogPostsError || landingPagesError;
+  const error = subError || plansError || productsError || blogPostsError || landingPagesError || ordersError;
 
   // FIX 2: isLoading ahora incluye isUserLoading para que espere al usuario
   const rawIsLoading =
@@ -60,7 +66,8 @@ export function useSubscription() {
     arePlansLoading ||
     isProductsLoading ||
     isBlogPostsLoading ||
-    isLandingPagesLoading;
+    isLandingPagesLoading ||
+    isOrdersLoading;
 
   // FIX 3: Timeout de seguridad — si tras 10s sigue cargando, forzamos salida
   useEffect(() => {
@@ -80,7 +87,7 @@ export function useSubscription() {
   const { plan, isActive, limits, isFree, isPro, isEnterprise } = useMemo(() => {
     const currentPlanId = subscription?.plan ?? 'free';
     const planDetails = allPlans?.find(p => p.id === currentPlanId);
-    const defaultLimits: PlanLimits = { products: 0, blogPosts: 0, landingPages: 0, coupons: 0, promotions: 0 };
+    const defaultLimits: PlanLimits = { products: 0, blogPosts: 0, landingPages: 0, coupons: 0, promotions: 0, orders: -1 };
 
     return {
       plan: currentPlanId as 'free' | 'pro' | 'enterprise',
@@ -95,6 +102,7 @@ export function useSubscription() {
   const productsCount = products?.length ?? 0;
   const blogPostsCount = blogPosts?.length ?? 0;
   const landingPagesCount = landingPages?.length ?? 0;
+  const ordersCount = orders?.length ?? 0;
 
   const canAddBlogPosts = (currentCount: number): boolean => {
     if (limits.blogPosts === -1) return true;
@@ -104,6 +112,11 @@ export function useSubscription() {
   const canAddProducts = (currentCount: number): boolean => {
     if (limits.products === -1) return true;
     return currentCount < limits.products;
+  };
+
+  const canAddOrders = (currentCount: number): boolean => {
+    if (limits.orders === -1) return true;
+    return currentCount < limits.orders;
   };
 
   return {
@@ -120,7 +133,9 @@ export function useSubscription() {
     productsCount,
     blogPostsCount,
     landingPagesCount,
+    ordersCount,
     canAddBlogPosts,
     canAddProducts,
+    canAddOrders,
   };
 }

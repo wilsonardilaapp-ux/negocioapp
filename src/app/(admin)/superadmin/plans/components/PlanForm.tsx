@@ -47,6 +47,7 @@ export default function PlanForm({ existingPlan, onClose }: PlanFormProps) {
                     ...existingPlan.limits,
                     promotions: existingPlan.limits.promotions ?? 0,
                     coupons: existingPlan.limits.coupons ?? 0,
+                    orders: existingPlan.limits.orders ?? -1,
                 }
             });
         } else {
@@ -64,6 +65,7 @@ export default function PlanForm({ existingPlan, onClose }: PlanFormProps) {
                     landingPages: 0,
                     promotions: 0,
                     coupons: 0,
+                    orders: -1,
                 }
             });
         }
@@ -119,7 +121,7 @@ export default function PlanForm({ existingPlan, onClose }: PlanFormProps) {
 
             <div className="space-y-4 rounded-lg border p-4">
                 <h4 className="font-semibold">Límites (-1 para ilimitado)</h4>
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                     <div>
                         <Label htmlFor="limits.products">Productos</Label>
                         <Input id="limits.products" type="number" {...register('limits.products', { valueAsNumber: true })} />
@@ -144,6 +146,11 @@ export default function PlanForm({ existingPlan, onClose }: PlanFormProps) {
                         <Label htmlFor="limits.coupons">Cupones</Label>
                         <Input id="limits.coupons" type="number" {...register('limits.coupons', { valueAsNumber: true })} />
                         {errors.limits?.coupons && <p className="text-sm text-destructive mt-1">{errors.limits.coupons.message}</p>}
+                    </div>
+                    <div>
+                        <Label htmlFor="limits.orders">Pedidos / mes</Label>
+                        <Input id="limits.orders" type="number" {...register('limits.orders', { valueAsNumber: true })} />
+                        {errors.limits?.orders && <p className="text-sm text-destructive mt-1">{errors.limits.orders.message}</p>}
                     </div>
                 </div>
             </div>
