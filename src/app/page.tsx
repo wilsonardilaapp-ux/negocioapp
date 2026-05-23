@@ -66,7 +66,7 @@ const fallbackData: LandingPageData = {
     fields: [
         { id: 'form-field-1', label: 'Nombre Completo', type: 'text', placeholder: 'ej. Juan Pérez', required: true },
         { id: 'form-field-2', label: 'Correo Electrónico', type: 'email', placeholder: 'ej. juan.perez@correo.com', required: true },
-        { id: 'form-field-3', label: 'WhatsApp', type: 'tel', placeholder: 'ej. 3001234567', required: false },
+        { id: 'form-field-3', label: 'WhatsApp', type: 'tel', placeholder: 'ej. 3228831634', required: false },
         { id: 'form-field-4', label: 'Mensaje', type: 'textarea', placeholder: 'Escribe tu consulta aquí...', required: true },
     ],
     destinationEmail: '',
@@ -79,7 +79,7 @@ const fallbackData: LandingPageData = {
     businessInfo: {
       name: 'Tu Negocio',
       address: 'Calle Falsa 123',
-      phone: '+57 300 123 4567',
+      phone: '3228831634',
       email: 'info@tunegocio.com',
     },
     socialLinks: {
@@ -99,7 +99,7 @@ const fallbackData: LandingPageData = {
     enabled: true,
     contactInfo: {
       address: 'Calle Falsa 123, Ciudad, País',
-      phone: '+57 300 123 4567',
+      phone: '3228831634',
       email: 'contacto@empresa.com',
       hours: 'Lunes a Viernes, 9am - 6pm',
     },

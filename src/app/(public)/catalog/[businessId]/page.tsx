@@ -514,10 +514,9 @@ const CatalogHeader = ({ config, cartItemCount, onCartClick }: CatalogHeaderProp
     const socialIcons: any = { tiktok: <TikTokIcon />, instagram: <InstagramIcon />, facebook: <FacebookIcon />, whatsapp: <WhatsAppIcon />, twitter: <XIcon />, };
     
     // SANITIZACIÓN DEFINITIVA PARA PRODUCCIÓN:
-    // 1. Forzar conversión a String para evitar errores con tipos numéricos de la DB.
-    // 2. Eliminar absolutamente todos los caracteres no numéricos EXCEPTO el símbolo +, incluyendo espacios y guiones.
+    // Se eliminan TODOS los caracteres no numéricos para la URL de envío.
     const rawHeaderPhone = String(config.businessInfo.phone || '');
-    const cleanHeaderPhone = rawHeaderPhone.replace(/[^\d+]/g, '');
+    const cleanHeaderPhone = rawHeaderPhone.replace(/\D/g, '');
 
     return (
         <div className="w-full">

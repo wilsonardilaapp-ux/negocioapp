@@ -143,7 +143,7 @@ export default function ContactoPage() {
 
   const contactInfo = [
     { icon: Mail, text: "soporte@zentry.com", href: "mailto:soporte@zentry.com" },
-    { icon: WhatsAppIcon, text: "+57 300 123 4567", href: "https://wa.me/573001234567" },
+    { icon: WhatsAppIcon, text: "3228831634", href: "https://api.whatsapp.com/send?phone=3228831634" },
     { icon: Instagram, text: "@ZentryApp", href: "#" },
     { icon: Facebook, text: "ZentryApp", href: "#" },
     { icon: TikTokIcon, text: "@ZentryApp", href: "#" },

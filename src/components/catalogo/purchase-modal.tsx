@@ -217,10 +217,9 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
     }
 
     // SANITIZACIÓN DEFINITIVA PARA PRODUCCIÓN:
-    // 1. Forzar conversión a String para evitar errores con tipos numéricos de la DB.
-    // 2. Eliminar todos los caracteres no numéricos EXCEPTO el símbolo +, incluyendo espacios y guiones.
+    // Se eliminan TODOS los caracteres no numéricos (incluyendo espacios y el símbolo +)
     const rawPhone = String(businessInfo?.phone || '');
-    const cleanPhone = rawPhone.replace(/[^\d+]/g, '');
+    const cleanPhone = rawPhone.replace(/\D/g, '');
     
     // Usar la URL de la API directa de WhatsApp para mayor compatibilidad
     const whatsappUrl = `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(orderSummary)}`;
