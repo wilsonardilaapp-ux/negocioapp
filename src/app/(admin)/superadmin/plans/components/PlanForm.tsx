@@ -43,6 +43,10 @@ export default function PlanForm({ existingPlan, onClose }: PlanFormProps) {
             reset({
                 ...existingPlan,
                 features: featuresAsObjects,
+                limits: {
+                    ...existingPlan.limits,
+                    promotions: existingPlan.limits.promotions ?? 0,
+                }
             });
         } else {
             reset({
@@ -57,6 +61,7 @@ export default function PlanForm({ existingPlan, onClose }: PlanFormProps) {
                     products: 0,
                     blogPosts: 0,
                     landingPages: 0,
+                    promotions: 0,
                 }
             });
         }
@@ -112,7 +117,7 @@ export default function PlanForm({ existingPlan, onClose }: PlanFormProps) {
 
             <div className="space-y-4 rounded-lg border p-4">
                 <h4 className="font-semibold">Límites (-1 para ilimitado)</h4>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                     <div>
                         <Label htmlFor="limits.products">Productos</Label>
                         <Input id="limits.products" type="number" {...register('limits.products', { valueAsNumber: true })} />
@@ -127,6 +132,11 @@ export default function PlanForm({ existingPlan, onClose }: PlanFormProps) {
                         <Label htmlFor="limits.landingPages">Landing Pages</Label>
                         <Input id="limits.landingPages" type="number" {...register('limits.landingPages', { valueAsNumber: true })} />
                         {errors.limits?.landingPages && <p className="text-sm text-destructive mt-1">{errors.limits.landingPages.message}</p>}
+                    </div>
+                    <div>
+                        <Label htmlFor="limits.promotions">Promociones</Label>
+                        <Input id="limits.promotions" type="number" {...register('limits.promotions', { valueAsNumber: true })} />
+                        {errors.limits?.promotions && <p className="text-sm text-destructive mt-1">{errors.limits.promotions.message}</p>}
                     </div>
                 </div>
             </div>

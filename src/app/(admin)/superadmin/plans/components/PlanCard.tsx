@@ -3,7 +3,7 @@
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Check, Edit, Trash2, InfinityIcon } from "lucide-react";
+import { Check, Edit, Trash2, InfinityIcon, Tag } from "lucide-react";
 import type { SubscriptionPlan } from "@/models/subscription-plan";
 import {
   AlertDialog,
@@ -75,6 +75,7 @@ export default function PlanCard({ plan, onEdit }: PlanCardProps) {
                         <li className="flex justify-between"><span>Productos:</span> <span className="font-medium">{plan.limits.products === -1 ? <InfinityIcon className="h-4 w-4"/> : plan.limits.products}</span></li>
                         <li className="flex justify-between"><span>Posts de Blog:</span> <span className="font-medium">{plan.limits.blogPosts === -1 ? <InfinityIcon className="h-4 w-4"/> : plan.limits.blogPosts}</span></li>
                         <li className="flex justify-between"><span>Landing Pages:</span> <span className="font-medium">{plan.limits.landingPages === -1 ? <InfinityIcon className="h-4 w-4"/> : plan.limits.landingPages}</span></li>
+                        <li className="flex justify-between"><span>Promociones:</span> <span className="font-medium">{plan.limits.promotions === -1 ? <InfinityIcon className="h-4 w-4"/> : plan.limits.promotions}</span></li>
                     </ul>
                 </div>
             </CardContent>
