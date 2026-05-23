@@ -47,8 +47,12 @@ class PromotionService {
   async createPromotion(data: CreatePromotionInput): Promise<string> {
     const db = this.getDb();
     const now = new Date().toISOString();
+    
+    // Limpieza de seguridad para evitar enviar campos prohibidos
+    const cleanData = { ...data };
+    
     const docRef = await addDoc(collection(db, 'promotions'), {
-      ...data,
+      ...cleanData,
       usageCount: 0,
       createdAt: now,
       updatedAt: now,
@@ -59,8 +63,12 @@ class PromotionService {
   async updatePromotion(id: string, updates: Partial<Promotion>): Promise<void> {
     const db = this.getDb();
     const ref = doc(db, 'promotions', id);
+    
+    // CRÍTICO: Eliminar el campo 'id' de los updates, ya que Firestore no permite actualizarlo internamente
+    const { id: _, ...cleanUpdates } = updates as any;
+    
     await updateDoc(ref, {
-      ...updates,
+      ...cleanUpdates,
       updatedAt: new Date().toISOString(),
     });
   }

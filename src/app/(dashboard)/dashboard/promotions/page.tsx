@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { usePromotions } from '@/hooks/use-promotions';
 import { promotionService, CreatePromotionInput } from '@/services/promotion-service';
@@ -46,13 +46,13 @@ export default function PromotionsPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingPromo, setEditingPromo] = useState<Promotion | null>(null);
 
-  // Check global module status (SaaS-wide toggle) - Standardized to 'promotions'
+  // Check global module status
   const globalModuleRef = useMemoFirebase(() => 
     !firestore ? null : doc(firestore, 'modules', 'promotions'), 
   [firestore]);
   const { data: globalModule, isLoading: isGlobalLoading } = useDoc<Module>(globalModuleRef);
 
-  // Business-specific assignment check (Manual assignment by superadmin)
+  // Business-specific assignment check
   const businessModuleRef = useMemoFirebase(() => 
     !firestore || !user ? null : doc(firestore, `businesses/${user.uid}/modules`, 'promotions'), 
   [firestore, user]);
@@ -104,13 +104,8 @@ export default function PromotionsPage() {
     return <div className="flex items-center justify-center h-64"><Loader2 className="animate-spin h-8 w-8 text-primary" /></div>;
   }
 
-  // A business has access if:
-  // 1. The module is active globally (Standard ID 'promotions').
-  // 2. AND (They have a manual assignment OR their plan allows promotions).
   const isModuleActiveGlobally = globalModule?.status === 'active';
   const isAssignedToBusiness = businessModule?.status === 'active';
-  
-  // Logic: if limit is -1 (unlimited) or greater than 0, they have permission.
   const hasPlanPermission = limits.promotions !== 0;
 
   const moduleInactive = !isModuleActiveGlobally || (!isAssignedToBusiness && !hasPlanPermission);
@@ -244,9 +239,10 @@ export default function PromotionsPage() {
 
 function PromotionDialog({ isOpen, onClose, promo, companyId }: { isOpen: boolean, onClose: () => void, promo: Promotion | null, companyId: string }) {
   const { toast } = useToast();
-  const [formData, setFormData] = useState<Partial<Promotion>>(promo || {
-    type: 'percentage',
-    applicableTo: 'all_catalog',
+  
+  const initialDefaults = {
+    type: 'percentage' as const,
+    applicableTo: 'all_catalog' as const,
     isActive: true,
     showInCatalog: true,
     showInCheckout: true,
@@ -255,10 +251,27 @@ function PromotionDialog({ isOpen, onClose, promo, companyId }: { isOpen: boolea
     discountValue: 0,
     minQuantity: 0,
     usageLimit: 0,
-  });
+    title: '',
+    description: '',
+  };
+
+  const [formData, setFormData] = useState<Partial<Promotion>>(promo || initialDefaults);
+
+  // EFECTO CRÍTICO: Resetea el formulario cuando el diálogo se abre para una nueva promo o cambia la promo a editar
+  useEffect(() => {
+    if (isOpen) {
+      setFormData(promo || initialDefaults);
+    }
+  }, [isOpen, promo]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!formData.title?.trim() || !formData.description?.trim()) {
+        toast({ variant: 'destructive', title: 'Error', description: 'Título y descripción son obligatorios.' });
+        return;
+    }
+
     if (formData.validUntil! < formData.validFrom!) {
       toast({ variant: 'destructive', title: 'Error', description: 'La fecha de fin debe ser posterior al inicio.' });
       return;
@@ -276,7 +289,8 @@ function PromotionDialog({ isOpen, onClose, promo, companyId }: { isOpen: boolea
       toast({ title: 'Éxito', description: 'Promoción guardada correctamente.' });
       onClose();
     } catch (error) {
-      toast({ variant: 'destructive', title: 'Error', description: 'No se pudo guardar la promoción.' });
+      console.error("Error saving promo:", error);
+      toast({ variant: 'destructive', title: 'Error', description: 'No se pudo guardar la promoción. Verifica tu conexión o permisos.' });
     }
   };
 
