@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -10,22 +9,20 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Tabs, TabsContent, TabsTrigger, TabsList } from '@/components/ui/tabs';
-import { Card, CardContent } from '@/components/ui/card';
-import { ShoppingBag, Building2, HandCoins, Minus, Plus, Tag, Trash2 } from 'lucide-react';
-import Image from 'next/image';
+import { ShoppingBag, Minus, Plus, Tag, Trash2, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { PaymentSettings } from '@/models/payment-settings';
-import type { Order, TipoEntrega } from '@/models/order';
-import { useFirestore, addDocumentNonBlocking } from '@/firebase';
-import { collection } from 'firebase/firestore';
+import type { TipoEntrega } from '@/models/order';
+import { useFirestore } from '@/firebase';
 import { cn } from '@/lib/utils';
 import type { CartItem } from '@/app/(public)/catalog/[businessId]/page';
-import { ScrollArea } from '../ui/scroll-area';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import type { LandingHeaderConfigData } from '@/models/landing-page';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { promotionService } from '@/services/promotion-service';
 import type { Promotion } from '@/models/promotion';
+import { WhatsAppIcon } from '@/components/icons';
+import { Badge } from '@/components/ui/badge';
 
 const purchaseSchema = z.object({
   fullName: z.string().min(3, { message: 'El nombre es requerido.' }),
