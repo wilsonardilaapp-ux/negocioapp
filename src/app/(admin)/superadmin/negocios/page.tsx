@@ -152,32 +152,48 @@ export default function BusinessesPage() {
     const servicesSnapshot = await getDocs(collection(firestore, `businesses/${business.id}/services`));
     setAssignedServices(servicesSnapshot.docs.filter(doc => doc.data().status === 'active').map(doc => doc.id));
 
-    // 2. NEW: Load Plan Limits and Hierarchy
-    const currentPlan = plans?.find(p => p.name === business.planName);
-    if (currentPlan) {
-      setCurrentPlanLimits(currentPlan.limits);
+    // 2. Load Plan Limits and Hierarchy - IMPROVED LOOKUP logic from useSubscription
+    if (plans && plans.length > 0) {
+      const bPlanName = (business.planName || '').toUpperCase();
       
-      // Hierarchical order
-      const tiers = ['FREE', 'BASIC', 'PRO', 'ENTERPRISE'];
-      const currentTier = currentPlan.id.toUpperCase();
-      const nextTierId = tiers[tiers.indexOf(currentTier) + 1];
-      
-      if (nextTierId) {
-        const nextPlan = plans?.find(p => p.id.toUpperCase() === nextTierId);
-        if (nextPlan) {
-          setNextPlanLimits(nextPlan.limits);
-          setNextPlanName(nextPlan.name);
+      // Try to find the plan by Name or ID (insensitively)
+      const currentPlan = plans.find(p => 
+        p.name.toUpperCase() === bPlanName || 
+        p.id.toUpperCase() === bPlanName ||
+        p.name.toUpperCase().includes(bPlanName)
+      );
+
+      if (currentPlan) {
+        setCurrentPlanLimits(currentPlan.limits);
+        
+        // Hierarchical order
+        const tiers = ['FREE', 'BASIC', 'PRO', 'ENTERPRISE'];
+        // Try to normalize the ID to one of the tiers
+        const currentTierId = currentPlan.id.toUpperCase();
+        const tierIndex = tiers.findIndex(t => currentTierId.includes(t));
+        
+        if (tierIndex !== -1 && tierIndex < tiers.length - 1) {
+          const nextTierId = tiers[tierIndex + 1];
+          // Find next plan that matches the next tier
+          const nextPlan = plans.find(p => p.id.toUpperCase().includes(nextTierId));
+          
+          if (nextPlan) {
+            setNextPlanLimits(nextPlan.limits);
+            setNextPlanName(nextPlan.name);
+          } else {
+            setNextPlanLimits(null);
+          }
         } else {
           setNextPlanLimits(null);
         }
       } else {
+        // Fallback if plan not found in collection
+        setCurrentPlanLimits({});
         setNextPlanLimits(null);
       }
     }
 
-    // 3. NEW: Load existing LimitesExtra from Business document
-    // We assume the business object might already have it or we fetch it fresh if needed
-    // In our case, it's safer to use the 'business' object passed or fetch it from firestore
+    // 3. Load existing LimitesExtra from Business document
     const businessDoc = businesses?.find(b => b.id === business.id) as any;
     if (businessDoc?.limitesExtra) {
       setLimitesExtra({
@@ -198,7 +214,7 @@ export default function BusinessesPage() {
   const handleSaveManageBusiness = async () => {
     if (!selectedBusiness) return;
     
-    // 1. Validate module extras (Original logic)
+    // 1. Validate module extras
     for (const moduleId of assignedModules) {
       const extra = moduleExtras[moduleId] || 0;
       const validation = validateModuleExtra(selectedBusiness.planName, extra);
@@ -208,7 +224,7 @@ export default function BusinessesPage() {
       }
     }
 
-    // 2. NEW: Validate Plan Limits Extra
+    // 2. Validate Plan Limits Extra
     const validation = validateLimitesExtra(
       nextPlanName || 'Superior',
       currentPlanLimits,
