@@ -33,13 +33,14 @@ import { cn } from '@/lib/utils';
 import { useSubscription } from '@/hooks/useSubscription';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import Link from 'next/link';
+import { LimitBanner } from '@/components/dashboard/LimitBanner';
 
 const formatCurrency = (value: number) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(value);
 
 export default function CuponesPage() {
   const { user } = useUser();
   const { coupons, isLoading: isCouponsLoading } = useCoupons();
-  const { limits, plan, isFree, isLoading: isSubLoading } = useSubscription();
+  const { limits, plan, isLoading: isSubLoading } = useSubscription();
   const { toast } = useToast();
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -70,7 +71,6 @@ export default function CuponesPage() {
   }
 
   const couponLimitReached = limits.coupons !== -1 && coupons.length >= limits.coupons;
-  const showLimitWarning = isFree && limits.coupons !== -1 && (coupons.length / limits.coupons) >= 0.8;
 
   return (
     <div className="flex flex-col gap-6">
@@ -89,39 +89,7 @@ export default function CuponesPage() {
         </CardHeader>
       </Card>
 
-      {couponLimitReached && (
-        <Alert variant="destructive" className="flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <Lock className="h-6 w-6" />
-            <div>
-              <AlertTitle>Límite de cupones alcanzado</AlertTitle>
-              <AlertDescription>
-                Has usado {coupons.length}/{limits.coupons} cupones de tu plan {plan.toUpperCase()}. Actualiza tu plan para seguir creando.
-              </AlertDescription>
-            </div>
-          </div>
-          <Button asChild>
-            <Link href="/dashboard/subscription">Actualizar a PRO →</Link>
-          </Button>
-        </Alert>
-      )}
-
-      {showLimitWarning && !couponLimitReached && (
-        <Alert variant="default" className="flex flex-col sm:flex-row items-center justify-between gap-4 border-yellow-500 text-yellow-700 [&>svg]:text-yellow-500">
-          <div className="flex items-center gap-3">
-            <AlertTriangle className="h-6 w-6" />
-            <div>
-              <AlertTitle>Casi en tu límite de cupones</AlertTitle>
-              <AlertDescription>
-                Has usado {coupons.length} de {limits.coupons} cupones de tu plan {plan.toUpperCase()}. Considera actualizar tu plan.
-              </AlertDescription>
-            </div>
-          </div>
-          <Button asChild variant="outline">
-            <Link href="/dashboard/subscription">Ver planes →</Link>
-          </Button>
-        </Alert>
-      )}
+      <LimitBanner current={coupons.length} limit={limits.coupons} label="cupones" plan={plan} />
 
       <Card>
         <Table>

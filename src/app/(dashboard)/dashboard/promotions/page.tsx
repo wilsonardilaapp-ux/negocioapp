@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -35,24 +34,23 @@ import type { Promotion } from '@/models/promotion';
 import type { Module } from '@/models/module';
 import { doc } from 'firebase/firestore';
 import { useSubscription } from '@/hooks/useSubscription';
+import { LimitBanner } from '@/components/dashboard/LimitBanner';
 
 export default function PromotionsPage() {
   const { user } = useUser();
   const firestore = useFirestore();
   const { promotions, isLoading: arePromosLoading } = usePromotions();
   const { toast } = useToast();
-  const { limits, isLoading: isSubscriptionLoading } = useSubscription();
+  const { limits, plan, isLoading: isSubscriptionLoading } = useSubscription();
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingPromo, setEditingPromo] = useState<Promotion | null>(null);
 
-  // Check global module status
   const globalModuleRef = useMemoFirebase(() => 
     !firestore ? null : doc(firestore, 'modules', 'promotions'), 
   [firestore]);
   const { data: globalModule, isLoading: isGlobalLoading } = useDoc<Module>(globalModuleRef);
 
-  // Business-specific assignment check
   const businessModuleRef = useMemoFirebase(() => 
     !firestore || !user ? null : doc(firestore, `businesses/${user.uid}/modules`, 'promotions'), 
   [firestore, user]);
@@ -141,14 +139,9 @@ export default function PromotionsPage() {
             <PlusCircle className="mr-2 h-4 w-4" /> Nueva Promoción
           </Button>
         </CardHeader>
-        {promoLimitReached && (
-          <CardContent>
-            <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-md text-xs text-yellow-800">
-               Has alcanzado el límite de {limits.promotions} promociones de tu plan. Actualiza tu plan para crear más.
-            </div>
-          </CardContent>
-        )}
       </Card>
+
+      <LimitBanner current={promotions.length} limit={limits.promotions} label="promociones" plan={plan} />
 
       <Tabs defaultValue="all">
         <TabsList>
@@ -221,6 +214,13 @@ export default function PromotionsPage() {
                     </TableCell>
                   </TableRow>
                 ))}
+                {promotions.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
+                      No tienes promociones creadas aún.
+                    </TableCell>
+                  </TableRow>
+                )}
               </TableBody>
             </Table>
           </Card>
@@ -257,7 +257,6 @@ function PromotionDialog({ isOpen, onClose, promo, companyId }: { isOpen: boolea
 
   const [formData, setFormData] = useState<Partial<Promotion>>(promo || initialDefaults);
 
-  // EFECTO CRÍTICO: Resetea el formulario cuando el diálogo se abre para una nueva promo o cambia la promo a editar
   useEffect(() => {
     if (isOpen) {
       setFormData(promo || initialDefaults);

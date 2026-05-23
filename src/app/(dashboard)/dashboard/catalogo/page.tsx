@@ -29,6 +29,7 @@ import type { Module } from '@/models/module';
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { useToast } from '@/hooks/use-toast';
 import { useSubscription } from '@/hooks/useSubscription';
+import { LimitBanner } from '@/components/dashboard/LimitBanner';
 
 const initialHeaderConfig: LandingHeaderConfigData = {
     banner: {
@@ -62,7 +63,6 @@ export default function CatalogoPage() {
     const [editingProduct, setEditingProduct] = useState<Product | null>(null);
     const [productToDelete, setProductToDelete] = useState<Product | null>(null);
     
-    // Simplified state
     const [headerConfig, setHeaderConfig] = useState<LandingHeaderConfigData>(initialHeaderConfig);
     const [moduleInactive, setModuleInactive] = useState(false);
     const [isInitialLoading, setInitialLoading] = useState(true);
@@ -71,14 +71,13 @@ export default function CatalogoPage() {
     const firestore = useFirestore();
     const { toast } = useToast();
     
-    // --- NEW: Use subscription hook for limits and plan info ---
     const { 
         canAddProducts, 
         limits, 
+        plan,
         isLoading: isSubscriptionLoading 
     } = useSubscription();
 
-    // --- Hooks for fetching data ---
     const productsQuery = useMemoFirebase(() => 
         user ? collection(firestore, 'businesses', user.uid, 'products') : null, 
     [firestore, user]);
@@ -88,7 +87,6 @@ export default function CatalogoPage() {
         user ? doc(firestore, 'businesses', user.uid, 'modules', 'catalogo') : null,
     [firestore, user]);
     
-    // --- Effect for module status and header config ---
     useEffect(() => {
         if (isUserLoading || !user || !firestore) return;
 
@@ -97,7 +95,6 @@ export default function CatalogoPage() {
             if (!isMounted) return;
             setInitialLoading(true);
             try {
-                // Check module status
                 const moduleSnap = await getDoc(catalogModuleRef!);
                 if (!moduleSnap.exists() || moduleSnap.data().status === 'inactive') {
                     if (isMounted) setModuleInactive(true);
@@ -105,7 +102,6 @@ export default function CatalogoPage() {
                 }
                 if (isMounted) setModuleInactive(false);
                 
-                // Fetch header config
                 const headerConfigRef = doc(firestore, 'businesses', user.uid, 'landingConfig', 'header');
                 const headerConfigSnap = await getDoc(headerConfigRef);
                 
@@ -136,7 +132,6 @@ export default function CatalogoPage() {
         return () => { isMounted = false; };
     }, [user, firestore, isUserLoading, toast, catalogModuleRef]);
     
-    // --- Combined loading state ---
     const isLoading = isUserLoading || isSubscriptionLoading || areProductsLoading || isInitialLoading;
     const productCount = products?.length ?? 0;
     const canCreate = canAddProducts(productCount);
@@ -153,7 +148,6 @@ export default function CatalogoPage() {
         const publicCatalogRef = doc(firestore, 'businesses', user.uid, 'publicData', 'catalog');
         setDocumentNonBlocking(publicCatalogRef, { products: productsToSave, headerConfig: configToSave }, { merge: true });
     }, [firestore, user]);
-    
     
     const handleSaveProduct = async (productData: Omit<Product, 'id' | 'businessId'>) => {
         if (!firestore || !user) return;
@@ -175,7 +169,6 @@ export default function CatalogoPage() {
         
         toast({ title: `Producto ${editingProduct ? 'actualizado' : 'creado'}`, description: `Se guardó "${dataToSave.name}"` });
 
-        // Let useCollection handle the product list update, but trigger public data sync
         const currentProducts = products || [];
         const newProductsList = editingProduct
             ? currentProducts.map(p => p.id === editingProduct!.id ? { ...dataToSave, id: editingProduct!.id } : p)
@@ -254,6 +247,8 @@ export default function CatalogoPage() {
             <CatalogHeaderForm data={headerConfig} setData={handleSaveHeader} />
             
             <CatalogQRGenerator />
+
+            <LimitBanner current={productCount} limit={limits.products} label="productos" plan={plan} />
 
             <Card>
                 <CardHeader className="flex flex-row justify-between items-center">

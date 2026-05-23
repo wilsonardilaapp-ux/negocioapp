@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useMemo, useState, useEffect, useRef } from 'react';
@@ -19,7 +18,6 @@ import type { BlogPost, BlogAppearanceConfig } from '@/models/blog-post';
 import { PostsTable } from '@/components/blog/posts-table';
 import type { Module } from '@/models/module';
 import { useSubscription } from '@/hooks/useSubscription';
-import BlogLimitBanner from './components/BlogLimitBanner';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
@@ -28,6 +26,7 @@ import { uploadMedia } from '@/ai/flows/upload-media-flow';
 import Image from 'next/image';
 import { cn } from '@/lib/utils';
 import { deletePost } from '@/actions/blog';
+import { LimitBanner } from '@/components/dashboard/LimitBanner';
 
 const MediaUploader = ({
     label,
@@ -243,7 +242,7 @@ export default function BlogPage() {
     });
   }, [unsortedPosts]);
 
-  const { plan, isFree, canAddBlogPosts, limits, isLoading: isSubscriptionLoading } = useSubscription();
+  const { plan, canAddBlogPosts, limits, isLoading: isSubscriptionLoading } = useSubscription();
   
   const totalPosts = posts?.length ?? 0;
   const isLoading = isModuleLoading || arePostsLoading || isSubscriptionLoading;
@@ -252,7 +251,6 @@ export default function BlogPage() {
     const result = await deletePost(postId);
     if (result.success) {
       toast({ title: 'Éxito', description: result.message });
-      // The useCollection hook will automatically update the UI on deletion
     } else {
       toast({ variant: 'destructive', title: 'Error', description: result.error });
     }
@@ -292,7 +290,7 @@ export default function BlogPage() {
               Gestiona los artículos y publicaciones para tu negocio.
             </CardDescription>
           </div>
-          <Button asChild disabled={isFree && !canCreate}>
+          <Button asChild disabled={!canCreate}>
             <Link href="/dashboard/blog/create">
               <PlusCircle className="mr-2 h-4 w-4" />
               Crear Nuevo Post
@@ -301,7 +299,7 @@ export default function BlogPage() {
         </CardHeader>
       </Card>
       
-      {isFree && <BlogLimitBanner currentPosts={totalPosts} maxPosts={limits.blogPosts} plan={plan} />}
+      <LimitBanner current={totalPosts} limit={limits.blogPosts} label="artículos" plan={plan} />
 
       <Card>
          <CardHeader>
