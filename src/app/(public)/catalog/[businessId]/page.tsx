@@ -72,32 +72,60 @@ const MediaPreview = ({ item, alt, objectFit = 'cover', priority = false }: { it
     );
 };
 
-const PublicProductCard = ({ product, onOpenModal }: { product: Product, onOpenModal: (product: Product) => void }) => {
+const PublicProductCard = ({ product, onOpenModal, activePromotions }: { product: Product, onOpenModal: (product: Product) => void, activePromotions: Promotion[] }) => {
     const mediaUrl = product.images?.[0] || 'https://picsum.photos/seed/placeholder/600/400';
     const isMediaVideo = isVideo(mediaUrl);
 
+    const applicablePromo = useMemo(() => {
+        return activePromotions.find(promo => {
+            if (!promo.isActive) return false;
+            if (promo.applicableTo === 'all_catalog') return true;
+            if (promo.applicableTo === 'category' && promo.categoryName === product.category) return true;
+            if (promo.applicableTo === 'specific_item' && (promo.itemId === product.id || promo.itemName === product.name)) return true;
+            return false;
+        });
+    }, [product, activePromotions]);
+
+    const getBadgeText = (promo: Promotion) => {
+        if (promo.type === 'bogo') return '2×1';
+        if (promo.type === 'percentage') return `${promo.discountValue}% OFF`;
+        if (promo.type === 'fixed') return `${formatCurrency(promo.discountValue)} OFF`;
+        if (promo.type === 'free_item') return 'REGALO';
+        if (promo.type === 'bundle') return 'COMBO';
+        return 'OFERTA';
+    };
+
     return (
-        <Card className="flex flex-col overflow-hidden transition-shadow hover:shadow-lg h-full">
-            <CardHeader className="p-0">
+        <Card className="group flex flex-col overflow-hidden transition-all duration-300 hover:shadow-xl h-full border-gray-100 relative">
+            <CardHeader className="p-0 relative overflow-hidden">
+                {applicablePromo && (
+                    <div className="absolute top-2 left-2 z-10 bg-[#FF4500] text-white text-[12px] font-bold px-2 py-1 rounded-[6px] shadow-md border border-white/20 select-none pointer-events-none" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}>
+                        {getBadgeText(applicablePromo)}
+                    </div>
+                )}
                 <div className="relative aspect-square w-full">
                     {isMediaVideo ? (
-                        <video src={mediaUrl} autoPlay loop muted className="object-cover w-full h-full" />
+                        <video src={mediaUrl} autoPlay loop muted className="object-cover w-full h-full transition-transform duration-500 group-hover:scale-105" />
                     ) : (
-                        <Image src={mediaUrl} alt={product.name} fill sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw" className="object-cover" />
+                        <Image src={mediaUrl} alt={product.name} fill sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw" className="object-cover transition-transform duration-500 group-hover:scale-105" />
                     )}
                 </div>
             </CardHeader>
             <CardContent className="p-4 flex-grow">
-                <CardTitle className="text-sm font-medium h-10 overflow-hidden">{product.name}</CardTitle>
-                 <div className="flex items-center gap-1 text-sm text-muted-foreground mb-2">
-                    <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
-                    <span>{product.rating.toFixed(1)}</span>
-                    <span className="text-xs">({product.ratingCount} valoraciones)</span>
+                <CardTitle className="text-sm font-bold h-10 overflow-hidden text-gray-900 group-hover:text-primary transition-colors leading-tight mb-2">{product.name}</CardTitle>
+                 <div className="flex items-center gap-1 text-[11px] text-muted-foreground mb-3">
+                    <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
+                    <span className="font-semibold text-gray-700">{product.rating.toFixed(1)}</span>
+                    <span>({product.ratingCount})</span>
                 </div>
-                <p className="text-base font-semibold">{formatCurrency(product.price)}</p>
+                <div className="flex items-center justify-between mt-auto">
+                    <p className="text-base font-black text-primary">{formatCurrency(product.price)}</p>
+                </div>
             </CardContent>
             <CardFooter className="p-4 pt-0">
-                <Button className="w-full" onClick={() => onOpenModal(product)}>Ver Producto</Button>
+                <Button className="w-full font-bold shadow-sm transition-all" onClick={() => onOpenModal(product)}>
+                    {applicablePromo ? `Ver Producto · ${getBadgeText(applicablePromo)}` : 'Ver Producto'}
+                </Button>
             </CardFooter>
         </Card>
     );
@@ -363,16 +391,22 @@ export default function CatalogPage() {
             <CatalogHeader config={headerConfig} />
             <main className="container mx-auto max-w-[1400px] py-8 px-4 sm:px-6 lg:px-8 xl:px-12">
                 {activePromotions.filter(p => p.showInCatalog).length > 0 && (
-                  <section className="mb-6">
-                    <h2 className="text-lg font-bold mb-3 flex items-center gap-2"><Tag className="h-5 w-5 text-primary" /> Promociones</h2>
-                    <div className="flex gap-3 overflow-x-auto pb-2">
+                  <section className="mb-8">
+                    <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-gray-900"><Tag className="h-6 w-6 text-primary" /> Promociones Activas</h2>
+                    <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide">
                       {activePromotions.filter(p => p.showInCatalog).map(promo => (
-                        <Card key={promo.id} className="min-w-[220px] border-primary/30 bg-primary/5 flex-shrink-0">
-                          <CardContent className="p-3">
-                            <Badge className="mb-1">{promoTypeLabel(promo.type)}</Badge>
-                            <p className="font-semibold text-sm">{promo.title}</p>
-                            <p className="text-xs text-muted-foreground">{promo.description}</p>
-                            <p className="text-xs mt-1 text-primary">Válido hasta: {format(new Date(promo.validUntil), 'dd/MM/yyyy')}</p>
+                        <Card key={promo.id} className="min-w-[280px] border-none border-l-4 border-l-[#FF4500] bg-white shadow-md hover:shadow-lg transition-shadow flex-shrink-0 rounded-xl overflow-hidden">
+                          <CardContent className="p-4 flex flex-col h-full">
+                            <Badge className="mb-2 w-fit bg-[#FF4500] text-white text-[14px] hover:bg-[#FF4500] border-none px-3 py-1 rounded-lg">
+                                {promoTypeLabel(promo.type)}
+                            </Badge>
+                            <p className="text-[16px] font-bold text-gray-900 leading-tight mb-1">{promo.title}</p>
+                            <p className="text-[13px] text-[#444] line-clamp-2 flex-grow">{promo.description}</p>
+                            <div className="mt-3 pt-2 border-t border-gray-100">
+                                <p className="text-[12px] text-[#FF4500] font-bold flex items-center gap-1">
+                                    Válido hasta: {format(new Date(promo.validUntil), 'dd/MM/yyyy')}
+                                </p>
+                            </div>
                           </CardContent>
                         </Card>
                       ))}
@@ -383,7 +417,7 @@ export default function CatalogPage() {
                     <Card><CardContent className="h-[400px] flex flex-col items-center justify-center text-center gap-4"><div className="p-4 bg-secondary rounded-full"><PackageSearch className="h-12 w-12 text-muted-foreground" /></div><h3 className="text-xl font-semibold">Este catálogo se está construyendo</h3></CardContent></Card>
                 ) : (
                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 md:gap-5">
-                        {products.map(p => <PublicProductCard key={p.id} product={p} onOpenModal={setSelectedProduct} />)}
+                        {products.map(p => <PublicProductCard key={p.id} product={p} onOpenModal={setSelectedProduct} activePromotions={activePromotions} />)}
                     </div>
                 )}
             </main>
