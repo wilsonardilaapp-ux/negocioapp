@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -160,59 +159,77 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
   };
 
   const onSubmit = async (data: z.infer<typeof purchaseSchema>) => {
-    let orderSummary = `*Nuevo Pedido*\n\n`;
-    orderSummary += `*Cliente:* ${data.fullName}\n`;
-    orderSummary += `*Teléfono:* ${data.whatsapp}\n`;
-    orderSummary += `*Entrega:* ${tipoEntrega === 'domicilio' ? 'Domicilio' : 'Recoger en tienda'}\n`;
-    if (data.address) orderSummary += `*Dirección:* ${data.address}\n`;
+    const separator = "━━━━━━━━━━━━━━━━━━";
+    const headerEmoji = tipoEntrega === 'domicilio' ? '🛵' : '🛍️';
+    const headerText = tipoEntrega === 'domicilio' ? 'PEDIDO A DOMICILIO' : 'PEDIDO PARA RECOGER';
+
+    let orderSummary = `${headerEmoji} *${headerText}*\n`;
+    orderSummary += `${separator}\n`;
+    orderSummary += `📍 *DATOS DE ENTREGA*\n`;
+    orderSummary += `👤 Cliente: ${data.fullName}\n`;
+    orderSummary += `📞 Teléfono: ${data.whatsapp}\n`;
+    orderSummary += `🏠 Dirección: ${data.address || 'N/A'}\n`;
+    orderSummary += `🚚 Entrega: ${tipoEntrega === 'domicilio' ? 'Domicilio' : 'Recoger en tienda'}\n`;
+    orderSummary += `${separator}\n`;
+    orderSummary += `🛒 *ITEMS*\n`;
     
-    // Add payment method info
+    cartItems.forEach(item => {
+        const price = item.appliedPromotion?.discountedPrice ?? item.price;
+        orderSummary += `• ${item.quantity}x ${item.name} - ${formatCurrency(price)}\n`;
+    });
+    
+    orderSummary += `${separator}\n`;
+    orderSummary += `💰 Subtotal: ${formatCurrency(subtotalProducts)}\n`;
+    
+    if (appliedCoupon) {
+        orderSummary += `🎟️ Cupón (${appliedCoupon.codigo}): -${formatCurrency(discountFromCoupon)}\n`;
+    }
+    
+    if (packagingTotal > 0) {
+        orderSummary += `📦 Empaque: ${formatCurrency(packagingTotal)}\n`;
+    }
+    
+    if (tipoEntrega === 'domicilio' && (businessInfo?.deliveryFee ?? 0) > 0) {
+        orderSummary += `🛵 Domicilio: ${formatCurrency(businessInfo?.deliveryFee ?? 0)}\n`;
+    }
+    
+    if (vatAmount > 0) {
+        orderSummary += `🧾 I.V.A (${vatRate}%): ${formatCurrency(vatAmount)}\n`;
+    }
+    
+    orderSummary += `${separator}\n`;
+    orderSummary += `💵 *TOTAL: ${formatCurrency(total)}*\n`;
+    
     let methodLabel = '';
     let methodInfo = '';
     if (selectedPaymentMethod === 'nequi') {
         methodLabel = 'Nequi';
-        methodInfo = `Número: ${String(paymentSettings?.nequi.accountNumber || '').replace(/\D/g, '')}`;
+        methodInfo = String(paymentSettings?.nequi.accountNumber || '').replace(/\D/g, '');
     } else if (selectedPaymentMethod === 'bancolombia') {
         methodLabel = 'Bancolombia';
-        methodInfo = `Número: ${String(paymentSettings?.bancolombia.accountNumber || '').replace(/\D/g, '')}`;
+        methodInfo = String(paymentSettings?.bancolombia.accountNumber || '').replace(/\D/g, '');
     } else if (selectedPaymentMethod === 'daviplata') {
         methodLabel = 'Daviplata';
-        methodInfo = `Número: ${String(paymentSettings?.daviplata.accountNumber || '').replace(/\D/g, '')}`;
+        methodInfo = String(paymentSettings?.daviplata.accountNumber || '').replace(/\D/g, '');
     } else if (selectedPaymentMethod === 'breB') {
         methodLabel = 'Bre-B';
-        methodInfo = `Llave: ${String(paymentSettings?.breB.keyValue || '').replace(/\D/g, '')}`;
+        methodInfo = String(paymentSettings?.breB.keyValue || '').replace(/\D/g, '');
     } else if (selectedPaymentMethod === 'pagoContraEntrega') {
         methodLabel = 'Pago contra entrega';
     }
-    orderSummary += `*Medio de Pago:* ${methodLabel}\n`;
-    if (methodInfo) orderSummary += `*Info Pago:* ${methodInfo}\n`;
-
-    orderSummary += `\n*Items:*\n`;
     
-    cartItems.forEach(item => {
-        const price = item.appliedPromotion?.discountedPrice ?? item.price;
-        orderSummary += `- ${item.quantity}x ${item.name} (${formatCurrency(price)} c/u)\n`;
-    });
-
-    orderSummary += `\n*Resumen:*\n`;
-    orderSummary += `Subtotal: ${formatCurrency(subtotalProducts)}\n`;
-    if (discountFromCoupon > 0 && appliedCoupon) {
-        orderSummary += `Descuento Cupón (${appliedCoupon.codigo}): -${formatCurrency(discountFromCoupon)}\n`;
-    }
-    if (vatAmount > 0) orderSummary += `I.V.A (${vatRate}%): ${formatCurrency(vatAmount)}\n`;
-    if (packagingTotal > 0) orderSummary += `Empaque: ${formatCurrency(packagingTotal)}\n`;
-    if (tipoEntrega === 'domicilio' && (businessInfo?.deliveryFee ?? 0) > 0) {
-        orderSummary += `Domicilio: ${formatCurrency(businessInfo?.deliveryFee ?? 0)}\n`;
-    }
-    orderSummary += `*TOTAL: ${formatCurrency(total)}*\n`;
-
+    orderSummary += `💳 Pago: ${methodLabel}${methodInfo ? ` - ${methodInfo}` : ''}\n`;
+    orderSummary += `${separator}\n`;
+    
     if (applicableGlobalPromo) {
-        orderSummary += `\n*Promo Aplicada:* ${applicableGlobalPromo.title}`;
+        orderSummary += `🎁 *Promo:* ${applicableGlobalPromo.title}\n`;
     }
-
+    
     if (data.message) {
-        orderSummary += `\n\n*Nota:* ${data.message}`;
+        orderSummary += `📝 *Nota:* ${data.message}\n`;
     }
+    
+    orderSummary += `¡Gracias por su pedido! 🙏`;
 
     if (appliedCoupon) {
         await couponService.incrementUsage(appliedCoupon.id);
