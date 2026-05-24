@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useRouter, useSearchParams } from "next/navigation";
@@ -26,7 +25,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { ToastAction } from "@/components/ui/toast";
 import { useAuth, useUser, useFirestore, initiateEmailSignUp } from "@/firebase";
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { doc, setDoc, writeBatch, getDoc, Timestamp, collection } from 'firebase/firestore';
 import type { Business } from '@/models/business';
 import type { User as AppUser } from "@/models/user";
@@ -35,7 +34,6 @@ import { v4 as uuidv4 } from "uuid";
 import type { LandingPageData, NavLink } from "@/models/landing-page";
 import type { PaymentSettings } from "@/models/payment-settings";
 import type { Module } from "@/models/module";
-import type { SystemService } from "@/models/system-service";
 import type { KnowledgeDocument } from "@/models/chatbot-config";
 import { isFirstUser } from '@/actions/user';
 import { Eye, EyeOff, Loader2 } from 'lucide-react';
@@ -206,7 +204,7 @@ const LoadingScreen = () => (
     </div>
 );
 
-export default function RegisterPage() {
+function RegisterForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { toast } = useToast();
@@ -267,7 +265,6 @@ export default function RegisterPage() {
         batch.set(configRef, { mainBusinessId: newUser.uid }, { merge: true });
       }
 
-      // Assign default modules to ANY new user.
       const defaultModulesForNewUser: { id: string, name: string, description: string }[] = [
         { id: 'catalogo', name: 'Catálogo', description: 'Módulo para gestionar el catálogo de productos.' },
         { id: 'blog', name: 'Blog', description: 'Módulo para gestionar el blog.' },
@@ -284,7 +281,6 @@ export default function RegisterPage() {
           });
       });
       
-      // Only the first user initializes global settings.
       if (isFirst) {
         const defaultModules: Omit<Module, 'id'>[] = [
           { name: 'Catálogo', description: 'Módulo para gestionar el catálogo de productos.', status: 'inactive', createdAt: new Date().toISOString() },
@@ -388,7 +384,6 @@ export default function RegisterPage() {
       };
       batch.set(coffeeOfferRef, coffeeOfferData);
 
-      // Lógica de suscripción
       const planId = searchParams.get('plan') as 'free' | 'pro' | 'enterprise' | null;
       const subscriptionDocRef = doc(firestore, 'businesses', newUser.uid, 'subscription', 'current');
       
@@ -461,7 +456,6 @@ export default function RegisterPage() {
     }
   }
 
-  // If Firebase is checking the auth state, show a loading screen.
   if (isUserLoading) {
     return <LoadingScreen />;
   }
@@ -508,7 +502,7 @@ export default function RegisterPage() {
               name="password"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Contraseña</Label>
+                  <FormLabel>Contraseña</FormLabel>
                   <div className="relative">
                     <FormControl>
                       <Input
@@ -555,4 +549,12 @@ export default function RegisterPage() {
       </Form>
     </Card>
   );
+}
+
+export default function RegisterPage() {
+    return (
+        <Suspense fallback={<LoadingScreen />}>
+            <RegisterForm />
+        </Suspense>
+    );
 }
