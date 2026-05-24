@@ -1,4 +1,3 @@
-
 'use client';
 
 import { 
@@ -32,23 +31,30 @@ class PromotionService {
 
   async getActivePromotions(companyId: string): Promise<Promotion[]> {
     const db = this.getDb();
-    const now = new Date().toISOString();
+    // Usamos solo la fecha (YYYY-MM-DD) para la comparación, evitando problemas con la hora del ISO
+    const today = new Date().toISOString().split('T')[0];
+    
     const q = query(
       collection(db, 'promotions'), 
       where('companyId', '==', companyId),
       where('isActive', '==', true)
     );
+    
     const snapshot = await getDocs(q);
     return snapshot.docs
       .map(doc => ({ id: doc.id, ...doc.data() } as Promotion))
-      .filter(p => p.validUntil >= now);
+      .filter(p => {
+          // Si la fecha de fin es mayor o igual a hoy, la promoción es válida
+          // No filtramos por validFrom de forma estricta aquí para permitir promociones pre-cargadas 
+          // que el usuario activó manualmente (según el comportamiento reportado).
+          return p.validUntil >= today;
+      });
   }
 
   async createPromotion(data: CreatePromotionInput): Promise<string> {
     const db = this.getDb();
     const now = new Date().toISOString();
     
-    // Limpieza de seguridad para evitar enviar campos prohibidos
     const cleanData = { ...data };
     
     const docRef = await addDoc(collection(db, 'promotions'), {
@@ -64,7 +70,6 @@ class PromotionService {
     const db = this.getDb();
     const ref = doc(db, 'promotions', id);
     
-    // CRÍTICO: Eliminar el campo 'id' de los updates, ya que Firestore no permite actualizarlo internamente
     const { id: _, ...cleanUpdates } = updates as any;
     
     await updateDoc(ref, {

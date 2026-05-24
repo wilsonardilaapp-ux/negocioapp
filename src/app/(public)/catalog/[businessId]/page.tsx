@@ -86,11 +86,22 @@ const PublicProductCard = ({ product, onOpenModal, activePromotions }: { product
     const isMediaVideo = isVideo(mediaUrl);
 
     const applicablePromo = useMemo(() => {
+        const productName = (product.name || '').toLowerCase().trim();
+        const productCategory = (product.category || '').toLowerCase().trim();
+
         return activePromotions.find(promo => {
             if (!promo.isActive) return false;
             if (promo.applicableTo === 'all_catalog') return true;
-            if (promo.applicableTo === 'category' && promo.categoryName === product.category) return true;
-            if (promo.applicableTo === 'specific_item' && (promo.itemId === product.id || promo.itemName === product.name)) return true;
+            
+            if (promo.applicableTo === 'category' && promo.categoryName) {
+                return promo.categoryName.toLowerCase().trim() === productCategory;
+            }
+            
+            if (promo.applicableTo === 'specific_item') {
+                const promoItemName = (promo.itemName || '').toLowerCase().trim();
+                return promo.itemId === product.id || promoItemName === productName;
+            }
+            
             return false;
         });
     }, [product, activePromotions]);
@@ -376,11 +387,14 @@ export default function CatalogPage() {
     }, [firestore, slug, isNetworkEnabled]);
 
     const getPromotionForItem = useCallback((item: Product, quantity: number): AppliedPromotion | undefined => {
+        const itemNameNormalized = (item.name || '').toLowerCase().trim();
+        const itemCategoryNormalized = (item.category || '').toLowerCase().trim();
+
         const promo = activePromotions.find(p => 
             p.isActive &&
             (p.applicableTo === 'all_catalog' ||
-             (p.applicableTo === 'category' && p.categoryName === item.category) ||
-             (p.applicableTo === 'specific_item' && (p.itemId === item.id || p.itemName === item.name)))
+             (p.applicableTo === 'category' && p.categoryName?.toLowerCase().trim() === itemCategoryNormalized) ||
+             (p.applicableTo === 'specific_item' && (p.itemId === item.id || p.itemName?.toLowerCase().trim() === itemNameNormalized)))
         );
 
         if (!promo) return undefined;
