@@ -439,6 +439,10 @@ export default function CatalogPage() {
         }));
     };
 
+    const handleClearCart = useCallback(() => {
+        setCart([]);
+    }, []);
+
     if (isLoading) return <div className="flex h-screen w-full items-center justify-center bg-background"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>;
     if (error) return <div className="flex h-screen w-full flex-col items-center justify-center bg-background text-center p-4"><PackageSearch className="h-16 w-16 text-muted-foreground mb-4" /><h1 className="text-2xl font-bold">Catálogo no encontrado</h1><p className="text-muted-foreground mt-2 max-w-md">{error}</p></div>;
 
@@ -492,7 +496,8 @@ export default function CatalogPage() {
                     onOpenChange={setIsPurchaseModalOpen} 
                     cartItems={cart} 
                     onRemoveItem={(id) => setCart(c => c.filter(i => i.id !== id))} 
-                    onUpdateQuantity={handleUpdateQuantity} 
+                    onUpdateQuantity={handleUpdateQuantity}
+                    onClearCart={handleClearCart}
                     businessId={pageData.resolvedBusinessId} 
                     businessInfo={headerConfig?.businessInfo ?? null} 
                     paymentSettings={pageData.paymentSettings} 
@@ -513,8 +518,6 @@ const CatalogHeader = ({ config, cartItemCount, onCartClick }: CatalogHeaderProp
     if (!config) return <div className="bg-card shadow-md p-4 text-center"><h1 className="text-2xl font-bold">Catálogo de Productos</h1></div>;
     const socialIcons: any = { tiktok: <TikTokIcon />, instagram: <InstagramIcon />, facebook: <FacebookIcon />, whatsapp: <WhatsAppIcon />, twitter: <XIcon />, };
     
-    // SANITIZACIÓN DEFINITIVA PARA PRODUCCIÓN:
-    // Se eliminan TODOS los caracteres no numéricos para la URL de envío.
     const rawHeaderPhone = String(config.businessInfo.phone || '');
     const cleanHeaderPhone = rawHeaderPhone.replace(/\D/g, '');
 

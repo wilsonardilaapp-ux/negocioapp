@@ -13,7 +13,8 @@ import { ShoppingBag, Minus, Plus, Tag, Trash2, Loader2, Ticket, X, CheckCircle,
 import { useToast } from '@/hooks/use-toast';
 import type { PaymentSettings } from '@/models/payment-settings';
 import type { TipoEntrega } from '@/models/order';
-import { useFirestore } from '@/firebase';
+import { useFirestore, addDocumentNonBlocking } from '@/firebase';
+import { collection, doc } from 'firebase/firestore';
 import { cn } from '@/lib/utils';
 import type { CartItem } from '@/app/(public)/catalog/[businessId]/page';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -42,6 +43,7 @@ interface PurchaseModalProps {
   cartItems: CartItem[];
   onRemoveItem: (productId: string) => void;
   onUpdateQuantity: (productId: string, newQuantity: number) => void;
+  onClearCart: () => void;
   businessId: string;
   businessInfo: LandingHeaderConfigData['businessInfo'] | null;
   paymentSettings: PaymentSettings | null;
@@ -55,7 +57,7 @@ const formatCurrency = (value: number) => {
     }).format(value);
 };
 
-export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, onUpdateQuantity, businessId, businessInfo, paymentSettings }: PurchaseModalProps) {
+export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, onUpdateQuantity, onClearCart, businessId, businessInfo, paymentSettings }: PurchaseModalProps) {
   const { toast } = useToast();
   const firestore = useFirestore();
   const [tipoEntrega, setTipoEntrega] = useState<TipoEntrega>('domicilio');
@@ -114,7 +116,6 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
   const vatRate = businessInfo?.vatRate ?? 0;
   const vatAmount = subtotalBeforeVat * (vatRate / 100);
   
-  // Domicilio calculation
   const deliveryFee = tipoEntrega === 'domicilio' ? (businessInfo?.deliveryFee ?? 0) : 0;
   
   const total = subtotalBeforeVat + vatAmount + deliveryFee;
@@ -173,9 +174,34 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
     orderSummary += `${separator}\n`;
     orderSummary += `🛒 *ITEMS*\n`;
     
+    // Preparar guardado en Firestore
+    const ordersCollectionRef = collection(firestore, `businesses/${businessId}/orders`);
+    const now = new Date().toISOString();
+
     cartItems.forEach(item => {
-        const price = item.appliedPromotion?.discountedPrice ?? item.price;
-        orderSummary += `• ${item.quantity}x ${item.name} - ${formatCurrency(price)}\n`;
+        const itemUnitPrice = item.appliedPromotion?.discountedPrice ?? item.price;
+        const itemSubtotal = itemUnitPrice * item.quantity;
+        orderSummary += `• ${item.quantity}x ${item.name} - ${formatCurrency(itemSubtotal)}\n`;
+
+        // Registrar en base de datos
+        const orderDocData = {
+            businessId,
+            customerName: data.fullName,
+            customerEmail: data.email,
+            customerPhone: data.whatsapp,
+            customerAddress: data.address || 'Recogida en tienda',
+            productId: item.id,
+            productName: item.name,
+            quantity: item.quantity,
+            unitPrice: itemUnitPrice,
+            subtotal: itemSubtotal,
+            paymentMethod: selectedPaymentMethod,
+            orderDate: now,
+            orderStatus: 'Pendiente' as const,
+            tipoEntrega: tipoEntrega,
+            packagingCost: item.packagingCost || 0,
+        };
+        addDocumentNonBlocking(ordersCollectionRef, orderDocData);
     });
     
     orderSummary += `${separator}\n`;
@@ -235,14 +261,14 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
         await couponService.incrementUsage(appliedCoupon.id);
     }
 
-    // SANITIZACIÓN DEFINITIVA PARA PRODUCCIÓN:
     const rawPhone = String(businessInfo?.phone || '3228831634');
     const cleanPhone = rawPhone.replace(/\D/g, '');
-    
-    // Usar la URL de la API directa de WhatsApp para mayor compatibilidad
     const whatsappUrl = `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(orderSummary)}`;
     
     window.open(whatsappUrl, '_blank');
+    
+    // Limpiar carrito y cerrar modal
+    onClearCart();
     onOpenChange(false);
   };
 
@@ -594,8 +620,7 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
                     variant="outline" 
                     className="flex-1 h-12 font-bold border-2" 
                     onClick={() => {
-                        // Surgical clearing by removing each item
-                        cartItems.forEach(item => onRemoveItem(item.id));
+                        onClearCart();
                         onOpenChange(false);
                         toast({ title: "Carrito vaciado" });
                     }}
