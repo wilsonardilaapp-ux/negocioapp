@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Save, Loader2 } from 'lucide-react';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
+import { Save, Loader2, Info } from 'lucide-react';
 import type { LandingPageData } from '@/models/landing-page';
 import EditorLandingForm from '@/components/landing-page/editor-landing-form';
 import EditorLandingPreview from '@/components/landing-page/editor-landing-preview';
@@ -104,10 +104,7 @@ export default function LandingPageBuilder() {
     setIsSaving(true);
     
     try {
-        // Step 1: Client-side write using the non-blocking function
         await setDocumentNonBlocking(docRef, data, { merge: true });
-
-        // Step 2: Server-side cache revalidation via the simplified Server Action
         const result = await saveBusinessLanding(user.uid);
         
         if (result.success) {
@@ -139,11 +136,22 @@ export default function LandingPageBuilder() {
         <Card className="p-6 flex justify-between items-center bg-white shadow-sm border-none">
             <div>
                 <CardTitle className="text-2xl font-bold">Constructor de Landing Page</CardTitle>
-                <CardDescription>Sincronización estabilizada y base de datos limpia.</CardDescription>
+                <CardDescription>Crea tu presencia digital en minutos.</CardDescription>
             </div>
             <Button onClick={handleSave} disabled={isSaving} className="bg-primary text-white font-bold px-8 shadow-md">
-                <Save className="mr-2 h-4 w-4" /> Guardar Todo
+                {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Save className="mr-2 h-4 w-4" />} Guardar Todo
             </Button>
+        </Card>
+
+        <Card>
+            <CardContent className="pt-6">
+                <div className="flex items-center gap-2 rounded-lg border bg-secondary/50 p-3 text-sm">
+                    <Info className="h-5 w-5 text-muted-foreground" />
+                    <p className="text-muted-foreground">
+                        Límite de landing pages: <span className="font-bold">{landingPagesCount} / {limits.landingPages === -1 ? '∞' : limits.landingPages}</span>.
+                    </p>
+                </div>
+            </CardContent>
         </Card>
 
         <LimitBanner current={landingPagesCount} limit={limits.landingPages} label="landing pages" plan={plan} />

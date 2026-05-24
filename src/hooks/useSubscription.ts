@@ -11,24 +11,21 @@ import type { LandingPageData } from '@/models/landing-page';
 import type { Order } from '@/models/order';
 import type { Business } from '@/models/business';
 import type { SuggestionRule } from '@/models/suggestion-rule';
+import type { Coupon } from '@/models/coupon';
+import type { Promotion } from '@/models/promotion';
 
-// Tiempo máximo de espera antes de romper el loading infinito (ms)
 const LOADING_TIMEOUT_MS = 10_000;
 
 export function useSubscription() {
   const { user, isUserLoading } = useUser();
   const firestore = useFirestore();
-
-  // FIX 1: Estado de timeout de seguridad
   const [timedOut, setTimedOut] = useState(false);
 
-  // Referencias — solo se crean cuando user?.uid está disponible
   const subscriptionRef = useMemoFirebase(
     () => (user?.uid ? doc(firestore, `businesses/${user.uid}/subscription`, 'current') : null),
     [user?.uid, firestore]
   );
   
-  // NEW: Business Reference to fetch extra limits
   const businessRef = useMemoFirebase(
     () => (user?.uid ? doc(firestore, 'businesses', user.uid) : null),
     [user?.uid, firestore]
@@ -61,8 +58,15 @@ export function useSubscription() {
     () => (user?.uid ? collection(firestore, `businesses/${user.uid}/suggestionRules`) : null),
     [user?.uid, firestore]
   );
+  const couponsQuery = useMemoFirebase(
+    () => user?.uid ? query(collection(firestore, 'cupones'), where('businessId', '==', user.uid)) : null,
+    [user?.uid, firestore]
+  );
+  const promotionsQuery = useMemoFirebase(
+    () => user?.uid ? query(collection(firestore, 'promotions'), where('companyId', '==', user.uid)) : null,
+    [user?.uid, firestore]
+  );
 
-  // Data fetching
   const { data: subscription, isLoading: isSubLoading, error: subError } = useDoc<Subscription>(subscriptionRef);
   const { data: businessData, isLoading: isBusinessDataLoading } = useDoc<Business>(businessRef);
   const { data: allPlans, isLoading: arePlansLoading, error: plansError } = useCollection<SubscriptionPlan>(plansRef);
@@ -71,10 +75,11 @@ export function useSubscription() {
   const { data: landingPages, isLoading: isLandingPagesLoading, error: landingPagesError } = useCollection<LandingPageData>(landingPagesRef);
   const { data: orders, isLoading: isOrdersLoading, error: ordersError } = useCollection<Order>(ordersRef);
   const { data: suggestions, isLoading: isSuggestionsLoading, error: suggestionsError } = useCollection<SuggestionRule>(suggestionsRef);
+  const { data: coupons, isLoading: isCouponsLoading, error: couponsError } = useCollection<Coupon>(couponsQuery);
+  const { data: promotions, isLoading: isPromotionsLoading, error: promotionsError } = useCollection<Promotion>(promotionsQuery);
 
-  const error = subError || plansError || productsError || blogPostsError || landingPagesError || ordersError || suggestionsError;
+  const error = subError || plansError || productsError || blogPostsError || landingPagesError || ordersError || suggestionsError || couponsError || promotionsError;
 
-  // FIX 2: isLoading ahora incluye isUserLoading para que espere al usuario
   const rawIsLoading =
     isUserLoading ||
     isSubLoading ||
@@ -84,9 +89,10 @@ export function useSubscription() {
     isBlogPostsLoading ||
     isLandingPagesLoading ||
     isOrdersLoading ||
-    isSuggestionsLoading;
+    isSuggestionsLoading ||
+    isCouponsLoading ||
+    isPromotionsLoading;
 
-  // FIX 3: Timeout de seguridad — si tras 10s sigue cargando, forzamos salida
   useEffect(() => {
     if (!rawIsLoading) {
       setTimedOut(false);
@@ -98,7 +104,6 @@ export function useSubscription() {
     return () => clearTimeout(timer);
   }, [rawIsLoading]);
 
-  // isLoading final: se rompe si hay timeout o error
   const isLoading = timedOut || error ? false : rawIsLoading;
 
   const { plan, isActive, limits, isFree, isPro, isEnterprise } = useMemo(() => {
@@ -106,11 +111,9 @@ export function useSubscription() {
     const planDetails = allPlans?.find(p => p.id === currentPlanId);
     const defaultLimits: PlanLimits = { products: 0, blogPosts: 0, landingPages: 0, coupons: 0, promotions: 0, orders: -1, suggestions: 0 };
 
-    // Get extra limits from business document
     const extras = (businessData as any)?.limitesExtra || {};
     const baseLimits = planDetails?.limits ?? defaultLimits;
 
-    // Merge logic: Base + Extra
     const mergedLimits: PlanLimits = {
         products: baseLimits.products === -1 ? -1 : (baseLimits.products + (extras.products || 0)),
         blogPosts: baseLimits.blogPosts === -1 ? -1 : (baseLimits.blogPosts + (extras.blogPosts || 0)),
@@ -136,6 +139,8 @@ export function useSubscription() {
   const landingPagesCount = landingPages?.length ?? 0;
   const ordersCount = orders?.length ?? 0;
   const suggestionsCount = suggestions?.length ?? 0;
+  const couponsCount = coupons?.length ?? 0;
+  const promotionsCount = promotions?.length ?? 0;
 
   const canAddBlogPosts = (currentCount: number): boolean => {
     if (limits.blogPosts === -1) return true;
@@ -173,6 +178,8 @@ export function useSubscription() {
     landingPagesCount,
     ordersCount,
     suggestionsCount,
+    couponsCount,
+    promotionsCount,
     canAddBlogPosts,
     canAddProducts,
     canAddOrders,

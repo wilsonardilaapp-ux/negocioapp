@@ -19,7 +19,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
-import { Printer, FileDown, Trash2 } from 'lucide-react';
+import { Printer, FileDown, Trash2, Info } from 'lucide-react';
 import { DataTable } from './data-table';
 import { columns } from './columns';
 import type { Order, OrderStatus } from '@/models/order';
@@ -44,9 +44,8 @@ export default function PedidosPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const { toast } = useToast();
 
-  const { plan, limits, isLoading: isSubscriptionLoading } = useSubscription();
+  const { plan, limits, ordersCount, isLoading: isSubscriptionLoading } = useSubscription();
 
-  // New state for bulk actions
   const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
   const [dateFrom, setDateFrom] = useState<string>('');
   const [dateTo, setDateTo] = useState<string>('');
@@ -91,9 +90,6 @@ export default function PedidosPage() {
   
   const isAllSelected = selectedOrders.length === filteredOrders.length && filteredOrders.length > 0;
   const isSomeSelected = selectedOrders.length > 0 && selectedOrders.length < filteredOrders.length;
-
-
-  // --- New Bulk Action Functions ---
 
   const selectByDateRange = () => {
     if (!dateFrom || !dateTo) {
@@ -177,8 +173,6 @@ export default function PedidosPage() {
     }
   };
 
-  // --- End New Functions ---
-
   const handleDeleteOrder = async (orderId: string) => {
     if (!firestore || !user) return;
     const docRef = doc(firestore, `businesses/${user.uid}/orders`, orderId);
@@ -228,9 +222,17 @@ export default function PedidosPage() {
             Revisa y administra los pedidos de tus clientes.
           </CardDescription>
         </CardHeader>
+        <CardContent>
+            <div className="flex items-center gap-2 rounded-lg border bg-secondary/50 p-3 text-sm">
+                <Info className="h-5 w-5 text-muted-foreground" />
+                <p className="text-muted-foreground">
+                    Límite de pedidos/mes: <span className="font-bold">{ordersCount} / {limits.orders === -1 ? '∞' : limits.orders}</span>.
+                </p>
+            </div>
+        </CardContent>
       </Card>
 
-      <LimitBanner current={orders?.length || 0} limit={limits.orders} label="pedidos/mes" plan={plan} />
+      <LimitBanner current={ordersCount} limit={limits.orders} label="pedidos/mes" plan={plan} />
 
       <Card>
         <CardHeader>
@@ -263,7 +265,6 @@ export default function PedidosPage() {
             />
           </div>
           
-          {/* New Bulk Action Toolbar */}
           <div className="my-4 p-4 border rounded-lg space-y-4">
               <div className="flex flex-wrap items-end gap-4">
                   <div className="flex-1 min-w-[200px]">

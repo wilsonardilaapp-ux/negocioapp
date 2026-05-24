@@ -25,7 +25,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue 
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Edit, Trash2, Loader2, Ticket, Clock, AlertTriangle, Lock } from 'lucide-react';
+import { PlusCircle, Edit, Trash2, Loader2, Ticket, Clock, AlertTriangle, Lock, Info } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import type { Coupon, CouponType, UsageLimitType } from '@/models/coupon';
@@ -40,7 +40,7 @@ const formatCurrency = (value: number) => new Intl.NumberFormat('es-CO', { style
 export default function CuponesPage() {
   const { user } = useUser();
   const { coupons, isLoading: isCouponsLoading } = useCoupons();
-  const { limits, plan, isLoading: isSubLoading } = useSubscription();
+  const { limits, plan, couponsCount, isLoading: isSubLoading } = useSubscription();
   const { toast } = useToast();
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -70,7 +70,7 @@ export default function CuponesPage() {
     return <div className="flex items-center justify-center h-64"><Loader2 className="animate-spin h-8 w-8 text-primary" /></div>;
   }
 
-  const couponLimitReached = limits.coupons !== -1 && coupons.length >= limits.coupons;
+  const couponLimitReached = limits.coupons !== -1 && couponsCount >= limits.coupons;
 
   return (
     <div className="flex flex-col gap-6">
@@ -87,9 +87,17 @@ export default function CuponesPage() {
             <PlusCircle className="mr-2 h-4 w-4" /> Nuevo Cupón
           </Button>
         </CardHeader>
+        <CardContent>
+            <div className="flex items-center gap-2 rounded-lg border bg-secondary/50 p-3 text-sm">
+                <Info className="h-5 w-5 text-muted-foreground" />
+                <p className="text-muted-foreground">
+                    Límite de cupones: <span className="font-bold">{couponsCount} / {limits.coupons === -1 ? '∞' : limits.coupons}</span>.
+                </p>
+            </div>
+        </CardContent>
       </Card>
 
-      <LimitBanner current={coupons.length} limit={limits.coupons} label="cupones" plan={plan} />
+      <LimitBanner current={couponsCount} limit={limits.coupons} label="cupones" plan={plan} />
 
       <Card>
         <Table>

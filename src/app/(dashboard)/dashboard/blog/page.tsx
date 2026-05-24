@@ -10,7 +10,7 @@ import {
   CardFooter,
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Frown, Save, Loader2, Image as ImageIcon, UploadCloud, Trash2, Pencil } from 'lucide-react';
+import { PlusCircle, Frown, Save, Loader2, Image as ImageIcon, UploadCloud, Trash2, Pencil, Info } from 'lucide-react';
 import Link from 'next/link';
 import { useCollection, useFirestore, useMemoFirebase, useUser, useDoc, setDocumentNonBlocking } from '@/firebase';
 import { collection, query, where, doc, type Timestamp, getDoc } from 'firebase/firestore';
@@ -242,9 +242,8 @@ export default function BlogPage() {
     });
   }, [unsortedPosts]);
 
-  const { plan, canAddBlogPosts, limits, isLoading: isSubscriptionLoading } = useSubscription();
+  const { plan, canAddBlogPosts, limits, blogPostsCount, isLoading: isSubscriptionLoading } = useSubscription();
   
-  const totalPosts = posts?.length ?? 0;
   const isLoading = isModuleLoading || arePostsLoading || isSubscriptionLoading;
 
   const handleDeletePost = async (postId: string) => {
@@ -277,7 +276,7 @@ export default function BlogPage() {
       );
   }
 
-  const canCreate = canAddBlogPosts(totalPosts);
+  const canCreate = canAddBlogPosts(blogPostsCount);
 
   return (
     <div className="flex flex-col gap-6">
@@ -297,9 +296,17 @@ export default function BlogPage() {
             </Link>
           </Button>
         </CardHeader>
+        <CardContent>
+            <div className="flex items-center gap-2 rounded-lg border bg-secondary/50 p-3 text-sm">
+                <Info className="h-5 w-5 text-muted-foreground" />
+                <p className="text-muted-foreground">
+                    Límite de posts: <span className="font-bold">{blogPostsCount} / {limits.blogPosts === -1 ? '∞' : limits.blogPosts}</span>.
+                </p>
+            </div>
+        </CardContent>
       </Card>
       
-      <LimitBanner current={totalPosts} limit={limits.blogPosts} label="artículos" plan={plan} />
+      <LimitBanner current={blogPostsCount} limit={limits.blogPosts} label="artículos" plan={plan} />
 
       <Card>
          <CardHeader>

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { PlusCircle, Frown, Lightbulb, Loader2, RefreshCw } from 'lucide-react';
+import { PlusCircle, Frown, Lightbulb, Loader2, RefreshCw, Info } from 'lucide-react';
 import { useUser, useFirestore, useCollection, useMemoFirebase, useDoc } from "@/firebase";
 import { collection, doc } from 'firebase/firestore';
 import type { Module } from "@/models/module";
@@ -134,6 +134,14 @@ export default function SuggestionsPage() {
                         </Button>
                     </div>
                 </CardHeader>
+                <CardContent>
+                    <div className="flex items-center gap-2 rounded-lg border bg-secondary/50 p-3 text-sm">
+                        <Info className="h-5 w-5 text-muted-foreground" />
+                        <p className="text-muted-foreground">
+                            Límite de sugerencias: <span className="font-bold">{suggestionsCount} / {limits.suggestions === -1 ? '∞' : limits.suggestions}</span>.
+                        </p>
+                    </div>
+                </CardContent>
             </Card>
 
             <LimitBanner current={suggestionsCount} limit={limits.suggestions} label="reglas de sugerencia" plan={plan} />

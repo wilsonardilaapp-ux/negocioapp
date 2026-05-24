@@ -27,7 +27,7 @@ import {
 } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Edit, Trash2, Loader2, Tag, Frown } from 'lucide-react';
+import { PlusCircle, Edit, Trash2, Loader2, Tag, Frown, Info } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import type { Promotion } from '@/models/promotion';
@@ -41,7 +41,7 @@ export default function PromotionsPage() {
   const firestore = useFirestore();
   const { promotions, isLoading: arePromosLoading } = usePromotions();
   const { toast } = useToast();
-  const { limits, plan, isLoading: isSubscriptionLoading } = useSubscription();
+  const { limits, plan, promotionsCount, isLoading: isSubscriptionLoading } = useSubscription();
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingPromo, setEditingPromo] = useState<Promotion | null>(null);
@@ -125,7 +125,7 @@ export default function PromotionsPage() {
     );
   }
 
-  const promoLimitReached = limits.promotions !== -1 && promotions.length >= limits.promotions;
+  const promoLimitReached = limits.promotions !== -1 && promotionsCount >= limits.promotions;
 
   return (
     <div className="flex flex-col gap-6">
@@ -139,9 +139,17 @@ export default function PromotionsPage() {
             <PlusCircle className="mr-2 h-4 w-4" /> Nueva Promoción
           </Button>
         </CardHeader>
+        <CardContent>
+            <div className="flex items-center gap-2 rounded-lg border bg-secondary/50 p-3 text-sm">
+                <Info className="h-5 w-5 text-muted-foreground" />
+                <p className="text-muted-foreground">
+                    Límite de promociones: <span className="font-bold">{promotionsCount} / {limits.promotions === -1 ? '∞' : limits.promotions}</span>.
+                </p>
+            </div>
+        </CardContent>
       </Card>
 
-      <LimitBanner current={promotions.length} limit={limits.promotions} label="promociones" plan={plan} />
+      <LimitBanner current={promotionsCount} limit={limits.promotions} label="promociones" plan={plan} />
 
       <Tabs defaultValue="all">
         <TabsList>
