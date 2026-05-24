@@ -10,6 +10,7 @@ import type { BlogPost } from '@/models/blog-post';
 import type { LandingPageData } from '@/models/landing-page';
 import type { Order } from '@/models/order';
 import type { Business } from '@/models/business';
+import type { SuggestionRule } from '@/models/suggestion-rule';
 
 // Tiempo máximo de espera antes de romper el loading infinito (ms)
 const LOADING_TIMEOUT_MS = 10_000;
@@ -56,6 +57,10 @@ export function useSubscription() {
     () => (user?.uid ? collection(firestore, `businesses/${user.uid}/orders`) : null),
     [user?.uid, firestore]
   );
+  const suggestionsRef = useMemoFirebase(
+    () => (user?.uid ? collection(firestore, `businesses/${user.uid}/suggestionRules`) : null),
+    [user?.uid, firestore]
+  );
 
   // Data fetching
   const { data: subscription, isLoading: isSubLoading, error: subError } = useDoc<Subscription>(subscriptionRef);
@@ -65,8 +70,9 @@ export function useSubscription() {
   const { data: blogPosts, isLoading: isBlogPostsLoading, error: blogPostsError } = useCollection<BlogPost>(blogPostsQuery);
   const { data: landingPages, isLoading: isLandingPagesLoading, error: landingPagesError } = useCollection<LandingPageData>(landingPagesRef);
   const { data: orders, isLoading: isOrdersLoading, error: ordersError } = useCollection<Order>(ordersRef);
+  const { data: suggestions, isLoading: isSuggestionsLoading, error: suggestionsError } = useCollection<SuggestionRule>(suggestionsRef);
 
-  const error = subError || plansError || productsError || blogPostsError || landingPagesError || ordersError;
+  const error = subError || plansError || productsError || blogPostsError || landingPagesError || ordersError || suggestionsError;
 
   // FIX 2: isLoading ahora incluye isUserLoading para que espere al usuario
   const rawIsLoading =
@@ -77,7 +83,8 @@ export function useSubscription() {
     isProductsLoading ||
     isBlogPostsLoading ||
     isLandingPagesLoading ||
-    isOrdersLoading;
+    isOrdersLoading ||
+    isSuggestionsLoading;
 
   // FIX 3: Timeout de seguridad — si tras 10s sigue cargando, forzamos salida
   useEffect(() => {
@@ -97,7 +104,7 @@ export function useSubscription() {
   const { plan, isActive, limits, isFree, isPro, isEnterprise } = useMemo(() => {
     const currentPlanId = subscription?.plan ?? 'free';
     const planDetails = allPlans?.find(p => p.id === currentPlanId);
-    const defaultLimits: PlanLimits = { products: 0, blogPosts: 0, landingPages: 0, coupons: 0, promotions: 0, orders: -1 };
+    const defaultLimits: PlanLimits = { products: 0, blogPosts: 0, landingPages: 0, coupons: 0, promotions: 0, orders: -1, suggestions: 0 };
 
     // Get extra limits from business document
     const extras = (businessData as any)?.limitesExtra || {};
@@ -111,6 +118,7 @@ export function useSubscription() {
         promotions: baseLimits.promotions === -1 ? -1 : (baseLimits.promotions + (extras.promotions || 0)),
         coupons: baseLimits.coupons === -1 ? -1 : (baseLimits.coupons + (extras.coupons || 0)),
         orders: baseLimits.orders === -1 ? -1 : (baseLimits.orders + (extras.orders || 0)),
+        suggestions: baseLimits.suggestions === -1 ? -1 : (baseLimits.suggestions + (extras.suggestions || 0)),
     };
 
     return {
@@ -127,6 +135,7 @@ export function useSubscription() {
   const blogPostsCount = blogPosts?.length ?? 0;
   const landingPagesCount = landingPages?.length ?? 0;
   const ordersCount = orders?.length ?? 0;
+  const suggestionsCount = suggestions?.length ?? 0;
 
   const canAddBlogPosts = (currentCount: number): boolean => {
     if (limits.blogPosts === -1) return true;
@@ -141,6 +150,11 @@ export function useSubscription() {
   const canAddOrders = (currentCount: number): boolean => {
     if (limits.orders === -1) return true;
     return currentCount < limits.orders;
+  };
+  
+  const canAddSuggestions = (currentCount: number): boolean => {
+    if (limits.suggestions === -1) return true;
+    return currentCount < limits.suggestions;
   };
 
   return {
@@ -158,8 +172,10 @@ export function useSubscription() {
     blogPostsCount,
     landingPagesCount,
     ordersCount,
+    suggestionsCount,
     canAddBlogPosts,
     canAddProducts,
     canAddOrders,
+    canAddSuggestions,
   };
 }

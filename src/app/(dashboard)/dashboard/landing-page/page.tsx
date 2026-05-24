@@ -13,6 +13,8 @@ import { useToast } from '@/hooks/use-toast';
 import { v4 as uuidv4 } from 'uuid';
 import { saveBusinessLanding } from '@/actions/save-business-landing';
 import type { SubscriptionPlan } from '@/models/subscription-plan';
+import { useSubscription } from '@/hooks/useSubscription';
+import { LimitBanner } from '@/components/dashboard/LimitBanner';
 
 const initialLandingData: LandingPageData = {
   hero: {
@@ -51,6 +53,8 @@ export default function LandingPageBuilder() {
   const { user } = useUser();
   const firestore = useFirestore();
   const { toast } = useToast();
+
+  const { plan, limits, landingPagesCount, isLoading: isSubscriptionLoading } = useSubscription();
 
   const docRef = useMemoFirebase(() => user ? doc(firestore, 'businesses', user.uid, 'landingPages', 'main') : null, [firestore, user]);
   
@@ -122,7 +126,7 @@ export default function LandingPageBuilder() {
     }
   };
   
-  if (isFetching || loadingPlans) {
+  if (isFetching || loadingPlans || isSubscriptionLoading) {
     return (
       <div className="flex justify-center items-center h-full">
         <Loader2 className="h-10 w-10 animate-spin text-primary" />
@@ -141,6 +145,9 @@ export default function LandingPageBuilder() {
                 <Save className="mr-2 h-4 w-4" /> Guardar Todo
             </Button>
         </Card>
+
+        <LimitBanner current={landingPagesCount} limit={limits.landingPages} label="landing pages" plan={plan} />
+
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2">
                 <EditorLandingForm 

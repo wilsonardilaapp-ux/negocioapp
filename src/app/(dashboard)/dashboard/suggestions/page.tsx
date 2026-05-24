@@ -1,5 +1,4 @@
-
-"use client";
+'use client';
 
 import { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
@@ -16,6 +15,8 @@ import MetricsDisplay from '@/components/suggestions/metrics-display';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { syncMetricsWithOrders } from '@/ai/flows/sync-suggestion-analytics';
 import { useToast } from '@/hooks/use-toast';
+import { useSubscription } from '@/hooks/useSubscription';
+import { LimitBanner } from '@/components/dashboard/LimitBanner';
 
 export default function SuggestionsPage() {
     const { user } = useUser();
@@ -24,6 +25,8 @@ export default function SuggestionsPage() {
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [editingRule, setEditingRule] = useState<SuggestionRule | null>(null);
     const [isSyncing, setIsSyncing] = useState(false);
+
+    const { plan, limits, suggestionsCount, isLoading: isSubscriptionLoading } = useSubscription();
 
     const suggestionsModuleQuery = useMemoFirebase(() => 
         !firestore ? null : doc(firestore, 'modules', 'motor-de-sugerencias-inteligentes'), 
@@ -80,7 +83,7 @@ export default function SuggestionsPage() {
         setIsFormOpen(true);
     };
     
-    const isLoading = isModulesLoading || areProductsLoading || areRulesLoading;
+    const isLoading = isModulesLoading || areProductsLoading || areRulesLoading || isSubscriptionLoading;
 
     if (isLoading && !rules) {
         return (
@@ -113,25 +116,15 @@ export default function SuggestionsPage() {
     return (
         <div className="flex flex-col gap-6">
             <Card>
-                <CardHeader className="flex flex-row justify-between items-center">
-                    <div>
-                        <CardTitle>Motor de Sugerencias Inteligentes</CardTitle>
-                        <CardDescription>
-                            Crea reglas para ofrecer productos complementarios (cross-sell) o de mayor valor (upsell).
-                        </CardDescription>
-                    </div>
-                    <div className="flex items-center gap-2">
-                         <Button onClick={handleSync} variant="outline" disabled={isSyncing}>
-                            {isSyncing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
-                            Sincronizar Métricas
-                        </Button>
-                        <Button onClick={handleAddNewRule}>
-                            <PlusCircle className="mr-2 h-4 w-4" />
-                            Crear Nueva Regla
-                        </Button>
-                    </div>
+                <CardHeader>
+                    <CardTitle>Motor de Sugerencias Inteligentes</CardTitle>
+                    <CardDescription>
+                        Crea reglas para ofrecer productos complementarios (cross-sell) o de mayor valor (upsell).
+                    </CardDescription>
                 </CardHeader>
             </Card>
+
+            <LimitBanner current={suggestionsCount} limit={limits.suggestions} label="reglas de sugerencia" plan={plan} />
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div className="lg:col-span-2 space-y-6">

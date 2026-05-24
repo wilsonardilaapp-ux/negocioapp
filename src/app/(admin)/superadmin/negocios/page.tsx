@@ -86,6 +86,7 @@ export default function BusinessesPage() {
     promotions: 0,
     coupons: 0,
     orders: 0,
+    suggestions: 0,
   });
   const [currentPlanLimits, setCurrentPlanLimits] = useState<Record<string, number>>({});
   const [nextPlanLimits, setNextPlanLimits] = useState<Record<string, number> | null>(null);
@@ -198,9 +199,10 @@ export default function BusinessesPage() {
         promotions: businessDoc.limitesExtra.promotions || 0,
         coupons: businessDoc.limitesExtra.coupons || 0,
         orders: businessDoc.limitesExtra.orders || 0,
+        suggestions: businessDoc.limitesExtra.suggestions || 0,
       });
     } else {
-      setLimitesExtra({ products: 0, blogPosts: 0, landingPages: 0, promotions: 0, coupons: 0, orders: 0 });
+      setLimitesExtra({ products: 0, blogPosts: 0, landingPages: 0, promotions: 0, coupons: 0, orders: 0, suggestions: 0 });
     }
     
     setShowManageModal(true);
@@ -314,6 +316,7 @@ export default function BusinessesPage() {
     { key: 'promotions', label: 'Promociones' },
     { key: 'coupons', label: 'Cupones' },
     { key: 'orders', label: 'Pedidos/mes' },
+    { key: 'suggestions', label: 'Sugerencias' },
   ];
 
   return (

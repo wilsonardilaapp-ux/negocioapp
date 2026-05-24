@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useMemo, useState } from 'react';
@@ -29,6 +28,8 @@ import 'jspdf-autotable';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { useSubscription } from '@/hooks/useSubscription';
+import { LimitBanner } from '@/components/dashboard/LimitBanner';
 
 
 declare module 'jspdf' {
@@ -42,6 +43,8 @@ export default function PedidosPage() {
   const { user } = useUser();
   const [searchTerm, setSearchTerm] = useState('');
   const { toast } = useToast();
+
+  const { plan, limits, isLoading: isSubscriptionLoading } = useSubscription();
 
   // New state for bulk actions
   const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
@@ -57,7 +60,7 @@ export default function PedidosPage() {
     return query(ordersRef, orderBy('orderDate', 'desc'));
   }, [firestore, user]);
 
-  const { data: orders, isLoading } = useCollection<Order>(ordersQuery);
+  const { data: orders, isLoading: areOrdersLoading } = useCollection<Order>(ordersQuery);
 
   const filteredOrders = useMemo(() => {
     if (!orders) return [];
@@ -214,6 +217,8 @@ export default function PedidosPage() {
     doc.save('pedidos.pdf');
   };
 
+  const isLoading = areOrdersLoading || isSubscriptionLoading;
+
   return (
     <div className="flex flex-col gap-6">
       <Card>
@@ -224,6 +229,8 @@ export default function PedidosPage() {
           </CardDescription>
         </CardHeader>
       </Card>
+
+      <LimitBanner current={orders?.length || 0} limit={limits.orders} label="pedidos/mes" plan={plan} />
 
       <Card>
         <CardHeader>
@@ -278,7 +285,7 @@ export default function PedidosPage() {
                           </AlertDialogTrigger>
                           <AlertDialogContent>
                             <AlertDialogHeader>
-                              <AlertDialogTitle>¿Confirmar eliminación?</AlertDialogTitle>
+                              <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
                               <AlertDialogDescription>
                                 Vas a eliminar permanentemente {selectedOrders.length} pedido(s). Esta acción no se puede deshacer.
                               </AlertDialogDescription>
