@@ -116,11 +116,23 @@ export default function SuggestionsPage() {
     return (
         <div className="flex flex-col gap-6">
             <Card>
-                <CardHeader>
-                    <CardTitle>Motor de Sugerencias Inteligentes</CardTitle>
-                    <CardDescription>
-                        Crea reglas para ofrecer productos complementarios (cross-sell) o de mayor valor (upsell).
-                    </CardDescription>
+                <CardHeader className="flex flex-row justify-between items-center">
+                    <div>
+                        <CardTitle>Motor de Sugerencias Inteligentes</CardTitle>
+                        <CardDescription>
+                            Crea reglas para ofrecer productos complementarios (cross-sell) o de mayor valor (upsell).
+                        </CardDescription>
+                    </div>
+                    <div className="flex gap-2">
+                        <Button variant="outline" onClick={handleSync} disabled={isSyncing}>
+                            {isSyncing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+                            Sincronizar Métricas
+                        </Button>
+                        <Button onClick={handleAddNewRule}>
+                            <PlusCircle className="mr-2 h-4 w-4" />
+                            Nueva Regla
+                        </Button>
+                    </div>
                 </CardHeader>
             </Card>
 
