@@ -48,6 +48,7 @@ export default function PlanForm({ existingPlan, onClose }: PlanFormProps) {
                     promotions: existingPlan.limits.promotions ?? 0,
                     coupons: existingPlan.limits.coupons ?? 0,
                     orders: existingPlan.limits.orders ?? -1,
+                    suggestions: existingPlan.limits.suggestions ?? 0,
                 }
             });
         } else {
@@ -66,6 +67,7 @@ export default function PlanForm({ existingPlan, onClose }: PlanFormProps) {
                     promotions: 0,
                     coupons: 0,
                     orders: -1,
+                    suggestions: 0,
                 }
             });
         }
@@ -151,6 +153,11 @@ export default function PlanForm({ existingPlan, onClose }: PlanFormProps) {
                         <Label htmlFor="limits.orders">Pedidos / mes</Label>
                         <Input id="limits.orders" type="number" {...register('limits.orders', { valueAsNumber: true })} />
                         {errors.limits?.orders && <p className="text-sm text-destructive mt-1">{errors.limits.orders.message}</p>}
+                    </div>
+                    <div>
+                        <Label htmlFor="limits.suggestions">Sugerencias</Label>
+                        <Input id="limits.suggestions" type="number" {...register('limits.suggestions', { valueAsNumber: true })} />
+                        {errors.limits?.suggestions && <p className="text-sm text-destructive mt-1">{errors.limits.suggestions.message}</p>}
                     </div>
                 </div>
             </div>
