@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
@@ -8,27 +9,23 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
-import Autoplay from "embla-carousel-autoplay";
-import { Star, Loader2, PackageSearch, Mail, Printer, FileDown, Settings, Frown, ArrowRight, X, Image as ImageIcon, Tag, ShoppingCart } from 'lucide-react';
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
+import { Star, Loader2, PackageSearch, Tag, ShoppingCart, Image as ImageIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Product } from '@/models/product';
 import type { Module } from '@/models/module';
 import type { LandingPageData, LandingHeaderConfigData } from '@/models/landing-page';
-import { TikTokIcon, WhatsAppIcon, XIcon, FacebookIcon, InstagramIcon, YoutubeIcon } from '@/components/icons';
+import { WhatsAppIcon, TikTokIcon, InstagramIcon, FacebookIcon, XIcon } from '@/components/icons';
 import { useParams, useSearchParams } from 'next/navigation';
 import { rateProduct } from '@/ai/flows/rate-product-flow';
 import { useToast } from '@/hooks/use-toast';
 import { PurchaseModal } from '@/components/catalogo/purchase-modal';
 import type { PaymentSettings } from '@/models/payment-settings';
-import html2canvas from 'html2canvas';
-import jsPDF from 'jspdf';
 import { getSuggestion } from '@/ai/flows/suggestion-flow';
 import { updateSuggestionMetrics } from '@/ai/flows/update-suggestion-metrics-flow';
 import type { SuggestionOutput } from '@/models/suggestion-io';
 import { SuggestionModal } from '@/components/suggestions/suggestion-modal';
 import PublicNav from '@/components/layout/public-nav';
-import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { promotionService } from '@/services/promotion-service';
 import type { Promotion } from '@/models/promotion';
 import { format } from 'date-fns';
@@ -327,9 +324,7 @@ function promoTypeLabel(type: Promotion['type']): string {
 export default function CatalogPage() {
     const { firestore, isNetworkEnabled } = useFirebase();
     const params = useParams();
-    const searchParams = useSearchParams();
     const slug = params.businessId as string;
-    const pageRef = useRef<HTMLDivElement>(null);
     
     const [pageData, setPageData] = useState<{
         resolvedBusinessId: string | null;
@@ -353,36 +348,58 @@ export default function CatalogPage() {
 
     useEffect(() => {
         if (!firestore || !slug || !isNetworkEnabled) return;
+        
         const initializePage = async () => {
             setIsLoading(true);
             try {
-                const shareConfigQuery = query(collectionGroup(firestore, 'shareConfig'), where('slug', '==', slug), limit(1));
-                const querySnapshot = await getDocs(shareConfigQuery);
-                const customSlugDoc = querySnapshot.docs.find(doc => doc.data().useCustomSlug === true);
-                const businessId = customSlugDoc ? (customSlugDoc.ref.parent.parent?.id ?? slug) : slug;
-                if (!businessId) throw new Error("No se pudo determinar el ID del negocio.");
-                
-                const [primaryModuleSnap, publicDataSnap, paymentSettingsSnap, landingPageSnap, promos] = await Promise.all([
+                // 1. Resolve business ID first
+                let businessId = slug;
+                if (slug.length < 20) { // Likely a slug, not a UID
+                    try {
+                        const shareConfigQuery = query(collectionGroup(firestore, 'shareConfig'), where('slug', '==', slug), limit(1));
+                        const querySnapshot = await getDocs(shareConfigQuery);
+                        const customSlugDoc = querySnapshot.docs.find(doc => doc.data().useCustomSlug === true);
+                        if (customSlugDoc) {
+                            businessId = customSlugDoc.ref.parent.parent?.id ?? slug;
+                        }
+                    } catch (e) { console.warn("Slug resolution failed, using ID directly"); }
+                }
+
+                // 2. Fetch ESSENTIAL data
+                const [primaryModuleSnap, publicDataSnap, landingPageSnap] = await Promise.all([
                     getDoc(doc(firestore, 'modules', 'catalogo')),
                     getDoc(doc(firestore, `businesses/${businessId}/publicData`, 'catalog')),
-                    getDoc(doc(firestore, 'paymentSettings', businessId)),
                     getDoc(doc(firestore, `businesses/${businessId}/landingPages`, 'main')),
-                    promotionService.getActivePromotions(businessId)
                 ]);
 
-                if (!primaryModuleSnap.exists() || primaryModuleSnap.data().status !== 'active') throw new Error("Módulo inactivo.");
+                if (!publicDataSnap.exists()) {
+                    throw new Error("El catálogo solicitado no existe o no ha sido publicado aún.");
+                }
 
-                setPageData({
+                setPageData(prev => ({
+                    ...prev,
                     resolvedBusinessId: businessId,
-                    publicData: publicDataSnap.exists() ? publicDataSnap.data() as any : null,
-                    paymentSettings: paymentSettingsSnap.exists() ? paymentSettingsSnap.data() as any : null,
+                    publicData: publicDataSnap.data() as any,
                     landingPageData: landingPageSnap.exists() ? landingPageSnap.data() as any : null,
-                    catalogModule: primaryModuleSnap.data() as any,
-                });
-                setActivePromotions(promos);
-            } catch (e: any) { setError(e.message); }
+                    catalogModule: primaryModuleSnap.exists() ? primaryModuleSnap.data() as any : null,
+                }));
+
+                // 3. Fetch NON-ESSENTIAL data separately (don't block the page)
+                getDoc(doc(firestore, 'paymentSettings', businessId)).then(snap => {
+                    if (snap.exists()) setPageData(prev => ({ ...prev, paymentSettings: snap.data() as any }));
+                }).catch(() => console.warn("Failed to load payment settings"));
+
+                promotionService.getActivePromotions(businessId).then(promos => {
+                    setActivePromotions(promos);
+                }).catch(() => console.warn("Failed to load promotions"));
+
+            } catch (e: any) { 
+                console.error("Initialization Error:", e);
+                setError(e.message); 
+            }
             finally { setIsLoading(false); }
         };
+
         initializePage();
     }, [firestore, slug, isNetworkEnabled]);
 
@@ -458,13 +475,13 @@ export default function CatalogPage() {
     }, []);
 
     if (isLoading) return <div className="flex h-screen w-full items-center justify-center bg-background"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>;
-    if (error) return <div className="flex h-screen w-full flex-col items-center justify-center bg-background text-center p-4"><PackageSearch className="h-16 w-16 text-muted-foreground mb-4" /><h1 className="text-2xl font-bold">Catálogo no encontrado</h1><p className="text-muted-foreground mt-2 max-w-md">{error}</p></div>;
+    if (error) return <div className="flex h-screen w-full flex-col items-center justify-center bg-background text-center p-4"><PackageSearch className="h-16 w-16 text-muted-foreground mb-4" /><h1 className="text-2xl font-bold">Catálogo no disponible</h1><p className="text-muted-foreground mt-2 max-w-md">{error}</p></div>;
 
     const products = pageData.publicData?.products || [];
     const headerConfig = pageData.publicData?.headerConfig || null;
 
     return (
-        <div id="catalog-page-root" ref={pageRef} className="bg-muted/40">
+        <div id="catalog-page-root" className="bg-muted/40 min-h-screen">
             <PublicNav navigation={pageData.landingPageData?.navigation} businessId={pageData.resolvedBusinessId ?? undefined} />
             <CatalogHeader 
                 config={headerConfig} 
@@ -517,7 +534,7 @@ export default function CatalogPage() {
                     paymentSettings={pageData.paymentSettings} 
                 />
             )}
-            <footer className="w-full border-t bg-background"><div className="container flex items-center justify-center h-16 px-4 md:px-6"><p className="text-sm text-muted-foreground">© {new Date().getFullYear()} {headerConfig?.businessInfo.name || 'Negocio V03'}.</p></div></footer>
+            <footer className="w-full border-t bg-background mt-12"><div className="container flex items-center justify-center h-16 px-4 md:px-6"><p className="text-sm text-muted-foreground">© {new Date().getFullYear()} {headerConfig?.businessInfo.name || 'Negocio V03'}.</p></div></footer>
         </div>
     );
 }
@@ -538,7 +555,7 @@ const CatalogHeader = ({ config, cartItemCount, onCartClick }: CatalogHeaderProp
     return (
         <div className="w-full">
             {config.banner.mediaUrl && <div className="relative w-full h-[200px] sm:h-[280px] lg:h-[360px] xl:h-[420px]">{config.banner.mediaType === 'image' ? <Image src={config.banner.mediaUrl} alt="Banner" fill sizes="100vw" className="object-cover"/> : <video src={config.banner.mediaUrl} autoPlay loop muted controls className="w-full h-full object-cover" />}</div>}
-            <div className="bg-card shadow-md p-4">
+            <div className="bg-card shadow-md p-4 sticky top-16 z-40">
                 <div className="container mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
                     <div className="text-center md:text-left">
                         <h1 className="text-xl md:text-3xl font-bold">{config.businessInfo.name}</h1>
