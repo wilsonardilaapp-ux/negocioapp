@@ -327,6 +327,12 @@ export default function SharePage() {
                     <p className="text-xs text-muted-foreground">Solo letras, números y guiones.</p>
                 </div>
             )}
+            <div className="flex justify-end pt-4 border-t">
+                <Button onClick={handleManualSave} disabled={isSaving} size="sm" className="bg-primary hover:bg-primary/90">
+                    {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                    Guardar Cambios URL
+                </Button>
+            </div>
         </CardContent>
       </Card>
       
