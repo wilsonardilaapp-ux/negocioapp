@@ -31,22 +31,23 @@ class PromotionService {
 
   async getActivePromotions(companyId: string): Promise<Promotion[]> {
     const db = this.getDb();
-    // Usamos solo la fecha (YYYY-MM-DD) para la comparación, evitando problemas con la hora del ISO
     const today = new Date().toISOString().split('T')[0];
     
+    // CRITICAL FIX: Added 'showInCatalog' filter to match Firestore Security Rules.
+    // In Firestore, "rules are not filters". Queries must match the constraints
+    // defined in firestore.rules to be allowed for public/unauthenticated users.
     const q = query(
       collection(db, 'promotions'), 
       where('companyId', '==', companyId),
-      where('isActive', '==', true)
+      where('isActive', '==', true),
+      where('showInCatalog', '==', true)
     );
     
     const snapshot = await getDocs(q);
     return snapshot.docs
       .map(doc => ({ id: doc.id, ...doc.data() } as Promotion))
       .filter(p => {
-          // Si la fecha de fin es mayor o igual a hoy, la promoción es válida
-          // No filtramos por validFrom de forma estricta aquí para permitir promociones pre-cargadas 
-          // que el usuario activó manualmente (según el comportamiento reportado).
+          // Additional safety check for validity period
           return p.validUntil >= today;
       });
   }
