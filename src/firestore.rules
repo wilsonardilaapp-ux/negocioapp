@@ -15,16 +15,16 @@ service cloud.firestore {
 
     // Datos del catálogo y landing (Subcolecciones públicas)
     match /businesses/{businessId}/publicData/{docId} {
-      allow read: if true;
+      allow read, list: if true;
     }
     
     match /businesses/{businessId}/landingPages/{docId} {
-      allow read: if true;
+      allow read, list: if true;
     }
 
     // Listado de productos (Si se consultan directamente)
     match /businesses/{businessId}/products/{productId} {
-      allow read: if true; 
+      allow read, list: if true; 
     }
 
     // Promociones públicas
@@ -90,7 +90,7 @@ service cloud.firestore {
     }
 
     function isBusinessMember(businessId) {
-      return request.auth != null && (request.auth.uid == businessId || (userExists() && 'businessId' in userData() && userData().businessId == businessId));
+      return request.auth.uid == businessId || (userExists() && 'businessId' in userData() && userData().businessId == businessId);
     }
 
     // ============================================
