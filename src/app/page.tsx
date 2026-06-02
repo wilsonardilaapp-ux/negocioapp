@@ -1,10 +1,9 @@
-
-import LandingPageContent from '@/components/landing-page/landing-page-content';
-import type { LandingPageData } from '@/models/landing-page';
+import LandingPageContent from '../components/landing-page/landing-page-content';
+import type { LandingPageData } from '../models/landing-page';
 import { v4 as uuidv4 } from 'uuid';
-import { getAdminFirestore } from "@/firebase/server-init";
-import type { SubscriptionPlan } from '@/models/subscription-plan';
-import { getLandingData } from '@/lib/get-landing-data';
+import { getAdminFirestore } from "../firebase/server-init";
+import type { SubscriptionPlan } from '../models/subscription-plan';
+import { getLandingData } from '../lib/get-landing-data';
 
 // Forzamos comportamiento dinámico total
 export const dynamic = 'force-dynamic';
@@ -88,6 +87,7 @@ const fallbackData: LandingPageData = {
       facebook: '',
       whatsapp: '',
       twitter: '',
+      youtube: '',
     },
     carouselItems: [
       { id: uuidv4(), mediaUrl: null, mediaType: null, slogan: '' },

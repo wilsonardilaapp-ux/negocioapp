@@ -4,7 +4,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Button } from "@/components/ui/button";
+import { Button } from "../../../components/ui/button";
 import {
   Card,
   CardContent,
@@ -12,8 +12,8 @@ import {
   CardFooter,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+} from "../../../components/ui/card";
+import { Input } from "../../../components/ui/input";
 import {
   Form,
   FormControl,
@@ -21,24 +21,24 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from "@/components/ui/form";
-import { useToast } from "@/hooks/use-toast";
-import { ToastAction } from "@/components/ui/toast";
-import { useAuth, useUser, useFirestore, initiateEmailSignUp } from "@/firebase";
+} from "../../../components/ui/form";
+import { useToast } from "../../../hooks/use-toast";
+import { ToastAction } from "../../../components/ui/toast";
+import { useAuth, useUser, useFirestore, initiateEmailSignUp } from "../../../firebase";
 import { useEffect, useState, Suspense } from "react";
 import { doc, setDoc, writeBatch, getDoc, Timestamp, collection } from 'firebase/firestore';
-import type { Business } from '@/models/business';
-import type { User as AppUser } from "@/models/user";
+import type { Business } from '../../../models/business';
+import type { User as AppUser } from "../../../models/user";
 import Link from "next/link";
 import { v4 as uuidv4 } from "uuid";
-import type { LandingPageData, NavLink } from "@/models/landing-page";
-import type { PaymentSettings } from "@/models/payment-settings";
-import type { Module } from "@/models/module";
-import type { KnowledgeDocument } from "@/models/chatbot-config";
-import { isFirstUser } from '@/actions/user';
+import type { LandingPageData, NavLink } from "../../../models/landing-page";
+import type { PaymentSettings } from "../../../models/payment-settings";
+import type { Module } from "../../../models/module";
+import type { KnowledgeDocument } from "../../../models/chatbot-config";
+import { isFirstUser } from '../../../actions/user';
 import { Eye, EyeOff, Loader2 } from 'lucide-react';
-import type { Subscription } from "@/models/subscription";
-import { STRIPE_PRICE_IDS } from "@/lib/stripe";
+import type { Subscription } from "../../../models/subscription";
+import { STRIPE_PRICE_IDS } from "../../../lib/stripe";
 
 const registerSchema = z.object({
   name: z.string().min(1, { message: "Por favor, introduce tu nombre." }),
@@ -112,6 +112,7 @@ const initialLandingPageData: LandingPageData = {
       facebook: '',
       whatsapp: '',
       twitter: '',
+      youtube: '',
     },
     carouselItems: [
       { id: uuidv4(), mediaUrl: null, mediaType: null, slogan: '' },

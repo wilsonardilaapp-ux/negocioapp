@@ -2,20 +2,48 @@
 
 import React, { useRef, useState, useEffect } from 'react';
 import Image from 'next/image';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
-import { useToast } from "@/hooks/use-toast";
-import type { LandingHeaderConfigData, CarouselItem } from '@/models/landing-page';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "../ui/card";
+import { Input } from "../ui/input";
+import { Label } from "../ui/label";
+import { Button } from "../ui/button";
+import { useToast } from "../../hooks/use-toast";
+import type { LandingHeaderConfigData, CarouselItem } from '../../models/landing-page';
 import { Loader2, UploadCloud, RotateCcw, Save, Trash2, Pencil, Image as ImageIcon } from "lucide-react";
-import { TikTokIcon, WhatsAppIcon, XIcon, FacebookIcon, InstagramIcon, YoutubeIcon } from '@/components/icons';
-import { uploadMedia } from '@/ai/flows/upload-media-flow';
+import { TikTokIcon, WhatsAppIcon, XIcon, FacebookIcon, InstagramIcon, YoutubeIcon } from '../icons';
+import { uploadMedia } from '../../ai/flows/upload-media-flow';
 
 interface CatalogHeaderFormProps {
   data: LandingHeaderConfigData;
   setData: (data: LandingHeaderConfigData) => void;
 }
+
+const initialHeaderConfig: LandingHeaderConfigData = {
+    banner: {
+      mediaUrl: null,
+      mediaType: null,
+    },
+    businessInfo: {
+      name: 'Mi Negocio',
+      address: 'Dirección de ejemplo',
+      phone: '3001234567',
+      email: 'info@tunegocio.com',
+      deliveryFee: 0,
+      vatRate: 19,
+    },
+    socialLinks: {
+      tiktok: '',
+      instagram: '',
+      facebook: '',
+      whatsapp: '',
+      twitter: '',
+      youtube: '',
+    },
+    carouselItems: [
+      { id: '1', mediaUrl: null, mediaType: null, slogan: '' },
+      { id: '2', mediaUrl: null, mediaType: null, slogan: '' },
+      { id: '3', mediaUrl: null, mediaType: null, slogan: '' },
+    ],
+};
 
 export default function CatalogHeaderForm({ data, setData }: CatalogHeaderFormProps) {
   const { toast } = useToast();
