@@ -1,16 +1,16 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { Button } from '@/components/ui/button';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
+import { Button } from '../../../components/ui/button';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../../../components/ui/card';
 import { PlusCircle, ShoppingBag, Edit, Trash2, Printer, FileDown, Info, Frown, Loader2 } from 'lucide-react';
-import type { Product } from '@/models/product';
-import ProductForm from '@/components/catalogo/product-form';
-import CatalogHeaderForm from '@/components/catalogo/catalog-header-form';
-import CatalogQRGenerator from '@/components/catalogo/catalog-qr-generator';
-import ShareCatalog from '@/components/catalogo/share-catalog';
-import ProductCard from '@/components/catalogo/product-card';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from '@/components/ui/dialog';
+import type { Product } from '../../../models/product';
+import ProductForm from '../../../components/catalogo/product-form';
+import CatalogHeaderForm from '../../../components/catalogo/catalog-header-form';
+import CatalogQRGenerator from '../../../components/catalogo/catalog-qr-generator';
+import ShareCatalog from '../../../components/catalogo/share-catalog';
+import ProductCard from '../../../components/catalogo/product-card';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from '../../../components/ui/dialog';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -20,16 +20,16 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import type { LandingHeaderConfigData } from '@/models/landing-page';
+} from "../../../components/ui/alert-dialog";
+import type { LandingHeaderConfigData } from '../../../models/landing-page';
 import { v4 as uuidv4 } from 'uuid';
-import { useUser, useFirestore, setDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase';
+import { useUser, useFirestore, setDocumentNonBlocking, deleteDocumentNonBlocking } from '../../../firebase';
 import { doc, collection, getDocs, getDoc } from 'firebase/firestore';
-import type { SystemService } from '@/models/system-service';
-import type { Module } from '@/models/module';
-import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
-import type { Business } from '@/models/business';
-import { useToast } from '@/hooks/use-toast';
+import type { SystemService } from '../../../models/system-service';
+import type { Module } from '../../../models/module';
+import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '../../../components/ui/tooltip';
+import type { Business } from '../../../models/business';
+import { useToast } from '../../../hooks/use-toast';
 
 
 const initialHeaderConfig: LandingHeaderConfigData = {
@@ -51,6 +51,7 @@ const initialHeaderConfig: LandingHeaderConfigData = {
       facebook: '',
       whatsapp: '',
       twitter: '',
+      youtube: '',
     },
     carouselItems: [
       { id: uuidv4(), mediaUrl: null, mediaType: null, slogan: '' },
