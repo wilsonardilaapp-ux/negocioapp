@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useRef, useMemo } from 'react';
@@ -170,7 +171,7 @@ export default function SharePage() {
             ...savedShareConfig,
             id: savedShareConfig.id || 'main',
             businessId: savedShareConfig.businessId || user.uid,
-            useCustomSlug: savedShareConfig.useCustomSlug ?? false,
+            useCustomSlug: !!savedShareConfig.useCustomSlug, // Forzamos booleano para consistencia
             slug: savedShareConfig.slug || user.uid,
             qrConfig: {
                 ...defaultShareConfig.qrConfig,
@@ -205,8 +206,9 @@ export default function SharePage() {
     if (!shareConfig || !shareConfigRef || !firestore) return;
     setIsSaving(true);
     try {
+      // Nos aseguramos de enviar el objeto completo con los estados booleanos actuales
       const dataToSave = { 
-        ...shareConfig, 
+        ...shareConfig,
         updatedAt: new Date().toISOString() 
       };
       
@@ -230,7 +232,7 @@ export default function SharePage() {
 
   const menuUrl = useMemo(() => {
     if (typeof window === 'undefined' || !shareConfig || !user) return '';
-    const slugToUse = shareConfig.useCustomSlug ? (shareConfig.slug || '') : user.uid;
+    const slugToUse = shareConfig.useCustomSlug ? (shareConfig.slug || user.uid) : user.uid;
     return `${window.location.origin}/catalog/${slugToUse}`;
   }, [shareConfig, user]);
 
@@ -404,7 +406,7 @@ export default function SharePage() {
                                 </Button>
                             </div>
                             <Button className="w-full" variant="default" onClick={() => window.open(menuUrl, '_blank')}>
-                                <Eye className="w-4 h-4 mr-2" /> Previsualizar como Cliente
+                                <ExternalLink className="h-4 w-4 mr-2" /> Previsualizar como Cliente
                             </Button>
                         </CardContent>
                     </Card>
