@@ -1,17 +1,17 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
-import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Button } from '../../../../components/ui/button';
+import { Card, CardHeader, CardTitle, CardDescription } from '../../../../components/ui/card';
 import { Save, Loader2 } from 'lucide-react';
-import type { LandingPageData } from '@/models/landing-page';
-import EditorLandingForm from '@/components/landing-page/editor-landing-form';
-import SuperAdminEditorLandingPreview from '@/components/landing-page/superadmin-editor-landing-preview';
-import { useToast } from '@/hooks/use-toast';
-import { saveLandingConfig } from '@/actions/save-landing-config';
-import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import type { LandingPageData } from '../../../../models/landing-page';
+import EditorLandingForm from '../../../../components/landing-page/editor-landing-form';
+import SuperAdminEditorLandingPreview from '../../../../components/landing-page/superadmin-editor-landing-preview';
+import { useToast } from '../../../../hooks/use-toast';
+import { saveLandingConfig } from '../../../../actions/save-landing-config';
+import { useCollection, useFirestore, useMemoFirebase } from '../../../../firebase';
 import { collection } from 'firebase/firestore';
-import type { SubscriptionPlan } from '@/models/subscription-plan';
+import type { SubscriptionPlan } from '../../../../models/subscription-plan';
 
 interface EditorClientProps {
   initialData: LandingPageData | null;

@@ -1,6 +1,6 @@
-import { getLandingData } from '../../../lib/get-landing-data';
+import { getLandingData } from '../../../../lib/get-landing-data';
 import LandingEditorClient from './EditorClient';
-import type { LandingPageData } from '../../../models/landing-page';
+import type { LandingPageData } from '../../../../models/landing-page';
 import { v4 as uuidv4 } from 'uuid';
 
 export const dynamic = 'force-dynamic';
