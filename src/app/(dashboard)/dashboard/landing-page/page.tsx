@@ -36,7 +36,7 @@ const initialLandingData: LandingPageData = {
   header: { 
     banner: { mediaUrl: null, mediaType: null }, 
     businessInfo: { name: '', address: '', phone: '', email: '' }, 
-    socialLinks: { tiktok: '', instagram: '', facebook: '', whatsapp: '', twitter: '' }, 
+    socialLinks: { tiktok: '', instagram: '', facebook: '', whatsapp: '', twitter: '', youtube: '' }, 
     carouselItems: [
         { id: uuidv4(), mediaUrl: null, mediaType: null, slogan: '' },
         { id: uuidv4(), mediaUrl: null, mediaType: null, slogan: '' },

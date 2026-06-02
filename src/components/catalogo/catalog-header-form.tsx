@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useRef, useState, useEffect } from 'react';
@@ -10,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import type { LandingHeaderConfigData, CarouselItem } from '@/models/landing-page';
 import { Loader2, UploadCloud, RotateCcw, Save, Trash2, Pencil, Image as ImageIcon } from "lucide-react";
-import { TikTokIcon, WhatsAppIcon, XIcon, FacebookIcon, InstagramIcon } from '@/components/icons';
+import { TikTokIcon, WhatsAppIcon, XIcon, FacebookIcon, InstagramIcon, YoutubeIcon } from '@/components/icons';
 import { uploadMedia } from '@/ai/flows/upload-media-flow';
 
 interface CatalogHeaderFormProps {
@@ -169,6 +168,7 @@ export default function CatalogHeaderForm({ data, setData }: CatalogHeaderFormPr
     facebook: <FacebookIcon />,
     whatsapp: <WhatsAppIcon />,
     twitter: <XIcon />,
+    youtube: <YoutubeIcon />,
   };
   
   const safeCarouselItems = Array.isArray(localData.carouselItems) ? localData.carouselItems : [];
@@ -235,7 +235,7 @@ export default function CatalogHeaderForm({ data, setData }: CatalogHeaderFormPr
         <div className="space-y-4">
             <Label className="text-lg font-semibold">Redes Sociales</Label>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {Object.keys(localData.socialLinks).map((key) => (
+                {Object.keys(socialIcons).map((key) => (
                     <div key={key} className="flex items-center gap-2">
                         <div className="h-9 w-9 flex items-center justify-center bg-muted rounded-md text-muted-foreground">
                             {socialIcons[key as keyof typeof socialIcons]}
@@ -286,5 +286,3 @@ export default function CatalogHeaderForm({ data, setData }: CatalogHeaderFormPr
     </Card>
   );
 }
-
-    

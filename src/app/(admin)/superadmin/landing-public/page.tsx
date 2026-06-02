@@ -1,4 +1,3 @@
-
 import { getLandingData } from '@/lib/get-landing-data';
 import LandingEditorClient from './EditorClient';
 import type { LandingPageData } from '@/models/landing-page';
@@ -72,6 +71,7 @@ const fallbackData: LandingPageData = {
       facebook: '',
       whatsapp: '',
       twitter: '',
+      youtube: '',
     },
     carouselItems: [
       { id: uuidv4(), mediaUrl: null, mediaType: null, slogan: '' },

@@ -1,5 +1,3 @@
-
-
 export type LandingPageData = {
   hero: HeroSection;
   navigation: NavigationSection;
@@ -120,7 +118,7 @@ export type LandingHeaderConfigData = {
         facebook: string;
         whatsapp: string;
         twitter: string;
-        youtube?: string; // Optional for backward compatibility
+        youtube: string;
         linkedin?: string; // Optional
     };
     carouselItems: CarouselItem[];
