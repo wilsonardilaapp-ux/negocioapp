@@ -61,7 +61,7 @@ const isVideo = (url: string) => {
     return videoExtensions.some(ext => url.toLowerCase().includes(ext));
 };
 
-const MediaPreview = ({ item, alt, objectFit = 'cover', priority = false }: { item: MediaItem, alt: string, objectFit?: 'cover' | 'contain', priority?: boolean }) => {
+const MediaPreview = ({ item, alt, objectFit = 'cover', priority = false }: { item: MediaItem, alt: string, objectFit?: 'cover' | 'contain' | 'fill', priority?: boolean }) => {
     if (item.type === 'video') {
         return <video src={item.url} className={cn('rounded-md object-cover w-full h-full')} autoPlay loop muted />;
     }
@@ -300,15 +300,20 @@ export default function CatalogPage() {
             setIsLoading(true);
             try {
                 let businessId = slug;
-                // Intentar resolver alias de forma silenciosa
+                
+                // 1. Resolución de Alias (No crítica)
                 try {
                     const shareConfigQuery = query(collectionGroup(firestore, 'shareConfig'), where('slug', '==', slug), limit(1));
                     const querySnapshot = await getDocs(shareConfigQuery);
                     const customSlugDoc = querySnapshot.docs.find(doc => doc.data().useCustomSlug === true);
-                    if (customSlugDoc) businessId = customSlugDoc.ref.parent.parent?.id ?? slug;
-                } catch (e) { console.warn("Slug resolution failed, falling back to URL parameter"); }
+                    if (customSlugDoc) {
+                        businessId = customSlugDoc.ref.parent.parent?.id ?? slug;
+                    }
+                } catch (e) {
+                    console.warn("No se pudo resolver el alias, usando ID de URL:", slug);
+                }
 
-                // Carga paralela resiliente
+                // 2. Carga de datos esenciales (Paralela y resiliente)
                 const results = await Promise.allSettled([
                     getDoc(doc(firestore, `businesses/${businessId}/publicData`, 'catalog')),
                     getDoc(doc(firestore, `businesses/${businessId}/landingPages`, 'main')),
@@ -319,7 +324,9 @@ export default function CatalogPage() {
                 const landingPageSnap = results[1].status === 'fulfilled' ? results[1].value : null;
                 const paymentSettingsSnap = results[2].status === 'fulfilled' ? results[2].value : null;
 
+                // Solo fallamos si el catálogo principal (publicData) no existe
                 if (!publicDataSnap?.exists()) {
+                    console.error("Acceso denegado o catálogo inexistente para:", businessId);
                     throw new Error("El catálogo solicitado no existe o no tiene permisos de lectura pública.");
                 }
 
@@ -330,13 +337,13 @@ export default function CatalogPage() {
                     paymentSettings: paymentSettingsSnap?.exists() ? paymentSettingsSnap.data() as any : null,
                 });
 
-                // Cargar promociones sin bloquear
+                // 3. Carga de promociones (Opcional, no bloqueante)
                 promotionService.getActivePromotions(businessId)
                     .then(setActivePromotions)
-                    .catch(() => console.warn("Could not load promotions"));
+                    .catch(err => console.warn("No se cargaron promociones:", err.message));
 
             } catch (e: any) { 
-                console.error("Initialization Error:", e);
+                console.error("Error crítico de carga:", e);
                 setError(e.message); 
             }
             finally { setIsLoading(false); }
@@ -363,7 +370,7 @@ export default function CatalogPage() {
     if (error) return (
         <div className="flex h-screen w-full flex-col items-center justify-center bg-background text-center p-4">
             <PackageSearch className="h-16 w-16 text-muted-foreground mb-4" />
-            <h1 className="text-2xl font-bold">Catálogo no encontrado</h1>
+            <h1 className="text-2xl font-bold">Catálogo no disponible</h1>
             <p className="text-muted-foreground mt-2 max-w-md">{error}</p>
         </div>
     );

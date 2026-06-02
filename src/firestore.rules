@@ -4,7 +4,75 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Funciones de ayuda
+    // ============================================
+    // 1. REGLAS PÚBLICAS (ACCESO TOTAL SIN LOGIN)
+    // ============================================
+    
+    // Configuración de alias y compartir (Necesario para collectionGroup)
+    match /{path=**}/shareConfig/{docId} {
+      allow read, list: if true;
+    }
+
+    // Datos del catálogo y landing (Subcolecciones públicas)
+    match /businesses/{businessId}/publicData/{docId} {
+      allow read: if true;
+    }
+    
+    match /businesses/{businessId}/landingPages/{docId} {
+      allow read: if true;
+    }
+
+    // Listado de productos (Si se consultan directamente)
+    match /businesses/{businessId}/products/{productId} {
+      allow read: if true; 
+    }
+
+    // Promociones públicas
+    match /promotions/{promotionId} {
+      allow read, list: if resource.data.showInCatalog == true;
+    }
+
+    // Cupones (Lectura pública para validación en carrito)
+    match /cupones/{couponId} {
+      allow read, list: if true;
+    }
+
+    // Métodos de pago y planes
+    match /paymentSettings/{userId} {
+      allow get: if true;
+    }
+
+    match /plans/{planId} {
+      allow read: if true;
+    }
+
+    match /globalConfig/{document=**} {
+      allow read: if true;
+    }
+
+    // Blog público
+    match /blog_posts/{postId} {
+      allow get: if true;
+      allow list: if resource.data.isActive == true;
+    }
+
+    // Pedidos y Contacto (Permitir que cualquiera envíe datos)
+    match /businesses/{businessId}/orders/{orderId} {
+      allow create: if true;
+    }
+
+    match /businesses/{businessId}/contactSubmissions/{submissionId} {
+      allow create: if true;
+    }
+
+    match /contactMessages/{messageId} {
+      allow create: if true;
+    }
+
+    // ============================================
+    // 2. FUNCIONES DE AYUDA (PARA ADMINS/DUEÑOS)
+    // ============================================
+
     function userDocPath() {
       return /databases/$(database)/documents/users/$(request.auth.uid);
     }
@@ -22,110 +90,46 @@ service cloud.firestore {
     }
 
     function isBusinessMember(businessId) {
-      return request.auth.uid == businessId || (userExists() && 'businessId' in userData() && userData().businessId == businessId);
-    }
-
-    function isOwner(businessId) {
       return request.auth != null && (request.auth.uid == businessId || (userExists() && 'businessId' in userData() && userData().businessId == businessId));
     }
 
-    // REGLAS PÚBLICAS (Accesibles sin estar registrado)
-    
-    // Permitir leer la configuración de compartir (necesario para alias personalizados)
-    match /{path=**}/shareConfig/{docId} {
-      allow read: if true;
-    }
-
-    // Permitir leer datos públicos de negocios (Catálogo y Landing)
-    match /businesses/{businessId}/publicData/{docId} {
-      allow read: if true;
-    }
-    
-    match /businesses/{businessId}/landingPages/{docId} {
-      allow read: if true;
-    }
-
-    match /blog_posts/{postId} {
-      allow get: if true;
-      allow list: if resource.data.isActive == true || (request.auth != null && (request.auth.uid == resource.data.businessId || isSuperAdmin()));
-    }
-
-    match /promotions/{promotionId} {
-      allow read: if resource.data.showInCatalog == true || (request.auth != null && (isSuperAdmin() || isOwner(resource.data.companyId)));
-    }
-
-    match /cupones/{couponId} {
-      allow read: if true;
-    }
-
-    match /plans/{planId} {
-      allow read: if true;
-    }
-
-    match /globalConfig/{document=**} {
-      allow read: if true;
-    }
-
-    // REGLAS PRIVADAS Y OPERACIONALES
-
-    // Pedidos (Permitir creación pública, lectura solo dueños)
-    match /businesses/{businessId}/orders/{orderId} {
-      allow create: if true;
-      allow read, update, delete: if isBusinessMember(businessId) || isSuperAdmin();
-    }
-
-    // Envíos de formulario (Públicos)
-    match /businesses/{businessId}/contactSubmissions/{submissionId} {
-      allow create: if true;
-      allow read, update, delete: if isBusinessMember(businessId) || isSuperAdmin();
-    }
+    // ============================================
+    // 3. REGLAS PRIVADAS (SOLO AUTENTICADOS)
+    // ============================================
 
     // Usuarios
     match /users/{userId} {
       allow get: if request.auth != null && (request.auth.uid == userId || isSuperAdmin());
-      allow update: if request.auth != null && (request.auth.uid == userId || isSuperAdmin())
-        && request.resource.data.role == resource.data.role
-        && request.resource.data.businessId == resource.data.businessId;
-      allow list: if isSuperAdmin();
       allow create: if request.auth != null && request.auth.uid == userId;
-      allow delete: if isSuperAdmin();
+      allow update: if request.auth != null && (request.auth.uid == userId || isSuperAdmin());
+      allow list, delete: if isSuperAdmin();
     }
 
-    // Configuración de pagos
-    match /paymentSettings/{userId} {
-      allow get: if true;
-      allow write: if request.auth != null && request.auth.uid == userId;
-    }
-
-    // Estructura general de Negocios
+    // Negocios y subcolecciones privadas
     match /businesses/{businessId} {
       allow get: if true;
-      allow list: if request.auth != null;
-      allow create, update, delete: if isBusinessMember(businessId) || isSuperAdmin();
+      allow list, update, delete: if isBusinessMember(businessId) || isSuperAdmin();
 
-      match /products/{productId} { allow read, write: if isBusinessMember(businessId) || isSuperAdmin(); }
       match /contactForms/{formId} { allow read, write: if isBusinessMember(businessId) || isSuperAdmin(); }
       match /suggestionRules/{ruleId} { allow read, write: if isBusinessMember(businessId) || isSuperAdmin(); }
       match /notifications/{notificationId} { allow read, update, delete: if isBusinessMember(businessId) || isSuperAdmin(); allow create: if isSuperAdmin(); }
       match /chatbotConfig/{doc=**} { allow read, write: if isBusinessMember(businessId) || isSuperAdmin(); }
       match /chatConversations/{doc=**} { allow read, write: if isBusinessMember(businessId) || isSuperAdmin(); }
-      match /services/{doc=**} { allow read, write: if isBusinessMember(businessId) || isSuperAdmin(); }
-      match /modules/{doc=**} { allow read, write: if isBusinessMember(businessId) || isSuperAdmin(); }
+      match /backups/{doc=**} { allow read, write: if isBusinessMember(businessId) || isSuperAdmin(); }
+      match /kardexConfig/{doc=**} { allow read, write: if isBusinessMember(businessId) || isSuperAdmin(); }
       match /reminders/{doc=**} { allow read, write: if isSuperAdmin(); }
+      match /shareConfig/{docId} { allow write: if isBusinessMember(businessId) || isSuperAdmin(); }
+      match /orders/{docId} { allow read, update, delete: if isBusinessMember(businessId) || isSuperAdmin(); }
+      match /contactSubmissions/{docId} { allow read, update, delete: if isBusinessMember(businessId) || isSuperAdmin(); }
     }
 
-    // Mensajes de contacto globales
-    match /contactMessages/{messageId} {
-      allow read, update, delete: if isSuperAdmin();
-      allow create: if true;
-    }
-
-    // Otros recursos del sistema
+    // Recursos del sistema
     match /modules/{moduleId} { allow read: if true; allow write: if isSuperAdmin(); }
     match /systemServices/{serviceId} { allow read: if request.auth != null; allow write: if isSuperAdmin(); }
     match /integrations/{integrationId} { allow read: if request.auth != null; allow write: if isSuperAdmin(); }
+    match /contactMessages/{messageId} { allow read, update, delete: if isSuperAdmin(); }
 
-    // Por defecto denegar
+    // Por defecto denegar todo lo demás
     match /{document=**} {
       allow read, write: if false;
     }
