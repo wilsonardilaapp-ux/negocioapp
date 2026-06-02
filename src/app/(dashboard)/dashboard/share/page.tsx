@@ -20,6 +20,7 @@ import {
   Trash2,
   Save,
   Loader2,
+  ExternalLink,
 } from 'lucide-react';
 import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { doc, setDoc } from 'firebase/firestore';
@@ -154,7 +155,6 @@ export default function SharePage() {
   const [copied, setCopied] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const qrCodeRef = useRef<HTMLDivElement>(null);
-  const hasLoadedInitial = useRef(false);
 
   const shareConfigRef = useMemoFirebase(() => 
     user ? doc(firestore, `businesses/${user.uid}/shareConfig`, 'main') : null,
@@ -164,26 +164,27 @@ export default function SharePage() {
   const { data: savedShareConfig, isLoading } = useDoc<MenuShare>(shareConfigRef);
   
   useEffect(() => {
-    if (isLoading || !user || hasLoadedInitial.current) return;
+    if (isLoading || !user) return;
 
     if (savedShareConfig) {
-        const mergedConfig: MenuShare = {
-            ...savedShareConfig,
-            id: savedShareConfig.id || 'main',
-            businessId: savedShareConfig.businessId || user.uid,
-            useCustomSlug: !!savedShareConfig.useCustomSlug, // Forzamos booleano para consistencia
-            slug: savedShareConfig.slug || user.uid,
-            qrConfig: {
-                ...defaultShareConfig.qrConfig,
-                ...(savedShareConfig.qrConfig || {}),
-            },
-            socialShareMessage: savedShareConfig.socialShareMessage || defaultShareConfig.socialShareMessage,
-            isActive: savedShareConfig.isActive ?? true,
-            createdAt: savedShareConfig.createdAt || new Date().toISOString(),
-            updatedAt: savedShareConfig.updatedAt || new Date().toISOString(),
-        };
-        setShareConfig(mergedConfig);
-        hasLoadedInitial.current = true;
+        // Mantenemos sincronizado el estado local con la base de datos si no estamos guardando activamente
+        if (!isSaving) {
+            setShareConfig({
+                ...savedShareConfig,
+                id: savedShareConfig.id || 'main',
+                businessId: savedShareConfig.businessId || user.uid,
+                useCustomSlug: !!savedShareConfig.useCustomSlug,
+                slug: savedShareConfig.slug || user.uid,
+                qrConfig: {
+                    ...defaultShareConfig.qrConfig,
+                    ...(savedShareConfig.qrConfig || {}),
+                },
+                socialShareMessage: savedShareConfig.socialShareMessage || defaultShareConfig.socialShareMessage,
+                isActive: savedShareConfig.isActive ?? true,
+                createdAt: savedShareConfig.createdAt || new Date().toISOString(),
+                updatedAt: savedShareConfig.updatedAt || new Date().toISOString(),
+            });
+        }
     } else if (savedShareConfig === null) {
       const newConfig: MenuShare = {
         id: 'main',
@@ -194,9 +195,8 @@ export default function SharePage() {
         updatedAt: new Date().toISOString(),
       };
       setShareConfig(newConfig);
-      hasLoadedInitial.current = true;
     }
-  }, [savedShareConfig, isLoading, user]);
+  }, [savedShareConfig, isLoading, user, isSaving]);
 
   const handleLocalChange = (newValues: Partial<MenuShare>) => {
     setShareConfig(prev => prev ? { ...prev, ...newValues } : null);
@@ -206,7 +206,7 @@ export default function SharePage() {
     if (!shareConfig || !shareConfigRef || !firestore) return;
     setIsSaving(true);
     try {
-      // Nos aseguramos de enviar el objeto completo con los estados booleanos actuales
+      // Forzamos el valor actual del estado local al documento
       const dataToSave = { 
         ...shareConfig,
         updatedAt: new Date().toISOString() 
