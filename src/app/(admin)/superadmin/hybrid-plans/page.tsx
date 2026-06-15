@@ -83,6 +83,12 @@ export default function HybridPlansPage() {
                     {plan.commissionType === 'percent' ? `${plan.pricePerOrder}%` : `$${plan.pricePerOrder.toLocaleString('es-CO')}`}
                   </span>
                 </div>
+                {plan.commissionType === 'percent' && plan.maxCommissionPerOrder && plan.maxCommissionPerOrder > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Tope máximo:</span>
+                    <span className="font-bold text-orange-600">${plan.maxCommissionPerOrder.toLocaleString('es-CO')}</span>
+                  </div>
+                )}
               </CardContent>
               <CardFooter className="flex gap-2">
                 <Button variant="outline" className="flex-1" onClick={() => handleOpenDialog(plan)}><Edit className="w-4 h-4 mr-2" /> Editar</Button>
@@ -115,6 +121,7 @@ function HybridPlanDialog({ isOpen, onClose, plan }: { isOpen: boolean, onClose:
       slug: '',
       basePrice: 0,
       pricePerOrder: 0,
+      maxCommissionPerOrder: 0,
       commissionType: 'percent',
       variableBillingFrequency: 'monthly',
       isActive: true,
@@ -152,6 +159,7 @@ function HybridPlanDialog({ isOpen, onClose, plan }: { isOpen: boolean, onClose:
           slug: '',
           basePrice: 0,
           pricePerOrder: 0,
+          maxCommissionPerOrder: 0,
           commissionType: 'percent',
           variableBillingFrequency: 'monthly',
           isActive: true,
@@ -181,19 +189,17 @@ function HybridPlanDialog({ isOpen, onClose, plan }: { isOpen: boolean, onClose:
     const planId = plan?.id || doc(collection(firestore, 'hybrid_plans')).id;
     const docRef = doc(firestore, 'hybrid_plans', planId);
 
-    // Sanitización forzada de datos
     const dataToSave = JSON.parse(JSON.stringify(data));
     dataToSave.id = planId;
     
-    // Normalización de SLUG: Siempre generamos uno limpio a partir del nombre si no hay uno válido
     const sourceForSlug = dataToSave.slug || dataToSave.name;
     dataToSave.slug = sourceForSlug
         .toLowerCase()
         .trim()
         .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "") // Quitar acentos
-        .replace(/\s+/g, '-')           // Espacios a guiones
-        .replace(/[^\w-]+/g, '');       // Quitar caracteres no permitidos
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/\s+/g, '-')
+        .replace(/[^\w-]+/g, '');
 
     startTransition(() => {
       setDocumentNonBlocking(docRef, dataToSave, { merge: true })
@@ -295,6 +301,18 @@ function HybridPlanDialog({ isOpen, onClose, plan }: { isOpen: boolean, onClose:
                     <Input type="number" step="0.01" {...register('pricePerOrder', { valueAsNumber: true })} />
                     {errors.pricePerOrder && <p className="text-xs text-destructive font-semibold">{errors.pricePerOrder.message}</p>}
                   </div>
+                </div>
+                <div className="flex-1 mt-3">
+                  <Label className="text-xs">Tope Máximo por Pedido ($) <span className="text-muted-foreground">(0 = sin tope)</span></Label>
+                  <Input 
+                    type="number" 
+                    step="1"
+                    {...register('maxCommissionPerOrder', { valueAsNumber: true })} 
+                    placeholder="Ej: 15000"
+                  />
+                  <p className="text-[10px] text-muted-foreground mt-1">
+                    Si la comisión calculada supera este valor, se cobra el tope. Solo aplica para comisión porcentual.
+                  </p>
                 </div>
               </div>
             </TabsContent>
