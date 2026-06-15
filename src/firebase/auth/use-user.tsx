@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -14,7 +15,13 @@ interface UserAuthState {
   userError: Error | null;
 }
 
-const SUPER_ADMIN_EMAILS = ['allseosoporte@gmail.com'];
+// EMAILS CON ACCESO TOTAL DE ADMINISTRADOR
+const SUPER_ADMIN_EMAILS = [
+  'allseosoporte@gmail.com',
+  'admin@zentry.com',
+  'admin@ecosalud.com',
+  'pcuser@gmail.com'
+];
 
 export function useUser() {
   const { auth, firestore, isNetworkEnabled } = useFirebase();
@@ -29,7 +36,7 @@ export function useUser() {
   const router = useRouter();
   const pathname = usePathname();
 
-  // Effect 1: Handle Auth State Changes ONLY
+  // Effect 1: Monitorear cambios en Firebase Auth
   useEffect(() => {
     if (!auth || !isNetworkEnabled) {
         setAuthState({ user: null, isLoading: false, error: null });
@@ -46,7 +53,7 @@ export function useUser() {
     return () => unsubscribe();
   }, [auth, isNetworkEnabled]);
 
-  // Effect 2: Handle Profile Fetching and Self-Healing
+  // Effect 2: Obtener Perfil y Auto-Recuperación
   useEffect(() => {
     if (!firestore || !authState.user) {
         setProfile(null);
@@ -62,32 +69,28 @@ export function useUser() {
             setProfile(docSnap.data() as UserProfile);
             setProfileLoading(false);
         } else if (authState.user) {
-            // Self-healing logic for users affected by the old registration bug.
+            // Lógica de auto-recuperación de perfil
             try {
                 const businessDocRef = doc(firestore, 'businesses', authState.user.uid);
                 const businessSnap = await getDoc(businessDocRef);
 
                 if (businessSnap.exists()) {
-                    // Business doc exists but user doc doesn't. Let's fix it.
                     const businessData = businessSnap.data();
                     const newUserProfile: UserProfile = {
                         id: authState.user.uid,
                         name: businessData.ownerName || authState.user.displayName || 'Usuario Recuperado',
                         email: authState.user.email!,
-                        role: 'cliente_admin', // Assume 'cliente_admin' for recovered accounts
+                        role: SUPER_ADMIN_EMAILS.includes(authState.user.email || '') ? 'super_admin' : 'cliente_admin',
                         status: 'active',
                         createdAt: new Date().toISOString(),
                         lastLogin: new Date().toISOString(),
                     };
                     
-                    // Atomically create the user document.
                     await setDoc(userDocRef, newUserProfile);
-                    
-                    // Set the profile in state so the app can proceed immediately
                     setProfile(newUserProfile);
                 } else if (SUPER_ADMIN_EMAILS.includes(authState.user.email || '')) {
-                    // Handle virtual super admin profile
-                    setProfile({
+                    // Si es un admin conocido pero no tiene doc, creamos perfil virtual para permitir acceso
+                    const adminProfile: UserProfile = {
                         id: authState.user.uid,
                         name: authState.user.displayName || 'Super Admin',
                         email: authState.user.email!,
@@ -95,13 +98,13 @@ export function useUser() {
                         status: 'active',
                         createdAt: new Date().toISOString(),
                         lastLogin: new Date().toISOString(),
-                    });
+                    };
+                    setProfile(adminProfile);
                 } else {
-                    // No user profile and no business profile to recover from.
                     setProfile(null);
                 }
             } catch (healError) {
-                console.error("Error during self-healing profile creation:", healError);
+                console.error("Error durante auto-recuperación de perfil:", healError);
                 setProfile(null);
             } finally {
                 setProfileLoading(false);
@@ -111,37 +114,38 @@ export function useUser() {
         console.error("useUser: Profile onSnapshot error:", error);
         setProfile(null);
         setProfileLoading(false);
-        setAuthState(prev => ({...prev, error}));
     });
 
     return () => unsubscribe();
   }, [firestore, authState.user]);
 
-  // Effect 3: Handle Redirection based on combined state
+  // Effect 3: Lógica de Redirección Automática
   const isUserLoading = authState.isLoading || isProfileLoading;
   
   useEffect(() => {
-    // Don't redirect while still figuring out who the user is
     if (isUserLoading) return;
 
     const isAuthPage = pathname === '/login' || pathname === '/register' || pathname === '/forgot-password';
     const isDashboardPage = pathname.startsWith('/dashboard');
     const isSuperAdminPage = pathname.startsWith('/superadmin');
-    const role = profile?.role;
 
     if (authState.user) {
+        const role = profile?.role;
+        
         if (role === 'super_admin') {
             if (isAuthPage || isDashboardPage) {
                 router.replace('/superadmin');
             }
-        } else if (role) { // Any other defined role
+        } else if (role === 'cliente_admin' || role === 'staff') {
             if (isAuthPage || isSuperAdminPage) {
                 router.replace('/dashboard');
             }
+        } else if (isAuthPage) {
+            // Redirección de emergencia si se logueó pero no hay perfil/rol definido aún
+            router.replace('/dashboard');
         }
-        // If user exists but profile is null (still loading or doesn't exist), we wait.
     } else {
-        // No user logged in
+        // No hay usuario logueado
         if (isDashboardPage || isSuperAdminPage) {
             router.replace('/login');
         }
