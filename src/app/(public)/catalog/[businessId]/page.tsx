@@ -436,7 +436,17 @@ const CatalogHeader = ({ config, cartItemCount, onCartClick }: { config: any, ca
     const cleanPhone = String(config.businessInfo.phone || '').replace(/\D/g, '');
     return (
         <div className="w-full">
-            {config.banner.mediaUrl && <div className="relative w-full h-[250px]"><Image src={config.banner.mediaUrl} alt="Banner" fill className="object-cover"/></div>}
+            {config.banner.mediaUrl && (
+                <div className="relative w-full h-[250px]">
+                    <Image 
+                        src={config.banner.mediaUrl} 
+                        alt="Banner" 
+                        fill 
+                        className="object-cover" 
+                        priority 
+                    />
+                </div>
+            )}
             <div className="bg-card shadow-md p-4 sticky top-16 z-40 border-b">
                 <div className="container mx-auto flex justify-between items-center">
                     <div><h1 className="text-xl font-bold">{config.businessInfo.name}</h1><p className="text-sm text-muted-foreground">{config.businessInfo.address}</p></div>
