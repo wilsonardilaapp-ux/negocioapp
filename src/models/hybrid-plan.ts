@@ -25,6 +25,8 @@ export const HybridPlanSchema = z.object({
     key: z.string().min(1, 'La clave es requerida'), 
     value: z.number() 
   })).optional(),
+  icon: z.string().optional(),
+  themeColor: z.string().optional(),
 });
 
 export type HybridPlan = z.infer<typeof HybridPlanSchema>;

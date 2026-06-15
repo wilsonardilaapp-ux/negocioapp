@@ -8,7 +8,7 @@ import { Label } from '../../../../components/ui/label';
 import { Switch } from '../../../../components/ui/switch';
 import { Badge } from '../../../../components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../../../components/ui/tabs';
-import { PlusCircle, Edit, Trash2, Loader2, DollarSign, Percent, Package, Settings, Monitor } from 'lucide-react';
+import { PlusCircle, Edit, Trash2, Loader2, DollarSign, Percent, Package, Settings, Monitor, Palette } from 'lucide-react';
 import { useCollection, useFirestore, useMemoFirebase, setDocumentNonBlocking, deleteDocumentNonBlocking } from '../../../../firebase';
 import { collection, doc } from 'firebase/firestore';
 import { useToast } from '../../../../hooks/use-toast';
@@ -119,6 +119,8 @@ function HybridPlanDialog({ isOpen, onClose, plan }: { isOpen: boolean, onClose:
       includedModuleKeys: [],
       features: [{ value: '' }],
       extraLimits: [],
+      icon: 'Package',
+      themeColor: '#4CAF50',
       limits: {
         products: -1,
         blogPosts: -1,
@@ -166,7 +168,7 @@ function HybridPlanDialog({ isOpen, onClose, plan }: { isOpen: boolean, onClose:
               <TabsTrigger value="costs"><DollarSign className="w-4 h-4 mr-1" /> Costos</TabsTrigger>
               <TabsTrigger value="modules"><Settings className="w-4 h-4 mr-1" /> Módulos</TabsTrigger>
               <TabsTrigger value="limits"><Package className="w-4 h-4 mr-1" /> Límites</TabsTrigger>
-              <TabsTrigger value="design"><Monitor className="w-4 h-4 mr-1" /> Diseño</TabsTrigger>
+              <TabsTrigger value="design"><Palette className="w-4 h-4 mr-1" /> Diseño</TabsTrigger>
             </TabsList>
 
             <TabsContent value="costs" className="space-y-4 pt-4">
@@ -302,21 +304,47 @@ function HybridPlanDialog({ isOpen, onClose, plan }: { isOpen: boolean, onClose:
               <p className="text-xs text-muted-foreground mt-4">Usa -1 para indicar uso ilimitado.</p>
             </TabsContent>
 
-            <TabsContent value="design" className="space-y-4 pt-4">
-              <div className="flex items-center justify-between gap-4 p-4 border rounded-lg">
-                <div>
-                  <Label>Estado del Plan</Label>
-                  <p className="text-xs text-muted-foreground">¿Está el plan disponible para ser asignado?</p>
+            <TabsContent value="design" className="space-y-6 pt-4">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between gap-4 p-4 border rounded-lg">
+                  <div>
+                    <Label>Estado del Plan</Label>
+                    <p className="text-xs text-muted-foreground">¿Está el plan disponible para ser asignado?</p>
+                  </div>
+                  <Switch checked={watch('isActive')} onCheckedChange={(val) => setValue('isActive', val)} />
                 </div>
-                <Switch checked={watch('isActive')} onCheckedChange={(val) => setValue('isActive', val)} />
-              </div>
-              <div className="flex items-center justify-between gap-4 p-4 border rounded-lg">
-                <div>
-                  <Label>Visibilidad Pública</Label>
-                  <p className="text-xs text-muted-foreground">¿Mostrar este plan en la landing page principal?</p>
+                <div className="flex items-center justify-between gap-4 p-4 border rounded-lg">
+                  <div>
+                    <Label>Visibilidad Pública</Label>
+                    <p className="text-xs text-muted-foreground">¿Mostrar este plan en la landing page principal?</p>
+                  </div>
+                  <Switch checked={watch('isPublic')} onCheckedChange={(val) => setValue('isPublic', val)} />
                 </div>
-                <Switch checked={watch('isPublic')} onCheckedChange={(val) => setValue('isPublic', val)} />
+
+                <div className="space-y-4 p-4 border rounded-lg bg-muted/10">
+                  <h4 className="font-semibold text-sm">Identidad Visual</h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="plan-icon">Icono Distintivo</Label>
+                      <Input id="plan-icon" {...register('icon')} placeholder="Ej: Rocket, Crown, Zap" />
+                      <p className="text-[10px] text-muted-foreground">Usa el nombre de un icono de Lucide.</p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="plan-color">Color del Tema</Label>
+                      <div className="flex gap-2">
+                        <Input id="plan-color" type="color" {...register('themeColor')} className="p-1 w-12 h-10 cursor-pointer" />
+                        <Input 
+                          value={watch('themeColor')} 
+                          onChange={(e) => setValue('themeColor', e.target.value)} 
+                          placeholder="#HEX" 
+                          className="flex-1" 
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
+
               <div className="space-y-4">
                 <Label>Características Destacadas</Label>
                 {fields.map((field, index) => (
