@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useState, useTransition, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '../../../../components/ui/card';
 import { Button } from '../../../../components/ui/button';
 import { Input } from '../../../../components/ui/input';
@@ -9,7 +9,7 @@ import { Label } from '../../../../components/ui/label';
 import { Switch } from '../../../../components/ui/switch';
 import { Badge } from '../../../../components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../../../components/ui/tabs';
-import { PlusCircle, Edit, Trash2, Loader2, DollarSign, Percent, Package, Settings, Monitor, Palette } from 'lucide-react';
+import { PlusCircle, Edit, Trash2, Loader2, DollarSign, Percent, Package, Settings, Palette, AlertCircle } from 'lucide-react';
 import { useCollection, useFirestore, useMemoFirebase, setDocumentNonBlocking, deleteDocumentNonBlocking, useUser } from '../../../../firebase';
 import { collection, doc } from 'firebase/firestore';
 import { useToast } from '../../../../hooks/use-toast';
@@ -111,7 +111,7 @@ function HybridPlanDialog({ isOpen, onClose, plan }: { isOpen: boolean, onClose:
 
   const { register, control, handleSubmit, reset, watch, setValue, formState: { errors } } = useForm<HybridPlan>({
     resolver: zodResolver(HybridPlanSchema),
-    defaultValues: plan || {
+    defaultValues: {
       name: '',
       slug: '',
       basePrice: 0,
@@ -143,11 +143,39 @@ function HybridPlanDialog({ isOpen, onClose, plan }: { isOpen: boolean, onClose:
     name: "extraLimits",
   });
 
-  const commissionType = watch('commissionType');
-
-  useState(() => {
-    if (plan) reset(plan);
-  });
+  // Sync form when plan prop changes or dialog opens
+  useEffect(() => {
+    if (isOpen) {
+      if (plan) {
+        reset(plan);
+      } else {
+        reset({
+          name: '',
+          slug: '',
+          basePrice: 0,
+          pricePerOrder: 0,
+          commissionType: 'percent',
+          variableBillingFrequency: 'monthly',
+          isActive: true,
+          isPublic: true,
+          includedModuleKeys: [],
+          features: [{ value: '' }],
+          extraLimits: [],
+          icon: 'Package',
+          themeColor: '#4CAF50',
+          limits: {
+            products: -1,
+            blogPosts: -1,
+            landingPages: -1,
+            promotions: -1,
+            coupons: -1,
+            orders: -1,
+            suggestions: -1,
+          }
+        });
+      }
+    }
+  }, [plan, isOpen, reset]);
 
   const onSubmit = (data: HybridPlan) => {
     if (!firestore || !user) return;
@@ -160,21 +188,17 @@ function HybridPlanDialog({ isOpen, onClose, plan }: { isOpen: boolean, onClose:
     if (!cleanData.id) cleanData.id = planId;
 
     startTransition(() => {
-      // Patrón de mutación no bloqueante con manejo de errores contextuales
       setDocumentNonBlocking(docRef, cleanData, { merge: true })
         .then(() => {
-          toast({ title: 'Plan guardado con éxito' });
+          toast({ title: plan?.id ? 'Plan actualizado' : 'Plan creado con éxito' });
           onClose();
         })
         .catch(async (serverError) => {
-          // Crear el error contextual async para el listener centralizado
           const permissionError = new FirestorePermissionError({
             path: docRef.path,
             operation: plan?.id ? 'update' : 'create',
             requestResourceData: cleanData,
           } satisfies SecurityRuleContext);
-
-          // Emitir el error al sistema de depuración
           errorEmitter.emit('permission-error', permissionError);
         });
     });
@@ -201,16 +225,19 @@ function HybridPlanDialog({ isOpen, onClose, plan }: { isOpen: boolean, onClose:
                 <div className="space-y-2">
                   <Label>Nombre del Plan</Label>
                   <Input {...register('name')} placeholder="Ej: Menfy Flexible" />
+                  {errors.name && <p className="text-xs text-destructive">{errors.name.message}</p>}
                 </div>
                 <div className="space-y-2">
                   <Label>Slug</Label>
                   <Input {...register('slug')} placeholder="menfy-flexible" />
+                  {errors.slug && <p className="text-xs text-destructive">{errors.slug.message}</p>}
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Tarifa Base Mensual ($)</Label>
                   <Input type="number" {...register('basePrice', { valueAsNumber: true })} />
+                  {errors.basePrice && <p className="text-xs text-destructive">{errors.basePrice.message}</p>}
                 </div>
                 <div className="space-y-2">
                   <Label>Frecuencia de Cobro Variable</Label>
@@ -248,6 +275,7 @@ function HybridPlanDialog({ isOpen, onClose, plan }: { isOpen: boolean, onClose:
                   <div className="flex-1">
                     <Label className="text-xs">Valor de la Comisión</Label>
                     <Input type="number" step="0.01" {...register('pricePerOrder', { valueAsNumber: true })} />
+                    {errors.pricePerOrder && <p className="text-xs text-destructive">{errors.pricePerOrder.message}</p>}
                   </div>
                 </div>
               </div>
@@ -257,7 +285,7 @@ function HybridPlanDialog({ isOpen, onClose, plan }: { isOpen: boolean, onClose:
                <Label>Claves de Módulos Incluidos (Separados por coma)</Label>
                <Controller name="includedModuleKeys" control={control} render={({ field }) => (
                  <Input 
-                   value={field.value.join(', ')} 
+                   value={Array.isArray(field.value) ? field.value.join(', ') : ''} 
                    onChange={(e) => field.onChange(e.target.value.split(',').map(s => s.trim()).filter(Boolean))}
                    placeholder="catalogo, chatbot, contabilidad" 
                  />
@@ -266,7 +294,7 @@ function HybridPlanDialog({ isOpen, onClose, plan }: { isOpen: boolean, onClose:
 
             <TabsContent value="limits" className="space-y-6 pt-4">
               <div className="grid grid-cols-2 gap-4">
-                {Object.keys(watch('limits')).map((key) => (
+                {Object.keys(watch('limits') || {}).map((key) => (
                   <div key={key} className="space-y-1">
                     <Label className="capitalize">{key.replace(/([A-Z])/g, ' $1')}</Label>
                     <Input type="number" {...register(`limits.${key as keyof HybridPlan['limits']}`, { valueAsNumber: true })} />
@@ -323,7 +351,7 @@ function HybridPlanDialog({ isOpen, onClose, plan }: { isOpen: boolean, onClose:
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label>Icono Distintivo</Label>
-                      <Input {...register('icon')} placeholder="Ej: Rocket, Crown" />
+                      <Input {...register('icon')} placeholder="Ej: Package, Rocket, Crown" />
                     </div>
                     <div className="space-y-2">
                       <Label>Color del Tema</Label>
