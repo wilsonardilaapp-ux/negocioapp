@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useRouter, useSearchParams } from "next/navigation";
@@ -34,8 +33,6 @@ import Link from "next/link";
 import { v4 as uuidv4 } from "uuid";
 import type { LandingPageData, NavLink } from "../../../models/landing-page";
 import type { PaymentSettings } from "../../../models/payment-settings";
-import type { Module } from "../../../models/module";
-import type { KnowledgeDocument } from "../../../models/chatbot-config";
 import { isFirstUser } from '../../../actions/user';
 import { Eye, EyeOff, Loader2 } from 'lucide-react';
 import type { Subscription } from "../../../models/subscription";
@@ -190,14 +187,6 @@ const initialPaymentSettings: Omit<PaymentSettings, 'id' | 'userId'> = {
   pagoContraEntrega: { enabled: false },
 };
 
-const slugify = (text: string) => 
-  text
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/\s+/g, '-')
-    .replace(/[^a-z0-9-]/g, '');
-    
 const LoadingScreen = () => (
     <div className="flex justify-center items-center h-screen">
       <div className="text-center flex flex-col items-center gap-2">
@@ -215,6 +204,16 @@ function RegisterForm() {
   const firestore = useFirestore();
   const { user, isUserLoading } = useUser();
   const [showPassword, setShowPassword] = useState(false);
+
+  // INICIALIZACIÓN DEL FORMULARIO - CORRECCIÓN DEL ERROR DE REFERENCIA
+  const form = useForm<z.infer<typeof registerSchema>>({
+    resolver: zodResolver(registerSchema),
+    defaultValues: {
+      name: "",
+      email: "",
+      password: "",
+    },
+  });
 
   async function onSubmit(values: z.infer<typeof registerSchema>) {
     if (!auth || !firestore) return;
@@ -302,10 +301,9 @@ function RegisterForm() {
       batch.set(paymentSettingsDocRef, paymentSettingsData);
       
       const planParam = searchParams.get('plan');
-      const subscriptionDocRef = doc(firestore, 'businesses', newUser.uid, 'subscription', 'current');
+      const subscriptionDocRef = doc(firestore, `businesses/${newUser.uid}/subscription`, 'current');
       
       if (planParam && planParam !== 'free') {
-        // 1. Verificar si es un plan estándar (Stripe)
         const upperPlanId = planParam.toUpperCase() as keyof typeof STRIPE_PRICE_IDS;
         const stripePriceId = STRIPE_PRICE_IDS[upperPlanId];
         
@@ -323,7 +321,6 @@ function RegisterForm() {
             }
         }
 
-        // 2. Si no es Stripe, verificar si es un Plan Híbrido en Firestore
         const hybridPlanSnap = await getDoc(doc(firestore, 'hybrid_plans', planParam));
         if (hybridPlanSnap.exists()) {
             const hybridPlanData = hybridPlanSnap.data() as HybridPlan;
@@ -333,13 +330,12 @@ function RegisterForm() {
                 status: 'active',
                 stripeCustomerId: null,
                 stripeSubscriptionId: null,
-                currentPeriodEnd: null, // Los planes híbridos se facturan manualmente o por comisión
+                currentPeriodEnd: null,
                 createdAt: now,
                 updatedAt: now,
                 paymentMethod: 'manual'
             };
             batch.set(subscriptionDocRef, hybridSubscription);
-            // También actualizamos el nombre del plan en el documento de negocio
             batch.update(businessDocRef, { planName: hybridPlanData.name });
             
             await batch.commit();
@@ -349,12 +345,8 @@ function RegisterForm() {
             });
             return;
         }
-
-        // 3. Fallback: Si no se encontró nada válido, tratar como error pero permitir registro básico
-        console.warn(`Plan ID '${planParam}' no reconocido.`);
       }
 
-      // Registro básico (Plan Free)
       const now = Timestamp.now();
       const freeSubscription: Subscription = {
         plan: 'free',
