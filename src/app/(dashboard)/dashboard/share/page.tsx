@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useRef, useMemo } from 'react';
@@ -320,13 +319,18 @@ export default function SharePage() {
                             className="rounded-none focus-visible:ring-0 focus-visible:ring-offset-0"
                             value={shareConfig.slug === user.uid ? '' : shareConfig.slug}
                             placeholder="nombre-de-tu-negocio"
-                            onChange={(e) => handleLocalChange({ slug: e.target.value.toLowerCase().replace(/\s+/g, '-') })}
+                            onChange={(e) => {
+                                // Limpieza quirúrgica: eliminamos espacios y guiones al inicio/final
+                                const rawValue = e.target.value;
+                                const cleanValue = rawValue.trim().toLowerCase().replace(/\s+/g, '-');
+                                handleLocalChange({ slug: cleanValue });
+                            }}
                         />
                          <Button variant="outline" size="icon" className="rounded-l-none border-l-0" onClick={handleCopyLink}>
                             {copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
                         </Button>
                     </div>
-                    <p className="text-xs text-muted-foreground">Solo letras, números y guiones.</p>
+                    <p className="text-xs text-muted-foreground">Solo letras, números y guiones. Evita espacios al principio.</p>
                 </div>
             )}
             <div className="flex justify-end pt-4 border-t">

@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
@@ -301,16 +300,34 @@ export default function CatalogPage() {
             try {
                 let businessId = slug;
                 
-                // 1. Resolución de Alias (No crítica)
+                // 1. Resolución de Alias (Prioridad Alta)
                 try {
-                    const shareConfigQuery = query(collectionGroup(firestore, 'shareConfig'), where('slug', '==', slug), limit(1));
+                    // Limpiamos el slug por seguridad
+                    const cleanSlug = slug.trim().toLowerCase();
+                    
+                    const shareConfigQuery = query(
+                        collectionGroup(firestore, 'shareConfig'), 
+                        where('slug', '==', cleanSlug), 
+                        limit(1)
+                    );
+                    
                     const querySnapshot = await getDocs(shareConfigQuery);
+                    
+                    // Buscamos el documento que explícitamente tenga activado el alias
                     const customSlugDoc = querySnapshot.docs.find(doc => doc.data().useCustomSlug === true);
+                    
                     if (customSlugDoc) {
-                        businessId = customSlugDoc.ref.parent.parent?.id ?? slug;
+                        // Navegamos hacia arriba: shareConfig (doc) -> shareConfig (coll) -> businesses (doc)
+                        const businessDoc = customSlugDoc.ref.parent.parent;
+                        if (businessDoc) {
+                            businessId = businessDoc.id;
+                            console.log("✅ Alias resuelto con éxito:", cleanSlug, "->", businessId);
+                        }
+                    } else {
+                        console.log("ℹ️ Alias no encontrado o no activo, probando como ID directo:", cleanSlug);
                     }
                 } catch (e) {
-                    console.warn("No se pudo resolver el alias, usando ID de URL:", slug);
+                    console.warn("⚠️ Falló la resolución de alias (posible falta de índice):", slug);
                 }
 
                 // 2. Carga de datos esenciales (Paralela y resiliente)
@@ -326,7 +343,7 @@ export default function CatalogPage() {
 
                 // Solo fallamos si el catálogo principal (publicData) no existe
                 if (!publicDataSnap?.exists()) {
-                    console.error("Acceso denegado o catálogo inexistente para:", businessId);
+                    console.error("❌ Catálogo no encontrado para ID:", businessId);
                     throw new Error("El catálogo solicitado no existe o no tiene permisos de lectura pública.");
                 }
 
@@ -343,7 +360,7 @@ export default function CatalogPage() {
                     .catch(err => console.warn("No se cargaron promociones:", err.message));
 
             } catch (e: any) { 
-                console.error("Error crítico de carga:", e);
+                console.error("🔥 Error crítico de carga:", e);
                 setError(e.message); 
             }
             finally { setIsLoading(false); }
