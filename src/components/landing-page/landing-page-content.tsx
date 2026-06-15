@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useMemo, useState } from 'react';
@@ -6,7 +5,7 @@ import Link from 'next/link';
 import type { LandingPageData, NavLink } from '@/models/landing-page';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { MessageCircle, Phone, Mail, Clock, MapPin, Youtube, Linkedin, ArrowUp, Star } from 'lucide-react';
+import { MessageCircle, Phone, Mail, Clock, MapPin, Youtube, Linkedin, Star, Loader2 } from 'lucide-react';
 import { PublicContactForm } from './public-contact-form';
 import { TikTokIcon, WhatsAppIcon, XIcon, FacebookIcon, InstagramIcon, YoutubeIcon } from '@/components/icons';
 import { cn } from '@/lib/utils';
@@ -48,7 +47,7 @@ const getLinkUrl = (link: NavLink, currentBusinessId: string | undefined): strin
   return '#';
 };
 
-const getPlanButtonConfig = (plan: SubscriptionPlan | HybridPlan, hotmartLinks: HotmartLink[]): PlanButton => {
+const getPlanButtonConfig = (plan: SubscriptionPlan | HybridPlan, hotmartLinks: HotmartLink[], user: any): PlanButton => {
     const hotmartLink = hotmartLinks.find((h) => h.planId === plan.id);
     const isHybrid = 'commissionType' in plan;
     const price = isHybrid ? (plan as HybridPlan).basePrice : (plan as SubscriptionPlan).price;
@@ -67,144 +66,64 @@ const getPlanButtonConfig = (plan: SubscriptionPlan | HybridPlan, hotmartLinks: 
     return {
       label: 'Suscribirse',
       variant: (plan as any).isMostPopular ? 'popular' : 'paid',
-      onClick: () => {
+      onClick: async () => {
         if (hotmartLink?.hotmartUrl) {
           window.open(hotmartLink.hotmartUrl, '_blank');
           return;
         }
+        if (!isHybrid && (plan as SubscriptionPlan).stripePriceId && !(plan as SubscriptionPlan).stripePriceId.includes('placeholder') && user) {
+          try {
+            const res = await fetch('/api/stripe/create-checkout-session', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                priceId: (plan as SubscriptionPlan).stripePriceId,
+                businessId: user.uid,
+                userId: user.uid,
+                email: user.email,
+              }),
+            });
+            const sessionData = await res.json();
+            if (sessionData.url) {
+              window.open(sessionData.url, '_self');
+              return;
+            }
+          } catch (e) {
+            console.error("Stripe error:", e);
+          }
+        }
         window.location.href = `/register?plan=${plan.id}`;
       },
     };
-  };
+};
 
+const SocialIconsMap: { [key: string]: React.ReactNode } = {
+  tiktok: <TikTokIcon className="h-5 w-5" />,
+  instagram: <InstagramIcon className="h-5 w-5" />,
+  facebook: <FacebookIcon className="h-5 w-5" />,
+  whatsapp: <WhatsAppIcon className="h-5 w-5" />,
+  twitter: <XIcon className="h-5 w-5" />,
+  youtube: <YoutubeIcon className="h-5 w-5" />,
+  facebookUrl: <FacebookIcon className="h-5 w-5" />,
+  instagramUrl: <InstagramIcon className="h-5 w-5" />,
+  tiktokUrl: <TikTokIcon className="h-5 w-5" />,
+  youtubeUrl: <Youtube className="h-5 w-5" />,
+  linkedinUrl: <Linkedin className="h-5 w-5" />,
+};
 
-export default function LandingPageContent({ data, plans = [], hybridPlans = [], businessId, logoUrl }: LandingPageContentProps) {
-  const { hero, navigation, sections, testimonials, form, footer, header } = data;
-
-  const finalLogoUrl = logoUrl || navigation.logoUrl;
-
-  const hotmartLinks: HotmartLink[] = useMemo(() => {
-    const links = plans.map(p => ({
-        planId: p.id,
-        planName: p.name,
-        hotmartUrl: (p as any).hotmartUrl || '',
-    }));
-    const hybridLinks = hybridPlans.map(p => ({
-      planId: p.id || '',
-      planName: p.name,
-      hotmartUrl: '', // Hybrid plans usually use manual or custom onboarding
-    }));
-    return [...links, ...hybridLinks];
-  }, [plans, hybridPlans]);
-
-  const navStyle = {
-    backgroundColor: navigation.backgroundColor || '#FFFFFF',
-    color: navigation.textColor || '#000000'
-  };
-
-  const heroBaseStyle = useMemo(() => ({
-    backgroundColor: hero.backgroundColor && hero.backgroundColor.trim() !== '' ? hero.backgroundColor : '#FFFFFF',
-    color: hero.textColor && hero.textColor.trim() !== '' ? hero.textColor : '#000000'
-  }), [hero.backgroundColor, hero.textColor]);
-
-  const hasValidImage = useMemo(() => {
-    return !!(
-      hero.imageUrl && 
-      typeof hero.imageUrl === 'string' && 
-      hero.imageUrl.trim().length > 0 &&
-      hero.imageUrl.startsWith('http')
-    );
-  }, [hero.imageUrl]);
-
-  const socialIcons: { [key: string]: React.ReactNode } = {
-    tiktok: <TikTokIcon className="h-5 w-5" />,
-    instagram: <InstagramIcon className="h-5 w-5" />,
-    facebook: <FacebookIcon className="h-5 w-5" />,
-    whatsapp: <WhatsAppIcon className="h-5 w-5" />,
-    twitter: <XIcon className="h-5 w-5" />,
-    youtube: <YoutubeIcon className="h-5 w-5" />,
-    facebookUrl: <FacebookIcon className="h-5 w-5" />,
-    instagramUrl: <InstagramIcon className="h-5 w-5" />,
-    tiktokUrl: <TikTokIcon className="h-5 w-5" />,
-    youtubeUrl: <Youtube className="h-5 w-5" />,
-    linkedinUrl: <Linkedin className="h-5 w-5" />,
-  };
-
-  const renderCarousel = () => (
-    header.carouselItems && header.carouselItems.some(item => item.mediaUrl) && (
-      <Carousel 
-          className="w-full" 
-          opts={{ loop: true }}
-          plugins={[
-              Autoplay({
-                delay: 5000,
-                stopOnInteraction: true,
-              }),
-          ]}
-      >
-          <CarouselContent>
-              {header.carouselItems.map(item => item.mediaUrl && (
-                  <CarouselItem key={item.id}>
-                       <div className="relative aspect-[1920/600] w-full">
-                          {item.mediaType === 'image' ? (
-                              <Image src={item.mediaUrl} alt={item.slogan || 'Carousel image'} fill sizes="100vw" className="object-cover" />
-                          ) : (
-                              <video src={item.mediaUrl} autoPlay loop muted controls={false} className="w-full h-full object-cover"/>
-                          )}
-                          {item.slogan && (
-                              <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-                                  <p className="text-white text-2xl md:text-4xl font-bold text-center drop-shadow-md p-4">{item.slogan}</p>
-                              </div>
-                          )}
-                      </div>
-                  </CarouselItem>
-              ))}
-          </CarouselContent>
-          <CarouselPrevious className="absolute left-4 top-1/2 -translate-y-1/2 z-10 bg-white/50 hover:bg-white text-foreground" />
-          <CarouselNext className="absolute right-4 top-1/2 -translate-y-1/2 z-10 bg-white/50 hover:bg-white text-foreground" />
-      </Carousel>
-    )
-  );
-
-  const renderMainBanner = () => (
-    <section className="bg-card shadow-sm py-8">
-      <div className="container mx-auto px-4 space-y-8">
-          {header.banner.mediaUrl && (
-              <div className="relative aspect-[1920/500] w-full rounded-lg overflow-hidden">
-                  {header.banner.mediaType === 'image' ? (
-                      <Image src={header.banner.mediaUrl} alt="Banner" fill sizes="100vw" className="object-cover"/>
-                  ) : (
-                      <video src={header.banner.mediaUrl} autoPlay loop muted controls={false} className="w-full h-full object-cover" />
-                  )}
-              </div>
-          )}
-          <div className="flex flex-col md:flex-row justify-between items-center gap-6">
-              <div className="text-center md:text-left">
-                  <h2 className="text-3xl font-bold font-headline">{header.businessInfo.name}</h2>
-                  <p className="text-md text-muted-foreground">{header.businessInfo.address}</p>
-                  <div className="flex flex-wrap justify-center md:justify-start gap-x-4 gap-y-1 mt-2 text-sm">
-                      {header.businessInfo.phone && <p className="text-muted-foreground">{header.businessInfo.phone}</p>}
-                      {header.businessInfo.email && <a href={`mailto:${header.businessInfo.email}`} className="text-muted-foreground hover:text-primary">{header.businessInfo.email}</a>}
-                  </div>
-              </div>
-              <div className="flex items-center gap-4">
-                  {Object.entries(header.socialLinks).filter(([_, value]) => value).map(([key, value]) => (
-                      <a key={key} href={value as string} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary transition-colors">
-                          {socialIcons[key]}
-                      </a>
-                  ))}
-              </div>
-          </div>
-      </div>
-    </section>
-  );
-
-  // Subcomponente interno para gestionar el estado de expansión de cada tarjeta de plan
-  const PlanCard = ({ plan }: { plan: SubscriptionPlan | HybridPlan }) => {
+const PlanCard = ({ 
+    plan, 
+    hotmartLinks, 
+    user 
+}: { 
+    plan: SubscriptionPlan | HybridPlan, 
+    hotmartLinks: HotmartLink[],
+    user: any 
+}) => {
     const [expanded, setExpanded] = useState(false);
     const ITEMS_LIMIT = 5;
     
-    const btn = getPlanButtonConfig(plan, hotmartLinks);
+    const btn = getPlanButtonConfig(plan, hotmartLinks, user);
     const isHybrid = 'commissionType' in plan;
     const hybridPlan = isHybrid ? plan as HybridPlan : null;
     const subscriptionPlan = !isHybrid ? plan as SubscriptionPlan : null;
@@ -314,8 +233,114 @@ export default function LandingPageContent({ data, plans = [], hybridPlans = [],
         </div>
       </div>
     );
+};
+
+export default function LandingPageContent({ data, plans = [], hybridPlans = [], businessId, logoUrl }: LandingPageContentProps) {
+  const { hero, navigation, sections, testimonials, form, footer, header } = data;
+
+  const finalLogoUrl = logoUrl || navigation.logoUrl;
+
+  const hotmartLinks: HotmartLink[] = useMemo(() => {
+    const links = plans.map(p => ({
+        planId: p.id,
+        planName: p.name,
+        hotmartUrl: (p as any).hotmartUrl || '',
+    }));
+    const hybridLinks = hybridPlans.map(p => ({
+      planId: p.id || '',
+      planName: p.name,
+      hotmartUrl: '', 
+    }));
+    return [...links, ...hybridLinks];
+  }, [plans, hybridPlans]);
+
+  const navStyle = {
+    backgroundColor: navigation.backgroundColor || '#FFFFFF',
+    color: navigation.textColor || '#000000'
   };
 
+  const heroBaseStyle = useMemo(() => ({
+    backgroundColor: hero.backgroundColor && hero.backgroundColor.trim() !== '' ? hero.backgroundColor : '#FFFFFF',
+    color: hero.textColor && hero.textColor.trim() !== '' ? hero.textColor : '#000000'
+  }), [hero.backgroundColor, hero.textColor]);
+
+  const hasValidImage = useMemo(() => {
+    return !!(
+      hero.imageUrl && 
+      typeof hero.imageUrl === 'string' && 
+      hero.imageUrl.trim().length > 0 &&
+      hero.imageUrl.startsWith('http')
+    );
+  }, [hero.imageUrl]);
+
+  const renderCarousel = () => (
+    header?.carouselItems && header.carouselItems.some(item => item.mediaUrl) && (
+      <Carousel 
+          className="w-full" 
+          opts={{ loop: true }}
+          plugins={[
+              Autoplay({
+                delay: 5000,
+                stopOnInteraction: true,
+              }),
+          ]}
+      >
+          <CarouselContent>
+              {header.carouselItems.map(item => item.mediaUrl && (
+                  <CarouselItem key={item.id}>
+                       <div className="relative aspect-[1920/600] w-full">
+                          {item.mediaType === 'image' ? (
+                              <Image src={item.mediaUrl} alt={item.slogan || 'Carousel image'} fill sizes="100vw" className="object-cover" />
+                          ) : (
+                              <video src={item.mediaUrl} autoPlay loop muted controls={false} className="w-full h-full object-cover"/>
+                          )}
+                          {item.slogan && (
+                              <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                                  <p className="text-white text-2xl md:text-4xl font-bold text-center drop-shadow-md p-4">{item.slogan}</p>
+                              </div>
+                          )}
+                      </div>
+                  </CarouselItem>
+              ))}
+          </CarouselContent>
+          <CarouselPrevious className="absolute left-4 top-1/2 -translate-y-1/2 z-10 bg-white/50 hover:bg-white text-foreground" />
+          <CarouselNext className="absolute right-4 top-1/2 -translate-y-1/2 z-10 bg-white/50 hover:bg-white text-foreground" />
+      </Carousel>
+    )
+  );
+
+  const renderMainBanner = () => (
+    <section className="bg-card shadow-sm py-8">
+      <div className="container mx-auto px-4 space-y-8">
+          {header?.banner?.mediaUrl && (
+              <div className="relative aspect-[1920/500] w-full rounded-lg overflow-hidden">
+                  {header.banner.mediaType === 'image' ? (
+                      <Image src={header.banner.mediaUrl} alt="Banner" fill sizes="100vw" className="object-cover"/>
+                  ) : (
+                      <video src={header.banner.mediaUrl} autoPlay loop muted controls={false} className="w-full h-full object-cover" />
+                  )}
+              </div>
+          )}
+          <div className="flex flex-col md:flex-row justify-between items-center gap-6">
+              <div className="text-center md:text-left">
+                  <h2 className="text-3xl font-bold font-headline">{header?.businessInfo?.name}</h2>
+                  <p className="text-md text-muted-foreground">{header?.businessInfo?.address}</p>
+                  <div className="flex flex-wrap justify-center md:justify-start gap-x-4 gap-y-1 mt-2 text-sm">
+                      {header?.businessInfo?.phone && <p className="text-muted-foreground">{header.businessInfo.phone}</p>}
+                      {header?.businessInfo?.email && <a href={`mailto:${header.businessInfo.email}`} className="text-muted-foreground hover:text-primary">{header.businessInfo.email}</a>}
+                  </div>
+              </div>
+              <div className="flex items-center gap-4">
+                  {header?.socialLinks && Object.entries(header.socialLinks).filter(([_, value]) => value).map(([key, value]) => (
+                      <a key={key} href={value as string} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary transition-colors">
+                          {SocialIconsMap[key]}
+                      </a>
+                  ))}
+              </div>
+          </div>
+      </div>
+    </section>
+  );
 
   return (
     <div className="flex flex-col">
@@ -326,7 +351,7 @@ export default function LandingPageContent({ data, plans = [], hybridPlans = [],
           className={cn('sticky top-0 z-50 py-4 transition-shadow', navigation.useShadow && 'shadow-md')}
         >
           <div className="container mx-auto px-4 flex justify-between items-center">
-            <div className={`flex items-center ${navigation.logoAlignment === 'center' ? 'mx-auto' : navigation.logoAlignment === 'right' ? 'ml-auto' : ''}`}>
+            <div className={cn('flex items-center', navigation.logoAlignment === 'center' ? 'mx-auto' : navigation.logoAlignment === 'right' ? 'ml-auto' : '')}>
               {finalLogoUrl ? (
                 <img src={finalLogoUrl} alt={navigation.logoAlt} style={{ width: `${navigation.logoWidth}px` }} className="h-auto" />
               ) : (
@@ -344,8 +369,7 @@ export default function LandingPageContent({ data, plans = [], hybridPlans = [],
         </nav>
       )}
       
-      {/* Conditional rendering for Carousel and Banner */}
-      {header.bannerPosition === 'above' ? (
+      {header?.bannerPosition === 'above' ? (
         <>
           {renderMainBanner()}
           {renderCarousel()}
@@ -468,7 +492,12 @@ export default function LandingPageContent({ data, plans = [], hybridPlans = [],
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                 {[...plans, ...hybridPlans].map((plan) => (
-                    <PlanCard key={plan.id} plan={plan} />
+                    <PlanCard 
+                      key={plan.id} 
+                      plan={plan} 
+                      hotmartLinks={hotmartLinks} 
+                      user={null} // Pass null for visitor view
+                    />
                 ))}
               </div>
             </div>
@@ -478,7 +507,7 @@ export default function LandingPageContent({ data, plans = [], hybridPlans = [],
       {/* Formulario */}
       <section id="contact" className="py-24 bg-gray-50 flex-grow">
         <div className="container mx-auto px-4 flex justify-center">
-          {form.fields.length > 0 && <PublicContactForm formConfig={form} businessId={businessId || ''} />}
+          {form?.fields && form.fields.length > 0 && <PublicContactForm formConfig={form} businessId={businessId || ''} />}
         </div>
       </section>
 
@@ -495,8 +524,6 @@ export default function LandingPageContent({ data, plans = [], hybridPlans = [],
           }}
         >
           <div className="container mx-auto px-4 grid grid-cols-1 md:grid-cols-4 gap-12">
-            
-            {/* Logo and Slogan */}
             <div className="md:col-span-1 space-y-4">
               {footer.logo.url && (
                 <div className="relative h-16 w-40">
@@ -506,51 +533,25 @@ export default function LandingPageContent({ data, plans = [], hybridPlans = [],
               <p className="text-sm">{footer.logo.slogan}</p>
             </div>
 
-            {/* Quick Links */}
             <div className="space-y-4">
               <h4 className="font-bold text-lg" style={{color: footer.visuals.darkMode ? '#FFFFFF' : '#000000'}}>Enlaces Rápidos</h4>
               <ul className="space-y-2">
                 {footer.quickLinks.map(link => {
                     const lowerCaseText = link.text.toLowerCase();
-                    if (lowerCaseText.includes('sobre nosotros')) {
-                        return (
-                            <li key={link.id}>
-                                <Link href="/sobre-nosotros" className="hover:underline">
-                                    {link.text}
-                                </Link>
-                            </li>
-                        );
-                    }
-                    if (lowerCaseText.includes('servicios')) {
-                      return (
-                          <li key={link.id}>
-                              <Link href="/servicios" className="hover:underline">
-                                  {link.text}
-                              </Link>
-                          </li>
-                      );
-                    }
-                     if (lowerCaseText.includes('contacto')) {
-                        return (
-                            <li key={link.id}>
-                                <Link href="/contacto" className="hover:underline">
-                                    {link.text}
-                                </Link>
-                            </li>
-                        );
-                    }
+                    const href = (lowerCaseText.includes('sobre nosotros')) ? '/sobre-nosotros' :
+                               (lowerCaseText.includes('servicios')) ? '/servicios' :
+                               (lowerCaseText.includes('contacto')) ? '/contacto' : link.url;
                     return (
                         <li key={link.id}>
-                            <a href={link.url} className="hover:underline">
+                            <Link href={href} className="hover:underline">
                                 {link.text}
-                            </a>
+                            </Link>
                         </li>
                     );
                 })}
               </ul>
             </div>
 
-            {/* Contact Info */}
             <div className="space-y-4">
               <h4 className="font-bold text-lg" style={{color: footer.visuals.darkMode ? '#FFFFFF' : '#000000'}}>Contacto</h4>
               <ul className="space-y-3">
@@ -561,15 +562,14 @@ export default function LandingPageContent({ data, plans = [], hybridPlans = [],
               </ul>
             </div>
             
-            {/* Social & Legal */}
             <div className="space-y-6">
                 {footer.socialLinks.showIcons && (
                      <div>
                         <h4 className="font-bold text-lg mb-3" style={{color: footer.visuals.darkMode ? '#FFFFFF' : '#000000'}}>Síguenos</h4>
                         <div className="flex gap-4">
-                            {Object.entries(footer.socialLinks).filter(([key, value]) => value && key !== 'showIcons' && socialIcons[key as keyof typeof socialIcons]).map(([key, value]) => (
+                            {Object.entries(footer.socialLinks).filter(([key, value]) => value && key !== 'showIcons' && SocialIconsMap[key]).map(([key, value]) => (
                                 <a key={key} href={value as string} target="_blank" rel="noopener noreferrer" className="hover:scale-110 transition-transform">
-                                    {socialIcons[key as keyof typeof socialIcons]}
+                                    {SocialIconsMap[key]}
                                 </a>
                             ))}
                         </div>
@@ -579,11 +579,10 @@ export default function LandingPageContent({ data, plans = [], hybridPlans = [],
                      <h4 className="font-bold text-lg mb-3" style={{color: footer.visuals.darkMode ? '#FFFFFF' : '#000000'}}>Legal</h4>
                      <ul className="space-y-2 text-sm">
                         {footer.legalLinks.privacyPolicyUrl && <li><Link href="/politica-de-privacidad" className="hover:underline">Política de Privacidad</Link></li>}
-                        {footer.legalLinks.terminos-y-condiciones && <li><Link href="/terminos-y-condiciones" className="hover:underline">Términos y Condiciones</Link></li>}
+                        {footer.legalLinks.termsAndConditionsUrl && <li><Link href="/terminos-y-condiciones" className="hover:underline">Términos y Condiciones</Link></li>}
                      </ul>
                 </div>
             </div>
-
           </div>
           <div className="container mx-auto px-4 mt-12 border-t pt-8 text-center text-xs">
             © {new Date().getFullYear()} {footer.copyright.companyName}. {footer.copyright.additionalText}
@@ -591,9 +590,6 @@ export default function LandingPageContent({ data, plans = [], hybridPlans = [],
         </footer>
       )}
 
-      {/* SANITIZACIÓN DEFINITIVA PARA PRODUCCIÓN:
-          Asegurar que el número para el botón flotante de WhatsApp esté limpio (solo dígitos).
-      */}
       <a 
         href={`https://api.whatsapp.com/send?phone=${String(data.header?.socialLinks?.whatsapp || footer.contactInfo.phone || '3228831634').replace(/\D/g, '')}`} 
         target="_blank" 
