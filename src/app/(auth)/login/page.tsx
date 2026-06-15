@@ -1,6 +1,7 @@
+
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -24,43 +25,21 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { useToast } from '@/hooks/use-toast';
-import { useAuth, useUser, useFirestore, useDoc, useMemoFirebase, initiateEmailSignIn } from '@/firebase';
-import { doc } from 'firebase/firestore';
-import type { GlobalConfig } from '@/models/global-config';
-import { useEffect } from 'react';
+import { useAuth, useUser, initiateEmailSignIn } from '@/firebase';
 import Link from 'next/link';
 import { Loader2, Eye, EyeOff } from 'lucide-react';
-
-const SUPER_ADMIN_UID = "qy2fh98JgYhZnWz682JuPX4A7fU2";
 
 const loginSchema = z.object({
   email: z.string().email({ message: "Introduce un correo electrónico válido." }),
   password: z.string().min(1, { message: "La contraseña es obligatoria." }),
 });
 
-const LoadingScreen = () => (
-    <div className="flex justify-center items-center h-screen">
-      <div className="text-center flex flex-col items-center gap-2">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        <p className="text-muted-foreground">Cargando y verificando sesión...</p>
-      </div>
-    </div>
-);
-
 export default function LoginPage() {
-  const router = useRouter();
   const { toast } = useToast();
   const auth = useAuth();
-  const firestore = useFirestore();
   const { user, isUserLoading } = useUser();
   const [showPassword, setShowPassword] = useState(false);
-
-  const configDocRef = useMemoFirebase(() => {
-    if (!firestore) return null;
-    return doc(firestore, 'globalConfig', 'system');
-  }, [firestore]);
-
-  const { data: config, isLoading: isConfigLoading } = useDoc<GlobalConfig>(configDocRef);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const form = useForm<z.infer<typeof loginSchema>>({
     resolver: zodResolver(loginSchema),
@@ -72,43 +51,44 @@ export default function LoginPage() {
   
   async function onSubmit(values: z.infer<typeof loginSchema>) {
     if (!auth) return;
+    setIsSubmitting(true);
     try {
-      await initiateEmailSignIn(auth, values.email, values.password);
-      toast({
-        title: "Inicio de sesión exitoso",
-        description: "Serás redirigido a tu panel.",
-      });
-      // The FirebaseProvider's onAuthStateChanged will handle the redirection.
+      await initiateEmailSignIn(auth, values.email.trim(), values.password);
+      // El hook useUser detectará el cambio y redirigirá automáticamente.
     } catch (error: any) {
-      // Log the specific Firebase error code to the developer console for debugging
-      console.error("Login Error:", error.code, error.message);
-      
+      console.error("Login Error:", error.code);
+      setIsSubmitting(false);
+      let description = "Revisa tu correo y contraseña.";
+      if (error.code === 'auth/wrong-password' || error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
+        description = "Credenciales incorrectas.";
+      }
       toast({
         variant: "destructive",
-        title: "Error de Autenticación",
-        description: "Credenciales incorrectas. Por favor, verifica tu correo y contraseña.",
+        title: "Error al acceder",
+        description,
       });
     }
   }
 
-  // If auth state is loading, show loading screen.
-  // The provider will handle redirection if a user is already logged in.
-  if (isUserLoading) {
-    return <LoadingScreen />;
+  // Si ya hay un usuario o estamos en proceso, mostramos el cargando
+  if (user || isUserLoading || isSubmitting) {
+    return (
+        <div className="flex flex-col items-center justify-center min-h-[400px] p-6 text-center space-y-4">
+            <Loader2 className="h-10 w-10 animate-spin text-primary" />
+            <p className="text-muted-foreground animate-pulse">Autenticando y preparando tu panel...</p>
+        </div>
+    );
   }
 
-  // If not loading and no user, show the login form.
   return (
-    <Card>
-      <CardHeader className="space-y-1 text-center">
-        <CardTitle className="text-2xl font-headline">Acceder a tu Cuenta</CardTitle>
-        <CardDescription>
-          Introduce tu correo y contraseña para continuar.
-        </CardDescription>
+    <Card className="shadow-lg">
+      <CardHeader className="text-center">
+        <CardTitle className="text-2xl font-bold">Zentry</CardTitle>
+        <CardDescription>Accede con tu cuenta de administrador</CardDescription>
       </CardHeader>
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)}>
-          <CardContent className="grid gap-4">
+          <CardContent className="space-y-4">
             <FormField
               control={form.control}
               name="email"
@@ -116,7 +96,7 @@ export default function LoginPage() {
                 <FormItem>
                   <FormLabel>Correo Electrónico</FormLabel>
                   <FormControl>
-                    <Input placeholder="nombre@ejemplo.com" {...field} />
+                    <Input placeholder="admin@zentry.com" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -127,20 +107,12 @@ export default function LoginPage() {
               name="password"
               render={({ field }) => (
                 <FormItem>
-                    <div className="flex items-baseline justify-between">
-                        <FormLabel>Contraseña</FormLabel>
-                        <Link
-                            href="/forgot-password"
-                            className="text-sm font-medium text-primary hover:underline"
-                        >
-                            ¿Olvidaste tu contraseña?
-                        </Link>
-                    </div>
+                  <FormLabel>Contraseña</FormLabel>
                   <div className="relative">
                     <FormControl>
                       <Input
                         type={showPassword ? 'text' : 'password'}
-                        placeholder="Tu contraseña"
+                        placeholder="••••••••"
                         {...field}
                       />
                     </FormControl>
@@ -148,17 +120,10 @@ export default function LoginPage() {
                       type="button"
                       variant="ghost"
                       size="icon"
-                      className="absolute right-1 top-1/2 -translate-y-1/2 h-auto p-1 text-muted-foreground"
-                      onClick={() => setShowPassword((prev) => !prev)}
+                      className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                      onClick={() => setShowPassword(!showPassword)}
                     >
-                      {showPassword ? (
-                        <EyeOff className="h-4 w-4" />
-                      ) : (
-                        <Eye className="h-4 w-4" />
-                      )}
-                      <span className="sr-only">
-                        {showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
-                      </span>
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </Button>
                   </div>
                   <FormMessage />
@@ -167,15 +132,13 @@ export default function LoginPage() {
             />
           </CardContent>
           <CardFooter className="flex flex-col gap-4">
-            <Button className="w-full" type="submit" disabled={form.formState.isSubmitting}>
-              {form.formState.isSubmitting ? "Accediendo..." : "Acceder"}
+            <Button className="w-full" type="submit" disabled={isSubmitting}>
+              Acceder al Sistema
             </Button>
-            <div className="text-sm text-muted-foreground">
-              ¿No tienes una cuenta?{" "}
-              <Link href="/register" className="underline text-primary hover:text-primary/80">
-                Regístrate aquí
-              </Link>
-              .
+            <div className="text-center text-sm">
+                <Link href="/forgot-password" title="Recuperar acceso" className="text-primary hover:underline">
+                    ¿Olvidaste tu contraseña?
+                </Link>
             </div>
           </CardFooter>
         </form>
