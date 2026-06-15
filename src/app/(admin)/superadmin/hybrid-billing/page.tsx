@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -26,7 +27,7 @@ import type { HybridPlan, HybridBillingResult } from '@/models/hybrid-plan';
 import type { Business } from '@/models/business';
 import type { Order } from '@/models/order';
 import type { GlobalPaymentConfig } from '@/models/global-payment-config';
-import { format } from 'date-fns';
+import { format, isSameMonth, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 
@@ -61,20 +62,27 @@ export default function HybridBillingPage() {
 
     try {
       const now = new Date();
-      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
 
       for (const business of businesses) {
         // Encontrar si el negocio tiene un plan híbrido asignado
         const plan = hybridPlans.find(p => p.name === business.planName);
         if (!plan) continue;
 
-        // Consultar pedidos del negocio este mes
+        // Consultar pedidos del negocio
         const ordersRef = collection(firestore, `businesses/${business.id}/orders`);
         const ordersSnap = await getDocs(ordersRef);
         const orders = ordersSnap.docs.map(doc => doc.data() as Order);
         
-        // Filtrar por fecha (este mes)
-        const currentMonthOrders = orders.filter(o => o.orderDate >= startOfMonth);
+        // Filtrar por mes actual y excluir cancelados de la facturación de comisiones
+        const currentMonthOrders = orders.filter(o => {
+            try {
+                const orderDate = parseISO(o.orderDate);
+                // Validamos que sea del mismo mes/año y que no esté cancelado
+                return isSameMonth(orderDate, now) && o.orderStatus !== 'Cancelado';
+            } catch (err) {
+                return false;
+            }
+        });
         
         const orderCount = currentMonthOrders.length;
 
@@ -88,7 +96,7 @@ export default function HybridBillingPage() {
         if (plan.commissionType === 'percent') {
           const comisionCalculada = totalValue * ((Number(plan.pricePerOrder) || 0) / 100);
           const tope = Number(plan.maxCommissionPerOrder) || 0;
-          variableAmount = tope > 0 ? Math.min(comisionCalculada, tope * orderCount) : comisionCalculada;
+          variableAmount = (tope > 0 && orderCount > 0) ? Math.min(comisionCalculada, tope * orderCount) : comisionCalculada;
         } else {
           variableAmount = orderCount * (Number(plan.pricePerOrder) || 0);
         }
