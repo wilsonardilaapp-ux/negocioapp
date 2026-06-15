@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useTransition } from 'react';
@@ -9,7 +10,7 @@ import { Switch } from '../../../../components/ui/switch';
 import { Badge } from '../../../../components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../../../components/ui/tabs';
 import { PlusCircle, Edit, Trash2, Loader2, DollarSign, Percent, Package, Settings, Monitor, Palette } from 'lucide-react';
-import { useCollection, useFirestore, useMemoFirebase, setDocumentNonBlocking, deleteDocumentNonBlocking } from '../../../../firebase';
+import { useCollection, useFirestore, useMemoFirebase, setDocumentNonBlocking, deleteDocumentNonBlocking, useUser } from '../../../../firebase';
 import { collection, doc } from 'firebase/firestore';
 import { useToast } from '../../../../hooks/use-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '../../../../components/ui/dialog';
@@ -18,6 +19,8 @@ import type { HybridPlan } from '../../../../models/hybrid-plan';
 import { useForm, Controller, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { HybridPlanSchema } from '../../../../models/hybrid-plan';
+import { errorEmitter } from '../../../../firebase/error-emitter';
+import { FirestorePermissionError, type SecurityRuleContext } from '../../../../firebase/errors';
 
 export default function HybridPlansPage() {
   const firestore = useFirestore();
@@ -102,6 +105,7 @@ export default function HybridPlansPage() {
 
 function HybridPlanDialog({ isOpen, onClose, plan }: { isOpen: boolean, onClose: () => void, plan: HybridPlan | null }) {
   const firestore = useFirestore();
+  const { user } = useUser();
   const { toast } = useToast();
   const [isPending, startTransition] = useTransition();
 
@@ -146,12 +150,33 @@ function HybridPlanDialog({ isOpen, onClose, plan }: { isOpen: boolean, onClose:
   });
 
   const onSubmit = (data: HybridPlan) => {
-    if (!firestore) return;
-    startTransition(async () => {
-      const planId = plan?.id || doc(collection(firestore, 'hybrid_plans')).id;
-      await setDocumentNonBlocking(doc(firestore, 'hybrid_plans', planId), data, { merge: true });
-      toast({ title: 'Plan guardado con éxito' });
-      onClose();
+    if (!firestore || !user) return;
+
+    const planId = plan?.id || doc(collection(firestore, 'hybrid_plans')).id;
+    const docRef = doc(firestore, 'hybrid_plans', planId);
+
+    // Sanitizar datos para Firestore
+    const cleanData = JSON.parse(JSON.stringify(data));
+    if (!cleanData.id) cleanData.id = planId;
+
+    startTransition(() => {
+      // Patrón de mutación no bloqueante con manejo de errores contextuales
+      setDocumentNonBlocking(docRef, cleanData, { merge: true })
+        .then(() => {
+          toast({ title: 'Plan guardado con éxito' });
+          onClose();
+        })
+        .catch(async (serverError) => {
+          // Crear el error contextual async para el listener centralizado
+          const permissionError = new FirestorePermissionError({
+            path: docRef.path,
+            operation: plan?.id ? 'update' : 'create',
+            requestResourceData: cleanData,
+          } satisfies SecurityRuleContext);
+
+          // Emitir el error al sistema de depuración
+          errorEmitter.emit('permission-error', permissionError);
+        });
     });
   };
 
@@ -225,11 +250,6 @@ function HybridPlanDialog({ isOpen, onClose, plan }: { isOpen: boolean, onClose:
                     <Input type="number" step="0.01" {...register('pricePerOrder', { valueAsNumber: true })} />
                   </div>
                 </div>
-                <p className="text-xs text-muted-foreground mt-2">
-                  {commissionType === 'percent' 
-                    ? 'Se cobrará un porcentaje del valor total de cada pedido.' 
-                    : 'Se cobrará un monto fijo por cada pedido realizado.'}
-                </p>
               </div>
             </TabsContent>
 
@@ -242,7 +262,6 @@ function HybridPlanDialog({ isOpen, onClose, plan }: { isOpen: boolean, onClose:
                    placeholder="catalogo, chatbot, contabilidad" 
                  />
                )} />
-               <p className="text-xs text-muted-foreground">Ingresa los IDs de los módulos que este plan activa automáticamente.</p>
             </TabsContent>
 
             <TabsContent value="limits" className="space-y-6 pt-4">
@@ -257,10 +276,7 @@ function HybridPlanDialog({ isOpen, onClose, plan }: { isOpen: boolean, onClose:
 
               <div className="pt-4 border-t space-y-4">
                 <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label className="text-base font-semibold">Límites Técnicos Extra</Label>
-                    <p className="text-xs text-muted-foreground">Define parámetros adicionales para control de consumo.</p>
-                  </div>
+                  <Label className="text-base font-semibold">Campos Técnicos Extra</Label>
                   <Button 
                     type="button" 
                     variant="outline" 
@@ -273,51 +289,32 @@ function HybridPlanDialog({ isOpen, onClose, plan }: { isOpen: boolean, onClose:
                 
                 <div className="space-y-3">
                   {extraLimitFields.map((field, index) => (
-                    <div key={field.id} className="flex gap-2 items-end animate-in fade-in slide-in-from-top-1 duration-200">
+                    <div key={field.id} className="flex gap-2 items-end">
                       <div className="flex-1 space-y-1">
-                        <Label className="text-[10px] uppercase font-bold text-muted-foreground">Clave Técnica</Label>
-                        <Input {...register(`extraLimits.${index}.key`)} placeholder="ej: api_requests_daily" />
+                        <Label className="text-xs">Clave Técnica</Label>
+                        <Input {...register(`extraLimits.${index}.key`)} placeholder="ej: api_calls" />
                       </div>
                       <div className="w-32 space-y-1">
-                        <Label className="text-[10px] uppercase font-bold text-muted-foreground">Valor Límite</Label>
+                        <Label className="text-xs">Valor Límite</Label>
                         <Input type="number" {...register(`extraLimits.${index}.value`, { valueAsNumber: true })} />
                       </div>
-                      <Button 
-                        type="button" 
-                        variant="ghost" 
-                        size="icon" 
-                        className="mb-0.5 h-10 w-10 text-destructive hover:bg-destructive/10" 
-                        onClick={() => removeExtraLimit(index)}
-                      >
-                        <Trash2 className="h-4 w-4" />
+                      <Button variant="ghost" size="icon" onClick={() => removeExtraLimit(index)}>
+                        <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>
                     </div>
                   ))}
-                  {extraLimitFields.length === 0 && (
-                      <p className="text-sm text-muted-foreground text-center py-4 border-2 border-dashed rounded-lg">
-                          No se han definido límites técnicos adicionales.
-                      </p>
-                  )}
                 </div>
               </div>
-              
-              <p className="text-xs text-muted-foreground mt-4">Usa -1 para indicar uso ilimitado.</p>
             </TabsContent>
 
             <TabsContent value="design" className="space-y-6 pt-4">
               <div className="space-y-4">
                 <div className="flex items-center justify-between gap-4 p-4 border rounded-lg">
-                  <div>
-                    <Label>Estado del Plan</Label>
-                    <p className="text-xs text-muted-foreground">¿Está el plan disponible para ser asignado?</p>
-                  </div>
+                  <Label>Estado del Plan</Label>
                   <Switch checked={watch('isActive')} onCheckedChange={(val) => setValue('isActive', val)} />
                 </div>
                 <div className="flex items-center justify-between gap-4 p-4 border rounded-lg">
-                  <div>
-                    <Label>Visibilidad Pública</Label>
-                    <p className="text-xs text-muted-foreground">¿Mostrar este plan en la landing page principal?</p>
-                  </div>
+                  <Label>Visibilidad Pública</Label>
                   <Switch checked={watch('isPublic')} onCheckedChange={(val) => setValue('isPublic', val)} />
                 </div>
 
@@ -325,20 +322,14 @@ function HybridPlanDialog({ isOpen, onClose, plan }: { isOpen: boolean, onClose:
                   <h4 className="font-semibold text-sm">Identidad Visual</h4>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="plan-icon">Icono Distintivo</Label>
-                      <Input id="plan-icon" {...register('icon')} placeholder="Ej: Rocket, Crown, Zap" />
-                      <p className="text-[10px] text-muted-foreground">Usa el nombre de un icono de Lucide.</p>
+                      <Label>Icono Distintivo</Label>
+                      <Input {...register('icon')} placeholder="Ej: Rocket, Crown" />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="plan-color">Color del Tema</Label>
+                      <Label>Color del Tema</Label>
                       <div className="flex gap-2">
-                        <Input id="plan-color" type="color" {...register('themeColor')} className="p-1 w-12 h-10 cursor-pointer" />
-                        <Input 
-                          value={watch('themeColor')} 
-                          onChange={(e) => setValue('themeColor', e.target.value)} 
-                          placeholder="#HEX" 
-                          className="flex-1" 
-                        />
+                        <Input type="color" {...register('themeColor')} className="p-1 w-12 h-10 cursor-pointer" />
+                        <Input value={watch('themeColor')} onChange={(e) => setValue('themeColor', e.target.value)} placeholder="#HEX" />
                       </div>
                     </div>
                   </div>

@@ -18,7 +18,8 @@ service cloud.firestore {
     }
 
     function isSuperAdmin() {
-      return userExists() && userData().role == 'super_admin';
+      // Optimización: verificación directa para evitar recursión innecesaria
+      return request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'super_admin';
     }
 
     function isBusinessMember(businessId) {
@@ -107,20 +108,14 @@ service cloud.firestore {
 
     // Users
     match /users/{userId} {
-      allow get: if request.auth != null && (
-        request.auth.uid == userId || isSuperAdmin()
-      );
-
-      allow update: if request.auth != null && (
-        request.auth.uid == userId || isSuperAdmin()
-      )
-      // Prevent normal users from escalating privileges
-      && request.resource.data.role == resource.data.role
-      && request.resource.data.businessId == resource.data.businessId;
-
-      allow list: if isSuperAdmin();
-      allow create: if request.auth != null && request.auth.uid == userId; // Allow user to create their own profile
-      allow delete: if isSuperAdmin(); // Only super admins can delete
+      // El propietario siempre puede leer su propio perfil sin llamar a isSuperAdmin (evita recursión)
+      allow get: if request.auth != null && request.auth.uid == userId;
+      
+      // Los administradores pueden gestionar otros perfiles
+      allow get, list, update, delete: if isSuperAdmin();
+      
+      // Permitir creación durante el registro
+      allow create: if request.auth != null && request.auth.uid == userId;
     }
 
     match /paymentSettings/{userId} {
