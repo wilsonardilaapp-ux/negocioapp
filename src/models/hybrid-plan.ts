@@ -12,6 +12,7 @@ export const HybridPlanSchema = z.object({
   variableBillingFrequency: z.enum(['weekly', 'monthly']),
   isActive: z.boolean(),
   isPublic: z.boolean(),
+  isMostPopular: z.boolean().optional(),
   includedModuleKeys: z.array(z.string()),
   features: z.array(z.object({ 
     value: z.string(),

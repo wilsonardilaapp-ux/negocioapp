@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useMemo, useState } from 'react';
@@ -65,7 +66,7 @@ const getPlanButtonConfig = (plan: SubscriptionPlan | HybridPlan, hotmartLinks: 
   
     return {
       label: 'Suscribirse',
-      variant: !isHybrid && (plan as SubscriptionPlan).isMostPopular ? 'popular' : 'paid',
+      variant: (plan as any).isMostPopular ? 'popular' : 'paid',
       onClick: () => {
         if (hotmartLink?.hotmartUrl) {
           window.open(hotmartLink.hotmartUrl, '_blank');
@@ -211,6 +212,7 @@ export default function LandingPageContent({ data, plans = [], hybridPlans = [],
     const price = isHybrid ? hybridPlan?.basePrice : subscriptionPlan?.price;
     const features = (isHybrid ? hybridPlan?.features : subscriptionPlan?.features) || [];
     const limits = isHybrid ? hybridPlan?.limits : subscriptionPlan?.limits;
+    const isMostPopular = (plan as any).isMostPopular === true;
 
     const visibleFeatures = expanded ? features : features.slice(0, ITEMS_LIMIT);
 
@@ -218,10 +220,10 @@ export default function LandingPageContent({ data, plans = [], hybridPlans = [],
       <div
         className={cn(
           "rounded-2xl p-6 bg-white relative flex flex-col h-full",
-          subscriptionPlan?.isMostPopular ? 'border-2 border-primary shadow-md' : 'border border-gray-200'
+          isMostPopular ? 'border-2 border-primary shadow-md' : 'border border-gray-200'
         )}
       >
-        {(subscriptionPlan?.isMostPopular) && (
+        {isMostPopular && (
           <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground text-xs font-bold px-3 py-1 rounded-full">
             Más Popular
           </span>
@@ -577,7 +579,7 @@ export default function LandingPageContent({ data, plans = [], hybridPlans = [],
                      <h4 className="font-bold text-lg mb-3" style={{color: footer.visuals.darkMode ? '#FFFFFF' : '#000000'}}>Legal</h4>
                      <ul className="space-y-2 text-sm">
                         {footer.legalLinks.privacyPolicyUrl && <li><Link href="/politica-de-privacidad" className="hover:underline">Política de Privacidad</Link></li>}
-                        {footer.legalLinks.termsAndConditionsUrl && <li><Link href="/terminos-y-condiciones" className="hover:underline">Términos y Condiciones</Link></li>}
+                        {footer.legalLinks.terminos-y-condiciones && <li><Link href="/terminos-y-condiciones" className="hover:underline">Términos y Condiciones</Link></li>}
                      </ul>
                 </div>
             </div>

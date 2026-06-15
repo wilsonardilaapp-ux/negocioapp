@@ -1,25 +1,26 @@
+
 'use client';
 
 import { useState, useTransition, useEffect, useMemo } from 'react';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '../../../../components/ui/card';
-import { Button } from '../../../../components/ui/button';
-import { Input } from '../../../../components/ui/input';
-import { Label } from '../../../../components/ui/label';
-import { Switch } from '../../../../components/ui/switch';
-import { Badge } from '../../../../components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../../../components/ui/tabs';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
+import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { PlusCircle, Edit, Trash2, Loader2, DollarSign, Percent, Package, Settings, Palette, GripVertical } from 'lucide-react';
-import { useCollection, useFirestore, useMemoFirebase, setDocumentNonBlocking, deleteDocumentNonBlocking, useUser } from '../../../../firebase';
+import { useCollection, useFirestore, useMemoFirebase, setDocumentNonBlocking, deleteDocumentNonBlocking, useUser } from '@/firebase';
 import { collection, doc } from 'firebase/firestore';
-import { useToast } from '../../../../hooks/use-toast';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '../../../../components/ui/dialog';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../../components/ui/select';
-import type { HybridPlan } from '../../../../models/hybrid-plan';
+import { useToast } from '@/hooks/use-toast';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import type { HybridPlan } from '@/models/hybrid-plan';
 import { useForm, Controller, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { HybridPlanSchema } from '../../../../models/hybrid-plan';
-import { errorEmitter } from '../../../../firebase/error-emitter';
-import { FirestorePermissionError, type SecurityRuleContext } from '../../../../firebase/errors';
+import { HybridPlanSchema } from '@/models/hybrid-plan';
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError, type SecurityRuleContext } from '@/firebase/errors';
 
 // DND Kit Imports
 import {
@@ -100,7 +101,10 @@ export default function HybridPlansPage() {
               <CardHeader>
                 <div className="flex justify-between items-start">
                   <CardTitle>{plan.name}</CardTitle>
-                  <Badge variant={plan.isActive ? 'default' : 'secondary'}>{plan.isActive ? 'Activo' : 'Inactivo'}</Badge>
+                  <div className="flex gap-2">
+                    {plan.isMostPopular && <Badge variant="default" className="bg-amber-500 text-white">Popular</Badge>}
+                    <Badge variant={plan.isActive ? 'default' : 'secondary'}>{plan.isActive ? 'Activo' : 'Inactivo'}</Badge>
+                  </div>
                 </div>
                 <CardDescription>{plan.slug}</CardDescription>
               </CardHeader>
@@ -124,7 +128,7 @@ export default function HybridPlansPage() {
               </CardContent>
               <CardFooter className="flex gap-2">
                 <Button variant="outline" className="flex-1" onClick={() => handleOpenDialog(plan)}><Edit className="w-4 h-4 mr-2" /> Editar</Button>
-                <Button variant="destructive" size="icon" onClick={() => handleDelete(plan)}><Trash2 className="w-4 h-4" /></Button>
+                <Button variant="destructive" size="icon" onClick={() => handleDelete(plan)}><Trash2 className="h-4 w-4" /></Button>
               </CardFooter>
             </Card>
           ))}
@@ -189,6 +193,7 @@ function HybridPlanDialog({ isOpen, onClose, plan }: { isOpen: boolean, onClose:
       variableBillingFrequency: 'monthly',
       isActive: true,
       isPublic: true,
+      isMostPopular: false,
       includedModuleKeys: [],
       features: [{ value: '', displayOrder: 0 }],
       extraLimits: [],
@@ -236,6 +241,7 @@ function HybridPlanDialog({ isOpen, onClose, plan }: { isOpen: boolean, onClose:
           variableBillingFrequency: 'monthly',
           isActive: true,
           isPublic: true,
+          isMostPopular: false,
           includedModuleKeys: [],
           features: [{ value: '', displayOrder: 0 }],
           extraLimits: [],
@@ -467,6 +473,13 @@ function HybridPlanDialog({ isOpen, onClose, plan }: { isOpen: boolean, onClose:
                 <div className="flex items-center justify-between gap-4 p-4 border rounded-lg bg-muted/10">
                   <Label className="font-semibold">Visibilidad Pública</Label>
                   <Switch checked={watch('isPublic')} onCheckedChange={(val) => setValue('isPublic', val)} />
+                </div>
+                <div className="flex items-center justify-between gap-4 p-4 border rounded-lg bg-muted/10">
+                  <div className="space-y-0.5">
+                    <Label className="font-semibold">Plan Destacado</Label>
+                    <p className="text-[10px] text-muted-foreground">Muestra el badge "Más Popular" en la tabla de precios.</p>
+                  </div>
+                  <Switch checked={watch('isMostPopular')} onCheckedChange={(val) => setValue('isMostPopular', val)} />
                 </div>
 
                 <div className="space-y-4 p-4 border rounded-lg">
