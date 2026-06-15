@@ -45,4 +45,6 @@ export type HybridBillingResult = {
   totalAmount: number;
   status: 'pending' | 'paid';
   paymentMethod?: string;
+  commissionType: 'fixed' | 'percent';
+  maxCommissionPerOrder: number;
 };

@@ -97,7 +97,9 @@ export default function HybridBillingPage() {
           variableAmount,
           totalAmount: plan.basePrice + variableAmount,
           status: 'pending',
-          paymentMethod: 'Nequi' // Default gateway
+          paymentMethod: 'Nequi',
+          commissionType: plan.commissionType || 'fixed',
+          maxCommissionPerOrder: Number(plan.maxCommissionPerOrder) || 0,
         });
       }
 
