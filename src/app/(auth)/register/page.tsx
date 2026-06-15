@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useRouter, useSearchParams } from "next/navigation";
@@ -39,6 +40,7 @@ import { isFirstUser } from '../../../actions/user';
 import { Eye, EyeOff, Loader2 } from 'lucide-react';
 import type { Subscription } from "../../../models/subscription";
 import { STRIPE_PRICE_IDS } from "../../../lib/stripe";
+import type { HybridPlan } from "../../../models/hybrid-plan";
 
 const registerSchema = z.object({
   name: z.string().min(1, { message: "Por favor, introduce tu nombre." }),
@@ -214,15 +216,6 @@ function RegisterForm() {
   const { user, isUserLoading } = useUser();
   const [showPassword, setShowPassword] = useState(false);
 
-  const form = useForm<z.infer<typeof registerSchema>>({
-    resolver: zodResolver(registerSchema),
-    defaultValues: {
-      name: "",
-      email: "",
-      password: "",
-    },
-  });
-
   async function onSubmit(values: z.infer<typeof registerSchema>) {
     if (!auth || !firestore) return;
     
@@ -281,57 +274,6 @@ function RegisterForm() {
               createdAt: new Date().toISOString() 
           });
       });
-      
-      if (isFirst) {
-        const defaultModules: Omit<Module, 'id'>[] = [
-          { name: 'Catálogo', description: 'Módulo para gestionar el catálogo de productos.', status: 'inactive', createdAt: new Date().toISOString() },
-          { name: 'Blog', description: 'Módulo para gestionar el blog', status: 'inactive', createdAt: new Date().toISOString() },
-          { name: 'Promociones', description: 'Módulo para gestionar ofertas y descuentos.', status: 'inactive', createdAt: new Date().toISOString() },
-          { name: 'Chatbot Integrado con WhatsApp', description: 'Asistente IA para WhatsApp y Web', status: 'inactive', createdAt: new Date().toISOString() },
-          { name: 'WHAPI (WhatsApp)', description: 'Integración con WHAPI para enviar mensajes de WhatsApp.', status: 'inactive', createdAt: new Date().toISOString() },
-          { name: 'Motor de Sugerencias Inteligentes', description: 'Motor para sugerir productos', status: 'inactive', createdAt: new Date().toISOString() },
-          { name: 'Google Analytics', description: 'Integración con Google Analytics', status: 'inactive', createdAt: new Date().toISOString() },
-          { name: 'Cloudinary', description: 'Almacenamiento de medios en la nube', status: 'inactive', createdAt: new Date().toISOString() },
-        ];
-        
-        defaultModules.forEach(mod => {
-            let modId = slugify(mod.name);
-            if (mod.name.toLowerCase().includes('catálogo')) {
-                modId = 'catalogo';
-            } else if (mod.name.includes('Blog')) {
-              modId = 'blog';
-            } else if (mod.name.includes('Promociones')) {
-              modId = 'promotions';
-            } else if (mod.name.includes('Chatbot')) {
-              modId = 'chatbot-integrado-con-whatsapp-para-soporte-y-ventas';
-            } else if (mod.name.includes('Sugerencias')) {
-              modId = 'motor-de-sugerencias-inteligentes';
-            } else if (mod.name.includes('Google Analytics')) {
-              modId = 'google-analytics';
-            } else if (mod.name === 'Cloudinary') {
-              modId = 'cloudinary';
-            }
-            const modRef = doc(firestore, 'modules', modId);
-            batch.set(modRef, { ...mod, id: modId }, { merge: true });
-        });
-        
-        const REQUIRED_INTEGRATIONS: Array<{ id: string; name: string }> = [
-          { id: 'cloudinary', name: 'Cloudinary' },
-          { id: 'chatbot-integrado-con-whatsapp-para-soporte-y-ventas', name: 'Chatbot IA (Google/OpenAI/Groq)' },
-          { id: 'whapi-whatsapp', name: 'WHAPI (WhatsApp)' },
-        ];
-
-        REQUIRED_INTEGRATIONS.forEach(int => {
-            const intRef = doc(firestore, 'integrations', int.id);
-            batch.set(intRef, {
-                id: int.id,
-                name: int.name,
-                fields: '{}',
-                status: 'inactive',
-                updatedAt: new Date().toISOString(),
-            }, { merge: true });
-        });
-      }
 
       const landingPageDocRef = doc(firestore, 'businesses', newUser.uid, 'landingPages', 'main');
       
@@ -359,83 +301,80 @@ function RegisterForm() {
       const paymentSettingsData: PaymentSettings = { id: newUser.uid, userId: newUser.uid, ...initialPaymentSettings };
       batch.set(paymentSettingsDocRef, paymentSettingsData);
       
-      const coffeeOfferRef = doc(firestore, 'businesses', newUser.uid, 'chatbotConfig', 'main', 'knowledgeBase', 'oferta-cafe-arandanos');
-      const coffeeOfferData: Omit<KnowledgeDocument, 'id'> = {
-        fileName: "Oferta Especial: Café de Arándanos",
-        fileType: "text/manual",
-        status: "ready",
-        createdAt: new Date().toISOString(),
-        content: `
-          ¡Descubre nuestro exclusivo Café de Arándanos! Una bebida única que combina lo mejor del café orgánico con el poder antioxidante de los arándanos.
-
-          **Beneficios:**
-          - Rico en antioxidantes que combaten el envejecimiento celular.
-          - Ayuda a mejorar la memoria y la función cognitiva.
-          - Contribuye a la salud del tracto urinario.
-          - Aporta energía natural sin los nervios del café tradicional.
-
-          **Preparación:**
-          Disfrútalo caliente o frío. Simplemente mezcla una cucharada en agua o leche de tu preferencia.
-
-          **Oferta por tiempo limitado:**
-          Lleva un frasco por $35.000 o dos por $60.000.
-        `,
-        isManual: true,
-        fileUrl: "https://res.cloudinary.com/dazt6g3o1/image/upload/v1717349882/w5j8ot00m5fg0f0r0t8z.jpg"
-      };
-      batch.set(coffeeOfferRef, coffeeOfferData);
-
-      const planId = searchParams.get('plan') as 'free' | 'pro' | 'enterprise' | null;
+      const planParam = searchParams.get('plan');
       const subscriptionDocRef = doc(firestore, 'businesses', newUser.uid, 'subscription', 'current');
       
-      if (planId && planId !== 'free') {
-        const upperPlanId = planId.toUpperCase() as keyof typeof STRIPE_PRICE_IDS;
-        const priceId = STRIPE_PRICE_IDS[upperPlanId];
+      if (planParam && planParam !== 'free') {
+        // 1. Verificar si es un plan estándar (Stripe)
+        const upperPlanId = planParam.toUpperCase() as keyof typeof STRIPE_PRICE_IDS;
+        const stripePriceId = STRIPE_PRICE_IDS[upperPlanId];
         
-        if (!priceId || priceId.includes('placeholder')) {
-            toast({
-                variant: "destructive",
-                title: "Error de Configuración",
-                description: `El plan '${planId}' no está configurado correctamente para pagos. Contacta al soporte.`,
+        if (stripePriceId && !stripePriceId.includes('placeholder')) {
+            const response = await fetch('/api/stripe/create-checkout-session', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ priceId: stripePriceId, businessId: newUser.uid, userId: newUser.uid, email: newUser.email }),
             });
-            throw new Error("Stripe Price ID no configurado.");
+            const session = await response.json();
+            if (session.url) {
+                await batch.commit();
+                window.location.href = session.url;
+                return;
+            }
         }
 
-        const response = await fetch('/api/stripe/create-checkout-session', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ priceId, businessId: newUser.uid, userId: newUser.uid, email: newUser.email }),
-        });
-        const session = await response.json();
-        if (session.url) {
+        // 2. Si no es Stripe, verificar si es un Plan Híbrido en Firestore
+        const hybridPlanSnap = await getDoc(doc(firestore, 'hybrid_plans', planParam));
+        if (hybridPlanSnap.exists()) {
+            const hybridPlanData = hybridPlanSnap.data() as HybridPlan;
+            const now = Timestamp.now();
+            const hybridSubscription: Subscription = {
+                plan: hybridPlanData.name,
+                status: 'active',
+                stripeCustomerId: null,
+                stripeSubscriptionId: null,
+                currentPeriodEnd: null, // Los planes híbridos se facturan manualmente o por comisión
+                createdAt: now,
+                updatedAt: now,
+                paymentMethod: 'manual'
+            };
+            batch.set(subscriptionDocRef, hybridSubscription);
+            // También actualizamos el nombre del plan en el documento de negocio
+            batch.update(businessDocRef, { planName: hybridPlanData.name });
+            
             await batch.commit();
-            window.location.href = session.url;
-        } else {
-            throw new Error('No se pudo crear la sesión de checkout.');
+            toast({
+                title: "Cuenta Creada con Plan Híbrido",
+                description: `Bienvenido. Se ha activado el plan ${hybridPlanData.name}.`,
+            });
+            return;
         }
 
-      } else {
-        const now = Timestamp.now();
-        const freeSubscription: Subscription = {
-          plan: 'free',
-          status: 'active',
-          stripeCustomerId: null,
-          stripeSubscriptionId: null,
-          currentPeriodEnd: null,
-          createdAt: now,
-          updatedAt: now,
-        };
-        batch.set(subscriptionDocRef, freeSubscription);
-        await batch.commit();
-        toast({
-            title: "Cuenta Creada con Éxito",
-            description: `Se te ha asignado el rol de ${userRole.replace('_', ' ')}. Serás redirigido...`,
-        });
+        // 3. Fallback: Si no se encontró nada válido, tratar como error pero permitir registro básico
+        console.warn(`Plan ID '${planParam}' no reconocido.`);
       }
+
+      // Registro básico (Plan Free)
+      const now = Timestamp.now();
+      const freeSubscription: Subscription = {
+        plan: 'free',
+        status: 'active',
+        stripeCustomerId: null,
+        stripeSubscriptionId: null,
+        currentPeriodEnd: null,
+        createdAt: now,
+        updatedAt: now,
+      };
+      batch.set(subscriptionDocRef, freeSubscription);
+      await batch.commit();
+      
+      toast({
+          title: "Cuenta Creada con Éxito",
+          description: `Se te ha asignado el rol de ${userRole.replace('_', ' ')}.`,
+      });
       
     } catch (error: any) {
       if (error.code === 'auth/email-already-in-use') {
-        console.log("Info: Registration attempt with an existing email.", values.email);
         toast({
           variant: "destructive",
           title: "Este correo electrónico ya está registrado.",
