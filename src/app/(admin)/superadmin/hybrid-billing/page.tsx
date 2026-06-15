@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -100,6 +99,13 @@ export default function HybridBillingPage() {
         const ordersSnap = await getDocs(ordersRef);
         const allOrders = ordersSnap.docs.map(doc => ({ ...doc.data(), id: doc.id } as Order));
         
+        // Debug Log solicitado
+        console.log(`[Debug] ${business.name} - Total órdenes: ${allOrders.length}`);
+        allOrders.forEach(o => {
+          const parsed = parseAnyDate(o.orderDate ?? (o as any).createdAt ?? (o as any).date ?? (o as any).fecha);
+          console.log(`  Orden: ${o.id}, orderDate raw: ${JSON.stringify(o.orderDate)}, parsed: ${parsed}, isSameMonth: ${parsed ? isSameMonth(parsed, referenceMonth) : 'N/A'}, status: ${o.orderStatus}`);
+        });
+
         // Filtrar por mes actual y excluir cancelados
         const currentMonthOrders = allOrders.filter(o => {
             const orderDate = parseAnyDate(o.orderDate);
