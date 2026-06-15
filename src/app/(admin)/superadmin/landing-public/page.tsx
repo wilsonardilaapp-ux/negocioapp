@@ -1,7 +1,6 @@
 import { getLandingData } from '../../../../lib/get-landing-data';
 import LandingEditorClient from './EditorClient';
 import type { LandingPageData } from '../../../../models/landing-page';
-import { v4 as uuidv4 } from 'uuid';
 
 export const dynamic = 'force-dynamic';
 
@@ -74,9 +73,9 @@ const fallbackData: LandingPageData = {
       youtube: '',
     },
     carouselItems: [
-      { id: uuidv4(), mediaUrl: null, mediaType: null, slogan: '' },
-      { id: uuidv4(), mediaUrl: null, mediaType: null, slogan: '' },
-      { id: uuidv4(), mediaUrl: null, mediaType: null, slogan: '' },
+      { id: 'carousel-item-1', mediaUrl: null, mediaType: null, slogan: '' },
+      { id: 'carousel-item-2', mediaUrl: null, mediaType: null, slogan: '' },
+      { id: 'carousel-item-3', mediaUrl: null, mediaType: null, slogan: '' },
     ],
   },
   footer: {
@@ -88,12 +87,12 @@ const fallbackData: LandingPageData = {
       hours: 'Lunes a Viernes, 9am - 6pm',
     },
     quickLinks: [
-      { id: uuidv4(), text: 'Inicio', url: '#' },
-      { id: uuidv4(), text: 'Sobre nosotros', url: '#' },
-      { id: uuidv4(), text: 'Servicios', url: '#' },
-      { id: uuidv4(), text: 'Blog', url: '#' },
-      { id: uuidv4(), text: 'Contacto', url: '#' },
-      { id: uuidv4(), text: 'FAQ', url: '#' },
+      { id: 'footer-link-1', text: 'Inicio', url: '#' },
+      { id: 'footer-link-2', text: 'Sobre nosotros', url: '#' },
+      { id: 'footer-link-3', text: 'Servicios', url: '#' },
+      { id: 'footer-link-4', text: 'Blog', url: '#' },
+      { id: 'footer-link-5', text: 'Contacto', url: '#' },
+      { id: 'footer-link-6', text: 'FAQ', url: '#' },
     ],
     legalLinks: {
       privacyPolicyUrl: '#',

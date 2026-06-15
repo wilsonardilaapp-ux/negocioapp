@@ -10,9 +10,11 @@ import { Youtube, Linkedin } from 'lucide-react';
 
 
 // Mock order data for preview
+// FIX: Using a static date string instead of new Date().toLocaleString() 
+// to prevent hydration errors (server/client mismatch).
 export const mockOrder = {
   invoiceNumber: 'FC-00123',
-  dateTime: new Date().toLocaleString(),
+  dateTime: '27/03/2024, 10:00:00 AM',
   client: {
     name: 'Juan Pérez',
     address: 'Calle Falsa 123, Apto 4B',

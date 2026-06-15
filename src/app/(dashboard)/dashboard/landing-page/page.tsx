@@ -10,7 +10,6 @@ import EditorLandingPreview from '@/components/landing-page/editor-landing-previ
 import { useUser, useFirestore, useMemoFirebase, setDocumentNonBlocking, useCollection } from '@/firebase';
 import { doc, getDoc, collection } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import { v4 as uuidv4 } from 'uuid';
 import { saveBusinessLanding } from '@/actions/save-business-landing';
 import type { SubscriptionPlan } from '@/models/subscription-plan';
 import { useSubscription } from '@/hooks/useSubscription';
@@ -38,9 +37,9 @@ const initialLandingData: LandingPageData = {
     businessInfo: { name: '', address: '', phone: '', email: '' }, 
     socialLinks: { tiktok: '', instagram: '', facebook: '', whatsapp: '', twitter: '', youtube: '' }, 
     carouselItems: [
-        { id: uuidv4(), mediaUrl: null, mediaType: null, slogan: '' },
-        { id: uuidv4(), mediaUrl: null, mediaType: null, slogan: '' },
-        { id: uuidv4(), mediaUrl: null, mediaType: null, slogan: '' },
+        { id: 'item-1', mediaUrl: null, mediaType: null, slogan: '' },
+        { id: 'item-2', mediaUrl: null, mediaType: null, slogan: '' },
+        { id: 'item-3', mediaUrl: null, mediaType: null, slogan: '' },
     ]
   },
   footer: { enabled: true, contactInfo: { address: '', phone: '', email: '', hours: '' }, quickLinks: [], legalLinks: { privacyPolicyUrl: '', termsAndConditionsUrl: '', cookiesPolicyUrl: '', legalNoticeUrl: '' }, socialLinks: { facebookUrl: '', instagramUrl: '', tiktokUrl: '', youtubeUrl: '', linkedinUrl: '', showIcons: true }, logo: { url: null, slogan: '' }, certifications: [], copyright: { companyName: '', additionalText: '' }, cta: { text: '', url: '', enabled: false }, visuals: { backgroundImageUrl: null, opacity: 80, backgroundColor: '#FFFFFF', textColor: '#000000', darkMode: false, showBackToTop: true }, adminExtras: { systemVersion: '1.0.0', supportLink: '', documentationLink: '' } },
