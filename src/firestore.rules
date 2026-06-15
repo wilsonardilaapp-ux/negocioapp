@@ -37,7 +37,7 @@ service cloud.firestore {
       return isOwner(businessId);
     }
 
-    // --- REGLAS PÚBLICAS CRÍTICAS (Añadidas para corregir errores de consola) ---
+    // --- REGLAS PÚBLICAS CRÍTICAS ---
     
     // 1. Permitir resolución de alias (slugs) mediante consulta de grupo (ej: /catalog/forros-autos)
     match /{path=**}/shareConfig/{docId} {
