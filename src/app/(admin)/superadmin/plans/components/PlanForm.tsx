@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useForm, Controller, useFieldArray } from 'react-hook-form';
@@ -102,6 +103,7 @@ export default function PlanForm({ existingPlan, onClose }: PlanFormProps) {
 
             reset({
                 ...existingPlan,
+                isActive: existingPlan.isActive ?? true,
                 features: featuresAsObjects,
                 limits: {
                     ...existingPlan.limits,
@@ -119,6 +121,7 @@ export default function PlanForm({ existingPlan, onClose }: PlanFormProps) {
                 price: 0,
                 stripePriceId: '',
                 isMostPopular: false,
+                isActive: true,
                 features: [{ value: '', displayOrder: 0 }],
                 limits: {
                     products: 0,
@@ -271,11 +274,26 @@ export default function PlanForm({ existingPlan, onClose }: PlanFormProps) {
                 </Button>
             </div>
 
-            <div className="flex items-center space-x-2">
-                <Controller name="isMostPopular" control={control} render={({ field }) => (
-                    <Switch id="isMostPopular" checked={field.value} onCheckedChange={field.onChange} />
-                )} />
-                <Label htmlFor="isMostPopular">Marcar como el plan más popular</Label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 bg-muted/30 p-4 rounded-xl border">
+                <div className="flex items-center space-x-2">
+                    <Controller name="isActive" control={control} render={({ field }) => (
+                        <Switch id="isActive" checked={field.value} onCheckedChange={field.onChange} />
+                    )} />
+                    <div className="space-y-0.5">
+                        <Label htmlFor="isActive" className="text-base">Plan Activo</Label>
+                        <p className="text-xs text-muted-foreground">Define si el plan está disponible para los usuarios.</p>
+                    </div>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                    <Controller name="isMostPopular" control={control} render={({ field }) => (
+                        <Switch id="isMostPopular" checked={field.value} onCheckedChange={field.onChange} />
+                    )} />
+                    <div className="space-y-0.5">
+                        <Label htmlFor="isMostPopular" className="text-base">Plan Destacado</Label>
+                        <p className="text-xs text-muted-foreground">Muestra el badge "Más Popular" en la tabla de precios.</p>
+                    </div>
+                </div>
             </div>
 
             <div className="flex justify-end gap-2 pt-4">

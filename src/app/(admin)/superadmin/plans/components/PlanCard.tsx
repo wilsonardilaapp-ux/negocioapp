@@ -1,9 +1,10 @@
+
 "use client";
 
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Check, Edit, Trash2, InfinityIcon, Tag } from "lucide-react";
+import { Check, Edit, Trash2, InfinityIcon, CircleAlert } from "lucide-react";
 import type { SubscriptionPlan } from "@/models/subscription-plan";
 import {
   AlertDialog,
@@ -19,6 +20,7 @@ import {
 import { useFirestore, deleteDocumentNonBlocking } from "@/firebase";
 import { doc } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
 
 interface PlanCardProps {
   plan: SubscriptionPlan;
@@ -44,11 +46,21 @@ export default function PlanCard({ plan, onEdit }: PlanCardProps) {
         });
     };
 
+    const isActive = plan.isActive !== false;
+
     return (
-        <Card className="flex flex-col">
+        <Card className={cn("flex flex-col relative", !isActive && "opacity-75 grayscale-[0.5]")}>
+            {!isActive && (
+                <div className="absolute top-2 left-2 z-10">
+                    <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 border-yellow-200">
+                        <CircleAlert className="w-3 h-3 mr-1" />
+                        Inactivo
+                    </Badge>
+                </div>
+            )}
             <CardHeader className="pb-4">
                 <div className="flex justify-between items-start">
-                    <CardTitle>{plan.name}</CardTitle>
+                    <CardTitle className={cn(!isActive && "text-muted-foreground")}>{plan.name}</CardTitle>
                     {plan.isMostPopular && <Badge>Más Popular</Badge>}
                 </div>
                 <CardDescription>{plan.description}</CardDescription>
