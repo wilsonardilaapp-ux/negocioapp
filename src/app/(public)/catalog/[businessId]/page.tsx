@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
@@ -303,13 +304,14 @@ export default function CatalogPage() {
                 
                 console.log("🔍 Intentando cargar catálogo para:", cleanSlug);
 
-                // ESTRATEGIA DE RESILIENCIA: Primero probamos si es un ID directo
+                // ESTRATEGIA RESILIENTE:
+                // 1. Verificar si el slug ya es un ID directo válido (UID)
                 const directBusinessDoc = await getDoc(doc(firestore, 'businesses', businessId));
                 
                 if (directBusinessDoc.exists()) {
                     console.log("✅ ID directo validado:", businessId);
                 } else {
-                    // Si no es ID directo, buscamos por alias personalizado
+                    // 2. Si no es UID, buscar en alias (shareConfig)
                     console.log("ℹ️ No es ID directo, buscando en alias (shareConfig)...");
                     try {
                         const shareConfigQuery = query(
@@ -328,15 +330,16 @@ export default function CatalogPage() {
                                 console.log("✅ Alias resuelto con éxito:", cleanSlug, "->", businessId);
                             }
                         } else {
-                            console.warn("❌ Alias no encontrado en ninguna configuración de compartir.");
+                            console.warn("❌ Alias no encontrado.");
                         }
                     } catch (e: any) {
-                        console.error("🔥 Error crítico en consulta de grupo:", e.message);
-                        // Si falla la consulta de grupo (por falta de índices), procedemos con el ID original
+                        console.error("⚠️ Fallo consulta de grupo (permisos/índices):", e.message);
+                        // No lanzamos error aquí para permitir el fallback al ID original 
+                        // o mostrar el error final en la carga del documento.
                     }
                 }
 
-                // Carga de datos esenciales usando el ID resuelto
+                // 3. Carga de datos finales con el ID resuelto
                 const results = await Promise.allSettled([
                     getDoc(doc(firestore, `businesses/${businessId}/publicData`, 'catalog')),
                     getDoc(doc(firestore, `businesses/${businessId}/landingPages`, 'main')),
@@ -364,7 +367,7 @@ export default function CatalogPage() {
                     .catch(err => console.warn("No se cargaron promociones:", err.message));
 
             } catch (e: any) { 
-                console.error("🚨 Error de inicialización:", e);
+                console.error("🚨 Error crítico de inicialización:", e);
                 setError(e.message); 
             }
             finally { setIsLoading(false); }

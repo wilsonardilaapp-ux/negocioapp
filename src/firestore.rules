@@ -38,6 +38,13 @@ service cloud.firestore {
       return isOwner(businessId);
     }
 
+    // --- REGLAS PÚBLICAS CRÍTICAS ---
+    
+    // Permitir resolución de alias (slugs) mediante consulta de grupo
+    match /{path=**}/shareConfig/{docId} {
+      allow read: if true;
+    }
+
     // --- REGLAS POR COLECCIÓN ---
 
     // Planes Híbridos (Menfy)
@@ -95,19 +102,9 @@ service cloud.firestore {
         allow create: if isSuperAdmin();
       }
 
-      // Permitir lectura pública de shareConfig para resolución de slugs
-      match /shareConfig/{docId} {
-        allow read: if true;
-      }
-
       match /{allSubcollections=**} {
         allow read, write: if isSuperAdmin() || isBusinessMember(businessId);
       }
-    }
-
-    // Permitir consultas de grupo de colecciones para shareConfig (necesario para buscar por slug)
-    match /{path=**}/shareConfig/{docId} {
-      allow read: if true;
     }
 
     // Mensajes de contacto globales
