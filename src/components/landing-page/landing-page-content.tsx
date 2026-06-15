@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useMemo } from 'react';
@@ -384,14 +383,14 @@ export default function LandingPageContent({ data, plans = [], hybridPlans = [],
                             </p>
                             <div className="mb-4">
                                 <span className="text-4xl font-bold text-gray-900">
-                                ${price?.toLocaleString()}
+                                ${price?.toLocaleString('es-CO')}
                                 </span>
                                 <span className="text-gray-400 text-sm">
                                 /mes
                                 </span>
                                 {isHybrid && (
                                   <p className="text-sm font-bold text-orange-600 mt-1">
-                                    + {hybridPlan?.commissionType === 'percent' ? `${hybridPlan.pricePerOrder}%` : `$${hybridPlan?.pricePerOrder.toLocaleString()}`} por pedido
+                                    + {hybridPlan?.commissionType === 'percent' ? `${hybridPlan.pricePerOrder}%` : `$${hybridPlan?.pricePerOrder.toLocaleString('es-CO')}`} por pedido
                                   </p>
                                 )}
                             </div>

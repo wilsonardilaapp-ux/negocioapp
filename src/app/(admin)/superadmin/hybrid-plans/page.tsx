@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useTransition, useEffect } from 'react';
@@ -76,12 +75,12 @@ export default function HybridPlansPage() {
               <CardContent className="flex-grow space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Base Mensual:</span>
-                  <span className="font-bold">${plan.basePrice.toLocaleString()}</span>
+                  <span className="font-bold">${plan.basePrice.toLocaleString('es-CO')}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Comisión:</span>
                   <span className="font-bold">
-                    {plan.commissionType === 'percent' ? `${plan.pricePerOrder}%` : `$${plan.pricePerOrder.toLocaleString()}`}
+                    {plan.commissionType === 'percent' ? `${plan.pricePerOrder}%` : `$${plan.pricePerOrder.toLocaleString('es-CO')}`}
                   </span>
                 </div>
               </CardContent>
