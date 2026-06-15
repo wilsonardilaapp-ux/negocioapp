@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useForm, Controller, useFieldArray } from 'react-hook-form';
@@ -11,12 +12,62 @@ import { useToast } from '@/hooks/use-toast';
 import { useUser, useFirestore, setDocumentNonBlocking } from '@/firebase';
 import { doc } from 'firebase/firestore';
 import { SubscriptionPlanSchema, type SubscriptionPlan } from '@/models/subscription-plan';
-import { Trash2, PlusCircle, Loader2 } from 'lucide-react';
-import { useEffect } from 'react';
+import { Trash2, PlusCircle, Loader2, GripVertical } from 'lucide-react';
+import { useEffect, useMemo } from 'react';
+
+// DND Kit Imports
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  useSortable,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 interface PlanFormProps {
     existingPlan?: SubscriptionPlan | null;
     onClose: () => void;
+}
+
+function SortableFeatureItem({ id, index, register, remove }: { id: string, index: number, register: any, remove: (index: number) => void }) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isDragging ? 50 : 'auto',
+    position: 'relative' as const,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} className="flex gap-2 items-center bg-background rounded-md">
+      <div {...attributes} {...listeners} className="cursor-grab p-1 hover:bg-muted rounded">
+        <GripVertical className="h-4 w-4 text-muted-foreground" />
+      </div>
+      <Input {...register(`features.${index}.value` as const)} placeholder={`Característica ${index + 1}`} />
+      <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)}>
+        <Trash2 className="h-4 w-4 text-destructive" />
+      </Button>
+    </div>
+  );
 }
 
 export default function PlanForm({ existingPlan, onClose }: PlanFormProps) {
@@ -28,17 +79,27 @@ export default function PlanForm({ existingPlan, onClose }: PlanFormProps) {
         resolver: zodResolver(SubscriptionPlanSchema),
     });
 
-    const { fields, append, remove } = useFieldArray({
+    const { fields, append, remove, move } = useFieldArray({
         control,
         name: "features",
     });
 
+    const sensors = useSensors(
+        useSensor(PointerSensor),
+        useSensor(KeyboardSensor, {
+          coordinateGetter: sortableKeyboardCoordinates,
+        })
+    );
+
     useEffect(() => {
         if (existingPlan) {
             // Handle legacy string[] format for features
-            const featuresAsObjects = ((existingPlan.features || []) as any[]).map(f => 
-                typeof f === 'string' ? { value: f } : f
+            const featuresAsObjects = ((existingPlan.features || []) as any[]).map((f, i) => 
+                typeof f === 'string' ? { value: f, displayOrder: i } : { ...f, displayOrder: f.displayOrder ?? i }
             );
+
+            // Al cargar, ordenar características por displayOrder ascendente
+            featuresAsObjects.sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
 
             reset({
                 ...existingPlan,
@@ -59,7 +120,7 @@ export default function PlanForm({ existingPlan, onClose }: PlanFormProps) {
                 price: 0,
                 stripePriceId: '',
                 isMostPopular: false,
-                features: [{ value: '' }],
+                features: [{ value: '', displayOrder: 0 }],
                 limits: {
                     products: 0,
                     blogPosts: 0,
@@ -73,13 +134,28 @@ export default function PlanForm({ existingPlan, onClose }: PlanFormProps) {
         }
     }, [existingPlan, reset]);
 
+    const handleDragEnd = (event: DragEndEvent) => {
+        const { active, over } = event;
+        if (active.id !== over?.id) {
+            const oldIndex = fields.findIndex((f) => f.id === active.id);
+            const newIndex = fields.findIndex((f) => f.id === over?.id);
+            move(oldIndex, newIndex);
+        }
+    };
+
     const onSubmit = (data: SubscriptionPlan) => {
         if (!user || !firestore) return;
         
         const planId = data.id;
         const planDocRef = doc(firestore, 'plans', planId);
 
-        setDocumentNonBlocking(planDocRef, data, { merge: true });
+        // Persistir el orden en displayOrder
+        const dataToSave = {
+            ...data,
+            features: data.features.map((f, i) => ({ ...f, displayOrder: i }))
+        };
+
+        setDocumentNonBlocking(planDocRef, dataToSave, { merge: true });
         toast({
             title: `Plan ${existingPlan ? 'actualizado' : 'creado'}`,
             description: `El plan "${data.name}" se ha guardado correctamente.`,
@@ -164,18 +240,33 @@ export default function PlanForm({ existingPlan, onClose }: PlanFormProps) {
             
             <div className="space-y-4 rounded-lg border p-4">
                 <h4 className="font-semibold">Lista de Características</h4>
-                <div className="space-y-2">
-                    {fields.map((item, index) => (
-                        <div key={item.id} className="flex items-center gap-2">
-                            <Input {...register(`features.${index}.value` as const)} placeholder={`Característica ${index + 1}`} />
-                            <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)}>
-                                <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
+                
+                <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    onDragEnd={handleDragEnd}
+                >
+                    <SortableContext
+                        items={fields.map(f => f.id)}
+                        strategy={verticalListSortingStrategy}
+                    >
+                        <div className="space-y-2">
+                            {fields.map((item, index) => (
+                                <SortableFeatureItem
+                                    key={item.id}
+                                    id={item.id}
+                                    index={index}
+                                    register={register}
+                                    remove={remove}
+                                />
+                            ))}
                         </div>
-                    ))}
-                    {errors.features && <p className="text-sm text-destructive mt-1">Todas las características deben tener contenido.</p>}
-                </div>
-                 <Button type="button" variant="outline" size="sm" onClick={() => append({ value: '' })}>
+                    </SortableContext>
+                </DndContext>
+
+                {errors.features && <p className="text-sm text-destructive mt-1">Todas las características deben tener contenido.</p>}
+                
+                <Button type="button" variant="outline" size="sm" onClick={() => append({ value: '', displayOrder: fields.length })}>
                     <PlusCircle className="mr-2 h-4 w-4" />
                     Añadir Característica
                 </Button>

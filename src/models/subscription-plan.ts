@@ -1,3 +1,4 @@
+
 import { z } from 'zod';
 
 export const PlanLimitsSchema = z.object({
@@ -18,7 +19,10 @@ export const SubscriptionPlanSchema = z.object({
   price: z.number().min(0, { message: "El precio debe ser 0 o mayor." }).describe("Precio mensual en USD (ej. 29)."),
   stripePriceId: z.string().min(1, { message: "El ID de precio de Stripe es requerido." }).regex(/^price_/, { message: "Debe ser un ID de precio de Stripe válido (ej. price_...)." }).describe("El ID del precio correspondiente en Stripe."),
   isMostPopular: z.boolean().optional().describe("Marcar para destacar el plan."),
-  features: z.array(z.object({ value: z.string().min(1, 'La característica no puede estar vacía.') })).describe("Lista de características clave para la página de precios."),
+  features: z.array(z.object({ 
+    value: z.string().min(1, 'La característica no puede estar vacía.'),
+    displayOrder: z.number().optional()
+  })).describe("Lista de características clave para la página de precios."),
   limits: PlanLimitsSchema,
 });
 
@@ -33,10 +37,12 @@ export const DefaultSubscriptionPlans: SubscriptionPlan[] = [
     stripePriceId: 'price_free_placeholder',
     isMostPopular: false,
     features: [
-      { value: '10 productos en catálogo' },
-      { value: '5 posts de blog' },
-      { value: '1 Landing Page' },
-      { value: 'Soporte base' },
+      { value: '10 productos en catálogo', displayOrder: 0 },
+      { value: '5 posts de blog', displayOrder: 1 },
+      { value: '1 Landing Page', displayOrder: 2 },
+      { value: 'Soporte base', displayOrder: 3 },
+      { value: 'Pedidos por mes : 21', displayOrder: 4 },
+      { value: 'Sugerencias: 2', displayOrder: 5 },
     ],
     limits: {
       products: 10,
@@ -44,7 +50,7 @@ export const DefaultSubscriptionPlans: SubscriptionPlan[] = [
       landingPages: 1,
       promotions: 2,
       coupons: 2,
-      orders: 20,
+      orders: 21,
       suggestions: 2,
     }
   },
@@ -56,11 +62,11 @@ export const DefaultSubscriptionPlans: SubscriptionPlan[] = [
     stripePriceId: 'price_pro_placeholder',
     isMostPopular: true,
     features: [
-      { value: 'Productos ilimitados' },
-      { value: 'Posts de blog ilimitados' },
-      { value: 'Landing Pages ilimitadas' },
-      { value: 'Soporte prioritario' },
-      { value: 'Módulo de Sugerencias IA' },
+      { value: 'Productos ilimitados', displayOrder: 0 },
+      { value: 'Posts de blog ilimitados', displayOrder: 1 },
+      { value: 'Landing Pages ilimitadas', displayOrder: 2 },
+      { value: 'Soporte prioritario', displayOrder: 3 },
+      { value: 'Módulo de Sugerencias IA', displayOrder: 4 },
     ],
     limits: {
       products: -1,
@@ -80,11 +86,11 @@ export const DefaultSubscriptionPlans: SubscriptionPlan[] = [
     stripePriceId: 'price_enterprise_placeholder',
     isMostPopular: false,
     features: [
-      { value: 'Todo lo del plan PRO' },
-      { value: 'Acceso a la API' },
-      { value: 'Soporte dedicado 24/7' },
-      { value: 'Onboarding personalizado' },
-      { value: 'Multi-usuario (próximamente)' },
+      { value: 'Todo lo del plan PRO', displayOrder: 0 },
+      { value: 'Acceso a la API', displayOrder: 1 },
+      { value: 'Soporte dedicado 24/7', displayOrder: 2 },
+      { value: 'Onboarding personalizado', displayOrder: 3 },
+      { value: 'Multi-usuario (próximamente)', displayOrder: 4 },
     ],
     limits: {
       products: -1,

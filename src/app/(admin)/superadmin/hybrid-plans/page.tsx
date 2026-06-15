@@ -1,6 +1,7 @@
+
 'use client';
 
-import { useState, useTransition, useEffect } from 'react';
+import { useState, useTransition, useEffect, useMemo } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '../../../../components/ui/card';
 import { Button } from '../../../../components/ui/button';
 import { Input } from '../../../../components/ui/input';
@@ -8,7 +9,7 @@ import { Label } from '../../../../components/ui/label';
 import { Switch } from '../../../../components/ui/switch';
 import { Badge } from '../../../../components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../../../components/ui/tabs';
-import { PlusCircle, Edit, Trash2, Loader2, DollarSign, Percent, Package, Settings, Palette, AlertCircle } from 'lucide-react';
+import { PlusCircle, Edit, Trash2, Loader2, DollarSign, Percent, Package, Settings, Palette, GripVertical } from 'lucide-react';
 import { useCollection, useFirestore, useMemoFirebase, setDocumentNonBlocking, deleteDocumentNonBlocking, useUser } from '../../../../firebase';
 import { collection, doc } from 'firebase/firestore';
 import { useToast } from '../../../../hooks/use-toast';
@@ -21,6 +22,25 @@ import { HybridPlanSchema } from '../../../../models/hybrid-plan';
 import { errorEmitter } from '../../../../firebase/error-emitter';
 import { FirestorePermissionError, type SecurityRuleContext } from '../../../../firebase/errors';
 
+// DND Kit Imports
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  useSortable,
+} from '@nd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+
 export default function HybridPlansPage() {
   const firestore = useFirestore();
   const { toast } = useToast();
@@ -28,7 +48,12 @@ export default function HybridPlansPage() {
   const [editingPlan, setEditingPlan] = useState<HybridPlan | null>(null);
 
   const plansQuery = useMemoFirebase(() => !firestore ? null : collection(firestore, 'hybrid_plans'), [firestore]);
-  const { data: plans, isLoading } = useCollection<HybridPlan>(plansQuery);
+  const { data: unsortedPlans, isLoading } = useCollection<HybridPlan>(plansQuery);
+
+  const plans = useMemo(() => {
+    if (!unsortedPlans) return [];
+    return [...unsortedPlans].sort((a, b) => a.basePrice - b.basePrice);
+  }, [unsortedPlans]);
 
   const handleOpenDialog = (plan: HybridPlan | null) => {
     setEditingPlan(plan);
@@ -43,6 +68,14 @@ export default function HybridPlansPage() {
     } catch (e) {
       toast({ title: 'Error al eliminar', variant: 'destructive' });
     }
+  };
+
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('es-CO', {
+        style: 'currency',
+        currency: 'COP',
+        minimumFractionDigits: 0,
+    }).format(value);
   };
 
   return (
@@ -75,18 +108,18 @@ export default function HybridPlansPage() {
               <CardContent className="flex-grow space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Base Mensual:</span>
-                  <span className="font-bold">${plan.basePrice.toLocaleString('es-CO')}</span>
+                  <span className="font-bold">{formatCurrency(plan.basePrice)}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Comisión:</span>
                   <span className="font-bold">
-                    {plan.commissionType === 'percent' ? `${plan.pricePerOrder}%` : `$${plan.pricePerOrder.toLocaleString('es-CO')}`}
+                    {plan.commissionType === 'percent' ? `${plan.pricePerOrder}%` : formatCurrency(plan.pricePerOrder)}
                   </span>
                 </div>
                 {plan.commissionType === 'percent' && plan.maxCommissionPerOrder && plan.maxCommissionPerOrder > 0 && (
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Tope máximo:</span>
-                    <span className="font-bold text-orange-600">${plan.maxCommissionPerOrder.toLocaleString('es-CO')}</span>
+                    <span className="font-bold text-orange-600">{formatCurrency(plan.maxCommissionPerOrder)}</span>
                   </div>
                 )}
               </CardContent>
@@ -104,6 +137,37 @@ export default function HybridPlansPage() {
         onClose={() => setIsDialogOpen(false)} 
         plan={editingPlan} 
       />
+    </div>
+  );
+}
+
+function SortableFeatureItem({ id, index, register, remove }: { id: string, index: number, register: any, remove: (index: number) => void }) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isDragging ? 50 : 'auto',
+    position: 'relative' as const,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} className="flex gap-2 items-center bg-background rounded-md">
+      <div {...attributes} {...listeners} className="cursor-grab p-1 hover:bg-muted rounded">
+        <GripVertical className="h-4 w-4 text-muted-foreground" />
+      </div>
+      <Input {...register(`features.${index}.value`)} placeholder="Ej: Reportes avanzados" />
+      <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)}>
+        <Trash2 className="h-4 w-4 text-destructive" />
+      </Button>
     </div>
   );
 }
@@ -127,7 +191,7 @@ function HybridPlanDialog({ isOpen, onClose, plan }: { isOpen: boolean, onClose:
       isActive: true,
       isPublic: true,
       includedModuleKeys: [],
-      features: [{ value: '' }],
+      features: [{ value: '', displayOrder: 0 }],
       extraLimits: [],
       icon: 'Package',
       themeColor: '#4CAF50',
@@ -143,16 +207,25 @@ function HybridPlanDialog({ isOpen, onClose, plan }: { isOpen: boolean, onClose:
     }
   });
 
-  const { fields, append, remove } = useFieldArray({ control, name: 'features' });
+  const { fields, append, remove, move } = useFieldArray({ control, name: 'features' });
   const { fields: extraLimitFields, append: appendExtraLimit, remove: removeExtraLimit } = useFieldArray({
     control,
     name: "extraLimits",
   });
 
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
   useEffect(() => {
     if (isOpen) {
       if (plan) {
-        reset(plan);
+        // Al cargar, ordenar características por displayOrder ascendente
+        const sortedFeatures = [...(plan.features || [])].sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
+        reset({ ...plan, features: sortedFeatures });
       } else {
         reset({
           name: '',
@@ -165,7 +238,7 @@ function HybridPlanDialog({ isOpen, onClose, plan }: { isOpen: boolean, onClose:
           isActive: true,
           isPublic: true,
           includedModuleKeys: [],
-          features: [{ value: '' }],
+          features: [{ value: '', displayOrder: 0 }],
           extraLimits: [],
           icon: 'Package',
           themeColor: '#4CAF50',
@@ -183,14 +256,28 @@ function HybridPlanDialog({ isOpen, onClose, plan }: { isOpen: boolean, onClose:
     }
   }, [plan, isOpen, reset]);
 
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (active.id !== over?.id) {
+      const oldIndex = fields.findIndex((item) => item.id === active.id);
+      const newIndex = fields.findIndex((item) => item.id === over?.id);
+      move(oldIndex, newIndex);
+    }
+  };
+
   const onSubmit = (data: HybridPlan) => {
     if (!firestore || !user) return;
 
     const planId = plan?.id || doc(collection(firestore, 'hybrid_plans')).id;
     const docRef = doc(firestore, 'hybrid_plans', planId);
 
+    // Asignar orden secuencial automáticamente basado en el orden actual del array
     const dataToSave = JSON.parse(JSON.stringify(data));
     dataToSave.id = planId;
+    dataToSave.features = data.features.map((f, index) => ({
+        ...f,
+        displayOrder: index
+    }));
     
     const sourceForSlug = dataToSave.slug || dataToSave.name;
     dataToSave.slug = sourceForSlug
@@ -409,14 +496,31 @@ function HybridPlanDialog({ isOpen, onClose, plan }: { isOpen: boolean, onClose:
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                     <Label className="font-bold">Características del Plan</Label>
-                    <Button type="button" variant="outline" size="sm" onClick={() => append({ value: '' })}><PlusCircle className="h-4 w-4 mr-2" /> Añadir</Button>
+                    <Button type="button" variant="outline" size="sm" onClick={() => append({ value: '', displayOrder: fields.length })}><PlusCircle className="h-4 w-4 mr-2" /> Añadir</Button>
                 </div>
-                {fields.map((field, index) => (
-                  <div key={field.id} className="flex gap-2">
-                    <Input {...register(`features.${index}.value`)} placeholder="Ej: Reportes avanzados" />
-                    <Button variant="ghost" size="icon" onClick={() => remove(index)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
-                  </div>
-                ))}
+                
+                <DndContext
+                  sensors={sensors}
+                  collisionDetection={closestCenter}
+                  onDragEnd={handleDragEnd}
+                >
+                  <SortableContext
+                    items={fields.map((field) => field.id)}
+                    strategy={verticalListSortingStrategy}
+                  >
+                    <div className="space-y-2">
+                      {fields.map((field, index) => (
+                        <SortableFeatureItem
+                          key={field.id}
+                          id={field.id}
+                          index={index}
+                          register={register}
+                          remove={remove}
+                        />
+                      ))}
+                    </div>
+                  </SortableContext>
+                </DndContext>
               </div>
             </TabsContent>
           </Tabs>
