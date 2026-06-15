@@ -194,12 +194,21 @@ function HybridPlanDialog({ isOpen, onClose, plan }: { isOpen: boolean, onClose:
           onClose();
         })
         .catch(async (serverError) => {
+          // Capturamos el error de permisos para el listener global de depuración
           const permissionError = new FirestorePermissionError({
             path: docRef.path,
             operation: plan?.id ? 'update' : 'create',
             requestResourceData: cleanData,
           } satisfies SecurityRuleContext);
+          
           errorEmitter.emit('permission-error', permissionError);
+
+          // Mostramos notificación de error al usuario para que no se quede esperando
+          toast({
+            variant: "destructive",
+            title: "Error de Permisos",
+            description: "No tienes autorización para realizar esta acción. Verifica tu sesión."
+          });
         });
     });
   };

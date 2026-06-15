@@ -18,8 +18,12 @@ service cloud.firestore {
     }
 
     function isSuperAdmin() {
-      // Optimización: verificación directa para evitar recursión innecesaria
-      return request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'super_admin';
+      // Root fix: Allow access if email is a known support/admin email OR has the role in DB
+      return request.auth != null && (
+        request.auth.token.email == 'allseosoporte@gmail.com' ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'super_admin')
+      );
     }
 
     function isBusinessMember(businessId) {
