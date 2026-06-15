@@ -23,7 +23,6 @@ service cloud.firestore {
 
     function isBusinessMember(businessId) {
       // OPTIMIZED: Check for owner UID first to avoid unnecessary 'exists/get' calls on list queries.
-      // This is the primary fix for the "Missing or insufficient permissions" error on the dashboard.
       return request.auth.uid == businessId || (userExists() && 'businessId' in userData() && userData().businessId == businessId);
     }
 
@@ -87,22 +86,22 @@ service cloud.firestore {
     }
 
     match /plans/{planId} {
-      allow read: if true;
+      allow read, list: if true;
       allow write: if isSuperAdmin();
     }
 
     match /globalConfig/{document=**} {
-      allow read: if true;
+      allow read, list: if true;
       allow write: if isSuperAdmin();
     }
 
     match /settings/{document=**} {
-      allow read: if true;
+      allow read, list: if true;
       allow write: if isSuperAdmin();
     }
 
     match /landing_configs/{docId} {
-      allow read: if true;
+      allow read, list: if true;
       allow write: if isSuperAdmin();
     }
 
@@ -215,6 +214,18 @@ service cloud.firestore {
       }
 
       match /cuentas/{cuentaId} {
+        allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
+      }
+
+      match /activosFijos/{activoId} {
+        allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
+      }
+
+      match /impuestos/{impuestoId} {
+        allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
+      }
+
+      match /declaracionesImpuestos/{declaracionId} {
         allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
       }
 
