@@ -12,22 +12,19 @@ import {
   Loader2, 
   Building2, 
   Calendar as CalendarIcon, 
-  Send, 
-  CheckCircle2, 
   AlertCircle, 
   DollarSign, 
-  MessageSquare,
-  ArrowRight,
-  RefreshCw
+  RefreshCw,
+  ArrowRight
 } from 'lucide-react';
 import { useCollection, useFirestore, useMemoFirebase, useDoc } from '@/firebase';
-import { collection, query, getDocs, doc } from 'firebase/firestore';
+import { collection, getDocs, doc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import type { HybridPlan, HybridBillingResult } from '@/models/hybrid-plan';
 import type { Business } from '@/models/business';
 import type { Order } from '@/models/order';
 import type { GlobalPaymentConfig } from '@/models/global-payment-config';
-import { format, isSameMonth, parseISO } from 'date-fns';
+import { format, isSameMonth, parseISO, startOfMonth } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 
@@ -55,7 +52,7 @@ export default function HybridBillingPage() {
     }).format(value);
   };
 
-  // Helper robusto para parsear montos (quita símbolos y maneja NaNs)
+  // Helper robusto para parsear montos (limpia símbolos y maneja NaNs)
   const parseAmount = (val: any): number => {
     if (typeof val === 'number') return val;
     if (typeof val === 'string') {
@@ -65,14 +62,17 @@ export default function HybridBillingPage() {
     return 0;
   };
 
-  // Helper robusto para parsear fechas (maneja Strings, Timestamps y Date objects)
+  // Helper robusto para parsear fechas de diversas fuentes (ISO Strings, Timestamps, etc.)
   const parseAnyDate = (val: any): Date | null => {
     if (!val) return null;
     try {
-      if (val instanceof Date) return val;
-      if (typeof val?.toDate === 'function') return val.toDate(); // Firebase Timestamp
-      if (typeof val === 'string') return parseISO(val);
+      // Si es un Timestamp de Firebase
+      if (typeof val?.toDate === 'function') return val.toDate();
+      // Si es un objeto con segundos (Admin SDK o similar)
       if (val?.seconds) return new Date(val.seconds * 1000);
+      // Si es un String ISO
+      if (typeof val === 'string') return parseISO(val);
+      // Fallback
       const d = new Date(val);
       return isNaN(d.getTime()) ? null : d;
     } catch (e) {
@@ -87,49 +87,47 @@ export default function HybridBillingPage() {
 
     try {
       const now = new Date();
-      console.log(`[Billing] Iniciando cálculo para ${format(now, 'MMMM yyyy')}`);
+      // Usamos el inicio del mes actual como referencia de comparación
+      const referenceMonth = startOfMonth(now);
 
       for (const business of businesses) {
         // Encontrar si el negocio tiene un plan híbrido asignado
-        const plan = hybridPlans.find(p => p.name === business.planName);
-        if (!plan) {
-            console.log(`[Billing] Negocio ${business.name} ignorado (No tiene plan híbrido).`);
-            continue;
-        }
+        const plan = hybridPlans.find(p => p.name === business.planName || p.id === business.planName);
+        if (!plan) continue;
 
-        // Consultar pedidos del negocio
+        // Consultar pedidos del negocio directamente de su subcolección
         const ordersRef = collection(firestore, `businesses/${business.id}/orders`);
         const ordersSnap = await getDocs(ordersRef);
         const allOrders = ordersSnap.docs.map(doc => ({ ...doc.data(), id: doc.id } as Order));
         
-        console.log(`[Billing] ${business.name}: ${allOrders.length} pedidos totales encontrados.`);
-
         // Filtrar por mes actual y excluir cancelados
         const currentMonthOrders = allOrders.filter(o => {
             const orderDate = parseAnyDate(o.orderDate);
             if (!orderDate) return false;
             
-            const matchesMonth = isSameMonth(orderDate, now);
+            // Verificamos que sea el mismo mes y año
+            const matchesMonth = isSameMonth(orderDate, referenceMonth);
             const notCancelled = o.orderStatus !== 'Cancelado';
             
             return matchesMonth && notCancelled;
         });
         
         const orderCount = currentMonthOrders.length;
-        console.log(`[Billing] ${business.name}: ${orderCount} pedidos corresponden al mes actual.`);
 
-        // Calcular comisión respetando tipo (% o fija) y tope máximo
-        const totalValue = currentMonthOrders.reduce((sum, o) => {
-          const valor = parseAmount(o.subtotal);
-          return sum + valor;
+        // Calcular valor total de ventas del mes
+        const totalSalesValue = currentMonthOrders.reduce((sum, o) => {
+          return sum + parseAmount(o.subtotal);
         }, 0);
 
+        // Lógica de comisión
         let variableAmount = 0;
         const commissionConfig = parseAmount(plan.pricePerOrder);
 
         if (plan.commissionType === 'percent') {
-          const comisionCalculada = totalValue * (commissionConfig / 100);
+          const comisionCalculada = totalSalesValue * (commissionConfig / 100);
           const tope = parseAmount(plan.maxCommissionPerOrder);
+          // Si hay tope, se aplica por cada pedido o al total? 
+          // Según el modelo actual de Negocio V03, es un tope por el total de la transacción
           variableAmount = (tope > 0 && orderCount > 0) ? Math.min(comisionCalculada, tope * orderCount) : comisionCalculada;
         } else {
           variableAmount = orderCount * commissionConfig;
@@ -142,8 +140,8 @@ export default function HybridBillingPage() {
           phone: business.phone,
           planName: plan.name,
           basePrice: parseAmount(plan.basePrice),
-          orderCount,
-          ordersTotalValue: totalValue,
+          orderCount, // Aquí va el número de documentos encontrados
+          ordersTotalValue: totalSalesValue,
           variableAmount,
           totalAmount: parseAmount(plan.basePrice) + variableAmount,
           status: 'pending',
@@ -156,7 +154,7 @@ export default function HybridBillingPage() {
       setBillingResults(results);
       toast({ 
         title: 'Cálculo completado', 
-        description: `Se procesaron ${results.length} negocios exitosamente.` 
+        description: `Se procesaron ${results.length} negocios para el período de ${format(now, 'MMMM', { locale: es })}.` 
       });
     } catch (e: any) {
       console.error("[Billing Error]", e);
@@ -190,21 +188,21 @@ export default function HybridBillingPage() {
 
     const message = `Hola *${res.businessName}*! 👋 
 
-Aquí está tu resumen de Menfy para el mes de *${currentMonth}*:
+Aquí está tu resumen de facturación para el mes de *${currentMonth}*:
 
-📊 *Resumen de actividad:*
+📊 *Actividad del Mes:*
 - Pedidos realizados: ${res.orderCount}
-- Valor en ventas: ${formatCurrency(res.ordersTotalValue)}
+- Valor total ventas: ${formatCurrency(res.ordersTotalValue)}
 
-💰 *Desglose de cobro:*
-- Tarifa base: ${formatCurrency(res.basePrice)}
+💰 *Desglose de Cobro:*
+- Tarifa base plan: ${formatCurrency(res.basePrice)}
 - Comisiones variables: ${formatCurrency(res.variableAmount)}
 -------------------------
 💵 *TOTAL A PAGAR: ${formatCurrency(res.totalAmount)}*
 
 📍 *Métodos de pago:*${paymentDetails || '\nConsulta los datos bancarios con el administrador.'}
 
-Gracias por confiar en nosotros! 🚀`;
+Gracias por tu puntualidad! 🚀`;
 
     const cleanPhone = res.phone.replace(/\D/g, '');
     const whatsappUrl = `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(message)}`;
@@ -295,17 +293,17 @@ Gracias por confiar en nosotros! 🚀`;
                     <TableCell><Badge variant="outline" className="font-medium">{res.planName}</Badge></TableCell>
                     <TableCell className="text-center">
                         <div className="flex flex-col items-center">
-                            <span className="font-bold">{res.orderCount}</span>
+                            <span className="font-bold text-lg">{res.orderCount}</span>
                             <span className="text-[10px] text-muted-foreground">{formatCurrency(res.ordersTotalValue)} en ventas</span>
                         </div>
                     </TableCell>
                     <TableCell className="text-right">
                         <div className="flex flex-col text-xs">
                             <span>Base: {formatCurrency(res.basePrice)}</span>
-                            <span className="text-orange-600">Var: {formatCurrency(res.variableAmount)}</span>
+                            <span className="text-orange-600 font-semibold">Comisión: {formatCurrency(res.variableAmount)}</span>
                         </div>
                     </TableCell>
-                    <TableCell className="text-right font-black text-primary">
+                    <TableCell className="text-right font-black text-primary text-lg">
                         {formatCurrency(res.totalAmount)}
                     </TableCell>
                     <TableCell className="text-center">
