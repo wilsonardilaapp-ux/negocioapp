@@ -28,10 +28,14 @@ export type HybridPlan = z.infer<typeof HybridPlanSchema>;
 export type HybridBillingResult = {
   businessId: string;
   businessName: string;
+  ownerEmail: string;
+  phone?: string;
   planName: string;
   basePrice: number;
   orderCount: number;
   ordersTotalValue: number;
   variableAmount: number;
   totalAmount: number;
+  status: 'pending' | 'paid';
+  paymentMethod?: string;
 };
