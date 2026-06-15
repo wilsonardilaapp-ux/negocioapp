@@ -56,6 +56,11 @@ service cloud.firestore {
       allow read, list: if true;
     }
 
+    // 4. Permitir lectura pública de cupones (Necesario para validación en checkout)
+    match /cupones/{couponId} {
+      allow read, list: if true;
+    }
+
     // --- REGLAS POR COLECCIÓN ---
 
     // Planes Híbridos (Menfy)

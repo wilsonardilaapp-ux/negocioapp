@@ -317,7 +317,6 @@ export default function CatalogPage() {
                             limit(1)
                         );
                         
-                        // Capturamos error de permisos aquí para intentar fallback si es posible
                         const querySnapshot = await getDocs(shareConfigQuery).catch(err => {
                             console.warn("⚠️ Fallo consulta de grupo (permisos):", err.message);
                             return null;
@@ -330,12 +329,10 @@ export default function CatalogPage() {
                                 businessId = businessDoc.id;
                                 console.log("✅ Alias resuelto con éxito:", cleanSlug, "->", businessId);
                             }
-                        } else {
-                            console.warn("❌ Alias no encontrado o consulta bloqueada.");
                         }
                     }
                 } catch (e) {
-                    console.warn("⚠️ Fallo en fase inicial de resolución, intentando carga forzada.");
+                    console.warn("⚠️ Fallo en fase inicial de resolución.");
                 }
 
                 // 3. CARGA FINAL: Intentar cargar los documentos con el ID resuelto
@@ -350,7 +347,6 @@ export default function CatalogPage() {
                 const paymentSettingsSnap = results[2].status === 'fulfilled' ? results[2].value : null;
 
                 if (!publicDataSnap?.exists()) {
-                    console.error("❌ Los datos del catálogo no existen para el ID:", businessId);
                     throw new Error("El catálogo solicitado no existe o su alias no es válido.");
                 }
 
@@ -361,7 +357,7 @@ export default function CatalogPage() {
                     paymentSettings: paymentSettingsSnap?.exists() ? paymentSettingsSnap.data() as any : null,
                 });
 
-                // Cargar promociones con manejo de error explícito
+                // Cargar promociones con manejo de error explícito para evitar Uncaught Promises
                 await promotionService.getActivePromotions(businessId)
                     .then(setActivePromotions)
                     .catch(err => console.warn("No se cargaron promociones:", err.message));
@@ -374,7 +370,7 @@ export default function CatalogPage() {
         };
 
         initializePage().catch(err => {
-            console.error("🔥 Error no capturado en initializePage:", err);
+            console.error("🔥 Error crítico de carga:", err);
             setError("Ocurrió un error inesperado al cargar la página.");
             setIsLoading(false);
         });
