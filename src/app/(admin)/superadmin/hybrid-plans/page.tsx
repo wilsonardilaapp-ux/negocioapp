@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useTransition, useEffect } from 'react';
@@ -109,7 +108,7 @@ function HybridPlanDialog({ isOpen, onClose, plan }: { isOpen: boolean, onClose:
   const { toast } = useToast();
   const [isPending, startTransition] = useTransition();
 
-  const { register, control, handleSubmit, reset, watch, setValue, formState: { errors } } = useForm<HybridPlan>({
+  const { register, control, handleSubmit, reset, watch, setValue, formState: { errors, isSubmitting } } = useForm<HybridPlan>({
     resolver: zodResolver(HybridPlanSchema),
     defaultValues: {
       name: '',
