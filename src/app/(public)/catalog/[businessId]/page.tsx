@@ -190,7 +190,7 @@ const ProductViewModal = ({ product, isOpen, onOpenChange, businessId, onAddToCa
         try {
             const suggestionResult = await getSuggestion({ businessId, productId: product.id });
             if (suggestionResult.suggestedProduct && suggestionResult.ruleId) {
-                await updateSuggestionMetrics({ businessId, ruleId: suggestionResult.ruleId, event: 'shown' });
+                await updateSuggestionMetrics({ businessId, ruleId: suggestionResult.ruleId, event: 'shown' }).catch(e => console.warn("Fallo al actualizar métricas:", e.message));
                 setSuggestion(suggestionResult);
                 setIsSuggestionModalOpen(true);
             } else {
@@ -318,7 +318,6 @@ export default function CatalogPage() {
                             limit(1)
                         );
                         
-                        // Capturamos error de permisos aquí para intentar fallback si es posible
                         const querySnapshot = await getDocs(shareConfigQuery).catch(err => {
                             console.warn("⚠️ Fallo consulta de grupo (permisos):", err.message);
                             return null;
@@ -340,8 +339,6 @@ export default function CatalogPage() {
                 }
 
                 // 3. CARGA FINAL: Intentar cargar los documentos con el ID resuelto
-                // Usamos Promise.allSettled para que si algo falla (ej: paymentSettings aún bloqueado), 
-                // el catálogo básico pueda seguir intentando cargar.
                 const results = await Promise.allSettled([
                     getDoc(doc(firestore, `businesses/${businessId}/publicData`, 'catalog')),
                     getDoc(doc(firestore, `businesses/${businessId}/landingPages`, 'main')),

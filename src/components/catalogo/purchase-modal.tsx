@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -72,9 +73,14 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
 
   useEffect(() => {
     if (isOpen && businessId) {
-        promotionService.getActivePromotions(businessId).then(promos => {
-            setActivePromotions(promos.filter(p => p.showInCheckout));
-        });
+        promotionService.getActivePromotions(businessId)
+            .then(promos => {
+                setActivePromotions(promos.filter(p => p.showInCheckout));
+            })
+            .catch(err => {
+                console.warn("⚠️ No se pudieron cargar las promociones en el checkout:", err.message);
+                setActivePromotions([]);
+            });
     }
   }, [isOpen, businessId]);
 
@@ -258,7 +264,7 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
     orderSummary += `¡Gracias por su pedido! 🙏`;
 
     if (appliedCoupon) {
-        await couponService.incrementUsage(appliedCoupon.id);
+        await couponService.incrementUsage(appliedCoupon.id).catch(err => console.warn("Fallo al incrementar uso de cupón:", err.message));
     }
 
     const rawPhone = String(businessInfo?.phone || '3228831634');

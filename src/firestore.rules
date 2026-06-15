@@ -41,7 +41,6 @@ service cloud.firestore {
     // --- REGLAS PÚBLICAS CRÍTICAS ---
     
     // 1. Permitir resolución de alias (slugs) mediante consulta de grupo
-    // IMPORTANTE: allow read permite tanto get como list (necesario para collectionGroup)
     match /{path=**}/shareConfig/{docId} {
       allow read: if true;
     }
@@ -54,7 +53,11 @@ service cloud.firestore {
 
     // 3. Permitir lectura pública de promociones
     match /promotions/{promoId} {
-      allow read: if true;
+      allow read, list: if true;
+    }
+
+    match /promotions/{promoId}/{sub=**} {
+      allow read, list: if true;
     }
 
     // --- REGLAS POR COLECCIÓN ---
