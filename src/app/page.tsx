@@ -38,7 +38,11 @@ async function getHybridPlans(): Promise<HybridPlan[]> {
       
     const snapshot = await q.get();
     if (snapshot.empty) return [];
-    return snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })) as HybridPlan[];
+    
+    // Mapear y ordenar por precio base de menor a mayor
+    return snapshot.docs
+      .map(doc => ({ ...doc.data(), id: doc.id } as HybridPlan))
+      .sort((a, b) => (a.basePrice || 0) - (b.basePrice || 0));
   } catch (error) {
     console.error("Error fetching hybrid plans:", error);
     return [];

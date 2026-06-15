@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useMemo, useState } from 'react';
@@ -254,6 +255,15 @@ export default function LandingPageContent({ data, plans = [], hybridPlans = [],
     return [...links, ...hybridLinks];
   }, [plans, hybridPlans]);
 
+  const sortedPlans = useMemo(() => {
+    const all = [...(plans || []), ...(hybridPlans || [])];
+    return all.sort((a, b) => {
+      const priceA = 'price' in a ? a.price : (a as HybridPlan).basePrice;
+      const priceB = 'price' in b ? b.price : (b as HybridPlan).basePrice;
+      return priceA - priceB;
+    });
+  }, [plans, hybridPlans]);
+
   const navStyle = {
     backgroundColor: navigation.backgroundColor || '#FFFFFF',
     color: navigation.textColor || '#000000'
@@ -479,7 +489,7 @@ export default function LandingPageContent({ data, plans = [], hybridPlans = [],
       )}
 
       {/* Plans Section */}
-      {(plans.length > 0 || hybridPlans.length > 0) && (
+      {sortedPlans.length > 0 && (
           <section className="py-16 px-4 bg-gray-50" id="precios">
             <div className="max-w-6xl mx-auto">
               <div className="text-center mb-10">
@@ -490,14 +500,15 @@ export default function LandingPageContent({ data, plans = [], hybridPlans = [],
                   Elige el plan que mejor se adapta a tu negocio.
                 </p>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                {[...plans, ...hybridPlans].map((plan) => (
-                    <PlanCard 
-                      key={plan.id} 
-                      plan={plan} 
-                      hotmartLinks={hotmartLinks} 
-                      user={null} // Pass null for visitor view
-                    />
+              <div className="flex flex-wrap justify-center gap-6">
+                {sortedPlans.map((plan) => (
+                    <div key={plan.id} className="w-full sm:w-[calc(50%-1.5rem)] lg:w-[calc(25%-1.5rem)] min-w-[300px] max-w-[350px]">
+                        <PlanCard 
+                          plan={plan} 
+                          hotmartLinks={hotmartLinks} 
+                          user={null} // Pass null for visitor view
+                        />
+                    </div>
                 ))}
               </div>
             </div>
