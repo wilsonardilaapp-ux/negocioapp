@@ -22,7 +22,7 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc } from 'firebase/firestore';
 import type { MenuShare, QRConfig } from '@/models/share';
 import { useToast } from '@/hooks/use-toast';
 import QRCode from "react-qr-code";
@@ -204,13 +204,24 @@ export default function SharePage() {
     if (!shareConfig || !shareConfigRef || !firestore) return;
     setIsSaving(true);
     try {
+      // 1. Limpieza y validación final del slug
+      const finalSlug = shareConfig.slug.trim().toLowerCase().replace(/\s+/g, '-').replace(/^-+|-+$/g, '');
+      
       const dataToSave = { 
         ...shareConfig,
-        isActive: true, // Aseguramos que esté activo al guardar
+        slug: finalSlug,
+        isActive: true, 
         updatedAt: new Date().toISOString() 
       };
       
       await setDoc(shareConfigRef, dataToSave);
+
+      // 2. IMPORTANTE: Forzar actualización del catálogo público con el nuevo slug para asegurar sincronía
+      const publicCatalogRef = doc(firestore, `businesses/${user.uid}/publicData`, 'catalog');
+      const publicCatalogSnap = await getDoc(publicCatalogRef);
+      if (publicCatalogSnap.exists()) {
+          await setDoc(publicCatalogRef, { slug: finalSlug }, { merge: true });
+      }
       
       toast({
         title: '¡Cambios Guardados!',

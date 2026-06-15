@@ -299,38 +299,44 @@ export default function CatalogPage() {
             setIsLoading(true);
             try {
                 let businessId = slug;
+                const cleanSlug = slug.trim().toLowerCase();
                 
-                console.log("🔍 Iniciando resolución de alias para:", slug);
+                console.log("🔍 Intentando cargar catálogo para:", cleanSlug);
 
-                // 1. Resolución de Alias (Prioridad Alta)
-                try {
-                    const cleanSlug = slug.trim().toLowerCase();
-                    
-                    const shareConfigQuery = query(
-                        collectionGroup(firestore, 'shareConfig'), 
-                        where('slug', '==', cleanSlug), 
-                        limit(1)
-                    );
-                    
-                    const querySnapshot = await getDocs(shareConfigQuery);
-                    
-                    // Buscamos el documento que explícitamente tenga el slug y sea el del negocio
-                    if (!querySnapshot.empty) {
-                        const customSlugDoc = querySnapshot.docs[0];
-                        // Navegamos hacia arriba: shareConfig (doc) -> shareConfig (coll) -> businesses (doc)
-                        const businessDoc = customSlugDoc.ref.parent.parent;
-                        if (businessDoc) {
-                            businessId = businessDoc.id;
-                            console.log("✅ Alias resuelto con éxito:", cleanSlug, "->", businessId);
+                // ESTRATEGIA DE RESILIENCIA: Primero probamos si es un ID directo
+                const directBusinessDoc = await getDoc(doc(firestore, 'businesses', businessId));
+                
+                if (directBusinessDoc.exists()) {
+                    console.log("✅ ID directo validado:", businessId);
+                } else {
+                    // Si no es ID directo, buscamos por alias personalizado
+                    console.log("ℹ️ No es ID directo, buscando en alias (shareConfig)...");
+                    try {
+                        const shareConfigQuery = query(
+                            collectionGroup(firestore, 'shareConfig'), 
+                            where('slug', '==', cleanSlug), 
+                            limit(1)
+                        );
+                        
+                        const querySnapshot = await getDocs(shareConfigQuery);
+                        
+                        if (!querySnapshot.empty) {
+                            const customSlugDoc = querySnapshot.docs[0];
+                            const businessDoc = customSlugDoc.ref.parent.parent;
+                            if (businessDoc) {
+                                businessId = businessDoc.id;
+                                console.log("✅ Alias resuelto con éxito:", cleanSlug, "->", businessId);
+                            }
+                        } else {
+                            console.warn("❌ Alias no encontrado en ninguna configuración de compartir.");
                         }
-                    } else {
-                        console.log("ℹ️ Alias no encontrado en shareConfig, probando como ID directo.");
+                    } catch (e: any) {
+                        console.error("🔥 Error crítico en consulta de grupo:", e.message);
+                        // Si falla la consulta de grupo (por falta de índices), procedemos con el ID original
                     }
-                } catch (e: any) {
-                    console.warn("⚠️ Error en resolución de alias (posible falta de índice o red):", e.message);
                 }
 
-                // 2. Carga de datos esenciales (Paralela y resiliente)
+                // Carga de datos esenciales usando el ID resuelto
                 const results = await Promise.allSettled([
                     getDoc(doc(firestore, `businesses/${businessId}/publicData`, 'catalog')),
                     getDoc(doc(firestore, `businesses/${businessId}/landingPages`, 'main')),
@@ -341,11 +347,9 @@ export default function CatalogPage() {
                 const landingPageSnap = results[1].status === 'fulfilled' ? results[1].value : null;
                 const paymentSettingsSnap = results[2].status === 'fulfilled' ? results[2].value : null;
 
-                // Si no existe el catálogo con el ID resuelto, damos un error claro
                 if (!publicDataSnap?.exists()) {
-                    console.error("❌ Catálogo no encontrado para ID:", businessId);
-                    // Si el slug tiene guiones y falló, puede que el negocio no tenga configurado el alias
-                    throw new Error("El catálogo solicitado no existe o no tiene permisos de lectura pública.");
+                    console.error("❌ Los datos del catálogo no existen para el ID:", businessId);
+                    throw new Error("El catálogo solicitado no existe o su alias no es válido.");
                 }
 
                 setPageData({
@@ -355,13 +359,12 @@ export default function CatalogPage() {
                     paymentSettings: paymentSettingsSnap?.exists() ? paymentSettingsSnap.data() as any : null,
                 });
 
-                // 3. Carga de promociones (Opcional)
                 promotionService.getActivePromotions(businessId)
                     .then(setActivePromotions)
                     .catch(err => console.warn("No se cargaron promociones:", err.message));
 
             } catch (e: any) { 
-                console.error("🔥 Error crítico de carga:", e);
+                console.error("🚨 Error de inicialización:", e);
                 setError(e.message); 
             }
             finally { setIsLoading(false); }
