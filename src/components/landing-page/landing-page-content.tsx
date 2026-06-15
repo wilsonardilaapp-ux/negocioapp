@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import Link from 'next/link';
 import type { LandingPageData, NavLink } from '@/models/landing-page';
 import { Button } from '@/components/ui/button';
@@ -198,6 +198,122 @@ export default function LandingPageContent({ data, plans = [], hybridPlans = [],
     </section>
   );
 
+  // Subcomponente interno para gestionar el estado de expansión de cada tarjeta de plan
+  const PlanCard = ({ plan }: { plan: SubscriptionPlan | HybridPlan }) => {
+    const [expanded, setExpanded] = useState(false);
+    const ITEMS_LIMIT = 5;
+    
+    const btn = getPlanButtonConfig(plan, hotmartLinks);
+    const isHybrid = 'commissionType' in plan;
+    const hybridPlan = isHybrid ? plan as HybridPlan : null;
+    const subscriptionPlan = !isHybrid ? plan as SubscriptionPlan : null;
+    
+    const price = isHybrid ? hybridPlan?.basePrice : subscriptionPlan?.price;
+    const features = (isHybrid ? hybridPlan?.features : subscriptionPlan?.features) || [];
+    const limits = isHybrid ? hybridPlan?.limits : subscriptionPlan?.limits;
+
+    const visibleFeatures = expanded ? features : features.slice(0, ITEMS_LIMIT);
+
+    return (
+      <div
+        className={cn(
+          "rounded-2xl p-6 bg-white relative flex flex-col h-full",
+          subscriptionPlan?.isMostPopular ? 'border-2 border-primary shadow-md' : 'border border-gray-200'
+        )}
+      >
+        {(subscriptionPlan?.isMostPopular) && (
+          <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground text-xs font-bold px-3 py-1 rounded-full">
+            Más Popular
+          </span>
+        )}
+        <div className="flex-grow">
+          <div className="flex justify-between items-start mb-2">
+            <h3 className="text-xl font-bold text-gray-800">
+              {plan.name}
+            </h3>
+            {isHybrid && <Badge variant="outline" className="bg-orange-50 border-orange-200 text-orange-700">Híbrido</Badge>}
+          </div>
+          <p className="text-sm text-gray-500 mt-1 min-h-[40px]">
+            {!isHybrid ? subscriptionPlan?.description : `Pago base + comisión por pedido.`}
+          </p>
+          <div className="mb-4">
+            <span className="text-4xl font-bold text-gray-900">
+              ${price?.toLocaleString('es-CO')}
+            </span>
+            <span className="text-gray-400 text-sm">
+              /mes
+            </span>
+            {isHybrid && (
+              <p className="text-sm font-bold text-orange-600 mt-1">
+                + {hybridPlan?.commissionType === 'percent' ? `${hybridPlan.pricePerOrder}%` : `$${hybridPlan?.pricePerOrder.toLocaleString('es-CO')}`} por pedido
+              </p>
+            )}
+          </div>
+          <ul className="space-y-2 mb-2">
+            {visibleFeatures.map((feature, idx) => (
+              <li
+                key={idx}
+                className="flex items-center gap-2 text-sm text-gray-600"
+              >
+                <span className="text-primary font-bold">
+                  ✓
+                </span>
+                {feature.value}
+              </li>
+            ))}
+          </ul>
+          
+          {features.length > ITEMS_LIMIT && (
+            <button
+              onClick={() => setExpanded(!expanded)}
+              className="text-sm text-primary hover:underline mb-6 flex items-center gap-1 font-medium"
+            >
+              {expanded ? "Ver menos ▲" : `Ver más (${features.length - ITEMS_LIMIT} más) ▼`}
+            </button>
+          )}
+
+          <div className="border-t border-gray-100 pt-4 space-y-1 text-sm text-gray-500">
+            <p className="text-sm font-semibold text-gray-700 mb-2">
+              Límites:
+            </p>
+            <div className="flex justify-between">
+              <span>Productos:</span>
+              <span className="font-medium text-gray-700">
+                {limits?.products === -1 ? 'Ilimitados' : limits?.products}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span>Posts de Blog:</span>
+              <span className="font-medium text-gray-700">
+                {limits?.blogPosts === -1 ? 'Ilimitados' : limits?.blogPosts}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span>Landing Pages:</span>
+              <span className="font-medium text-gray-700">
+                {limits?.landingPages === -1 ? 'Ilimitadas' : limits?.landingPages}
+              </span>
+            </div>
+          </div>
+        </div>
+        <div className="mt-auto pt-6">
+          <button
+            type="button"
+            onClick={btn.onClick}
+            className={cn(
+              "w-full py-3 px-6 rounded-xl text-white font-semibold text-sm transition-colors duration-200",
+              btn.variant === 'free' ? 'bg-green-500 hover:bg-green-600' :
+              btn.variant === 'popular' ? 'bg-green-500 hover:bg-green-600' :
+              'bg-blue-600 hover:bg-blue-700'
+            )}
+          >
+            {btn.label}
+          </button>
+        </div>
+      </div>
+    );
+  };
+
 
   return (
     <div className="flex flex-col">
@@ -349,105 +465,9 @@ export default function LandingPageContent({ data, plans = [], hybridPlans = [],
                 </p>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                {[...plans, ...hybridPlans].map((plan) => {
-                    const btn = getPlanButtonConfig(plan, hotmartLinks);
-                    const isHybrid = 'commissionType' in plan;
-                    const hybridPlan = isHybrid ? plan as HybridPlan : null;
-                    const subscriptionPlan = !isHybrid ? plan as SubscriptionPlan : null;
-                    const price = isHybrid ? hybridPlan?.basePrice : subscriptionPlan?.price;
-                    const features = isHybrid ? hybridPlan?.features : subscriptionPlan?.features;
-                    const limits = isHybrid ? hybridPlan?.limits : subscriptionPlan?.limits;
-
-                    return (
-                        <div
-                        key={plan.id}
-                        className={cn(
-                            "rounded-2xl p-6 bg-white relative flex flex-col h-full",
-                            subscriptionPlan?.isMostPopular ? 'border-2 border-primary shadow-md' : 'border border-gray-200'
-                        )}
-                        >
-                        {(subscriptionPlan?.isMostPopular) && (
-                            <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground text-xs font-bold px-3 py-1 rounded-full">
-                            Más Popular
-                            </span>
-                        )}
-                        <div className="flex-grow">
-                            <div className="flex justify-between items-start mb-2">
-                              <h3 className="text-xl font-bold text-gray-800">
-                                  {plan.name}
-                              </h3>
-                              {isHybrid && <Badge variant="outline" className="bg-orange-50 border-orange-200 text-orange-700">Híbrido</Badge>}
-                            </div>
-                            <p className="text-sm text-gray-500 mt-1 min-h-[40px]">
-                                {!isHybrid ? subscriptionPlan?.description : `Pago base + comisión por pedido.`}
-                            </p>
-                            <div className="mb-4">
-                                <span className="text-4xl font-bold text-gray-900">
-                                ${price?.toLocaleString('es-CO')}
-                                </span>
-                                <span className="text-gray-400 text-sm">
-                                /mes
-                                </span>
-                                {isHybrid && (
-                                  <p className="text-sm font-bold text-orange-600 mt-1">
-                                    + {hybridPlan?.commissionType === 'percent' ? `${hybridPlan.pricePerOrder}%` : `$${hybridPlan?.pricePerOrder.toLocaleString('es-CO')}`} por pedido
-                                  </p>
-                                )}
-                            </div>
-                            <ul className="space-y-2 mb-6">
-                                {features?.map((feature, idx) => (
-                                <li
-                                    key={idx}
-                                    className="flex items-center gap-2 text-sm text-gray-600"
-                                >
-                                    <span className="text-primary font-bold">
-                                    ✓
-                                    </span>
-                                    {feature.value}
-                                </li>
-                                ))}
-                            </ul>
-                            <div className="border-t border-gray-100 pt-4 space-y-1 text-sm text-gray-500">
-                                <p className="text-sm font-semibold text-gray-700 mb-2">
-                                Límites:
-                                </p>
-                                <div className="flex justify-between">
-                                <span>Productos:</span>
-                                <span className="font-medium text-gray-700">
-                                    {limits?.products === -1 ? 'Ilimitados' : limits?.products}
-                                </span>
-                                </div>
-                                <div className="flex justify-between">
-                                <span>Posts de Blog:</span>
-                                <span className="font-medium text-gray-700">
-                                    {limits?.blogPosts === -1 ? 'Ilimitados' : limits?.blogPosts}
-                                </span>
-                                </div>
-                                <div className="flex justify-between">
-                                <span>Landing Pages:</span>
-                                <span className="font-medium text-gray-700">
-                                    {limits?.landingPages === -1 ? 'Ilimitadas' : limits?.landingPages}
-                                </span>
-                                </div>
-                            </div>
-                        </div>
-                        <div className="mt-auto pt-6">
-                           <button
-                                type="button"
-                                onClick={btn.onClick}
-                                className={cn(
-                                    "w-full py-3 px-6 rounded-xl text-white font-semibold text-sm transition-colors duration-200",
-                                    btn.variant === 'free' ? 'bg-green-500 hover:bg-green-600' :
-                                    btn.variant === 'popular' ? 'bg-green-500 hover:bg-green-600' :
-                                    'bg-blue-600 hover:bg-blue-700'
-                                )}
-                                >
-                                {btn.label}
-                            </button>
-                        </div>
-                        </div>
-                    );
-                })}
+                {[...plans, ...hybridPlans].map((plan) => (
+                    <PlanCard key={plan.id} plan={plan} />
+                ))}
               </div>
             </div>
           </section>
