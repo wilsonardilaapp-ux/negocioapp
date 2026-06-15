@@ -19,7 +19,8 @@ import {
   Building,
   Bell,
   Mail,
-  ScanLine, // Importado
+  ScanLine,
+  Calculator,
 } from "lucide-react";
 
 import { SidebarMenu, SidebarMenuItem, SidebarMenuButton } from "@/components/ui/sidebar";
@@ -31,6 +32,8 @@ const navItems = [
   { href: "/superadmin/subscriptions", icon: CreditCard, label: "Suscripciones" },
   { href: "/superadmin/revenue", icon: TrendingUp, label: "Ingresos" },
   { href: "/superadmin/plans", icon: Package, label: "Planes" },
+  { href: "/superadmin/hybrid-plans", icon: Package, label: "Planes Híbridos" },
+  { href: "/superadmin/hybrid-billing", icon: Calculator, label: "Facturación Híbrida" },
   { href: "/superadmin/payment-methods", icon: CreditCard, label: "Pasarelas de Pago" },
   { href: "/superadmin/blog", icon: FileText, label: "Blog" },
   { href: "/superadmin/notifications", icon: Bell, label: "Notificaciones" },

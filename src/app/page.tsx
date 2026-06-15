@@ -3,6 +3,7 @@ import type { LandingPageData } from '../models/landing-page';
 import { v4 as uuidv4 } from 'uuid';
 import { getAdminFirestore } from "../firebase/server-init";
 import type { SubscriptionPlan } from '../models/subscription-plan';
+import type { HybridPlan } from '../models/hybrid-plan';
 import { getLandingData } from '../lib/get-landing-data';
 
 // Forzamos comportamiento dinámico total
@@ -17,6 +18,19 @@ async function getPlans(): Promise<SubscriptionPlan[]> {
     return snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })) as SubscriptionPlan[];
   } catch (error) {
     console.error("Error fetching plans for public page:", error);
+    return [];
+  }
+}
+
+async function getHybridPlans(): Promise<HybridPlan[]> {
+  try {
+    const db = await getAdminFirestore();
+    const q = db.collection("hybrid_plans").where("isPublic", "==", true).where("isActive", "==", true);
+    const snapshot = await q.get();
+    if (snapshot.empty) return [];
+    return snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })) as HybridPlan[];
+  } catch (error) {
+    console.error("Error fetching hybrid plans:", error);
     return [];
   }
 }
@@ -157,20 +171,25 @@ const fallbackData: LandingPageData = {
 
 export default async function RootPage() {
   try {
-    const [landingData, plans] = await Promise.all([getLandingData(), getPlans()]);
+    const [landingData, plans, hybridPlans] = await Promise.all([
+      getLandingData(), 
+      getPlans(), 
+      getHybridPlans()
+    ]);
     
-    // Si no hay datos en la DB (porque se eliminó 'main'), usa los datos de fallback.
-    // Esto asegura que la página no se rompa y que el editor pueda crear el documento en el primer guardado.
     const dataToRender = landingData || fallbackData;
 
     return (
       <main className="w-full">
-        <LandingPageContent data={dataToRender} plans={plans} />
+        <LandingPageContent 
+          data={dataToRender} 
+          plans={plans} 
+          hybridPlans={hybridPlans} 
+        />
       </main>
     );
   } catch (error) {
       console.error("Error en Home:", error);
-      // Intenta obtener los planes incluso si la landing falla para no tener una página totalmente en blanco.
       const plans = await getPlans();
       return (
         <main className="w-full">

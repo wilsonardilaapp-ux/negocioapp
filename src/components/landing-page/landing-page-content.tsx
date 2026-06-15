@@ -12,6 +12,7 @@ import Image from 'next/image';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
 import Autoplay from "embla-carousel-autoplay";
 import type { SubscriptionPlan } from '@/models/subscription-plan';
+import type { HybridPlan } from '@/models/hybrid-plan';
 
 interface PlanButton {
   label: string;
@@ -28,6 +29,7 @@ interface HotmartLink {
 interface LandingPageContentProps {
   data: LandingPageData;
   plans?: SubscriptionPlan[];
+  hybridPlans?: HybridPlan[];
   businessId?: string;
   logoUrl?: string;
 }
@@ -44,10 +46,12 @@ const getLinkUrl = (link: NavLink, currentBusinessId: string | undefined): strin
   return '#';
 };
 
-const getPlanButtonConfig = (plan: SubscriptionPlan, hotmartLinks: HotmartLink[]): PlanButton => {
+const getPlanButtonConfig = (plan: SubscriptionPlan | HybridPlan, hotmartLinks: HotmartLink[]): PlanButton => {
     const hotmartLink = hotmartLinks.find((h) => h.planId === plan.id);
+    const isHybrid = 'commissionType' in plan;
+    const price = isHybrid ? (plan as HybridPlan).basePrice : (plan as SubscriptionPlan).price;
   
-    if (plan.price === 0) {
+    if (price === 0) {
       return {
         label: 'Empezar Gratis',
         variant: 'free',
@@ -60,7 +64,7 @@ const getPlanButtonConfig = (plan: SubscriptionPlan, hotmartLinks: HotmartLink[]
   
     return {
       label: 'Suscribirse',
-      variant: plan.isMostPopular ? 'popular' : 'paid',
+      variant: !isHybrid && (plan as SubscriptionPlan).isMostPopular ? 'popular' : 'paid',
       onClick: () => {
         if (hotmartLink?.hotmartUrl) {
           window.open(hotmartLink.hotmartUrl, '_blank');
@@ -72,19 +76,24 @@ const getPlanButtonConfig = (plan: SubscriptionPlan, hotmartLinks: HotmartLink[]
   };
 
 
-export default function LandingPageContent({ data, plans = [], businessId, logoUrl }: LandingPageContentProps) {
+export default function LandingPageContent({ data, plans = [], hybridPlans = [], businessId, logoUrl }: LandingPageContentProps) {
   const { hero, navigation, sections, testimonials, form, footer, header } = data;
 
   const finalLogoUrl = logoUrl || navigation.logoUrl;
 
   const hotmartLinks: HotmartLink[] = useMemo(() => {
-    if (!plans) return [];
-    return plans.map(p => ({
+    const links = plans.map(p => ({
         planId: p.id,
         planName: p.name,
         hotmartUrl: (p as any).hotmartUrl || '',
     }));
-  }, [plans]);
+    const hybridLinks = hybridPlans.map(p => ({
+      planId: p.id || '',
+      planName: p.name,
+      hotmartUrl: '', // Hybrid plans usually use manual or custom onboarding
+    }));
+    return [...links, ...hybridLinks];
+  }, [plans, hybridPlans]);
 
   const navStyle = {
     backgroundColor: navigation.backgroundColor || '#FFFFFF',
@@ -327,9 +336,9 @@ export default function LandingPageContent({ data, plans = [], businessId, logoU
       )}
 
       {/* Plans Section */}
-      {plans && plans.length > 0 && (
+      {(plans.length > 0 || hybridPlans.length > 0) && (
           <section className="py-16 px-4 bg-gray-50" id="precios">
-            <div className="max-w-5xl mx-auto">
+            <div className="max-w-6xl mx-auto">
               <div className="text-center mb-10">
                 <h2 className="text-3xl font-bold text-gray-900">
                   Planes y Precios
@@ -338,39 +347,54 @@ export default function LandingPageContent({ data, plans = [], businessId, logoU
                   Elige el plan que mejor se adapta a tu negocio.
                 </p>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {plans.map((plan) => {
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                {[...plans, ...hybridPlans].map((plan) => {
                     const btn = getPlanButtonConfig(plan, hotmartLinks);
+                    const isHybrid = 'commissionType' in plan;
+                    const hybridPlan = isHybrid ? plan as HybridPlan : null;
+                    const subscriptionPlan = !isHybrid ? plan as SubscriptionPlan : null;
+                    const price = isHybrid ? hybridPlan?.basePrice : subscriptionPlan?.price;
+                    const features = isHybrid ? hybridPlan?.features : subscriptionPlan?.features;
+                    const limits = isHybrid ? hybridPlan?.limits : subscriptionPlan?.limits;
+
                     return (
                         <div
                         key={plan.id}
                         className={cn(
-                            "rounded-2xl p-6 bg-white relative flex flex-col",
-                            plan.isMostPopular ? 'border-2 border-primary shadow-md' : 'border border-gray-200'
+                            "rounded-2xl p-6 bg-white relative flex flex-col h-full",
+                            subscriptionPlan?.isMostPopular ? 'border-2 border-primary shadow-md' : 'border border-gray-200'
                         )}
                         >
-                        {plan.isMostPopular && (
+                        {(subscriptionPlan?.isMostPopular) && (
                             <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground text-xs font-bold px-3 py-1 rounded-full">
                             Más Popular
                             </span>
                         )}
                         <div className="flex-grow">
-                            <h3 className="text-xl font-bold text-gray-800">
-                                {plan.name}
-                            </h3>
-                            <p className="text-sm text-gray-500 mt-1 h-10">
-                                {plan.description}
+                            <div className="flex justify-between items-start mb-2">
+                              <h3 className="text-xl font-bold text-gray-800">
+                                  {plan.name}
+                              </h3>
+                              {isHybrid && <Badge variant="outline" className="bg-orange-50 border-orange-200 text-orange-700">Híbrido</Badge>}
+                            </div>
+                            <p className="text-sm text-gray-500 mt-1 min-h-[40px]">
+                                {!isHybrid ? subscriptionPlan?.description : `Pago base + comisión por pedido.`}
                             </p>
-                            <div className="mb-6">
+                            <div className="mb-4">
                                 <span className="text-4xl font-bold text-gray-900">
-                                ${plan.price.toFixed(2)}
+                                ${price?.toLocaleString()}
                                 </span>
                                 <span className="text-gray-400 text-sm">
                                 /mes
                                 </span>
+                                {isHybrid && (
+                                  <p className="text-sm font-bold text-orange-600 mt-1">
+                                    + {hybridPlan?.commissionType === 'percent' ? `${hybridPlan.pricePerOrder}%` : `$${hybridPlan?.pricePerOrder.toLocaleString()}`} por pedido
+                                  </p>
+                                )}
                             </div>
                             <ul className="space-y-2 mb-6">
-                                {plan.features.map((feature, idx) => (
+                                {features?.map((feature, idx) => (
                                 <li
                                     key={idx}
                                     className="flex items-center gap-2 text-sm text-gray-600"
@@ -389,19 +413,19 @@ export default function LandingPageContent({ data, plans = [], businessId, logoU
                                 <div className="flex justify-between">
                                 <span>Productos:</span>
                                 <span className="font-medium text-gray-700">
-                                    {plan.limits.products === -1 ? 'Ilimitados' : plan.limits.products}
+                                    {limits?.products === -1 ? 'Ilimitados' : limits?.products}
                                 </span>
                                 </div>
                                 <div className="flex justify-between">
                                 <span>Posts de Blog:</span>
                                 <span className="font-medium text-gray-700">
-                                    {plan.limits.blogPosts === -1 ? 'Ilimitados' : plan.limits.blogPosts}
+                                    {limits?.blogPosts === -1 ? 'Ilimitados' : limits?.blogPosts}
                                 </span>
                                 </div>
                                 <div className="flex justify-between">
                                 <span>Landing Pages:</span>
                                 <span className="font-medium text-gray-700">
-                                    {plan.limits.landingPages === -1 ? 'Ilimitadas' : plan.limits.landingPages}
+                                    {limits?.landingPages === -1 ? 'Ilimitadas' : limits?.landingPages}
                                 </span>
                                 </div>
                             </div>

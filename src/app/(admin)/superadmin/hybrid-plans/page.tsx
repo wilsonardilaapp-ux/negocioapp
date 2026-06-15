@@ -1,0 +1,291 @@
+'use client';
+
+import { useState, useTransition } from 'react';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
+import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { PlusCircle, Edit, Trash2, Loader2, DollarSign, Percent, Package, Settings, Monitor } from 'lucide-react';
+import { useCollection, useFirestore, useMemoFirebase, setDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase';
+import { collection, doc } from 'firebase/firestore';
+import { useToast } from '@/hooks/use-toast';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import type { HybridPlan } from '@/models/hybrid-plan';
+import { useForm, Controller, useFieldArray } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { HybridPlanSchema } from '@/models/hybrid-plan';
+
+export default function HybridPlansPage() {
+  const firestore = useFirestore();
+  const { toast } = useToast();
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingPlan, setEditingPlan] = useState<HybridPlan | null>(null);
+
+  const plansQuery = useMemoFirebase(() => !firestore ? null : collection(firestore, 'hybrid_plans'), [firestore]);
+  const { data: plans, isLoading } = useCollection<HybridPlan>(plansQuery);
+
+  const handleOpenDialog = (plan: HybridPlan | null) => {
+    setEditingPlan(plan);
+    setIsDialogOpen(true);
+  };
+
+  const handleDelete = async (plan: HybridPlan) => {
+    if (!firestore || !plan.id) return;
+    try {
+      await deleteDocumentNonBlocking(doc(firestore, 'hybrid_plans', plan.id));
+      toast({ title: 'Plan eliminado', variant: 'destructive' });
+    } catch (e) {
+      toast({ title: 'Error al eliminar', variant: 'destructive' });
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-6">
+      <Card>
+        <CardHeader className="flex flex-row justify-between items-center">
+          <div>
+            <CardTitle>Planes Híbridos (Menfy)</CardTitle>
+            <CardDescription>Tarifa base + Comisión por transacción.</CardDescription>
+          </div>
+          <Button onClick={() => handleOpenDialog(null)}>
+            <PlusCircle className="mr-2 h-4 w-4" /> Nuevo Plan Híbrido
+          </Button>
+        </CardHeader>
+      </Card>
+
+      {isLoading ? (
+        <div className="flex justify-center p-12"><Loader2 className="animate-spin" /></div>
+      ) : (
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {plans?.map(plan => (
+            <Card key={plan.id} className="flex flex-col">
+              <CardHeader>
+                <div className="flex justify-between items-start">
+                  <CardTitle>{plan.name}</CardTitle>
+                  <Badge variant={plan.isActive ? 'default' : 'secondary'}>{plan.isActive ? 'Activo' : 'Inactivo'}</Badge>
+                </div>
+                <CardDescription>{plan.slug}</CardDescription>
+              </CardHeader>
+              <CardContent className="flex-grow space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Base Mensual:</span>
+                  <span className="font-bold">${plan.basePrice.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Comisión:</span>
+                  <span className="font-bold">
+                    {plan.commissionType === 'percent' ? `${plan.pricePerOrder}%` : `$${plan.pricePerOrder.toLocaleString()}`}
+                  </span>
+                </div>
+              </CardContent>
+              <CardFooter className="flex gap-2">
+                <Button variant="outline" className="flex-1" onClick={() => handleOpenDialog(plan)}><Edit className="w-4 h-4 mr-2" /> Editar</Button>
+                <Button variant="destructive" size="icon" onClick={() => handleDelete(plan)}><Trash2 className="w-4 h-4" /></Button>
+              </CardFooter>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      <HybridPlanDialog 
+        isOpen={isDialogOpen} 
+        onClose={() => setIsDialogOpen(false)} 
+        plan={editingPlan} 
+      />
+    </div>
+  );
+}
+
+function HybridPlanDialog({ isOpen, onClose, plan }: { isOpen: boolean, onClose: () => void, plan: HybridPlan | null }) {
+  const firestore = useFirestore();
+  const { toast } = useToast();
+  const [isPending, startTransition] = useTransition();
+
+  const { register, control, handleSubmit, reset, watch, setValue, formState: { errors } } = useForm<HybridPlan>({
+    resolver: zodResolver(HybridPlanSchema),
+    defaultValues: plan || {
+      name: '',
+      slug: '',
+      basePrice: 0,
+      pricePerOrder: 0,
+      commissionType: 'percent',
+      variableBillingFrequency: 'monthly',
+      isActive: true,
+      isPublic: true,
+      includedModuleKeys: [],
+      features: [{ value: '' }],
+      limits: {
+        products: -1,
+        blogPosts: -1,
+        landingPages: -1,
+        promotions: -1,
+        coupons: -1,
+        orders: -1,
+        suggestions: -1,
+      }
+    }
+  });
+
+  const { fields, append, remove } = useFieldArray({ control, name: 'features' });
+  const commissionType = watch('commissionType');
+
+  useState(() => {
+    if (plan) reset(plan);
+  });
+
+  const onSubmit = (data: HybridPlan) => {
+    if (!firestore) return;
+    startTransition(async () => {
+      const planId = plan?.id || doc(collection(firestore, 'hybrid_plans')).id;
+      await setDocumentNonBlocking(doc(firestore, 'hybrid_plans', planId), data, { merge: true });
+      toast({ title: 'Plan guardado con éxito' });
+      onClose();
+    });
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>{plan ? 'Editar Plan Híbrido' : 'Nuevo Plan Híbrido'}</DialogTitle>
+          <DialogDescription>Define los costos fijos y variables del plan.</DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+          <Tabs defaultValue="costs">
+            <TabsList className="grid w-full grid-cols-4">
+              <TabsTrigger value="costs"><DollarSign className="w-4 h-4 mr-1" /> Costos</TabsTrigger>
+              <TabsTrigger value="modules"><Settings className="w-4 h-4 mr-1" /> Módulos</TabsTrigger>
+              <TabsTrigger value="limits"><Package className="w-4 h-4 mr-1" /> Límites</TabsTrigger>
+              <TabsTrigger value="design"><Monitor className="w-4 h-4 mr-1" /> Diseño</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="costs" className="space-y-4 pt-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Nombre del Plan</Label>
+                  <Input {...register('name')} placeholder="Ej: Menfy Flexible" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Slug</Label>
+                  <Input {...register('slug')} placeholder="menfy-flexible" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Tarifa Base Mensual ($)</Label>
+                  <Input type="number" {...register('basePrice', { valueAsNumber: true })} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Frecuencia de Cobro Variable</Label>
+                  <Controller name="variableBillingFrequency" control={control} render={({ field }) => (
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="weekly">Semanal</SelectItem>
+                        <SelectItem value="monthly">Mensual</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )} />
+                </div>
+              </div>
+              <div className="space-y-2 p-4 border rounded-lg bg-muted/20">
+                <Label className="text-base">Configuración de Comisión</Label>
+                <div className="flex gap-4 items-end">
+                  <div className="w-40">
+                    <Label className="text-xs">Tipo</Label>
+                    <Controller name="commissionType" control={control} render={({ field }) => (
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <SelectTrigger>
+                          <div className="flex items-center gap-2">
+                            {field.value === 'percent' ? <Percent className="w-4 h-4" /> : <DollarSign className="w-4 h-4" />}
+                            <SelectValue />
+                          </div>
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="percent">Porcentual (%)</SelectItem>
+                          <SelectItem value="fixed">Fija ($)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    )} />
+                  </div>
+                  <div className="flex-1">
+                    <Label className="text-xs">Valor de la Comisión</Label>
+                    <Input type="number" step="0.01" {...register('pricePerOrder', { valueAsNumber: true })} />
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground mt-2">
+                  {commissionType === 'percent' 
+                    ? 'Se cobrará un porcentaje del valor total de cada pedido.' 
+                    : 'Se cobrará un monto fijo por cada pedido realizado.'}
+                </p>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="modules" className="space-y-4 pt-4">
+               <Label>Claves de Módulos Incluidos (Separados por coma)</Label>
+               <Controller name="includedModuleKeys" control={control} render={({ field }) => (
+                 <Input 
+                   value={field.value.join(', ')} 
+                   onChange={(e) => field.onChange(e.target.value.split(',').map(s => s.trim()).filter(Boolean))}
+                   placeholder="catalogo, chatbot, contabilidad" 
+                 />
+               )} />
+               <p className="text-xs text-muted-foreground">Ingresa los IDs de los módulos que este plan activa automáticamente.</p>
+            </TabsContent>
+
+            <TabsContent value="limits" className="space-y-4 pt-4">
+              <div className="grid grid-cols-2 gap-4">
+                {Object.keys(watch('limits')).map((key) => (
+                  <div key={key} className="space-y-1">
+                    <Label className="capitalize">{key.replace(/([A-Z])/g, ' $1')}</Label>
+                    <Input type="number" {...register(`limits.${key as keyof HybridPlan['limits']}`, { valueAsNumber: true })} />
+                  </div>
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground">Usa -1 para indicar uso ilimitado.</p>
+            </TabsContent>
+
+            <TabsContent value="design" className="space-y-4 pt-4">
+              <div className="flex items-center justify-between gap-4 p-4 border rounded-lg">
+                <div>
+                  <Label>Estado del Plan</Label>
+                  <p className="text-xs text-muted-foreground">¿Está el plan disponible para ser asignado?</p>
+                </div>
+                <Switch checked={watch('isActive')} onCheckedChange={(val) => setValue('isActive', val)} />
+              </div>
+              <div className="flex items-center justify-between gap-4 p-4 border rounded-lg">
+                <div>
+                  <Label>Visibilidad Pública</Label>
+                  <p className="text-xs text-muted-foreground">¿Mostrar este plan en la landing page principal?</p>
+                </div>
+                <Switch checked={watch('isPublic')} onCheckedChange={(val) => setValue('isPublic', val)} />
+              </div>
+              <div className="space-y-4">
+                <Label>Características Destacadas</Label>
+                {fields.map((field, index) => (
+                  <div key={field.id} className="flex gap-2">
+                    <Input {...register(`features.${index}.value`)} placeholder="Ej: Reportes en tiempo real" />
+                    <Button variant="ghost" size="icon" onClick={() => remove(index)}><Trash2 className="w-4 h-4" /></Button>
+                  </div>
+                ))}
+                <Button type="button" variant="outline" size="sm" onClick={() => append({ value: '' })}><PlusCircle className="w-4 h-4 mr-2" /> Añadir Característica</Button>
+              </div>
+            </TabsContent>
+          </Tabs>
+
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={onClose} disabled={isPending}>Cancelar</Button>
+            <Button type="submit" disabled={isPending}>
+              {isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              {plan ? 'Guardar Cambios' : 'Crear Plan'}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}

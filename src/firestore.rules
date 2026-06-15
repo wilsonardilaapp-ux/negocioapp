@@ -36,6 +36,12 @@ service cloud.firestore {
       allow read, list: if true;
     }
 
+    // New collection for hybrid plans
+    match /hybrid_plans/{planId} {
+      allow read, list: if true;
+      allow write: if isSuperAdmin();
+    }
+
     // Promotions Rules
     match /promotions/{promotionId} {
       allow read, list: if resource.data.showInCatalog == true
@@ -197,26 +203,6 @@ service cloud.firestore {
         allow write: if isBusinessMember(businessId) || isSuperAdmin();
       }
 
-      match /backups/{backupId} {
-        allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
-      }
-
-      match /backupSchedules/{scheduleId} {
-        allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
-      }
-
-      match /kardexConfig/{docId} {
-        allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
-      }
-
-      match /kardexItems/{itemId} {
-        allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
-      }
-
-      match /kardexMovimientos/{movimientoId} {
-        allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
-      }
-
       // Notifications
       match /notifications/{notificationId} {
         allow read, update, delete: if isBusinessMember(businessId) || isSuperAdmin();
@@ -229,18 +215,6 @@ service cloud.firestore {
       }
 
       match /cuentas/{cuentaId} {
-        allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
-      }
-
-      match /activosFijos/{activoId} {
-        allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
-      }
-
-      match /impuestos/{impuestoId} {
-        allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
-      }
-
-      match /declaracionesImpuestos/{declaracionId} {
         allow read, write: if isBusinessMember(businessId) || isSuperAdmin();
       }
 
