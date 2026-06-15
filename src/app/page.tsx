@@ -13,10 +13,16 @@ export const dynamic = 'force-dynamic';
 async function getPlans(): Promise<SubscriptionPlan[]> {
   try {
     const db = await getAdminFirestore();
+    // Obtenemos todos ordenados por precio
     const q = db.collection("plans").orderBy("price", "asc");
     const snapshot = await q.get();
     if (snapshot.empty) return [];
-    return snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })) as SubscriptionPlan[];
+    
+    // Filtramos en memoria para asegurar que solo se muestren los activos
+    // Evitamos el requisito de índices compuestos de Firestore para mayor compatibilidad
+    return snapshot.docs
+      .map(doc => ({ ...doc.data(), id: doc.id } as SubscriptionPlan))
+      .filter(plan => plan.isActive === true);
   } catch (error) {
     console.error("Error fetching plans for public page:", error);
     return [];
@@ -26,7 +32,10 @@ async function getPlans(): Promise<SubscriptionPlan[]> {
 async function getHybridPlans(): Promise<HybridPlan[]> {
   try {
     const db = await getAdminFirestore();
-    const q = db.collection("hybrid_plans").where("isPublic", "==", true).where("isActive", "==", true);
+    const q = db.collection("hybrid_plans")
+      .where("isPublic", "==", true)
+      .where("isActive", "==", true);
+      
     const snapshot = await q.get();
     if (snapshot.empty) return [];
     return snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })) as HybridPlan[];

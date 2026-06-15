@@ -1,3 +1,4 @@
+
 import { getAdminFirestore } from "@/firebase/server-init";
 import type { SubscriptionPlan } from "@/models/subscription-plan";
 import type { LandingPageData } from "@/models/landing-page";
@@ -13,7 +14,11 @@ async function getPlans(): Promise<SubscriptionPlan[]> {
         if (snapshot.empty) {
             return [];
         }
-        return snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })) as SubscriptionPlan[];
+        
+        // Filtramos en memoria para asegurar que solo se muestren los activos en la página de precios
+        return snapshot.docs
+          .map(doc => ({ ...doc.data(), id: doc.id } as SubscriptionPlan))
+          .filter(plan => plan.isActive === true);
     } catch (error) {
         console.error("Error fetching plans:", error);
         return [];
