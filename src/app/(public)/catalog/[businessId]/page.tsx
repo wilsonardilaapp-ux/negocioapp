@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
@@ -318,6 +317,7 @@ export default function CatalogPage() {
                             limit(1)
                         );
                         
+                        // Capturamos error de permisos aquí para intentar fallback si es posible
                         const querySnapshot = await getDocs(shareConfigQuery).catch(err => {
                             console.warn("⚠️ Fallo consulta de grupo (permisos):", err.message);
                             return null;
@@ -361,7 +361,8 @@ export default function CatalogPage() {
                     paymentSettings: paymentSettingsSnap?.exists() ? paymentSettingsSnap.data() as any : null,
                 });
 
-                promotionService.getActivePromotions(businessId)
+                // Cargar promociones con manejo de error explícito
+                await promotionService.getActivePromotions(businessId)
                     .then(setActivePromotions)
                     .catch(err => console.warn("No se cargaron promociones:", err.message));
 
@@ -372,7 +373,11 @@ export default function CatalogPage() {
             finally { setIsLoading(false); }
         };
 
-        initializePage();
+        initializePage().catch(err => {
+            console.error("🔥 Error no capturado en initializePage:", err);
+            setError("Ocurrió un error inesperado al cargar la página.");
+            setIsLoading(false);
+        });
     }, [firestore, slug, isNetworkEnabled]);
 
     const handleAddToCart = (itemsToAdd: CartItem[]) => {

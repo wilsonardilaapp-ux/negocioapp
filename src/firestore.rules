@@ -40,8 +40,9 @@ service cloud.firestore {
     // --- REGLAS PÚBLICAS CRÍTICAS ---
     
     // 1. Permitir resolución de alias (slugs) mediante consulta de grupo (ej: /catalog/forros-autos)
+    // CRÍTICO: Debe incluir 'list' para permitir queries de tipo collectionGroup
     match /{path=**}/shareConfig/{docId} {
-      allow read: if true;
+      allow read, list: if true;
     }
 
     // 2. Permitir lectura pública de configuraciones de pago (necesario para el carrito público)
