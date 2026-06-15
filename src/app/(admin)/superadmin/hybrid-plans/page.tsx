@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useTransition, useEffect } from 'react';
@@ -108,7 +109,7 @@ function HybridPlanDialog({ isOpen, onClose, plan }: { isOpen: boolean, onClose:
   const { toast } = useToast();
   const [isPending, startTransition] = useTransition();
 
-  const { register, control, handleSubmit, reset, watch, setValue, formState: { errors, isSubmitting } } = useForm<HybridPlan>({
+  const { register, control, handleSubmit, reset, watch, setValue, getValues, formState: { errors, isSubmitting } } = useForm<HybridPlan>({
     resolver: zodResolver(HybridPlanSchema),
     defaultValues: {
       name: '',
@@ -182,43 +183,43 @@ function HybridPlanDialog({ isOpen, onClose, plan }: { isOpen: boolean, onClose:
     const planId = plan?.id || doc(collection(firestore, 'hybrid_plans')).id;
     const docRef = doc(firestore, 'hybrid_plans', planId);
 
-    // Sanitizar datos y asegurar que el ID esté en el documento
-    const cleanData = JSON.parse(JSON.stringify(data));
-    cleanData.id = planId;
+    // Sanitización total de datos para evitar undefined y asegurar tipos correctos
+    const dataToSave = JSON.parse(JSON.stringify(data));
+    dataToSave.id = planId;
     
-    // El slug debe ser una versión limpia del nombre si no se provee
-    if (!cleanData.slug) {
-        cleanData.slug = cleanData.name.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]+/g, '');
+    if (!dataToSave.slug) {
+        dataToSave.slug = dataToSave.name.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]+/g, '');
     }
 
     startTransition(() => {
-      console.log("Intentando guardar plan:", cleanData);
-      setDocumentNonBlocking(docRef, cleanData, { merge: true })
+      // Usamos setDocumentNonBlocking pero manejamos la promesa para cerrar el diálogo y notificar
+      setDocumentNonBlocking(docRef, dataToSave, { merge: true })
         .then(() => {
           toast({ title: plan?.id ? 'Plan actualizado' : 'Plan creado con éxito' });
           onClose();
         })
         .catch(async (serverError) => {
-          console.error("Error al guardar plan híbrido:", serverError);
+          console.error("ERROR CRÍTICO AL GUARDAR PLAN:", serverError);
+          
           const permissionError = new FirestorePermissionError({
             path: docRef.path,
             operation: plan?.id ? 'update' : 'create',
-            requestResourceData: cleanData,
+            requestResourceData: dataToSave,
           } satisfies SecurityRuleContext);
-          
-          errorEmitter.emit('permission-error', permissionError);
 
+          errorEmitter.emit('permission-error', permissionError);
+          
           toast({
             variant: "destructive",
-            title: "Error de Guardado",
-            description: "No se pudo guardar el plan. Verifica los permisos de administrador."
+            title: "Error de Permisos",
+            description: "No tienes autorización para realizar esta acción. Verifica que eres SuperAdmin."
           });
         });
     });
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={(open) => !isPending && !isSubmitting && onClose()}>
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{plan ? 'Editar Plan Híbrido' : 'Nuevo Plan Híbrido'}</DialogTitle>
@@ -399,9 +400,9 @@ function HybridPlanDialog({ isOpen, onClose, plan }: { isOpen: boolean, onClose:
           </Tabs>
 
           <DialogFooter className="border-t pt-4">
-            <Button type="button" variant="outline" onClick={onClose} disabled={isPending}>Cancelar</Button>
+            <Button type="button" variant="outline" onClick={onClose} disabled={isPending || isSubmitting}>Cancelar</Button>
             <Button type="submit" disabled={isPending || isSubmitting}>
-              {isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              {(isPending || isSubmitting) && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
               {plan ? 'Guardar Cambios' : 'Crear Plan'}
             </Button>
           </DialogFooter>

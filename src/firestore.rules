@@ -13,12 +13,12 @@ service cloud.firestore {
     function isAdminEmail() {
       return isAuthenticated() && (
         request.auth.token.email == 'allseosoporte@gmail.com' ||
-        request.auth.token.email == 'admin@zentry.com'
+        request.auth.token.email == 'admin@zentry.com' ||
+        request.auth.token.email == 'admin@ecosalud.com'
       );
     }
 
     function isSuperAdmin() {
-      // Priorizar el check por email para evitar llamadas a get() y posibles recursiones
       return isAdminEmail() || (
         isAuthenticated() && 
         exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
@@ -60,18 +60,9 @@ service cloud.firestore {
 
     // Usuarios y Perfiles
     match /users/{userId} {
-      // El usuario puede leer su propio perfil sin llamar a isSuperAdmin para evitar recursión
-      allow get: if isAuthenticated() && request.auth.uid == userId;
-      // Los admins pueden hacer todo
-      allow get, list, write: if isSuperAdmin();
-      // Permitir creación inicial durante el registro
-      allow create: if isAuthenticated() && request.auth.uid == userId;
-    }
-
-    // Configuración de Pago por Usuario
-    match /paymentSettings/{userId} {
-      allow get: if true;
-      allow write: if isAuthenticated() && request.auth.uid == userId;
+      allow get: if isAuthenticated() && (request.auth.uid == userId || isSuperAdmin());
+      allow list: if isSuperAdmin();
+      allow write: if isSuperAdmin() || (isAuthenticated() && request.auth.uid == userId);
     }
 
     // Negocios y sus recursos
@@ -79,34 +70,24 @@ service cloud.firestore {
       allow get, list: if true;
       allow write: if isSuperAdmin() || isBusinessMember(businessId);
 
-      // Datos públicos del negocio
       match /publicData/{docId=**} {
         allow read, list: if true;
         allow write: if isSuperAdmin() || isBusinessMember(businessId);
       }
 
-      // Landing Pages del negocio
       match /landingPages/{pageId} {
         allow read, list: if true;
         allow write: if isSuperAdmin() || isBusinessMember(businessId);
       }
 
-      // Productos
       match /products/{productId} {
         allow read, list: if true;
         allow write: if isSuperAdmin() || isBusinessMember(businessId);
       }
 
-      // Pedidos
       match /orders/{orderId} {
-        allow create: if true; // Permitir que cualquiera cree un pedido (cliente final)
-        allow read, update, delete: if isSuperAdmin() || isBusinessMember(businessId);
-      }
-
-      // Mensajes de contacto y notificaciones
-      match /contactSubmissions/{submissionId} {
         allow create: if true;
-        allow read, write: if isSuperAdmin() || isBusinessMember(businessId);
+        allow read, update, delete: if isSuperAdmin() || isBusinessMember(businessId);
       }
 
       match /notifications/{notificationId} {
@@ -114,27 +95,15 @@ service cloud.firestore {
         allow create: if isSuperAdmin();
       }
 
-      // Otros recursos del negocio
       match /{allSubcollections=**} {
         allow read, write: if isSuperAdmin() || isBusinessMember(businessId);
       }
     }
 
-    // Mensajes de contacto globales (Bandeja SuperAdmin)
+    // Mensajes de contacto globales
     match /contactMessages/{messageId} {
       allow create: if true;
       allow read, write: if isSuperAdmin();
-    }
-
-    // Cupones y Promociones
-    match /cupones/{couponId} {
-      allow read: if true;
-      allow write: if isAuthenticated(); // Se refina por lógica de negocio
-    }
-
-    match /promotions/{promotionId} {
-      allow read, list: if true;
-      allow write: if isAuthenticated();
     }
 
     // --- REGLA POR DEFECTO ---
