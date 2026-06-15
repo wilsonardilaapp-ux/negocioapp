@@ -1,3 +1,4 @@
+
 import LandingPageContent from '../components/landing-page/landing-page-content';
 import type { LandingPageData } from '../models/landing-page';
 import { v4 as uuidv4 } from 'uuid';
@@ -33,6 +34,16 @@ async function getHybridPlans(): Promise<HybridPlan[]> {
     console.error("Error fetching hybrid plans:", error);
     return [];
   }
+}
+
+async function getMainBusinessId(): Promise<string | null> {
+    try {
+        const db = await getAdminFirestore();
+        const configSnap = await db.collection("globalConfig").doc("system").get();
+        return configSnap.exists ? configSnap.data()?.mainBusinessId : null;
+    } catch (error) {
+        return null;
+    }
 }
 
 const fallbackData: LandingPageData = {
@@ -104,9 +115,9 @@ const fallbackData: LandingPageData = {
       youtube: '',
     },
     carouselItems: [
-      { id: uuidv4(), mediaUrl: null, mediaType: null, slogan: '' },
-      { id: uuidv4(), mediaUrl: null, mediaType: null, slogan: '' },
-      { id: uuidv4(), mediaUrl: null, mediaType: null, slogan: '' },
+      { id: 'item-1', mediaUrl: null, mediaType: null, slogan: '' },
+      { id: 'item-2', mediaUrl: null, mediaType: null, slogan: '' },
+      { id: 'item-3', mediaUrl: null, mediaType: null, slogan: '' },
     ],
   },
   footer: {
@@ -114,16 +125,16 @@ const fallbackData: LandingPageData = {
     contactInfo: {
       address: 'Calle Falsa 123, Ciudad, País',
       phone: '3228831634',
-      email: 'contacto@empresa.com',
+      email: 'allseosoporte@gmail.com',
       hours: 'Lunes a Viernes, 9am - 6pm',
     },
     quickLinks: [
-      { id: uuidv4(), text: 'Inicio', url: '#' },
-      { id: uuidv4(), text: 'Sobre nosotros', url: '#' },
-      { id: uuidv4(), text: 'Servicios', url: '#' },
-      { id: uuidv4(), text: 'Blog', url: '#' },
-      { id: uuidv4(), text: 'Contacto', url: '#' },
-      { id: uuidv4(), text: 'FAQ', url: '#' },
+      { id: 'ql-1', text: 'Inicio', url: '#' },
+      { id: 'ql-2', text: 'Sobre nosotros', url: '#' },
+      { id: 'ql-3', text: 'Servicios', url: '#' },
+      { id: 'ql-4', text: 'Blog', url: '#' },
+      { id: 'ql-5', text: 'Contacto', url: '#' },
+      { id: 'ql-6', text: 'FAQ', url: '#' },
     ],
     legalLinks: {
       privacyPolicyUrl: '#',
@@ -145,7 +156,7 @@ const fallbackData: LandingPageData = {
     },
     certifications: [],
     copyright: {
-      companyName: 'Tu Empresa',
+      companyName: 'Zentry',
       additionalText: 'Todos los derechos reservados.',
     },
     cta: {
@@ -171,11 +182,17 @@ const fallbackData: LandingPageData = {
 
 export default async function RootPage() {
   try {
-    const [landingData, plans, hybridPlans] = await Promise.all([
+    const results = await Promise.allSettled([
       getLandingData(), 
       getPlans(), 
-      getHybridPlans()
+      getHybridPlans(),
+      getMainBusinessId()
     ]);
+    
+    const landingData = results[0].status === 'fulfilled' ? results[0].value : null;
+    const plans = results[1].status === 'fulfilled' ? results[1].value : [];
+    const hybridPlans = results[2].status === 'fulfilled' ? results[2].value : [];
+    const mainBusinessId = results[3].status === 'fulfilled' ? results[3].value : null;
     
     const dataToRender = landingData || fallbackData;
 
@@ -185,15 +202,16 @@ export default async function RootPage() {
           data={dataToRender} 
           plans={plans} 
           hybridPlans={hybridPlans} 
+          businessId={mainBusinessId || undefined}
         />
       </main>
     );
   } catch (error) {
-      console.error("Error en Home:", error);
-      const plans = await getPlans();
+      console.error("Critical error rendering Home:", error);
+      // Fallback absoluto en caso de error fatal de infraestructura
       return (
         <main className="w-full">
-            <LandingPageContent data={fallbackData} plans={plans} />
+            <LandingPageContent data={fallbackData} plans={[]} hybridPlans={[]} />
         </main>
       );
   }

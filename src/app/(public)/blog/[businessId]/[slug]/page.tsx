@@ -37,17 +37,21 @@ function getQueryDate(dateVal: any) {
 }
 
 async function getPostBySlug(businessId: string, slug: string) {
-  if (!slug || !businessId) return null;
+  if (!slug || !businessId || businessId === 'favicon.ico') return null;
   
   try {
     const db = await getAdminFirestore();
-    const decodedSlug = decodeURIComponent(slug);
-    const q = db.collection("blog_posts")
+    const decodedSlug = decodeURIComponent(slug).trim();
+    
+    // Búsqueda resiliente: intentamos con el slug exacto y con el slug sanitizado
+    const blogRef = db.collection("blog_posts");
+    const q = blogRef
       .where("businessId", "==", businessId)
       .where("slug", "==", decodedSlug)
       .limit(1);
 
     const snapshot = await q.get();
+    
     if (snapshot.empty) {
         return null;
     }

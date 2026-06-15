@@ -179,20 +179,24 @@ function HybridPlanDialog({ isOpen, onClose, plan }: { isOpen: boolean, onClose:
   const onSubmit = (data: HybridPlan) => {
     if (!firestore || !user) return;
 
-    // Generar un ID nuevo si es creación, o usar el existente
     const planId = plan?.id || doc(collection(firestore, 'hybrid_plans')).id;
     const docRef = doc(firestore, 'hybrid_plans', planId);
 
-    // Sanitización total de datos para evitar undefined y asegurar tipos correctos
+    // Sanitización forzada de datos
     const dataToSave = JSON.parse(JSON.stringify(data));
     dataToSave.id = planId;
     
-    if (!dataToSave.slug) {
-        dataToSave.slug = dataToSave.name.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]+/g, '');
-    }
+    // Normalización de SLUG: Siempre generamos uno limpio a partir del nombre si no hay uno válido
+    const sourceForSlug = dataToSave.slug || dataToSave.name;
+    dataToSave.slug = sourceForSlug
+        .toLowerCase()
+        .trim()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "") // Quitar acentos
+        .replace(/\s+/g, '-')           // Espacios a guiones
+        .replace(/[^\w-]+/g, '');       // Quitar caracteres no permitidos
 
     startTransition(() => {
-      // Usamos setDocumentNonBlocking pero manejamos la promesa para cerrar el diálogo y notificar
       setDocumentNonBlocking(docRef, dataToSave, { merge: true })
         .then(() => {
           toast({ title: plan?.id ? 'Plan actualizado' : 'Plan creado con éxito' });
@@ -212,7 +216,7 @@ function HybridPlanDialog({ isOpen, onClose, plan }: { isOpen: boolean, onClose:
           toast({
             variant: "destructive",
             title: "Error de Permisos",
-            description: "No tienes autorización para realizar esta acción. Verifica que eres SuperAdmin."
+            description: "No tienes autorización para realizar esta acción o el formato de datos es inválido."
           });
         });
     });
@@ -242,8 +246,9 @@ function HybridPlanDialog({ isOpen, onClose, plan }: { isOpen: boolean, onClose:
                   {errors.name && <p className="text-xs text-destructive font-semibold">{errors.name.message}</p>}
                 </div>
                 <div className="space-y-2">
-                  <Label>Slug</Label>
+                  <Label>Slug (URL amistosa)</Label>
                   <Input {...register('slug')} placeholder="menfy-flexible" />
+                  <p className="text-[10px] text-muted-foreground italic">Se normalizará automáticamente al guardar.</p>
                   {errors.slug && <p className="text-xs text-destructive font-semibold">{errors.slug.message}</p>}
                 </div>
               </div>

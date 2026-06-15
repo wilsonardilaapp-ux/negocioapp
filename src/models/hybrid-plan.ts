@@ -6,6 +6,7 @@ export const HybridPlanSchema = z.object({
   slug: z.string().min(1, 'El slug es requerido'),
   basePrice: z.number().min(0, 'La tarifa base no puede ser negativa'),
   pricePerOrder: z.number().min(0, 'La comisión por pedido no puede ser negativa'),
+  maxCommissionPerOrder: z.number().min(0).optional(),
   commissionType: z.enum(['fixed', 'percent']),
   variableBillingFrequency: z.enum(['weekly', 'monthly']),
   isActive: z.boolean(),
