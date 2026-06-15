@@ -1,23 +1,23 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
-import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '../../../../components/ui/card';
+import { Button } from '../../../../components/ui/button';
+import { Input } from '../../../../components/ui/input';
+import { Label } from '../../../../components/ui/label';
+import { Switch } from '../../../../components/ui/switch';
+import { Badge } from '../../../../components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../../../components/ui/tabs';
 import { PlusCircle, Edit, Trash2, Loader2, DollarSign, Percent, Package, Settings, Monitor } from 'lucide-react';
-import { useCollection, useFirestore, useMemoFirebase, setDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase';
+import { useCollection, useFirestore, useMemoFirebase, setDocumentNonBlocking, deleteDocumentNonBlocking } from '../../../../firebase';
 import { collection, doc } from 'firebase/firestore';
-import { useToast } from '@/hooks/use-toast';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import type { HybridPlan } from '@/models/hybrid-plan';
+import { useToast } from '../../../../hooks/use-toast';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '../../../../components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../../components/ui/select';
+import type { HybridPlan } from '../../../../models/hybrid-plan';
 import { useForm, Controller, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { HybridPlanSchema } from '@/models/hybrid-plan';
+import { HybridPlanSchema } from '../../../../models/hybrid-plan';
 
 export default function HybridPlansPage() {
   const firestore = useFirestore();
@@ -118,6 +118,7 @@ function HybridPlanDialog({ isOpen, onClose, plan }: { isOpen: boolean, onClose:
       isPublic: true,
       includedModuleKeys: [],
       features: [{ value: '' }],
+      extraLimits: [],
       limits: {
         products: -1,
         blogPosts: -1,
@@ -131,6 +132,11 @@ function HybridPlanDialog({ isOpen, onClose, plan }: { isOpen: boolean, onClose:
   });
 
   const { fields, append, remove } = useFieldArray({ control, name: 'features' });
+  const { fields: extraLimitFields, append: appendExtraLimit, remove: removeExtraLimit } = useFieldArray({
+    control,
+    name: "extraLimits",
+  });
+
   const commissionType = watch('commissionType');
 
   useState(() => {
@@ -237,7 +243,7 @@ function HybridPlanDialog({ isOpen, onClose, plan }: { isOpen: boolean, onClose:
                <p className="text-xs text-muted-foreground">Ingresa los IDs de los módulos que este plan activa automáticamente.</p>
             </TabsContent>
 
-            <TabsContent value="limits" className="space-y-4 pt-4">
+            <TabsContent value="limits" className="space-y-6 pt-4">
               <div className="grid grid-cols-2 gap-4">
                 {Object.keys(watch('limits')).map((key) => (
                   <div key={key} className="space-y-1">
@@ -246,7 +252,54 @@ function HybridPlanDialog({ isOpen, onClose, plan }: { isOpen: boolean, onClose:
                   </div>
                 ))}
               </div>
-              <p className="text-xs text-muted-foreground">Usa -1 para indicar uso ilimitado.</p>
+
+              <div className="pt-4 border-t space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label className="text-base font-semibold">Límites Técnicos Extra</Label>
+                    <p className="text-xs text-muted-foreground">Define parámetros adicionales para control de consumo.</p>
+                  </div>
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => appendExtraLimit({ key: '', value: -1 })}
+                  >
+                    <PlusCircle className="mr-2 h-4 w-4" /> Añadir Campo de Límite
+                  </Button>
+                </div>
+                
+                <div className="space-y-3">
+                  {extraLimitFields.map((field, index) => (
+                    <div key={field.id} className="flex gap-2 items-end animate-in fade-in slide-in-from-top-1 duration-200">
+                      <div className="flex-1 space-y-1">
+                        <Label className="text-[10px] uppercase font-bold text-muted-foreground">Clave Técnica</Label>
+                        <Input {...register(`extraLimits.${index}.key`)} placeholder="ej: api_requests_daily" />
+                      </div>
+                      <div className="w-32 space-y-1">
+                        <Label className="text-[10px] uppercase font-bold text-muted-foreground">Valor Límite</Label>
+                        <Input type="number" {...register(`extraLimits.${index}.value`, { valueAsNumber: true })} />
+                      </div>
+                      <Button 
+                        type="button" 
+                        variant="ghost" 
+                        size="icon" 
+                        className="mb-0.5 h-10 w-10 text-destructive hover:bg-destructive/10" 
+                        onClick={() => removeExtraLimit(index)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                  {extraLimitFields.length === 0 && (
+                      <p className="text-sm text-muted-foreground text-center py-4 border-2 border-dashed rounded-lg">
+                          No se han definido límites técnicos adicionales.
+                      </p>
+                  )}
+                </div>
+              </div>
+              
+              <p className="text-xs text-muted-foreground mt-4">Usa -1 para indicar uso ilimitado.</p>
             </TabsContent>
 
             <TabsContent value="design" className="space-y-4 pt-4">
@@ -269,10 +322,10 @@ function HybridPlanDialog({ isOpen, onClose, plan }: { isOpen: boolean, onClose:
                 {fields.map((field, index) => (
                   <div key={field.id} className="flex gap-2">
                     <Input {...register(`features.${index}.value`)} placeholder="Ej: Reportes en tiempo real" />
-                    <Button variant="ghost" size="icon" onClick={() => remove(index)}><Trash2 className="w-4 h-4" /></Button>
+                    <Button variant="ghost" size="icon" onClick={() => remove(index)}><Trash2 className="h-4 w-4" /></Button>
                   </div>
                 ))}
-                <Button type="button" variant="outline" size="sm" onClick={() => append({ value: '' })}><PlusCircle className="w-4 h-4 mr-2" /> Añadir Característica</Button>
+                <Button type="button" variant="outline" size="sm" onClick={() => append({ value: '' })}><PlusCircle className="h-4 w-4 mr-2" /> Añadir Característica</Button>
               </div>
             </TabsContent>
           </Tabs>

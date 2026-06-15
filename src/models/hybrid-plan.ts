@@ -21,6 +21,10 @@ export const HybridPlanSchema = z.object({
     orders: z.number(),
     suggestions: z.number(),
   }),
+  extraLimits: z.array(z.object({ 
+    key: z.string().min(1, 'La clave es requerida'), 
+    value: z.number() 
+  })).optional(),
 });
 
 export type HybridPlan = z.infer<typeof HybridPlanSchema>;
