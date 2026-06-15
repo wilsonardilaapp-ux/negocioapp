@@ -26,7 +26,7 @@ import { doc, setDoc } from 'firebase/firestore';
 import type { MenuShare, QRConfig } from '@/models/share';
 import { useToast } from '@/hooks/use-toast';
 import QRCode from "react-qr-code";
-import html2canvas from 'html2canvas';
+import html2canvas from "html2canvas";
 import { WhatsAppIcon, TikTokIcon, XIcon, FacebookIcon } from '@/components/icons';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
@@ -166,7 +166,6 @@ export default function SharePage() {
     if (isLoading || !user) return;
 
     if (savedShareConfig) {
-        // Mantenemos sincronizado el estado local con la base de datos si no estamos guardando activamente
         if (!isSaving) {
             setShareConfig({
                 ...savedShareConfig,
@@ -205,9 +204,9 @@ export default function SharePage() {
     if (!shareConfig || !shareConfigRef || !firestore) return;
     setIsSaving(true);
     try {
-      // Forzamos el valor actual del estado local al documento
       const dataToSave = { 
         ...shareConfig,
+        isActive: true, // Aseguramos que esté activo al guardar
         updatedAt: new Date().toISOString() 
       };
       
@@ -320,9 +319,9 @@ export default function SharePage() {
                             value={shareConfig.slug === user.uid ? '' : shareConfig.slug}
                             placeholder="nombre-de-tu-negocio"
                             onChange={(e) => {
-                                // Limpieza quirúrgica: eliminamos espacios y guiones al inicio/final
                                 const rawValue = e.target.value;
-                                const cleanValue = rawValue.trim().toLowerCase().replace(/\s+/g, '-');
+                                // Limpieza quirúrgica de espacios y caracteres raros
+                                const cleanValue = rawValue.trim().toLowerCase().replace(/\s+/g, '-').replace(/^-+|-+$/g, '');
                                 handleLocalChange({ slug: cleanValue });
                             }}
                         />
@@ -330,15 +329,9 @@ export default function SharePage() {
                             {copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
                         </Button>
                     </div>
-                    <p className="text-xs text-muted-foreground">Solo letras, números y guiones. Evita espacios al principio.</p>
+                    <p className="text-xs text-muted-foreground">Solo letras, números y guiones centrales.</p>
                 </div>
             )}
-            <div className="flex justify-end pt-4 border-t">
-                <Button onClick={handleManualSave} disabled={isSaving} size="sm" className="bg-primary hover:bg-primary/90">
-                    {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                    Guardar Cambios URL
-                </Button>
-            </div>
         </CardContent>
       </Card>
       

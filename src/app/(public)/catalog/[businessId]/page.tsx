@@ -300,9 +300,10 @@ export default function CatalogPage() {
             try {
                 let businessId = slug;
                 
+                console.log("🔍 Iniciando resolución de alias para:", slug);
+
                 // 1. Resolución de Alias (Prioridad Alta)
                 try {
-                    // Limpiamos el slug por seguridad
                     const cleanSlug = slug.trim().toLowerCase();
                     
                     const shareConfigQuery = query(
@@ -313,10 +314,9 @@ export default function CatalogPage() {
                     
                     const querySnapshot = await getDocs(shareConfigQuery);
                     
-                    // Buscamos el documento que explícitamente tenga activado el alias
-                    const customSlugDoc = querySnapshot.docs.find(doc => doc.data().useCustomSlug === true);
-                    
-                    if (customSlugDoc) {
+                    // Buscamos el documento que explícitamente tenga el slug y sea el del negocio
+                    if (!querySnapshot.empty) {
+                        const customSlugDoc = querySnapshot.docs[0];
                         // Navegamos hacia arriba: shareConfig (doc) -> shareConfig (coll) -> businesses (doc)
                         const businessDoc = customSlugDoc.ref.parent.parent;
                         if (businessDoc) {
@@ -324,10 +324,10 @@ export default function CatalogPage() {
                             console.log("✅ Alias resuelto con éxito:", cleanSlug, "->", businessId);
                         }
                     } else {
-                        console.log("ℹ️ Alias no encontrado o no activo, probando como ID directo:", cleanSlug);
+                        console.log("ℹ️ Alias no encontrado en shareConfig, probando como ID directo.");
                     }
-                } catch (e) {
-                    console.warn("⚠️ Falló la resolución de alias (posible falta de índice):", slug);
+                } catch (e: any) {
+                    console.warn("⚠️ Error en resolución de alias (posible falta de índice o red):", e.message);
                 }
 
                 // 2. Carga de datos esenciales (Paralela y resiliente)
@@ -341,9 +341,10 @@ export default function CatalogPage() {
                 const landingPageSnap = results[1].status === 'fulfilled' ? results[1].value : null;
                 const paymentSettingsSnap = results[2].status === 'fulfilled' ? results[2].value : null;
 
-                // Solo fallamos si el catálogo principal (publicData) no existe
+                // Si no existe el catálogo con el ID resuelto, damos un error claro
                 if (!publicDataSnap?.exists()) {
                     console.error("❌ Catálogo no encontrado para ID:", businessId);
+                    // Si el slug tiene guiones y falló, puede que el negocio no tenga configurado el alias
                     throw new Error("El catálogo solicitado no existe o no tiene permisos de lectura pública.");
                 }
 
@@ -354,7 +355,7 @@ export default function CatalogPage() {
                     paymentSettings: paymentSettingsSnap?.exists() ? paymentSettingsSnap.data() as any : null,
                 });
 
-                // 3. Carga de promociones (Opcional, no bloqueante)
+                // 3. Carga de promociones (Opcional)
                 promotionService.getActivePromotions(businessId)
                     .then(setActivePromotions)
                     .catch(err => console.warn("No se cargaron promociones:", err.message));
@@ -386,9 +387,11 @@ export default function CatalogPage() {
     
     if (error) return (
         <div className="flex h-screen w-full flex-col items-center justify-center bg-background text-center p-4">
+            <PublicNav navigation={pageData.landingPageData?.navigation} businessId={pageData.resolvedBusinessId ?? undefined} />
             <PackageSearch className="h-16 w-16 text-muted-foreground mb-4" />
             <h1 className="text-2xl font-bold">Catálogo no disponible</h1>
             <p className="text-muted-foreground mt-2 max-w-md">{error}</p>
+            <Button variant="outline" className="mt-6" onClick={() => window.location.reload()}>Reintentar</Button>
         </div>
     );
 
@@ -428,12 +431,12 @@ const CatalogHeader = ({ config, cartItemCount, onCartClick }: { config: any, ca
     return (
         <div className="w-full">
             {config.banner.mediaUrl && <div className="relative w-full h-[250px]"><Image src={config.banner.mediaUrl} alt="Banner" fill className="object-cover"/></div>}
-            <div className="bg-card shadow-md p-4 sticky top-16 z-40">
+            <div className="bg-card shadow-md p-4 sticky top-16 z-40 border-b">
                 <div className="container mx-auto flex justify-between items-center">
                     <div><h1 className="text-xl font-bold">{config.businessInfo.name}</h1><p className="text-sm text-muted-foreground">{config.businessInfo.address}</p></div>
                     <div className="flex items-center gap-3">
-                        <Button asChild size="sm"><a href={`https://api.whatsapp.com/send?phone=${cleanPhone}`} target="_blank"><WhatsAppIcon className="mr-2" /> Contactar</a></Button>
-                        <button onClick={onCartClick} className="relative p-2"><ShoppingCart /><Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0">{cartItemCount}</Badge></button>
+                        <Button asChild size="sm" variant="outline" className="hidden sm:flex"><a href={`https://api.whatsapp.com/send?phone=${cleanPhone}`} target="_blank"><WhatsAppIcon className="mr-2" /> Contactar</a></Button>
+                        <button onClick={onCartClick} className="relative p-2 hover:bg-muted rounded-full transition-colors"><ShoppingCart /><Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0">{cartItemCount}</Badge></button>
                     </div>
                 </div>
             </div>
