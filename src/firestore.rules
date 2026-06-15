@@ -1,4 +1,3 @@
-
 rules_version = '2';
 
 service cloud.firestore {
@@ -38,17 +37,22 @@ service cloud.firestore {
       return isOwner(businessId);
     }
 
-    // --- REGLAS PÚBLICAS CRÍTICAS ---
+    // --- REGLAS PÚBLICAS CRÍTICAS (Añadidas para corregir errores de consola) ---
     
-    // 1. Permitir resolución de alias (slugs) mediante consulta de grupo
+    // 1. Permitir resolución de alias (slugs) mediante consulta de grupo (ej: /catalog/forros-autos)
     match /{path=**}/shareConfig/{docId} {
       allow read: if true;
     }
 
-    // 2. Permitir lectura pública de configuraciones de pago (necesario para mostrar Nequi/Bancolombia en catálogo)
+    // 2. Permitir lectura pública de configuraciones de pago (necesario para el carrito público)
     match /paymentSettings/{userId} {
       allow read: if true;
       allow write: if isSuperAdmin() || (isAuthenticated() && request.auth.uid == userId);
+    }
+
+    // 3. Permitir lectura pública de promociones (Elimina el error de Missing Permissions)
+    match /promotions/{promoId} {
+      allow read, list: if true;
     }
 
     // --- REGLAS POR COLECCIÓN ---
@@ -117,15 +121,6 @@ service cloud.firestore {
     match /contactMessages/{messageId} {
       allow create: if true;
       allow read, write: if isSuperAdmin();
-    }
-
-    // --- REGLAS DE PROMOCIONES PÚBLICAS ---
-    match /promotions/{promoId} {
-      allow read, list: if true;
-    }
-
-    match /promotions/{promoId}/{sub=**} {
-      allow read, list: if true;
     }
 
     // --- REGLA POR DEFECTO ---
