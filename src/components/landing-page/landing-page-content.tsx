@@ -1,9 +1,11 @@
+
 'use client';
 
 import React, { useMemo } from 'react';
 import Link from 'next/link';
 import type { LandingPageData, NavLink } from '@/models/landing-page';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { MessageCircle, Phone, Mail, Clock, MapPin, Youtube, Linkedin, ArrowUp, Star } from 'lucide-react';
 import { PublicContactForm } from './public-contact-form';
 import { TikTokIcon, WhatsAppIcon, XIcon, FacebookIcon, InstagramIcon, YoutubeIcon } from '@/components/icons';
