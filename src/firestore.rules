@@ -51,15 +51,6 @@ service cloud.firestore {
       allow write: if isSuperAdmin() || (isAuthenticated() && request.auth.uid == userId);
     }
 
-    // 3. Permitir lectura pública de promociones
-    match /promotions/{promoId} {
-      allow read, list: if true;
-    }
-
-    match /promotions/{promoId}/{sub=**} {
-      allow read, list: if true;
-    }
-
     // --- REGLAS POR COLECCIÓN ---
 
     // Planes Híbridos (Menfy)
@@ -126,6 +117,15 @@ service cloud.firestore {
     match /contactMessages/{messageId} {
       allow create: if true;
       allow read, write: if isSuperAdmin();
+    }
+
+    // --- REGLAS DE PROMOCIONES PÚBLICAS ---
+    match /promotions/{promoId} {
+      allow read, list: if true;
+    }
+
+    match /promotions/{promoId}/{sub=**} {
+      allow read, list: if true;
     }
 
     // --- REGLA POR DEFECTO ---
