@@ -55,6 +55,31 @@ export default function HybridBillingPage() {
     }).format(value);
   };
 
+  // Helper robusto para parsear montos (quita símbolos y maneja NaNs)
+  const parseAmount = (val: any): number => {
+    if (typeof val === 'number') return val;
+    if (typeof val === 'string') {
+      const clean = val.replace(/[^0-9.-]/g, '');
+      return parseFloat(clean) || 0;
+    }
+    return 0;
+  };
+
+  // Helper robusto para parsear fechas (maneja Strings, Timestamps y Date objects)
+  const parseAnyDate = (val: any): Date | null => {
+    if (!val) return null;
+    try {
+      if (val instanceof Date) return val;
+      if (typeof val?.toDate === 'function') return val.toDate(); // Firebase Timestamp
+      if (typeof val === 'string') return parseISO(val);
+      if (val?.seconds) return new Date(val.seconds * 1000);
+      const d = new Date(val);
+      return isNaN(d.getTime()) ? null : d;
+    } catch (e) {
+      return null;
+    }
+  };
+
   const calculateBilling = async () => {
     if (!firestore || !businesses || !hybridPlans) return;
     setIsCalculating(true);
@@ -62,43 +87,52 @@ export default function HybridBillingPage() {
 
     try {
       const now = new Date();
+      console.log(`[Billing] Iniciando cálculo para ${format(now, 'MMMM yyyy')}`);
 
       for (const business of businesses) {
         // Encontrar si el negocio tiene un plan híbrido asignado
         const plan = hybridPlans.find(p => p.name === business.planName);
-        if (!plan) continue;
+        if (!plan) {
+            console.log(`[Billing] Negocio ${business.name} ignorado (No tiene plan híbrido).`);
+            continue;
+        }
 
         // Consultar pedidos del negocio
         const ordersRef = collection(firestore, `businesses/${business.id}/orders`);
         const ordersSnap = await getDocs(ordersRef);
-        const orders = ordersSnap.docs.map(doc => doc.data() as Order);
+        const allOrders = ordersSnap.docs.map(doc => ({ ...doc.data(), id: doc.id } as Order));
         
-        // Filtrar por mes actual y excluir cancelados de la facturación de comisiones
-        const currentMonthOrders = orders.filter(o => {
-            try {
-                const orderDate = parseISO(o.orderDate);
-                // Validamos que sea del mismo mes/año y que no esté cancelado
-                return isSameMonth(orderDate, now) && o.orderStatus !== 'Cancelado';
-            } catch (err) {
-                return false;
-            }
+        console.log(`[Billing] ${business.name}: ${allOrders.length} pedidos totales encontrados.`);
+
+        // Filtrar por mes actual y excluir cancelados
+        const currentMonthOrders = allOrders.filter(o => {
+            const orderDate = parseAnyDate(o.orderDate);
+            if (!orderDate) return false;
+            
+            const matchesMonth = isSameMonth(orderDate, now);
+            const notCancelled = o.orderStatus !== 'Cancelado';
+            
+            return matchesMonth && notCancelled;
         });
         
         const orderCount = currentMonthOrders.length;
+        console.log(`[Billing] ${business.name}: ${orderCount} pedidos corresponden al mes actual.`);
 
         // Calcular comisión respetando tipo (% o fija) y tope máximo
         const totalValue = currentMonthOrders.reduce((sum, o) => {
-          const valor = Number(o.subtotal || 0);
+          const valor = parseAmount(o.subtotal);
           return sum + valor;
         }, 0);
 
         let variableAmount = 0;
+        const commissionConfig = parseAmount(plan.pricePerOrder);
+
         if (plan.commissionType === 'percent') {
-          const comisionCalculada = totalValue * ((Number(plan.pricePerOrder) || 0) / 100);
-          const tope = Number(plan.maxCommissionPerOrder) || 0;
+          const comisionCalculada = totalValue * (commissionConfig / 100);
+          const tope = parseAmount(plan.maxCommissionPerOrder);
           variableAmount = (tope > 0 && orderCount > 0) ? Math.min(comisionCalculada, tope * orderCount) : comisionCalculada;
         } else {
-          variableAmount = orderCount * (Number(plan.pricePerOrder) || 0);
+          variableAmount = orderCount * commissionConfig;
         }
 
         results.push({
@@ -107,26 +141,26 @@ export default function HybridBillingPage() {
           ownerEmail: business.ownerEmail,
           phone: business.phone,
           planName: plan.name,
-          basePrice: plan.basePrice,
+          basePrice: parseAmount(plan.basePrice),
           orderCount,
           ordersTotalValue: totalValue,
           variableAmount,
-          totalAmount: plan.basePrice + variableAmount,
+          totalAmount: parseAmount(plan.basePrice) + variableAmount,
           status: 'pending',
           paymentMethod: 'Nequi',
           commissionType: plan.commissionType || 'fixed',
-          maxCommissionPerOrder: Number(plan.maxCommissionPerOrder) || 0,
+          maxCommissionPerOrder: parseAmount(plan.maxCommissionPerOrder),
         });
       }
 
       setBillingResults(results);
       toast({ 
         title: 'Cálculo completado', 
-        description: `Se procesaron ${results.length} negocios con planes híbridos.` 
+        description: `Se procesaron ${results.length} negocios exitosamente.` 
       });
-    } catch (e) {
-      console.error(e);
-      toast({ title: 'Error al calcular cobros', variant: 'destructive' });
+    } catch (e: any) {
+      console.error("[Billing Error]", e);
+      toast({ title: 'Error al calcular cobros', description: e.message, variant: 'destructive' });
     } finally {
       setIsCalculating(false);
     }
@@ -150,8 +184,8 @@ export default function HybridBillingPage() {
     let paymentDetails = "";
     
     if (paymentConfig) {
-        if (paymentConfig.nequi.enabled) paymentDetails += `\n📲 Nequi: ${paymentConfig.nequi.accountNumber}`;
-        if (paymentConfig.bancolombia.enabled) paymentDetails += `\n🏦 Bancolombia: ${paymentConfig.bancolombia.accountNumber}`;
+        if (paymentConfig.nequi?.enabled) paymentDetails += `\n📲 Nequi: ${paymentConfig.nequi.accountNumber}`;
+        if (paymentConfig.bancolombia?.enabled) paymentDetails += `\n🏦 Bancolombia: ${paymentConfig.bancolombia.accountNumber}`;
     }
 
     const message = `Hola *${res.businessName}*! 👋 
