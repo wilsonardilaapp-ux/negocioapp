@@ -143,7 +143,6 @@ function HybridPlanDialog({ isOpen, onClose, plan }: { isOpen: boolean, onClose:
     name: "extraLimits",
   });
 
-  // Sync form when plan prop changes or dialog opens
   useEffect(() => {
     if (isOpen) {
       if (plan) {
@@ -180,21 +179,28 @@ function HybridPlanDialog({ isOpen, onClose, plan }: { isOpen: boolean, onClose:
   const onSubmit = (data: HybridPlan) => {
     if (!firestore || !user) return;
 
+    // Generar un ID nuevo si es creación, o usar el existente
     const planId = plan?.id || doc(collection(firestore, 'hybrid_plans')).id;
     const docRef = doc(firestore, 'hybrid_plans', planId);
 
-    // Sanitizar datos para Firestore
+    // Sanitizar datos y asegurar que el ID esté en el documento
     const cleanData = JSON.parse(JSON.stringify(data));
-    if (!cleanData.id) cleanData.id = planId;
+    cleanData.id = planId;
+    
+    // El slug debe ser una versión limpia del nombre si no se provee
+    if (!cleanData.slug) {
+        cleanData.slug = cleanData.name.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]+/g, '');
+    }
 
     startTransition(() => {
+      console.log("Intentando guardar plan:", cleanData);
       setDocumentNonBlocking(docRef, cleanData, { merge: true })
         .then(() => {
           toast({ title: plan?.id ? 'Plan actualizado' : 'Plan creado con éxito' });
           onClose();
         })
         .catch(async (serverError) => {
-          // Capturamos el error de permisos para el listener global de depuración
+          console.error("Error al guardar plan híbrido:", serverError);
           const permissionError = new FirestorePermissionError({
             path: docRef.path,
             operation: plan?.id ? 'update' : 'create',
@@ -203,11 +209,10 @@ function HybridPlanDialog({ isOpen, onClose, plan }: { isOpen: boolean, onClose:
           
           errorEmitter.emit('permission-error', permissionError);
 
-          // Mostramos notificación de error al usuario para que no se quede esperando
           toast({
             variant: "destructive",
-            title: "Error de Permisos",
-            description: "No tienes autorización para realizar esta acción. Verifica tu sesión."
+            title: "Error de Guardado",
+            description: "No se pudo guardar el plan. Verifica los permisos de administrador."
           });
         });
     });
@@ -234,19 +239,19 @@ function HybridPlanDialog({ isOpen, onClose, plan }: { isOpen: boolean, onClose:
                 <div className="space-y-2">
                   <Label>Nombre del Plan</Label>
                   <Input {...register('name')} placeholder="Ej: Menfy Flexible" />
-                  {errors.name && <p className="text-xs text-destructive">{errors.name.message}</p>}
+                  {errors.name && <p className="text-xs text-destructive font-semibold">{errors.name.message}</p>}
                 </div>
                 <div className="space-y-2">
                   <Label>Slug</Label>
                   <Input {...register('slug')} placeholder="menfy-flexible" />
-                  {errors.slug && <p className="text-xs text-destructive">{errors.slug.message}</p>}
+                  {errors.slug && <p className="text-xs text-destructive font-semibold">{errors.slug.message}</p>}
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Tarifa Base Mensual ($)</Label>
                   <Input type="number" {...register('basePrice', { valueAsNumber: true })} />
-                  {errors.basePrice && <p className="text-xs text-destructive">{errors.basePrice.message}</p>}
+                  {errors.basePrice && <p className="text-xs text-destructive font-semibold">{errors.basePrice.message}</p>}
                 </div>
                 <div className="space-y-2">
                   <Label>Frecuencia de Cobro Variable</Label>
@@ -262,7 +267,7 @@ function HybridPlanDialog({ isOpen, onClose, plan }: { isOpen: boolean, onClose:
                 </div>
               </div>
               <div className="space-y-2 p-4 border rounded-lg bg-muted/20">
-                <Label className="text-base">Configuración de Comisión</Label>
+                <Label className="text-base font-bold">Configuración de Comisión</Label>
                 <div className="flex gap-4 items-end">
                   <div className="w-40">
                     <Label className="text-xs">Tipo</Label>
@@ -284,21 +289,22 @@ function HybridPlanDialog({ isOpen, onClose, plan }: { isOpen: boolean, onClose:
                   <div className="flex-1">
                     <Label className="text-xs">Valor de la Comisión</Label>
                     <Input type="number" step="0.01" {...register('pricePerOrder', { valueAsNumber: true })} />
-                    {errors.pricePerOrder && <p className="text-xs text-destructive">{errors.pricePerOrder.message}</p>}
+                    {errors.pricePerOrder && <p className="text-xs text-destructive font-semibold">{errors.pricePerOrder.message}</p>}
                   </div>
                 </div>
               </div>
             </TabsContent>
 
             <TabsContent value="modules" className="space-y-4 pt-4">
-               <Label>Claves de Módulos Incluidos (Separados por coma)</Label>
+               <Label className="font-semibold">Módulos Incluidos</Label>
                <Controller name="includedModuleKeys" control={control} render={({ field }) => (
                  <Input 
                    value={Array.isArray(field.value) ? field.value.join(', ') : ''} 
                    onChange={(e) => field.onChange(e.target.value.split(',').map(s => s.trim()).filter(Boolean))}
-                   placeholder="catalogo, chatbot, contabilidad" 
+                   placeholder="ej: catalogo, blog, promotions" 
                  />
                )} />
+               <p className="text-xs text-muted-foreground">Escribe las IDs de los módulos separados por coma.</p>
             </TabsContent>
 
             <TabsContent value="limits" className="space-y-6 pt-4">
@@ -313,14 +319,14 @@ function HybridPlanDialog({ isOpen, onClose, plan }: { isOpen: boolean, onClose:
 
               <div className="pt-4 border-t space-y-4">
                 <div className="flex items-center justify-between">
-                  <Label className="text-base font-semibold">Campos Técnicos Extra</Label>
+                  <Label className="text-base font-bold">Campos Técnicos Extra</Label>
                   <Button 
                     type="button" 
                     variant="outline" 
                     size="sm" 
                     onClick={() => appendExtraLimit({ key: '', value: -1 })}
                   >
-                    <PlusCircle className="mr-2 h-4 w-4" /> Añadir Campo de Límite
+                    <PlusCircle className="mr-2 h-4 w-4" /> Añadir Campo
                   </Button>
                 </div>
                 
@@ -328,11 +334,11 @@ function HybridPlanDialog({ isOpen, onClose, plan }: { isOpen: boolean, onClose:
                   {extraLimitFields.map((field, index) => (
                     <div key={field.id} className="flex gap-2 items-end">
                       <div className="flex-1 space-y-1">
-                        <Label className="text-xs">Clave Técnica</Label>
+                        <Label className="text-[10px] uppercase">Clave Técnica</Label>
                         <Input {...register(`extraLimits.${index}.key`)} placeholder="ej: api_calls" />
                       </div>
                       <div className="w-32 space-y-1">
-                        <Label className="text-xs">Valor Límite</Label>
+                        <Label className="text-[10px] uppercase">Valor</Label>
                         <Input type="number" {...register(`extraLimits.${index}.value`, { valueAsNumber: true })} />
                       </div>
                       <Button variant="ghost" size="icon" onClick={() => removeExtraLimit(index)}>
@@ -346,27 +352,32 @@ function HybridPlanDialog({ isOpen, onClose, plan }: { isOpen: boolean, onClose:
 
             <TabsContent value="design" className="space-y-6 pt-4">
               <div className="space-y-4">
-                <div className="flex items-center justify-between gap-4 p-4 border rounded-lg">
-                  <Label>Estado del Plan</Label>
+                <div className="flex items-center justify-between gap-4 p-4 border rounded-lg bg-muted/10">
+                  <Label className="font-semibold">Estado del Plan</Label>
                   <Switch checked={watch('isActive')} onCheckedChange={(val) => setValue('isActive', val)} />
                 </div>
-                <div className="flex items-center justify-between gap-4 p-4 border rounded-lg">
-                  <Label>Visibilidad Pública</Label>
+                <div className="flex items-center justify-between gap-4 p-4 border rounded-lg bg-muted/10">
+                  <Label className="font-semibold">Visibilidad Pública</Label>
                   <Switch checked={watch('isPublic')} onCheckedChange={(val) => setValue('isPublic', val)} />
                 </div>
 
-                <div className="space-y-4 p-4 border rounded-lg bg-muted/10">
-                  <h4 className="font-semibold text-sm">Identidad Visual</h4>
+                <div className="space-y-4 p-4 border rounded-lg">
+                  <h4 className="font-bold text-sm">Identidad Visual</h4>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label>Icono Distintivo</Label>
+                      <Label>Icono (Lucide)</Label>
                       <Input {...register('icon')} placeholder="Ej: Package, Rocket, Crown" />
                     </div>
                     <div className="space-y-2">
                       <Label>Color del Tema</Label>
                       <div className="flex gap-2">
                         <Input type="color" {...register('themeColor')} className="p-1 w-12 h-10 cursor-pointer" />
-                        <Input value={watch('themeColor')} onChange={(e) => setValue('themeColor', e.target.value)} placeholder="#HEX" />
+                        <Input 
+                            value={watch('themeColor')} 
+                            onChange={(e) => setValue('themeColor', e.target.value)} 
+                            className="font-mono uppercase"
+                            placeholder="#HEX" 
+                        />
                       </div>
                     </div>
                   </div>
@@ -374,21 +385,23 @@ function HybridPlanDialog({ isOpen, onClose, plan }: { isOpen: boolean, onClose:
               </div>
 
               <div className="space-y-4">
-                <Label>Características Destacadas</Label>
+                <div className="flex items-center justify-between">
+                    <Label className="font-bold">Características del Plan</Label>
+                    <Button type="button" variant="outline" size="sm" onClick={() => append({ value: '' })}><PlusCircle className="h-4 w-4 mr-2" /> Añadir</Button>
+                </div>
                 {fields.map((field, index) => (
                   <div key={field.id} className="flex gap-2">
-                    <Input {...register(`features.${index}.value`)} placeholder="Ej: Reportes en tiempo real" />
-                    <Button variant="ghost" size="icon" onClick={() => remove(index)}><Trash2 className="h-4 w-4" /></Button>
+                    <Input {...register(`features.${index}.value`)} placeholder="Ej: Reportes avanzados" />
+                    <Button variant="ghost" size="icon" onClick={() => remove(index)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
                   </div>
                 ))}
-                <Button type="button" variant="outline" size="sm" onClick={() => append({ value: '' })}><PlusCircle className="h-4 w-4 mr-2" /> Añadir Característica</Button>
               </div>
             </TabsContent>
           </Tabs>
 
-          <DialogFooter>
+          <DialogFooter className="border-t pt-4">
             <Button type="button" variant="outline" onClick={onClose} disabled={isPending}>Cancelar</Button>
-            <Button type="submit" disabled={isPending}>
+            <Button type="submit" disabled={isPending || isSubmitting}>
               {isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
               {plan ? 'Guardar Cambios' : 'Crear Plan'}
             </Button>
