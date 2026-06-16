@@ -222,7 +222,7 @@ function RegisterForm() {
       
       const batch = writeBatch(firestore);
 
-      // CRÍTICO: Todo usuario que se registra desde el formulario público es un cliente_admin (Administrador de su negocio)
+      // CRÍTICO: Todo usuario que se registra desde el formulario público es un cliente_admin
       const userRole: 'cliente_admin' = 'cliente_admin';
 
       const userDocRef = doc(firestore, 'users', newUser.uid);
@@ -324,7 +324,7 @@ function RegisterForm() {
             const hybridPlanData = hybridPlanSnap.data() as HybridPlan;
             const now = Timestamp.now();
             const hybridSubscription: Subscription = {
-                plan: hybridPlanData.name,
+                plan: planParam, // GUARDAR EL ID (SLUG) PARA QUE EL HOOK LO ENCUENTRE
                 status: 'active',
                 stripeCustomerId: null,
                 stripeSubscriptionId: null,

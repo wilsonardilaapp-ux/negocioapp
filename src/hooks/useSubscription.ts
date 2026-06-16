@@ -13,6 +13,7 @@ import type { Business } from '@/models/business';
 import type { SuggestionRule } from '@/models/suggestion-rule';
 import type { Coupon } from '@/models/coupon';
 import type { Promotion } from '@/models/promotion';
+import type { HybridPlan } from '@/models/hybrid-plan';
 
 const LOADING_TIMEOUT_MS = 10_000;
 
@@ -35,6 +36,12 @@ export function useSubscription() {
     () => (firestore ? collection(firestore, 'plans') : null),
     [firestore]
   );
+
+  const hybridPlansRef = useMemoFirebase(
+    () => (firestore ? collection(firestore, 'hybrid_plans') : null),
+    [firestore]
+  );
+
   const productsRef = useMemoFirebase(
     () => (user?.uid ? collection(firestore, `businesses/${user.uid}/products`) : null),
     [user?.uid, firestore]
@@ -70,6 +77,8 @@ export function useSubscription() {
   const { data: subscription, isLoading: isSubLoading, error: subError } = useDoc<Subscription>(subscriptionRef);
   const { data: businessData, isLoading: isBusinessDataLoading } = useDoc<Business>(businessRef);
   const { data: allPlans, isLoading: arePlansLoading, error: plansError } = useCollection<SubscriptionPlan>(plansRef);
+  const { data: allHybridPlans, isLoading: areHybridPlansLoading } = useCollection<HybridPlan>(hybridPlansRef);
+  
   const { data: products, isLoading: isProductsLoading, error: productsError } = useCollection<Product>(productsRef);
   const { data: blogPosts, isLoading: isBlogPostsLoading, error: blogPostsError } = useCollection<BlogPost>(blogPostsQuery);
   const { data: landingPages, isLoading: isLandingPagesLoading, error: landingPagesError } = useCollection<LandingPageData>(landingPagesRef);
@@ -85,6 +94,7 @@ export function useSubscription() {
     isSubLoading ||
     isBusinessDataLoading ||
     arePlansLoading ||
+    areHybridPlansLoading ||
     isProductsLoading ||
     isBlogPostsLoading ||
     isLandingPagesLoading ||
@@ -108,7 +118,11 @@ export function useSubscription() {
 
   const { plan, isActive, limits, isFree, isPro, isEnterprise } = useMemo(() => {
     const currentPlanId = subscription?.plan ?? 'free';
-    const planDetails = allPlans?.find(p => p.id === currentPlanId);
+    
+    // Buscar en planes normales o híbridos
+    const planDetails = allPlans?.find(p => p.id === currentPlanId) || 
+                       allHybridPlans?.find(p => p.id === currentPlanId || p.name === currentPlanId);
+
     const defaultLimits: PlanLimits = { products: 0, blogPosts: 0, landingPages: 0, coupons: 0, promotions: 0, orders: -1, suggestions: 0 };
 
     const extras = (businessData as any)?.limitesExtra || {};
@@ -124,15 +138,17 @@ export function useSubscription() {
         suggestions: baseLimits.suggestions === -1 ? -1 : (baseLimits.suggestions + (extras.suggestions || 0)),
     };
 
+    const planType = currentPlanId.toLowerCase();
+
     return {
-      plan: currentPlanId as 'free' | 'pro' | 'enterprise',
+      plan: currentPlanId,
       isActive: subscription?.status === 'active',
       limits: mergedLimits,
-      isFree: currentPlanId === 'free',
-      isPro: currentPlanId === 'pro',
-      isEnterprise: currentPlanId === 'enterprise',
+      isFree: planType === 'free',
+      isPro: planType.includes('pro'),
+      isEnterprise: planType.includes('enterprise'),
     };
-  }, [subscription, allPlans, businessData]);
+  }, [subscription, allPlans, allHybridPlans, businessData]);
 
   const productsCount = products?.length ?? 0;
   const blogPostsCount = blogPosts?.length ?? 0;

@@ -50,10 +50,17 @@ service cloud.firestore {
 
     match /promotions/{promoId} {
       allow read, list: if true;
+      allow write: if isSuperAdmin() || isOwner(request.resource.data.companyId || resource.data.companyId);
     }
 
     match /cupones/{couponId} {
       allow read, list: if true;
+      allow write: if isSuperAdmin() || isOwner(request.resource.data.businessId || resource.data.businessId);
+    }
+
+    match /blog_posts/{postId} {
+      allow read: if true;
+      allow write: if isSuperAdmin() || isOwner(request.resource.data.businessId || resource.data.businessId);
     }
 
     // --- REGLAS POR COLECCIÓN ---
@@ -76,7 +83,6 @@ service cloud.firestore {
     match /users/{userId} {
       allow get: if isAuthenticated() && (request.auth.uid == userId || isSuperAdmin());
       allow list: if isSuperAdmin();
-      // Permitir actualización del propio perfil (necesario para la autosanación de roles)
       allow write: if isSuperAdmin() || (isAuthenticated() && request.auth.uid == userId);
     }
 
