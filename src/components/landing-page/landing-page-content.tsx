@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useMemo, useState } from 'react';
@@ -93,6 +92,7 @@ const getPlanButtonConfig = (plan: SubscriptionPlan | HybridPlan, hotmartLinks: 
             console.error("Stripe error:", e);
           }
         }
+        // Redirección por defecto para planes híbridos o cuando Stripe falla/no está configurado
         window.location.href = `/register?plan=${plan.id}`;
       },
     };
@@ -242,12 +242,12 @@ export default function LandingPageContent({ data, plans = [], hybridPlans = [],
   const finalLogoUrl = logoUrl || navigation.logoUrl;
 
   const hotmartLinks: HotmartLink[] = useMemo(() => {
-    const links = plans.map(p => ({
+    const links = (plans || []).map(p => ({
         planId: p.id,
         planName: p.name,
         hotmartUrl: (p as any).hotmartUrl || '',
     }));
-    const hybridLinks = hybridPlans.map(p => ({
+    const hybridLinks = (hybridPlans || []).map(p => ({
       planId: p.id || '',
       planName: p.name,
       hotmartUrl: '', 

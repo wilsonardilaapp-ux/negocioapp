@@ -59,7 +59,8 @@ service cloud.firestore {
     }
 
     match /blog_posts/{postId} {
-      allow read: if true;
+      // CRÍTICO: Se requiere 'list' para que el dashboard pueda contar los posts y validar límites
+      allow read, list: if true;
       allow write: if isSuperAdmin() || isOwner(request.resource.data.businessId || resource.data.businessId);
     }
 
