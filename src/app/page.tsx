@@ -36,12 +36,14 @@ async function getHybridPlans(): Promise<HybridPlan[]> {
   try {
     const db = await getAdminFirestore();
     const snapshot = await db.collection("hybrid_plans").get();
+    console.log("[getHybridPlans] Total docs encontrados:", snapshot.size);
+    snapshot.docs.forEach(d => console.log("[getHybridPlans] Doc:", d.id, JSON.stringify(d.data()).substring(0, 100)));
     if (snapshot.empty) return [];
     return snapshot.docs
       .map(doc => ({ ...doc.data(), id: doc.id } as HybridPlan))
       .sort((a, b) => (a.basePrice || 0) - (b.basePrice || 0));
   } catch (error) {
-    console.error("Error fetching hybrid plans:", error);
+    console.error("[getHybridPlans] Error:", error);
     return [];
   }
 }
