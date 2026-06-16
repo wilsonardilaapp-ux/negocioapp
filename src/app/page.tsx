@@ -5,6 +5,7 @@ import type { SubscriptionPlan } from '../models/subscription-plan';
 import { DefaultSubscriptionPlans } from '../models/subscription-plan';
 import type { HybridPlan } from '../models/hybrid-plan';
 import { getLandingData } from '../lib/get-landing-data';
+import FaviconInjector from '@/components/layout/FaviconInjector';
 
 // Forzamos comportamiento dinámico total y desactivamos el caché
 export const dynamic = 'force-dynamic';
@@ -18,11 +19,9 @@ async function getPlans(): Promise<SubscriptionPlan[]> {
     const snapshot = await q.get();
     
     if (snapshot.empty) {
-        // Devolvemos array vacío para permitir que los planes híbridos tomen el control
         return [];
     }
     
-    // Filtramos en memoria para asegurar que solo se muestren los activos
     return snapshot.docs
       .map(doc => ({ ...doc.data(), id: doc.id } as SubscriptionPlan))
       .filter(plan => plan.isActive === true);
@@ -36,8 +35,6 @@ async function getHybridPlans(): Promise<HybridPlan[]> {
   try {
     const db = await getAdminFirestore();
     const snapshot = await db.collection("hybrid_plans").get();
-    console.log("[getHybridPlans] Total docs encontrados:", snapshot.size);
-    snapshot.docs.forEach(d => console.log("[getHybridPlans] Doc:", d.id, JSON.stringify(d.data()).substring(0, 100)));
     if (snapshot.empty) return [];
     return snapshot.docs
       .map(doc => ({ ...doc.data(), id: doc.id } as HybridPlan))
@@ -48,13 +45,22 @@ async function getHybridPlans(): Promise<HybridPlan[]> {
   }
 }
 
-async function getMainBusinessId(): Promise<string | null> {
+async function getMainBusinessData(): Promise<{ id: string | null, data: any | null }> {
     try {
         const db = await getAdminFirestore();
         const configSnap = await db.collection("globalConfig").doc("system").get();
-        return configSnap.exists ? configSnap.data()?.mainBusinessId : null;
+        const mainBusinessId = configSnap.exists ? configSnap.data()?.mainBusinessId : null;
+
+        if (mainBusinessId) {
+            const bSnap = await db.collection("businesses").doc(mainBusinessId).get();
+            return { 
+                id: mainBusinessId, 
+                data: bSnap.exists ? bSnap.data() : null 
+            };
+        }
+        return { id: null, data: null };
     } catch (error) {
-        return null;
+        return { id: null, data: null };
     }
 }
 
@@ -93,6 +99,7 @@ const fallbackData: LandingPageData = {
   },
   sections: [],
   testimonials: [],
+  plans: [],
   seo: {
     title: 'Zentry | Plataforma SaaS de Gestión Empresarial',
     description: 'Centraliza y automatiza tu negocio con Zentry. Catálogos, IA, Blog y más.',
@@ -197,13 +204,13 @@ export default async function RootPage() {
       getLandingData(), 
       getPlans(), 
       getHybridPlans(),
-      getMainBusinessId()
+      getMainBusinessData()
     ]);
     
     const landingData = results[0].status === 'fulfilled' ? results[0].value : null;
     let plans = results[1].status === 'fulfilled' ? (results[1].value || []) : [];
     const hybridPlans = results[2].status === 'fulfilled' ? (results[2].value || []) : [];
-    const mainBusinessId = results[3].status === 'fulfilled' ? results[3].value : null;
+    const mainBusiness = results[3].status === 'fulfilled' ? results[3].value : { id: null, data: null };
     
     const dataToRender = landingData || fallbackData;
 
@@ -212,13 +219,17 @@ export default async function RootPage() {
         plans = DefaultSubscriptionPlans;
     }
 
+    const faviconUrl = mainBusiness.data?.faviconUrl || mainBusiness.data?.logoURL || null;
+    const siteTitle = mainBusiness.data?.name || "Zentry Platform";
+
     return (
       <main className="w-full">
+        <FaviconInjector faviconUrl={faviconUrl} title={siteTitle} />
         <LandingPageContent 
           data={dataToRender} 
           plans={plans} 
           hybridPlans={hybridPlans} 
-          businessId={mainBusinessId || undefined}
+          businessId={mainBusiness.id || undefined}
         />
       </main>
     );
