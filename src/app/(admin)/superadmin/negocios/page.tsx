@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -23,7 +24,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { Check, Plus, Search, Building2, Eye, Puzzle, Tag, AlertCircle, TrendingUp, Mail, User, ShieldCheck } from 'lucide-react';
+import { Check, Plus, Search, Building2, Eye, Puzzle, Tag, AlertCircle, TrendingUp, Mail, User, ShieldCheck, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Label } from '@/components/ui/label';
 import { validateModuleExtra, validateLimitesExtra } from '@/utils/validateModuleExtra';
@@ -43,8 +44,6 @@ const iconMap: { [key: string]: React.ReactNode } = {
 };
 
 const StatusBadge = ({ status }: { status: EntityStatus | string | undefined }) => {
-  // Resiliencia para estados nulos o no normalizados
-  // Si no hay estado definido, pero el negocio existe, mostramos un estado neutral para evitar "Inactivo" falso
   if (!status) {
     return (
       <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 font-medium">
@@ -93,6 +92,9 @@ export default function BusinessesPage() {
   const { data: services } = useCollection<SystemService>(useMemoFirebase(() => collection(firestore, 'systemServices'), [firestore]));
   const { data: modules } = useCollection<Module>(useMemoFirebase(() => collection(firestore, 'modules'), [firestore]));
 
+  // Unify all available plans for easy lookup
+  const allPlans = useMemo(() => [...(plans || []), ...(hybridPlans || [])], [plans, hybridPlans]);
+
   // Filter State
   const [searchBusiness, setSearchBusiness] = useState('');
   const [filterPlan, setFilterPlan] = useState<string>('all');
@@ -101,6 +103,7 @@ export default function BusinessesPage() {
   // Modal State
   const [showBusinessModal, setShowBusinessModal] = useState(false);
   const [showManageModal, setShowManageModal] = useState(false);
+  const [isManaging, setIsManaging] = useState(false);
   const [selectedBusiness, setSelectedBusiness] = useState<Business | null>(null);
   
   // Modules State
@@ -133,7 +136,7 @@ export default function BusinessesPage() {
         business.name.toLowerCase().includes(searchBusiness.toLowerCase()) ||
         (business.ownerName && business.ownerName.toLowerCase().includes(searchBusiness.toLowerCase())) ||
         (business.ownerEmail && business.ownerEmail.toLowerCase().includes(searchBusiness.toLowerCase()));
-      const planMatch = filterPlan === 'all' || business.planName === plans?.find(p => p.id === filterPlan)?.name;
+      const planMatch = filterPlan === 'all' || business.planName === plans?.find(p => p.id === filterPlan)?.name || business.planName === filterPlan;
       const statusMatch = filterStatus === 'all' || business.status === filterStatus;
       return searchMatch && planMatch && statusMatch;
     });
@@ -144,11 +147,11 @@ export default function BusinessesPage() {
       alert('Por favor, completa todos los campos obligatorios.');
       return;
     }
-    const selectedPlan = plans?.find(p => p.id === businessForm.planId);
+    const selectedPlan = allPlans.find(p => p.id === businessForm.planId);
     const newBusinessRef = doc(collection(firestore, 'businesses'));
     const newBusiness: Omit<Business, 'id'> = {
       ...businessForm,
-      planName: selectedPlan?.name,
+      planName: selectedPlan?.name || businessForm.planId,
       logoURL: 'https://seeklogo.com/images/E/eco-friendly-logo-7087A22106-seeklogo.com.png',
       description: 'Bienvenido a Negocio V03',
     };
@@ -158,89 +161,100 @@ export default function BusinessesPage() {
   };
 
   const openManageBusiness = async (business: Business) => {
-    // 0. Fetch the actual subscription from subcollection (Source of Truth)
-    // Esto asegura que si el plan real es Híbrido, el modal lo detecte aunque en el doc principal diga 'Gratuito'
-    const subSnap = await getDoc(doc(firestore, `businesses/${business.id}/subscription`, 'current'));
-    const subData = subSnap.exists() ? subSnap.data() as any : null;
-    const actualPlanId = subData?.plan || 'free';
+    setIsManaging(true);
+    try {
+        // 0. Fetch the actual subscription from subcollection (Source of Truth)
+        const subSnap = await getDoc(doc(firestore, `businesses/${business.id}/subscription`, 'current'));
+        const subData = subSnap.exists() ? subSnap.data() as any : null;
+        const actualPlanId = subData?.plan || 'free';
 
-    // Unify all plans for lookup
-    const allAvailablePlans = [...(plans || []), ...(hybridPlans || [])];
-    const currentPlanDetails = allAvailablePlans.find(p => p.id === actualPlanId || p.name === business.planName);
+        const currentPlanDetails = allPlans.find(p => p.id === actualPlanId || p.name === business.planName);
+        const resolvedPlanName = currentPlanDetails?.name || business.planName || 'Plan Gratuito';
 
-    // Aseguramos fallbacks para visualización en el modal
-    setSelectedBusiness({ 
-      ...business, 
-      status: business.status || subData?.status || 'active', 
-      ownerName: business.ownerName || business.name || 'N/A',
-      ownerEmail: business.ownerEmail || business.contactEmail || 'N/A',
-      planName: currentPlanDetails?.name || business.planName || (actualPlanId !== 'free' ? actualPlanId : 'Plan Gratuito'), 
-      imageLimit: business.imageLimit ?? undefined,
-      productLimit: business.productLimit ?? undefined 
-    });
-    
-    // 1. Load assigned modules and services
-    const modulesSnapshot = await getDocs(collection(firestore, `businesses/${business.id}/modules`));
-    const activeModuleIds: string[] = [];
-    const extras: Record<string, number> = {};
-    
-    modulesSnapshot.docs.forEach(doc => {
-      const data = doc.data();
-      if (data.status === 'active') {
-        activeModuleIds.push(doc.id);
-        extras[doc.id] = data.extra || 0;
-      }
-    });
-    
-    setAssignedModules(activeModuleIds);
-    setModuleExtras(extras);
-
-    const servicesSnapshot = await getDocs(collection(firestore, `businesses/${business.id}/services`));
-    setAssignedServices(servicesSnapshot.docs.filter(doc => doc.data().status === 'active').map(doc => doc.id));
-
-    // 2. Load Plan Limits and Hierarchy
-    if (currentPlanDetails && 'limits' in currentPlanDetails) {
-      setCurrentPlanLimits(currentPlanDetails.limits);
-      
-      const tiers = ['FREE', 'BASIC', 'PRO', 'ENTERPRISE'];
-      const currentTierId = currentPlanDetails.id?.toUpperCase() || '';
-      const tierIndex = tiers.findIndex(t => currentTierId.includes(t));
-      
-      if (tierIndex !== -1 && tierIndex < tiers.length - 1) {
-        const nextTierId = tiers[tierIndex + 1];
-        const nextPlan = plans?.find(p => p.id.toUpperCase().includes(nextTierId));
-        
-        if (nextPlan) {
-          setNextPlanLimits(nextPlan.limits);
-          setNextPlanName(nextPlan.name);
-        } else {
-          setNextPlanLimits(null);
+        // --- LÓGICA DE AUTOSANACIÓN ---
+        // Si detectamos que el planName en el doc principal no coincide con la suscripción real, lo corregimos silenciosamente.
+        if (business.planName !== resolvedPlanName) {
+            console.log(`[Autosanación] Corrigiendo plan para ${business.name}: ${business.planName} -> ${resolvedPlanName}`);
+            updateDocumentNonBlocking(doc(firestore, 'businesses', business.id), { planName: resolvedPlanName });
         }
-      } else {
-        setNextPlanLimits(null);
-      }
-    } else {
-      setCurrentPlanLimits({});
-      setNextPlanLimits(null);
-    }
 
-    // 3. Load existing LimitesExtra from Business document
-    const businessDoc = businesses?.find(b => b.id === business.id) as any;
-    if (businessDoc?.limitesExtra) {
-      setLimitesExtra({
-        products: businessDoc.limitesExtra.products || 0,
-        blogPosts: businessDoc.limitesExtra.blogPosts || 0,
-        landingPages: businessDoc.limitesExtra.landingPages || 0,
-        promotions: businessDoc.limitesExtra.promotions || 0,
-        coupons: businessDoc.limitesExtra.coupons || 0,
-        orders: businessDoc.limitesExtra.orders || 0,
-        suggestions: businessDoc.limitesExtra.suggestions || 0,
-      });
-    } else {
-      setLimitesExtra({ products: 0, blogPosts: 0, landingPages: 0, promotions: 0, coupons: 0, orders: 0, suggestions: 0 });
+        setSelectedBusiness({ 
+            ...business, 
+            status: business.status || subData?.status || 'active', 
+            ownerName: business.ownerName || business.name || 'N/A',
+            ownerEmail: business.ownerEmail || business.contactEmail || 'N/A',
+            planName: resolvedPlanName,
+            imageLimit: business.imageLimit ?? undefined,
+            productLimit: business.productLimit ?? undefined 
+        });
+        
+        // 1. Load assigned modules and services
+        const modulesSnapshot = await getDocs(collection(firestore, `businesses/${business.id}/modules`));
+        const activeModuleIds: string[] = [];
+        const extras: Record<string, number> = {};
+        
+        modulesSnapshot.docs.forEach(doc => {
+            const data = doc.data();
+            if (data.status === 'active') {
+                activeModuleIds.push(doc.id);
+                extras[doc.id] = data.extra || 0;
+            }
+        });
+        
+        setAssignedModules(activeModuleIds);
+        setModuleExtras(extras);
+
+        const servicesSnapshot = await getDocs(collection(firestore, `businesses/${business.id}/services`));
+        setAssignedServices(servicesSnapshot.docs.filter(doc => doc.data().status === 'active').map(doc => doc.id));
+
+        // 2. Load Plan Limits and Hierarchy
+        if (currentPlanDetails && 'limits' in currentPlanDetails) {
+            setCurrentPlanLimits(currentPlanDetails.limits);
+            
+            const tiers = ['FREE', 'BASIC', 'PRO', 'ENTERPRISE'];
+            const currentTierId = currentPlanDetails.id?.toUpperCase() || '';
+            const tierIndex = tiers.findIndex(t => currentTierId.includes(t));
+            
+            if (tierIndex !== -1 && tierIndex < tiers.length - 1) {
+                const nextTierId = tiers[tierIndex + 1];
+                const nextPlan = plans?.find(p => p.id.toUpperCase().includes(nextTierId));
+                
+                if (nextPlan) {
+                    setNextPlanLimits(nextPlan.limits);
+                    setNextPlanName(nextPlan.name);
+                } else {
+                    setNextPlanLimits(null);
+                }
+            } else {
+                setNextPlanLimits(null);
+            }
+        } else {
+            setCurrentPlanLimits({});
+            setNextPlanLimits(null);
+        }
+
+        // 3. Load existing LimitesExtra from Business document
+        const businessDoc = business as any;
+        if (businessDoc?.limitesExtra) {
+            setLimitesExtra({
+                products: businessDoc.limitesExtra.products || 0,
+                blogPosts: businessDoc.limitesExtra.blogPosts || 0,
+                landingPages: businessDoc.limitesExtra.landingPages || 0,
+                promotions: businessDoc.limitesExtra.promotions || 0,
+                coupons: businessDoc.limitesExtra.coupons || 0,
+                orders: businessDoc.limitesExtra.orders || 0,
+                suggestions: businessDoc.limitesExtra.suggestions || 0,
+            });
+        } else {
+            setLimitesExtra({ products: 0, blogPosts: 0, landingPages: 0, promotions: 0, coupons: 0, orders: 0, suggestions: 0 });
+        }
+        
+        setShowManageModal(true);
+    } catch (e) {
+        console.error("Error al abrir gestión de negocio:", e);
+    } finally {
+        setIsManaging(false);
     }
-    
-    setShowManageModal(true);
   };
   
   const handleSaveManageBusiness = async () => {
@@ -272,6 +286,7 @@ export default function BusinessesPage() {
     
     const businessUpdateData: any = {
       status: selectedBusiness.status,
+      planName: selectedBusiness.planName,
       imageLimit: selectedBusiness.imageLimit && Number(selectedBusiness.imageLimit) > 0 ? Number(selectedBusiness.imageLimit) : null,
       productLimit: selectedBusiness.productLimit && Number(selectedBusiness.productLimit) > 0 ? Number(selectedBusiness.productLimit) : null,
       limitesExtra: limitesExtra
@@ -319,10 +334,6 @@ export default function BusinessesPage() {
     setLimitesExtra(prev => ({ ...prev, [key]: numericValue }));
   };
 
-  const toggleServiceAssignment = (serviceId: string) => {
-    setAssignedServices(prev => prev.includes(serviceId) ? prev.filter(id => id !== serviceId) : [...prev, serviceId]);
-  };
-
   const limiteFields = [
     { key: 'products', label: 'Productos' },
     { key: 'blogPosts', label: 'Posts Blog' },
@@ -353,7 +364,7 @@ export default function BusinessesPage() {
             <Input
               placeholder="Buscar negocios..."
               value={searchBusiness}
-              onChange={e => setSearchBusiness(e.target.value)}
+              onChange={e => setSearchTerm(e.target.value)}
               className="pl-10"
             />
           </div>
@@ -361,8 +372,7 @@ export default function BusinessesPage() {
             <SelectTrigger className="w-40"><SelectValue placeholder="Plan" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos los planes</SelectItem>
-              {(plans || []).map(plan => <SelectItem key={plan.id} value={plan.id}>{plan.name}</SelectItem>)}
-              {(hybridPlans || []).map(plan => <SelectItem key={plan.id} value={plan.id}>{plan.name}</SelectItem>)}
+              {allPlans.map(plan => <SelectItem key={plan.id} value={plan.id!}>{plan.name}</SelectItem>)}
             </SelectContent>
           </Select>
           <Select value={filterStatus} onValueChange={setFilterStatus}>
@@ -392,7 +402,14 @@ export default function BusinessesPage() {
                 </tr>
               </thead>
               <tbody className="divide-y">
-                {(filteredBusinesses || []).map(business => (
+                {businessesLoading ? (
+                    <tr>
+                        <td colSpan={5} className="py-12 text-center">
+                            <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary mb-2" />
+                            <p className="text-sm text-muted-foreground">Cargando negocios...</p>
+                        </td>
+                    </tr>
+                ) : filteredBusinesses.map(business => (
                   <tr key={business.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
@@ -409,7 +426,10 @@ export default function BusinessesPage() {
                     </td>
                     <td className="px-6 py-4">
                         <Badge variant="outline" className="font-semibold text-xs py-0.5 px-2 bg-muted/30">
-                            {business.planName || 'Plan Gratuito'}
+                            {(() => {
+                                const matched = allPlans.find(p => p.id === business.planName || p.name === business.planName);
+                                return matched ? matched.name : (business.planName || 'Plan Gratuito');
+                            })()}
                         </Badge>
                     </td>
                     <td className="px-6 py-4">
@@ -420,8 +440,8 @@ export default function BusinessesPage() {
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center justify-end gap-2">
-                        <Button size="sm" variant="outline" className="font-bold" onClick={() => openManageBusiness(business)}>
-                            <Eye className="w-4 h-4 mr-1.5" />
+                        <Button size="sm" variant="outline" className="font-bold" onClick={() => openManageBusiness(business)} disabled={isManaging}>
+                            {isManaging && selectedBusiness?.id === business.id ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <Eye className="w-4 h-4 mr-1.5" />}
                             Gestionar
                         </Button>
                         <Button size="sm" variant="outline" onClick={() => router.push(`/landing/${business.id}`)} className="text-primary hover:text-primary hover:bg-primary/5 font-bold">
@@ -450,12 +470,11 @@ export default function BusinessesPage() {
             <div className="grid grid-cols-2 gap-4">
               <div><Label>Teléfono</Label><Input value={businessForm.phone} onChange={e => setBusinessForm(prev => ({ ...prev, phone: e.target.value }))} placeholder="+57 300 123 4567" /></div>
               <div>
-                <Label>Plan</Label>
+                <Label>Plan Inicial</Label>
                 <Select value={businessForm.planId} onValueChange={v => setBusinessForm(prev => ({ ...prev, planId: v }))}>
                   <SelectTrigger><SelectValue placeholder="Seleccionar plan" /></SelectTrigger>
                   <SelectContent>
-                    {(plans || []).map(plan => <SelectItem key={plan.id} value={plan.id}>{plan.name}</SelectItem>)}
-                    {(hybridPlans || []).map(plan => <SelectItem key={plan.id} value={plan.id}>{plan.name}</SelectItem>)}
+                    {allPlans.map(plan => <SelectItem key={plan.id} value={plan.id!}>{plan.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
@@ -499,9 +518,26 @@ export default function BusinessesPage() {
                         <Mail className="w-3.5 h-3.5 text-primary"/> {selectedBusiness.ownerEmail}
                     </p>
                 </div>
-                <div className="mt-2">
+                <div className="mt-2 col-span-2">
                     <p className="text-[10px] uppercase font-bold text-muted-foreground mb-1">Plan de Suscripción</p>
-                    <p className="font-black text-primary text-sm">{selectedBusiness.planName}</p>
+                    <Select 
+                        value={allPlans.find(p => p.name === selectedBusiness.planName || p.id === selectedBusiness.planName)?.id || 'free'} 
+                        onValueChange={(val) => {
+                            const newPlan = allPlans.find(p => p.id === val);
+                            if (newPlan) {
+                                setSelectedBusiness({...selectedBusiness, planName: newPlan.name});
+                            }
+                        }}
+                    >
+                        <SelectTrigger className="w-full font-black text-primary border-primary/20">
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {allPlans.map(plan => (
+                                <SelectItem key={plan.id} value={plan.id!}>{plan.name}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
                 </div>
                 <div className="mt-2">
                     <p className="text-[10px] uppercase font-bold text-muted-foreground mb-1">Estado en Plataforma</p>
