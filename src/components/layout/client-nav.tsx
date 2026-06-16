@@ -1,3 +1,4 @@
+
 "use client";
 
 import Link from "next/link";
@@ -93,8 +94,10 @@ export function ClientNav() {
 
   if (isLoading && !activeModules) {
     return (
-      <div className="flex items-center justify-center p-4">
-        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+      <div className="flex flex-col gap-2 p-4">
+        {[...Array(6)].map((_, i) => (
+            <div key={i} className="h-8 w-full bg-muted animate-pulse rounded-md" />
+        ))}
       </div>
     );
   }

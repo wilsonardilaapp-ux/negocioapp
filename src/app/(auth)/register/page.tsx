@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useRouter, useSearchParams } from "next/navigation";
@@ -37,6 +38,7 @@ import { Eye, EyeOff, Loader2 } from 'lucide-react';
 import type { Subscription } from "../../../models/subscription";
 import { STRIPE_PRICE_IDS } from "../../../lib/stripe";
 import type { HybridPlan } from "../../../models/hybrid-plan";
+import type { SubscriptionPlan } from "../../../models/subscription-plan";
 
 const registerSchema = z.object({
   name: z.string().min(1, { message: "Por favor, introduce tu nombre." }),
@@ -217,71 +219,80 @@ function RegisterForm() {
     if (!auth || !firestore) return;
     
     try {
+      // 1. Obtener información del plan seleccionado ANTES de empezar el batch
+      const planParam = searchParams.get('plan');
+      let planDetails: SubscriptionPlan | HybridPlan | null = null;
+      let modulesToActivate: string[] = ['catalogo', 'blog']; // Módulos base siempre activos
+
+      if (planParam) {
+          const standardPlanSnap = await getDoc(doc(firestore, 'plans', planParam));
+          if (standardPlanSnap.exists()) {
+              planDetails = { ...standardPlanSnap.data(), id: standardPlanSnap.id } as SubscriptionPlan;
+          } else {
+              const hybridPlanSnap = await getDoc(doc(firestore, 'hybrid_plans', planParam));
+              if (hybridPlanSnap.exists()) {
+                  planDetails = { ...hybridPlanSnap.data(), id: hybridPlanSnap.id } as HybridPlan;
+              }
+          }
+
+          if (planDetails && planDetails.includedModuleKeys) {
+              // Unificamos módulos base con los del plan
+              modulesToActivate = [...new Set([...modulesToActivate, ...planDetails.includedModuleKeys])];
+          }
+      }
+
+      // 2. Iniciar registro de usuario
       const userCredential = await initiateEmailSignUp(auth, values.email, values.password);
       const newUser = userCredential.user;
       
       const batch = writeBatch(firestore);
+      const nowISO = new Date().toISOString();
+      const nowTimestamp = Timestamp.now();
 
-      // CRÍTICO: Todo usuario que se registra desde el formulario público es un cliente_admin
-      const userRole: 'cliente_admin' = 'cliente_admin';
-
+      // Perfil de Usuario
       const userDocRef = doc(firestore, 'users', newUser.uid);
       const userData: AppUser = {
         id: newUser.uid,
         name: values.name,
         email: values.email,
-        role: userRole,
+        role: 'cliente_admin',
         status: 'active',
-        createdAt: new Date().toISOString(),
-        lastLogin: new Date().toISOString(),
+        createdAt: nowISO,
+        lastLogin: nowISO,
       };
       batch.set(userDocRef, userData);
       
+      // Documento de Negocio
       const businessDocRef = doc(firestore, 'businesses', newUser.uid);
       const businessData: Business = {
         id: newUser.uid,
-        // userId es CRÍTICO para que la consulta en useSubscription funcione
-        userId: newUser.uid,
         name: `${values.name}'s Business`,
         ownerName: values.name,
         ownerEmail: values.email,
         status: 'active',
         logoURL: 'https://seeklogo.com/images/E/eco-friendly-logo-7087A22106-seeklogo.com.png',
         description: 'Bienvenido a mi negocio en Negocio V03.',
+        planName: planDetails?.name || 'Plan Gratuito',
       };
       batch.set(businessDocRef, businessData);
 
-      const configRef = doc(firestore, 'globalConfig', 'system');
-      const configSnap = await getDoc(configRef);
-
-      if (!configSnap.exists() || !configSnap.data().mainBusinessId) {
-        batch.set(configRef, { mainBusinessId: newUser.uid }, { merge: true });
-      }
-
-      const defaultModulesForNewUser: { id: string, name: string, description: string }[] = [
-        { id: 'catalogo', name: 'Catálogo', description: 'Módulo para gestionar el catálogo de productos.' },
-        { id: 'blog', name: 'Blog', description: 'Módulo para gestionar el blog.' },
-      ];
-      
-      defaultModulesForNewUser.forEach(mod => {
-          const moduleRef = doc(firestore, `businesses/${newUser.uid}/modules`, mod.id);
+      // Inicializar Módulos dinámicamente
+      modulesToActivate.forEach(modId => {
+          const moduleRef = doc(firestore, `businesses/${newUser.uid}/modules`, modId);
           batch.set(moduleRef, { 
-              id: mod.id, 
-              name: mod.name,
-              description: mod.description,
+              id: modId, 
               status: 'active',
-              createdAt: new Date().toISOString() 
+              createdAt: nowISO 
           });
       });
 
+      // Configuración de Landing Page
       const landingPageDocRef = doc(firestore, 'businesses', newUser.uid, 'landingPages', 'main');
-      
       const dynamicLinks: NavLink[] = [
         { id: uuidv4(), text: 'Inicio', url: `/landing/${newUser.uid}`, openInNewTab: false, enabled: true },
-        { id: uuidv4(), text: 'Servicios', url: `#servicios`, openInNewTab: false, enabled: true },
-        { id: uuidv4(), text: 'Contacto', url: '/contact', openInNewTab: false, enabled: true },
         { id: uuidv4(), text: 'Catálogo', url: `/catalog/${newUser.uid}`, openInNewTab: false, enabled: true },
-        { id: uuidv4(), text: 'Blog', url: '/blog', openInNewTab: false, enabled: true },
+        { id: uuidv4(), text: 'Blog', url: `/blog/${newUser.uid}`, openInNewTab: false, enabled: true },
+        { id: uuidv4(), text: 'Contacto', url: `/contacto-cliente/${newUser.uid}`, openInNewTab: false, enabled: true },
       ];
 
       batch.set(landingPageDocRef, {
@@ -291,22 +302,34 @@ function RegisterForm() {
           businessName: businessData.name,
           links: dynamicLinks
         },
-        header: { ...initialLandingPageData.header, businessInfo: { ...initialLandingPageData.header.businessInfo, name: businessData.name, email: newUser.email || 'info@tunegocio.com' }},
-        form: { ...initialLandingPageData.form, destinationEmail: newUser.email || '' },
-        footer: { ...initialLandingPageData.footer, contactInfo: { ...initialLandingPageData.footer.contactInfo, email: newUser.email || 'info@tunegocio.com' }, copyright: { ...initialLandingPageData.footer.copyright, companyName: businessData.name }},
+        header: { ...initialLandingPageData.header, businessInfo: { ...initialLandingPageData.header.businessInfo, name: businessData.name, email: values.email }},
+        form: { ...initialLandingPageData.form, destinationEmail: values.email },
+        footer: { ...initialLandingPageData.footer, contactInfo: { ...initialLandingPageData.footer.contactInfo, email: values.email }, copyright: { ...initialLandingPageData.footer.copyright, companyName: businessData.name }},
       });
 
+      // Configuración de Pagos
       const paymentSettingsDocRef = doc(firestore, 'paymentSettings', newUser.uid);
-      const paymentSettingsData: PaymentSettings = { id: newUser.uid, userId: newUser.uid, ...initialPaymentSettings };
-      batch.set(paymentSettingsDocRef, paymentSettingsData);
+      batch.set(paymentSettingsDocRef, { id: newUser.uid, userId: newUser.uid, ...initialPaymentSettings });
       
-      const planParam = searchParams.get('plan');
+      // Documento de Suscripción
       const subscriptionDocRef = doc(firestore, `businesses/${newUser.uid}/subscription`, 'current');
-      
-      if (planParam && planParam !== 'free') {
-        const upperPlanId = planParam.toUpperCase() as keyof typeof STRIPE_PRICE_IDS;
-        const stripePriceId = STRIPE_PRICE_IDS[upperPlanId];
-        
+      const subscriptionData: Subscription = {
+        plan: planParam || 'free',
+        status: 'active',
+        stripeCustomerId: null,
+        stripeSubscriptionId: null,
+        currentPeriodEnd: null,
+        createdAt: nowTimestamp,
+        updatedAt: nowTimestamp,
+      };
+      batch.set(subscriptionDocRef, subscriptionData);
+
+      // 3. Ejecutar Batch
+      await batch.commit();
+
+      // 4. Manejar redirección a pasarela si aplica
+      if (planParam && planParam !== 'free' && planDetails && 'stripePriceId' in planDetails) {
+        const stripePriceId = (planDetails as SubscriptionPlan).stripePriceId;
         if (stripePriceId && !stripePriceId.includes('placeholder')) {
             const response = await fetch('/api/stripe/create-checkout-session', {
                 method: 'POST',
@@ -315,168 +338,83 @@ function RegisterForm() {
             });
             const session = await response.json();
             if (session.url) {
-                await batch.commit();
                 window.location.href = session.url;
                 return;
             }
         }
-
-        const hybridPlanSnap = await getDoc(doc(firestore, 'hybrid_plans', planParam));
-        if (hybridPlanSnap.exists()) {
-            const hybridPlanData = hybridPlanSnap.data() as HybridPlan;
-            const now = Timestamp.now();
-            const hybridSubscription: Subscription = {
-                plan: planParam, 
-                status: 'active',
-                stripeCustomerId: null,
-                stripeSubscriptionId: null,
-                currentPeriodEnd: null,
-                createdAt: now,
-                updatedAt: now,
-                paymentMethod: 'manual'
-            };
-            batch.set(subscriptionDocRef, hybridSubscription);
-            // Guardamos el nombre comercial del plan para fallback
-            batch.update(businessDocRef, { planName: hybridPlanData.name });
-            
-            await batch.commit();
-            toast({
-                title: "Cuenta Creada con Plan Híbrido",
-                description: `Bienvenido. Se ha activado el plan ${hybridPlanData.name}.`,
-            });
-            router.push('/dashboard');
-            return;
-        }
       }
 
-      const now = Timestamp.now();
-      const freeSubscription: Subscription = {
-        plan: 'free',
-        status: 'active',
-        stripeCustomerId: null,
-        stripeSubscriptionId: null,
-        currentPeriodEnd: null,
-        createdAt: now,
-        updatedAt: now,
-      };
-      batch.set(subscriptionDocRef, freeSubscription);
-      await batch.commit();
-      
       toast({
           title: "Cuenta Creada con Éxito",
-          description: `Se te ha asignado el rol de Administrador.`,
+          description: `Bienvenido a Zentry. Tu plan ${planDetails?.name || 'Gratuito'} está activo.`,
       });
       
+      router.push('/dashboard');
+      
     } catch (error: any) {
+      console.error("Error during registration:", error);
       if (error.code === 'auth/email-already-in-use') {
         toast({
           variant: "destructive",
-          title: "Este correo electrónico ya está registrado.",
-          description: "Por favor, intenta con otro correo o inicia sesión.",
-          action: (
-            <ToastAction asChild altText="Iniciar Sesión">
-              <Link href="/login">Iniciar Sesión</Link>
-            </ToastAction>
-          ),
+          title: "Email ya registrado",
+          description: "Por favor, inicia sesión.",
+          action: <ToastAction asChild altText="Login"><Link href="/login">Iniciar Sesión</Link></ToastAction>,
         });
       } else {
-        console.error("An unexpected error occurred during registration:", error);
         toast({
           variant: "destructive",
           title: "Error al Registrarse",
-          description: error.message || "No se pudo completar el registro. Inténtalo de nuevo.",
+          description: error.message || "No se pudo completar el registro.",
         });
       }
     }
   }
 
-  if (isUserLoading) {
-    return <LoadingScreen />;
-  }
+  if (isUserLoading) return <LoadingScreen />;
 
   return (
     <Card>
       <CardHeader className="space-y-1 text-center">
         <CardTitle className="text-2xl font-headline">Crear una Cuenta</CardTitle>
-        <CardDescription>
-          Ingresa tus datos para crear el perfil de tu negocio.
-        </CardDescription>
+        <CardDescription>Ingresa tus datos para crear el perfil de tu negocio.</CardDescription>
       </CardHeader>
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)}>
           <CardContent className="grid gap-4">
-            <FormField
-              control={form.control}
-              name="name"
-              render={({ field }) => (
+            <FormField control={form.control} name="name" render={({ field }) => (
                 <FormItem>
                   <FormLabel>Nombre completo</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Tu Nombre Completo" {...field} />
-                  </FormControl>
+                  <FormControl><Input placeholder="Tu Nombre Completo" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="email"
-              render={({ field }) => (
+            )} />
+            <FormField control={form.control} name="email" render={({ field }) => (
                 <FormItem>
                   <FormLabel>Correo Electrónico</FormLabel>
-                  <FormControl>
-                    <Input placeholder="nombre@ejemplo.com" {...field} />
-                  </FormControl>
+                  <FormControl><Input placeholder="nombre@ejemplo.com" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="password"
-              render={({ field }) => (
+            )} />
+            <FormField control={form.control} name="password" render={({ field }) => (
                 <FormItem>
                   <FormLabel>Contraseña</FormLabel>
                   <div className="relative">
-                    <FormControl>
-                      <Input
-                        type={showPassword ? 'text' : 'password'}
-                        placeholder="Mínimo 6 caracteres"
-                        {...field}
-                      />
-                    </FormControl>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="absolute right-1 top-1/2 -translate-y-1/2 h-auto p-1 text-muted-foreground"
-                      onClick={() => setShowPassword((prev) => !prev)}
-                    >
-                      {showPassword ? (
-                        <EyeOff className="h-4 w-4" />
-                      ) : (
-                        <Eye className="h-4 w-4" />
-                      )}
-                      <span className="sr-only">
-                        {showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
-                      </span>
+                    <FormControl><Input type={showPassword ? 'text' : 'password'} placeholder="Mínimo 6 caracteres" {...field} /></FormControl>
+                    <Button type="button" variant="ghost" size="icon" className="absolute right-1 top-1/2 -translate-y-1/2 h-auto p-1 text-muted-foreground" onClick={() => setShowPassword((prev) => !prev)}>
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </Button>
                   </div>
                   <FormMessage />
                 </FormItem>
-              )}
-            />
+            )} />
           </CardContent>
           <CardFooter className="flex flex-col gap-4">
             <Button className="w-full" type="submit" disabled={form.formState.isSubmitting}>
-              {form.formState.isSubmitting ? "Creando cuenta..." : "Crear Cuenta"}
+              {form.formState.isSubmitting ? "Preparando tu entorno..." : "Crear Cuenta"}
             </Button>
-             <div className="text-sm text-muted-foreground">
+             <div className="text-sm text-muted-foreground text-center">
               ¿Ya tienes una cuenta?{" "}
-              <Link href="/login" className="underline text-primary hover:text-primary/80">
-                Inicia sesión aquí
-              </Link>
-              .
+              <Link href="/login" className="underline text-primary hover:text-primary/80">Inicia sesión aquí</Link>.
             </div>
           </CardFooter>
         </form>
