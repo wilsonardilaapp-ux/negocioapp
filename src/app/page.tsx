@@ -4,6 +4,7 @@ import type { LandingPageData } from '../models/landing-page';
 import { v4 as uuidv4 } from 'uuid';
 import { getAdminFirestore } from "../firebase/server-init";
 import type { SubscriptionPlan } from '../models/subscription-plan';
+import { DefaultSubscriptionPlans } from '../models/subscription-plan';
 import type { HybridPlan } from '../models/hybrid-plan';
 import { getLandingData } from '../lib/get-landing-data';
 
@@ -16,16 +17,18 @@ async function getPlans(): Promise<SubscriptionPlan[]> {
     // Obtenemos todos ordenados por precio
     const q = db.collection("plans").orderBy("price", "asc");
     const snapshot = await q.get();
-    if (snapshot.empty) return [];
+    
+    if (snapshot.empty) {
+        return DefaultSubscriptionPlans;
+    }
     
     // Filtramos en memoria para asegurar que solo se muestren los activos
-    // Evitamos el requisito de índices compuestos de Firestore para mayor compatibilidad
     return snapshot.docs
       .map(doc => ({ ...doc.data(), id: doc.id } as SubscriptionPlan))
       .filter(plan => plan.isActive === true);
   } catch (error) {
     console.error("Error fetching plans for public page:", error);
-    return [];
+    return DefaultSubscriptionPlans;
   }
 }
 
@@ -61,12 +64,12 @@ async function getMainBusinessId(): Promise<string | null> {
 
 const fallbackData: LandingPageData = {
   hero: {
-    title: 'Innovación que impulsa tu negocio al futuro',
-    subtitle: 'Transformamos tecnología en crecimiento real',
-    additionalContent: '<p>En <strong>PS-USER</strong>, combinamos innovación, estrategia y tecnología para impulsar la transformación digital de tu negocio. Desarrollamos soluciones inteligentes en software, automatización, inteligencia artificial y presencia digital que optimizan tus procesos y potencian tus resultados. Nuestro equipo experto te acompaña en cada paso, desde la planificación hasta la implementación, garantizando eficiencia, seguridad y crecimiento sostenible. Conviértete en una empresa más ágil, competitiva y conectada con el futuro. <strong>PS-USER</strong>, tu aliado tecnológico para alcanzar el éxito en la era digital.</p>',
-    imageUrl: 'https://images.unsplash.com/photo-1588656909074-a9ff6d608eb9?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw4fHxuYXR1cmUlMjB3ZWxsbmVzc3xlbnwwfHx8fDE3NjIyMjAxMzN8MA&ixlib=rb-4.1.0&q=80&w=1080',
-    ctaButtonText: 'Contáctanos',
-    ctaButtonUrl: '#contact',
+    title: 'Zentry: La plataforma integral para tu éxito digital',
+    subtitle: 'Todo lo que tu negocio necesita en un solo lugar',
+    additionalContent: '<p><strong>Zentry</strong> es el aliado tecnológico definitivo para tu transformación digital. Nuestra plataforma centraliza catálogos inteligentes, blogs profesionales, motores de sugerencias con IA y una gestión de pedidos optimizada para que puedas escalar tu negocio sin límites.</p>',
+    imageUrl: 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?q=80&w=2026&auto=format&fit=crop',
+    ctaButtonText: 'Ver Planes y Precios',
+    ctaButtonUrl: '#precios',
     backgroundColor: '#FFFFFF',
     textColor: '#000000',
     buttonColor: '#4CAF50',
@@ -74,16 +77,15 @@ const fallbackData: LandingPageData = {
   navigation: {
     enabled: true,
     logoUrl: '',
-    logoAlt: 'Logo de Mi Negocio',
+    logoAlt: 'Logo Zentry',
     logoWidth: 120,
     logoAlignment: 'left',
-    businessName: 'Mi Negocio',
+    businessName: 'Zentry',
     links: [
-      { id: 'nav-link-1', text: 'Inicio', url: '#', openInNewTab: false, enabled: true },
-      { id: 'nav-link-2', text: 'Servicios', url: '#', openInNewTab: false, enabled: true },
-      { id: 'nav-link-3', text: 'Contacto', url: '#', openInNewTab: false, enabled: true },
-      { id: 'nav-link-4', text: 'Catálogo', url: '#', openInNewTab: false, enabled: true },
-      { id: 'nav-link-5', text: 'Blog', url: '#', openInNewTab: false, enabled: true },
+      { id: 'nav-link-1', text: 'Inicio', url: '/', openInNewTab: false, enabled: true },
+      { id: 'nav-link-2', text: 'Planes', url: '#precios', openInNewTab: false, enabled: true },
+      { id: 'nav-link-3', text: 'Servicios', url: '/servicios', openInNewTab: false, enabled: true },
+      { id: 'nav-link-4', text: 'Contacto', url: '/contact', openInNewTab: false, enabled: true },
     ],
     backgroundColor: '#FFFFFF',
     textColor: '#000000',
@@ -95,9 +97,9 @@ const fallbackData: LandingPageData = {
   sections: [],
   testimonials: [],
   seo: {
-    title: 'Mi Negocio | Soluciones Innovadoras',
-    description: 'Ofrecemos soluciones innovadoras para impulsar tu negocio al siguiente nivel.',
-    keywords: ['innovación', 'tecnología', 'negocio'],
+    title: 'Zentry | Plataforma SaaS de Gestión Empresarial',
+    description: 'Centraliza y automatiza tu negocio con Zentry. Catálogos, IA, Blog y más.',
+    keywords: ['zentry', 'saas', 'gestión', 'negocio', 'catálogo'],
   },
   form: {
     fields: [
@@ -106,7 +108,7 @@ const fallbackData: LandingPageData = {
         { id: 'form-field-3', label: 'WhatsApp', type: 'tel', placeholder: 'ej. 3228831634', required: false },
         { id: 'form-field-4', label: 'Mensaje', type: 'textarea', placeholder: 'Escribe tu consulta aquí...', required: true },
     ],
-    destinationEmail: '',
+    destinationEmail: 'allseosoporte@gmail.com',
   },
   header: {
     banner: {
@@ -114,10 +116,10 @@ const fallbackData: LandingPageData = {
       mediaType: null,
     },
     businessInfo: {
-      name: 'Tu Negocio',
-      address: 'Calle Falsa 123',
+      name: 'Zentry Platform',
+      address: 'Soporte Global Online',
       phone: '3228831634',
-      email: 'info@tunegocio.com',
+      email: 'allseosoporte@gmail.com',
     },
     socialLinks: {
       tiktok: '',
@@ -136,22 +138,21 @@ const fallbackData: LandingPageData = {
   footer: {
     enabled: true,
     contactInfo: {
-      address: 'Calle Falsa 123, Ciudad, País',
+      address: 'Central de Operaciones Zentry',
       phone: '3228831634',
       email: 'allseosoporte@gmail.com',
       hours: 'Lunes a Viernes, 9am - 6pm',
     },
     quickLinks: [
-      { id: 'ql-1', text: 'Inicio', url: '#' },
-      { id: 'ql-2', text: 'Sobre nosotros', url: '#' },
-      { id: 'ql-3', text: 'Servicios', url: '#' },
-      { id: 'ql-4', text: 'Blog', url: '#' },
-      { id: 'ql-5', text: 'Contacto', url: '#' },
-      { id: 'ql-6', text: 'FAQ', url: '#' },
+      { id: 'ql-1', text: 'Inicio', url: '/' },
+      { id: 'ql-2', text: 'Sobre nosotros', url: '/sobre-nosotros' },
+      { id: 'ql-3', text: 'Servicios', url: '/servicios' },
+      { id: 'ql-4', text: 'Planes', url: '/pricing' },
+      { id: 'ql-5', text: 'Contacto', url: '/contact' },
     ],
     legalLinks: {
-      privacyPolicyUrl: '#',
-      termsAndConditionsUrl: '#',
+      privacyPolicyUrl: '/politica-de-privacidad',
+      termsAndConditionsUrl: '/terminos-y-condiciones',
       cookiesPolicyUrl: '#',
       legalNoticeUrl: '#',
     },
@@ -165,7 +166,7 @@ const fallbackData: LandingPageData = {
     },
     logo: {
       url: null,
-      slogan: 'Tu slogan aquí',
+      slogan: 'Tu negocio, sin límites.',
     },
     certifications: [],
     copyright: {
@@ -174,8 +175,8 @@ const fallbackData: LandingPageData = {
     },
     cta: {
       text: '¡Empieza Ahora!',
-      url: '#',
-      enabled: false,
+      url: '/register',
+      enabled: true,
     },
     visuals: {
       backgroundImageUrl: null,
@@ -186,7 +187,7 @@ const fallbackData: LandingPageData = {
       showBackToTop: true,
     },
     adminExtras: {
-      systemVersion: '1.0.0',
+      systemVersion: '1.2.0',
       supportLink: '#',
       documentationLink: '#',
     },
@@ -203,8 +204,8 @@ export default async function RootPage() {
     ]);
     
     const landingData = results[0].status === 'fulfilled' ? results[0].value : null;
-    const plans = results[1].status === 'fulfilled' ? results[1].value : [];
-    const hybridPlans = results[2].status === 'fulfilled' ? results[2].value : [];
+    const plans = results[1].status === 'fulfilled' ? (results[1].value || []) : [];
+    const hybridPlans = results[2].status === 'fulfilled' ? (results[2].value || []) : [];
     const mainBusinessId = results[3].status === 'fulfilled' ? results[3].value : null;
     
     const dataToRender = landingData || fallbackData;
@@ -221,10 +222,9 @@ export default async function RootPage() {
     );
   } catch (error) {
       console.error("Critical error rendering Home:", error);
-      // Fallback absoluto en caso de error fatal de infraestructura
       return (
         <main className="w-full">
-            <LandingPageContent data={fallbackData} plans={[]} hybridPlans={[]} />
+            <LandingPageContent data={fallbackData} plans={DefaultSubscriptionPlans} hybridPlans={[]} />
         </main>
       );
   }
