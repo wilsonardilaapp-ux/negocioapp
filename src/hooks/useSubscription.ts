@@ -117,7 +117,7 @@ export function useSubscription() {
   const isLoading = timedOut || error ? false : rawIsLoading;
 
   const { plan, isActive, limits, isFree, isPro, isEnterprise } = useMemo(() => {
-    const currentPlanId = subscription?.plan ?? 'free';
+    const currentPlanId = subscription?.plan ?? (businessData as any)?.planName ?? 'free';
     
     // Buscar en planes normales o híbridos
     const planDetails = allPlans?.find(p => p.id === currentPlanId) || 
