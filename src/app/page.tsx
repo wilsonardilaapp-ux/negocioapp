@@ -36,10 +36,7 @@ async function getHybridPlans(): Promise<HybridPlan[]> {
   try {
     const db = await getAdminFirestore();
     const snapshot = await db.collection("hybrid_plans").get();
-    if (snapshot.empty) {
-      console.log("No hybrid plans found in DB.");
-      return [];
-    }
+    if (snapshot.empty) return [];
     return snapshot.docs
       .map(doc => ({ ...doc.data(), id: doc.id } as HybridPlan))
       .sort((a, b) => (a.basePrice || 0) - (b.basePrice || 0));
