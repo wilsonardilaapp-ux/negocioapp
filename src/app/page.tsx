@@ -1,14 +1,14 @@
 import LandingPageContent from '../components/landing-page/landing-page-content';
 import type { LandingPageData } from '../models/landing-page';
-import { v4 as uuidv4 } from 'uuid';
 import { getAdminFirestore } from "../firebase/server-init";
 import type { SubscriptionPlan } from '../models/subscription-plan';
 import { DefaultSubscriptionPlans } from '../models/subscription-plan';
 import type { HybridPlan } from '../models/hybrid-plan';
 import { getLandingData } from '../lib/get-landing-data';
 
-// Forzamos comportamiento dinámico total
+// Forzamos comportamiento dinámico total y desactivamos el caché
 export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 async function getPlans(): Promise<SubscriptionPlan[]> {
   try {
@@ -18,8 +18,8 @@ async function getPlans(): Promise<SubscriptionPlan[]> {
     const snapshot = await q.get();
     
     if (snapshot.empty) {
-        // Solo devolvemos los defaults si la colección está realmente vacía
-        return DefaultSubscriptionPlans;
+        // Devolvemos array vacío para permitir que los planes híbridos tomen el control
+        return [];
     }
     
     // Filtramos en memoria para asegurar que solo se muestren los activos
@@ -28,8 +28,7 @@ async function getPlans(): Promise<SubscriptionPlan[]> {
       .filter(plan => plan.isActive === true);
   } catch (error) {
     console.error("Error fetching standard plans for public page:", error);
-    // En caso de error de conexión, devolvemos los defaults para no romper la UI
-    return DefaultSubscriptionPlans;
+    return [];
   }
 }
 
@@ -203,11 +202,16 @@ export default async function RootPage() {
     ]);
     
     const landingData = results[0].status === 'fulfilled' ? results[0].value : null;
-    const plans = results[1].status === 'fulfilled' ? (results[1].value || []) : [];
+    let plans = results[1].status === 'fulfilled' ? (results[1].value || []) : [];
     const hybridPlans = results[2].status === 'fulfilled' ? (results[2].value || []) : [];
     const mainBusinessId = results[3].status === 'fulfilled' ? results[3].value : null;
     
     const dataToRender = landingData || fallbackData;
+
+    // Fallback: Solo si NO hay planes reales de ningún tipo, mostramos los de simulación
+    if (plans.length === 0 && hybridPlans.length === 0) {
+        plans = DefaultSubscriptionPlans;
+    }
 
     return (
       <main className="w-full">
