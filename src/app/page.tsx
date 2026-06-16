@@ -1,4 +1,3 @@
-
 import LandingPageContent from '../components/landing-page/landing-page-content';
 import type { LandingPageData } from '../models/landing-page';
 import { v4 as uuidv4 } from 'uuid';
@@ -19,6 +18,7 @@ async function getPlans(): Promise<SubscriptionPlan[]> {
     const snapshot = await q.get();
     
     if (snapshot.empty) {
+        // Solo devolvemos los defaults si la colección está realmente vacía
         return DefaultSubscriptionPlans;
     }
     
@@ -27,7 +27,8 @@ async function getPlans(): Promise<SubscriptionPlan[]> {
       .map(doc => ({ ...doc.data(), id: doc.id } as SubscriptionPlan))
       .filter(plan => plan.isActive === true);
   } catch (error) {
-    console.error("Error fetching plans for public page:", error);
+    console.error("Error fetching standard plans for public page:", error);
+    // En caso de error de conexión, devolvemos los defaults para no romper la UI
     return DefaultSubscriptionPlans;
   }
 }
@@ -35,12 +36,15 @@ async function getPlans(): Promise<SubscriptionPlan[]> {
 async function getHybridPlans(): Promise<HybridPlan[]> {
   try {
     const db = await getAdminFirestore();
+    // Relajamos la query para asegurar que se recuperen si están marcados como activos
     const q = db.collection("hybrid_plans")
-      .where("isPublic", "==", true)
       .where("isActive", "==", true);
       
     const snapshot = await q.get();
-    if (snapshot.empty) return [];
+    if (snapshot.empty) {
+      console.log("No hybrid plans found in DB.");
+      return [];
+    }
     
     // Mapear y ordenar por precio base de menor a mayor
     return snapshot.docs
