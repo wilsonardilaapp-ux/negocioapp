@@ -1,6 +1,7 @@
+
 'use client';
 
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState, useEffect, useCallback } from 'react';
 import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
 import { doc, collection, query, where, limit, type Timestamp } from 'firebase/firestore';
 import type { Subscription } from '@/models/subscription';
@@ -126,7 +127,6 @@ export function useSubscription() {
   const isLoading = timedOut || error ? false : rawIsLoading;
 
   const memoizedSubscriptionValues = useMemo(() => {
-    // FUENTE DE VERDAD: Priorizar la suscripción activa si existe
     const subscriptionPlanId = subscription?.plan;
     const businessPlanName = (businessData as any)?.planName;
     
@@ -159,20 +159,15 @@ export function useSubscription() {
     };
 
     const planType = (details?.name || currentPlanId).toLowerCase();
-
-    // LÓGICA CENTRALIZADA DE MÓDULOS ACTIVOS (DERECHOS)
     const activeModuleIds = new Set<string>();
     
-    // 1. Módulos incluidos en el plan
     details?.includedModuleKeys?.forEach(key => activeModuleIds.add(key));
 
-    // 2. Módulos activados/desactivados manualmente en la DB del cliente
     dbModules?.forEach(m => {
         if (m.status === 'active') activeModuleIds.add(m.id);
         else if (m.status === 'inactive') activeModuleIds.delete(m.id);
     });
 
-    // 3. SaaS Autosanación: Si el plan es Estándar o superior, garantizar Catálogo y Blog
     const planName = details?.name || currentPlanId;
     const normalizedName = planName.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
     if (normalizedName.includes('estandar') || normalizedName.includes('pro') || normalizedName.includes('enterprise')) {
@@ -200,29 +195,29 @@ export function useSubscription() {
   const couponsCount = coupons?.length ?? 0;
   const promotionsCount = promotions?.length ?? 0;
 
-  const canAddBlogPosts = (currentCount: number): boolean => {
+  const canAddBlogPosts = useCallback((currentCount: number): boolean => {
     if (memoizedSubscriptionValues.limits.blogPosts === -1) return true;
     return currentCount < memoizedSubscriptionValues.limits.blogPosts;
-  };
+  }, [memoizedSubscriptionValues.limits.blogPosts]);
 
-  const canAddProducts = (currentCount: number): boolean => {
+  const canAddProducts = useCallback((currentCount: number): boolean => {
     if (memoizedSubscriptionValues.limits.products === -1) return true;
     return currentCount < memoizedSubscriptionValues.limits.products;
-  };
+  }, [memoizedSubscriptionValues.limits.products]);
 
-  const canAddOrders = (currentCount: number): boolean => {
+  const canAddOrders = useCallback((currentCount: number): boolean => {
     if (memoizedSubscriptionValues.limits.orders === -1) return true;
     return currentCount < memoizedSubscriptionValues.limits.orders;
-  };
+  }, [memoizedSubscriptionValues.limits.orders]);
   
-  const canAddSuggestions = (currentCount: number): boolean => {
+  const canAddSuggestions = useCallback((currentCount: number): boolean => {
     if (memoizedSubscriptionValues.limits.suggestions === -1) return true;
     return currentCount < memoizedSubscriptionValues.limits.suggestions;
-  };
+  }, [memoizedSubscriptionValues.limits.suggestions]);
 
-  const isModuleAuthorized = (moduleId: string): boolean => {
+  const isModuleAuthorized = useCallback((moduleId: string): boolean => {
       return memoizedSubscriptionValues.activeModuleIds.has(moduleId);
-  };
+  }, [memoizedSubscriptionValues.activeModuleIds]);
 
   return {
     subscription,

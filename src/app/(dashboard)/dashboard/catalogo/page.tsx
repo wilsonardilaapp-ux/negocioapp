@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -23,8 +24,8 @@ import {
 } from "../../../../components/ui/alert-dialog";
 import type { LandingHeaderConfigData } from '../../../../models/landing-page';
 import { v4 as uuidv4 } from 'uuid';
-import { useUser, useFirestore, setDocumentNonBlocking, deleteDocumentNonBlocking, useDoc, useCollection, useMemoFirebase } from '../../../../firebase';
-import { doc, collection, getDoc } from 'firebase/firestore';
+import { useUser, useFirestore, setDocumentNonBlocking, deleteDocumentNonBlocking, useCollection, useMemoFirebase } from '../../../../firebase';
+import { doc, getDoc } from 'firebase/firestore';
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '../../../../components/ui/tooltip';
 import { useToast } from '../../../../hooks/use-toast';
 import { useSubscription } from '../../../../hooks/useSubscription';
@@ -78,6 +79,8 @@ export default function CatalogoPage() {
         isLoading: isSubscriptionLoading 
     } = useSubscription();
 
+    const isAuthorized = useMemo(() => isModuleAuthorized('catalogo'), [isModuleAuthorized]);
+
     const productsQuery = useMemoFirebase(() => 
         user ? collection(firestore, 'businesses', user.uid, 'products') : null, 
     [firestore, user]);
@@ -90,13 +93,11 @@ export default function CatalogoPage() {
         const fetchConfig = async () => {
             if (!isMounted) return;
             
-            // Si el módulo no está autorizado por el plan ni por DB, no seguimos
-            if (!isModuleAuthorized('catalogo')) {
+            if (!isAuthorized) {
                 setInitialLoading(false);
                 return;
             }
 
-            setInitialLoading(true);
             try {
                 const headerConfigRef = doc(firestore, 'businesses', user.uid, 'landingConfig', 'header');
                 const headerConfigSnap = await getDoc(headerConfigRef);
@@ -126,7 +127,7 @@ export default function CatalogoPage() {
 
         fetchConfig();
         return () => { isMounted = false; };
-    }, [user, firestore, isUserLoading, toast, isModuleAuthorized]);
+    }, [user, firestore, isUserLoading, toast, isAuthorized]);
     
     const isLoading = isUserLoading || isSubscriptionLoading || areProductsLoading || isInitialLoading;
     const productCount = products?.length ?? 0;
@@ -214,8 +215,7 @@ export default function CatalogoPage() {
         return <div className="flex items-center justify-center h-64"><Loader2 className="h-8 w-8 animate-spin" /> Cargando tu catálogo...</div>
     }
 
-    // Usamos el hook central para verificar autorización en lugar de la DB manual
-    if (!isModuleAuthorized('catalogo')) {
+    if (!isAuthorized) {
         return (
             <Card>
                 <CardHeader>
@@ -334,6 +334,7 @@ export default function CatalogoPage() {
                             </p>
                         </CardContent>
                     </Card>
+
                 )}
             </div>
             
