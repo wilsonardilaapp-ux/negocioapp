@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -319,17 +318,29 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
             <div className="border rounded-xl divide-y bg-muted/30 overflow-hidden">
                 {cartItems.map(item => (
                 <div key={item.id} className="flex items-center justify-between p-4 bg-white/50">
-                    <div className="flex-1 min-w-0 pr-4">
-                        <p className="font-bold text-sm truncate">{item.name}</p>
-                        <div className="flex items-center gap-2 mt-1">
-                            {item.appliedPromotion && (
-                                <span className="text-xs line-through text-muted-foreground">
-                                    {formatCurrency(item.price)}
+                    <div className="flex items-center flex-1 min-w-0 pr-4 gap-4">
+                        {/* IMAGEN DEL PRODUCTO EN EL CARRITO */}
+                        <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-lg border bg-white">
+                            <Image 
+                                src={item.images?.[0] || 'https://picsum.photos/seed/placeholder/200/200'} 
+                                alt={item.name} 
+                                fill 
+                                sizes="3.5rem"
+                                className="object-cover"
+                            />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                            <p className="font-bold text-sm truncate">{item.name}</p>
+                            <div className="flex items-center gap-2 mt-1">
+                                {item.appliedPromotion && (
+                                    <span className="text-xs line-through text-muted-foreground">
+                                        {formatCurrency(item.price)}
+                                    </span>
+                                )}
+                                <span className="text-sm font-black text-primary">
+                                    {formatCurrency(item.appliedPromotion?.discountedPrice ?? item.price)}
                                 </span>
-                            )}
-                            <span className="text-sm font-black text-primary">
-                                {formatCurrency(item.appliedPromotion?.discountedPrice ?? item.price)}
-                            </span>
+                            </div>
                         </div>
                     </div>
                     <div className="flex items-center gap-3">
@@ -652,9 +663,9 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
                 disabled={isSubmitting || !selectedPaymentMethod}
             >
                 {isSubmitting ? (
-                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 ) : (
-                    <WhatsAppIcon className="mr-2 h-5 w-5" />
+                    <WhatsAppIcon className="mr-2 h-4 w-4" />
                 )}
                 Confirmar y Enviar Pedido
             </button>
