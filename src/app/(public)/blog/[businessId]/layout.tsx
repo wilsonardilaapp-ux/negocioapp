@@ -8,31 +8,33 @@ type Props = {
 };
 
 async function getBusinessData(idOrSlug: string) {
-  const db = await getAdminFirestore();
-  const cleanSlug = idOrSlug.toLowerCase().trim();
+  try {
+    const db = await getAdminFirestore();
+    const cleanSlug = idOrSlug.toLowerCase().trim();
 
-  const directSnap = await db.collection("businesses").doc(idOrSlug).get();
-  if (directSnap.exists) return directSnap.data();
+    const directSnap = await db.collection("businesses").doc(idOrSlug).get();
+    if (directSnap.exists) return directSnap.data();
 
-  const shareSnap = await db.collectionGroup("shareConfig")
-    .where("slug", "==", cleanSlug)
-    .limit(1)
-    .get();
+    const shareSnap = await db.collectionGroup("shareConfig")
+      .where("slug", "==", cleanSlug)
+      .limit(1)
+      .get();
 
-  if (!shareSnap.empty) {
-    const businessId = shareSnap.docs[0].ref.parent.parent?.id;
-    if (businessId) {
-      const bSnap = await db.collection("businesses").doc(businessId).get();
-      return bSnap.data();
+    if (!shareSnap.empty) {
+      const businessId = shareSnap.docs[0].ref.parent.parent?.id;
+      if (businessId) {
+        const bSnap = await db.collection("businesses").doc(businessId).get();
+        return bSnap.data();
+      }
     }
+  } catch (error) {
+    console.error("Error resolving business data:", error);
   }
-
   return null;
 }
 
 export async function generateMetadata({ params }: { params: { businessId: string } }): Promise<Metadata> {
   const business = await getBusinessData(params.businessId);
-  
   if (!business) return { title: "Blog" };
   
   return {
@@ -44,10 +46,11 @@ export async function generateMetadata({ params }: { params: { businessId: strin
 export default async function BlogLayout({ children, params }: Props) {
   const business = await getBusinessData(params.businessId);
   const faviconUrl = business?.faviconUrl || business?.logoURL || null;
+  const title = business?.name ? `Blog - ${business.name}` : "Blog";
 
   return (
     <>
-      <FaviconInjector faviconUrl={faviconUrl} />
+      <FaviconInjector faviconUrl={faviconUrl} title={title} />
       {children}
     </>
   );

@@ -3,14 +3,26 @@
 import { useEffect } from 'react';
 
 /**
- * Inyecta dinámicamente el favicon en el head del documento.
- * Limpia iconos previos para asegurar que el branding del cliente SaaS prevalezca.
+ * Inyecta dinámicamente el favicon y el título en el head del documento.
+ * Maneja URLs externas y Base64.
  */
-export default function FaviconInjector({ faviconUrl }: { faviconUrl?: string | null }) {
+export default function FaviconInjector({ 
+  faviconUrl, 
+  title 
+}: { 
+  faviconUrl?: string | null;
+  title?: string | null;
+}) {
   useEffect(() => {
+    // 1. Actualizar el título de la pestaña
+    if (title) {
+      document.title = title;
+    }
+
+    // 2. Actualizar el Favicon
     if (!faviconUrl) return;
 
-    // Eliminar favicons y apple-touch-icons previos para evitar conflictos de caché del navegador
+    // Eliminar favicons y apple-touch-icons previos para evitar conflictos de caché
     const existingIcons = document.querySelectorAll("link[rel~='icon'], link[rel='apple-touch-icon']");
     existingIcons.forEach(el => el.parentNode?.removeChild(el));
 
@@ -26,7 +38,7 @@ export default function FaviconInjector({ faviconUrl }: { faviconUrl?: string | 
     appleLink.href = faviconUrl;
     document.head.appendChild(appleLink);
     
-  }, [faviconUrl]);
+  }, [faviconUrl, title]);
 
   return null;
 }

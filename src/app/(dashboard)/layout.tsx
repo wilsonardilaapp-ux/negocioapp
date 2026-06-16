@@ -1,4 +1,3 @@
-
 'use client';
 
 import type { ReactNode } from "react";
@@ -33,6 +32,7 @@ import { uploadMedia } from "@/ai/flows/upload-media-flow";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
 import { NotificationBell } from "@/components/layout/NotificationBell";
+import FaviconInjector from "@/components/layout/FaviconInjector";
 
 const LoadingScreen = () => (
     <div className="flex justify-center items-center h-screen">
@@ -46,7 +46,6 @@ const LoadingScreen = () => (
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   const { user, isUserLoading } = useUser();
   const auth = useAuth();
-  const router = useRouter();
   const firestore = useFirestore();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
@@ -58,13 +57,9 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
   const { data: business, isLoading: isBusinessLoading } = useDoc<Business>(businessDocRef);
 
-  // Redirection is now primarily handled by the FirebaseProvider.
-  // This layout will just show a loading screen or nothing while the provider decides.
-
   const handleLogout = async () => {
     if (!auth) return;
     try {
-      // The FirebaseProvider will handle the redirection via onAuthStateChanged
       await auth.signOut();
     } catch (error) {
       console.error("Error signing out: ", error);
@@ -100,12 +95,15 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   }
   
   if (!user) {
-      // Render nothing while the FirebaseProvider handles the redirection.
       return null;
   }
 
   return (
     <SidebarProvider>
+      <FaviconInjector 
+        faviconUrl={business?.faviconUrl || business?.logoURL} 
+        title={business?.name ? `Dashboard - ${business.name}` : 'Zentry Dashboard'} 
+      />
       <Sidebar>
         <SidebarHeader>
           <Link href="/dashboard" className="flex items-center gap-2">
