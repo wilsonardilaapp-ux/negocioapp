@@ -4,30 +4,28 @@ import { useEffect } from 'react';
 
 /**
  * Inyecta dinámicamente el favicon en el head del documento.
- * Útil para SaaS donde el favicon cambia según el cliente y puede ser un string Base64.
+ * Limpia iconos previos para asegurar que el branding del cliente SaaS prevalezca.
  */
 export default function FaviconInjector({ faviconUrl }: { faviconUrl?: string | null }) {
   useEffect(() => {
     if (!faviconUrl) return;
 
-    // Buscar el link del favicon existente
-    let link: HTMLLinkElement | null = document.querySelector("link[rel~='icon']");
-    
-    // Si no existe, crearlo
-    if (!link) {
-      link = document.createElement('link');
-      link.rel = 'icon';
-      document.getElementsByTagName('head')[0].appendChild(link);
-    }
+    // Eliminar favicons y apple-touch-icons previos para evitar conflictos de caché del navegador
+    const existingIcons = document.querySelectorAll("link[rel~='icon'], link[rel='apple-touch-icon']");
+    existingIcons.forEach(el => el.parentNode?.removeChild(el));
 
-    // Actualizar la ruta del icono (soporta URL y Base64)
+    // Crear e inyectar el nuevo favicon (soporta URL y Base64)
+    const link = document.createElement('link');
+    link.rel = 'icon';
     link.href = faviconUrl;
+    document.head.appendChild(link);
+
+    // Inyectar apple-touch-icon para dispositivos iOS
+    const appleLink = document.createElement('link');
+    appleLink.rel = 'apple-touch-icon';
+    appleLink.href = faviconUrl;
+    document.head.appendChild(appleLink);
     
-    // Opcional: También para apple-touch-icon
-    let appleLink: HTMLLinkElement | null = document.querySelector("link[rel='apple-touch-icon']");
-    if (appleLink) {
-        appleLink.href = faviconUrl;
-    }
   }, [faviconUrl]);
 
   return null;

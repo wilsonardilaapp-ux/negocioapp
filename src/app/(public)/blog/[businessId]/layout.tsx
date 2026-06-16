@@ -7,24 +7,42 @@ type Props = {
   children: React.ReactNode;
 };
 
-export async function generateMetadata({ params }: { params: { businessId: string } }): Promise<Metadata> {
+async function getBusinessData(idOrSlug: string) {
   const db = await getAdminFirestore();
-  const businessSnap = await db.collection("businesses").doc(params.businessId).get();
+  const cleanSlug = idOrSlug.toLowerCase().trim();
+
+  const directSnap = await db.collection("businesses").doc(idOrSlug).get();
+  if (directSnap.exists) return directSnap.data();
+
+  const shareSnap = await db.collectionGroup("shareConfig")
+    .where("slug", "==", cleanSlug)
+    .limit(1)
+    .get();
+
+  if (!shareSnap.empty) {
+    const businessId = shareSnap.docs[0].ref.parent.parent?.id;
+    if (businessId) {
+      const bSnap = await db.collection("businesses").doc(businessId).get();
+      return bSnap.data();
+    }
+  }
+
+  return null;
+}
+
+export async function generateMetadata({ params }: { params: { businessId: string } }): Promise<Metadata> {
+  const business = await getBusinessData(params.businessId);
   
-  if (!businessSnap.exists) return { title: "Blog" };
+  if (!business) return { title: "Blog" };
   
-  const business = businessSnap.data();
   return {
-    title: business?.name ? `Blog - ${business.name}` : "Blog",
+    title: business.name ? `Blog - ${business.name}` : "Blog",
     description: "Lee nuestras últimas noticias y artículos.",
   };
 }
 
 export default async function BlogLayout({ children, params }: Props) {
-  const db = await getAdminFirestore();
-  const businessSnap = await db.collection("businesses").doc(params.businessId).get();
-  
-  const business = businessSnap.data();
+  const business = await getBusinessData(params.businessId);
   const faviconUrl = business?.faviconUrl || business?.logoURL || null;
 
   return (
