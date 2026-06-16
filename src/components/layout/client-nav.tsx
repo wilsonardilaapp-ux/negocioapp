@@ -1,4 +1,3 @@
-
 "use client";
 
 import Link from "next/link";
@@ -92,8 +91,10 @@ export function ClientNav() {
     }
 
     // 3. Regla de autosanación SaaS: Si el plan es Estándar o superior, asegurar visibilidad de módulos base
-    const planName = planDetails?.name?.toLowerCase() || '';
-    if (planName.includes('estándar') || planName.includes('pro') || planName.includes('enterprise')) {
+    const rawPlanName = planDetails?.name || '';
+    const normalizedPlanName = rawPlanName.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    
+    if (normalizedPlanName.includes('estandar') || normalizedPlanName.includes('pro') || normalizedPlanName.includes('enterprise')) {
         ids.add('catalogo');
         ids.add('blog');
     }

@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -139,11 +138,16 @@ export default function BusinessesPage() {
         business.name.toLowerCase().includes(searchBusiness.toLowerCase()) ||
         (business.ownerName && business.ownerName.toLowerCase().includes(searchBusiness.toLowerCase())) ||
         (business.ownerEmail && business.ownerEmail.toLowerCase().includes(searchBusiness.toLowerCase()));
-      const planMatch = filterPlan === 'all' || business.planName === plans?.find(p => p.id === filterPlan)?.name || business.planName === filterPlan;
+      
+      const matchedPlan = allPlans.find(p => p.id === business.planName || p.name === business.planName);
+      const planNameForFilter = matchedPlan?.id || business.planName || 'free';
+      
+      const planMatch = filterPlan === 'all' || planNameForFilter === filterPlan;
       const statusMatch = filterStatus === 'all' || business.status === filterStatus;
+      
       return searchMatch && planMatch && statusMatch;
     });
-  }, [businesses, searchBusiness, filterPlan, filterStatus, plans]);
+  }, [businesses, searchBusiness, filterPlan, filterStatus, allPlans]);
 
   const handleSaveBusiness = async () => {
     if (!businessForm.name || !businessForm.ownerName || !businessForm.ownerEmail || !businessForm.planId) {
@@ -168,11 +172,14 @@ export default function BusinessesPage() {
     try {
         const subSnap = await getDoc(doc(firestore, `businesses/${business.id}/subscription`, 'current'));
         const subData = subSnap.exists() ? subSnap.data() as any : null;
-        const actualPlanId = subData?.plan || 'free';
+        
+        // Priorizar suscripción si está activa
+        const actualPlanId = (subData?.status === 'active' ? subData.plan : null) || business.planName || 'free';
 
-        const currentPlanDetails = allPlans.find(p => p.id === actualPlanId || p.name === business.planName);
+        const currentPlanDetails = allPlans.find(p => p.id === actualPlanId || p.name === actualPlanId);
         const resolvedPlanName = currentPlanDetails?.name || business.planName || 'Plan Gratuito';
 
+        // Actualización silenciosa si hay desajuste
         if (business.planName !== resolvedPlanName) {
             updateDocumentNonBlocking(doc(firestore, 'businesses', business.id), { planName: resolvedPlanName });
         }
@@ -180,7 +187,7 @@ export default function BusinessesPage() {
         setSelectedBusiness({ 
             ...business, 
             status: business.status || subData?.status || 'active', 
-            ownerName: business.ownerName || business.name || 'N/A',
+            ownerName: business.ownerName || business.name || 'Propietario',
             ownerEmail: business.ownerEmail || business.contactEmail || 'N/A',
             planName: resolvedPlanName,
             imageLimit: business.imageLimit ?? undefined,
@@ -259,6 +266,8 @@ export default function BusinessesPage() {
     setIsSavingChanges(true);
 
     try {
+        const batch = writeBatch(firestore);
+
         // 1. Validar extras de módulos
         for (const moduleId of assignedModules) {
           const extra = moduleExtras[moduleId] || 0;
@@ -281,8 +290,6 @@ export default function BusinessesPage() {
           throw new Error(`Error en Límites Extra:\n${errorMsg}`);
         }
         
-        const batch = writeBatch(firestore);
-
         // 3. Actualizar documento principal del negocio
         const businessRef = doc(firestore, 'businesses', selectedBusiness.id);
         const businessUpdateData: any = {
@@ -294,14 +301,14 @@ export default function BusinessesPage() {
         };
         batch.update(businessRef, businessUpdateData);
         
-        // 4. Desactivar todos los módulos y servicios existentes para limpieza
+        // 4. Limpieza: Desactivar todos los módulos y servicios existentes
         const currentModules = await getDocs(collection(firestore, `businesses/${selectedBusiness.id}/modules`));
         currentModules.forEach(mDoc => batch.update(mDoc.ref, { status: 'inactive' }));
         
         const currentServices = await getDocs(collection(firestore, `businesses/${selectedBusiness.id}/services`));
         currentServices.forEach(sDoc => batch.update(sDoc.ref, { status: 'inactive' }));
         
-        // 5. Activar módulos y servicios seleccionados
+        // 5. Activación Selectiva
         assignedModules.forEach(id => {
           const extra = moduleExtras[id] || 0;
           batch.set(doc(firestore, `businesses/${selectedBusiness.id}/modules`, id), { status: 'active', extra }, { merge: true });
@@ -311,12 +318,12 @@ export default function BusinessesPage() {
             batch.set(doc(firestore, `businesses/${selectedBusiness.id}/services`, id), { status: 'active' }, { merge: true });
         });
 
-        // 6. Ejecutar cambios atómicos
+        // 6. Persistencia Atómica
         await batch.commit();
         
         toast({ 
-            title: "Configuración guardada", 
-            description: `Se han actualizado los parámetros para ${selectedBusiness.name}.` 
+            title: "Cambios guardados", 
+            description: `Se ha sincronizado el perfil de ${selectedBusiness.name}.` 
         });
         
         setShowManageModal(false);
@@ -324,8 +331,8 @@ export default function BusinessesPage() {
         console.error("Error al guardar gestión de negocio:", e);
         toast({ 
             variant: 'destructive', 
-            title: 'Error al guardar', 
-            description: e.message || 'Ocurrió un error inesperado al intentar guardar.' 
+            title: 'No se pudo guardar', 
+            description: e.message || 'Ocurrió un error inesperado.' 
         });
     } finally {
         setIsSavingChanges(false);
@@ -434,13 +441,13 @@ export default function BusinessesPage() {
                   <tr key={business.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
-                          <Building2 className="w-5 h-5 text-primary" />
+                        <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center text-primary">
+                          <Building2 className="w-5 h-5" />
                         </div>
                         <div>
                           <p className="font-bold text-gray-900">{business.name}</p>
                           <p className="text-xs text-gray-500 font-medium">
-                            {business.ownerName || business.name || 'Propietario N/A'}
+                            {business.ownerName || business.name || 'Propietario'}
                           </p>
                         </div>
                       </div>
@@ -672,7 +679,7 @@ export default function BusinessesPage() {
             </Button>
           </DialogFooter>
         </DialogContent>
-      </Dialog>
+       </Dialog>
     </div>
   );
 }

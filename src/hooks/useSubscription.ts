@@ -28,7 +28,7 @@ export function useSubscription() {
   );
   
   const businessQuery = useMemoFirebase(
-    () => (user?.uid ? query(collection(firestore, 'businesses'), where('userId', '==', user.uid), limit(1)) : null),
+    () => (user?.uid ? query(collection(firestore, 'businesses'), where('id', '==', user.uid), limit(1)) : null),
     [user?.uid, firestore]
   );
 
@@ -118,12 +118,20 @@ export function useSubscription() {
   const isLoading = timedOut || error ? false : rawIsLoading;
 
   const { plan, isActive, limits, isFree, isPro, isEnterprise, planDetails } = useMemo(() => {
-    const businessPlanName = (businessData as any)?.planName;
+    // FUENTE DE VERDAD: Priorizar la suscripción activa si existe
     const subscriptionPlan = subscription?.plan;
+    const businessPlanName = (businessData as any)?.planName;
     
-    // planName híbrido tiene prioridad absoluta
-    const currentPlanId = businessPlanName ?? subscriptionPlan ?? 'free';
-    
+    let currentPlanId = 'free';
+
+    if (subscriptionPlan && subscription?.status === 'active') {
+        currentPlanId = subscriptionPlan;
+    } else if (businessPlanName && businessPlanName !== 'Plan Gratuito') {
+        currentPlanId = businessPlanName;
+    } else if (businessPlanName === 'Plan Gratuito' && subscriptionPlan) {
+        currentPlanId = subscriptionPlan;
+    }
+
     const details = allPlans?.find(p => p.id === currentPlanId || p.name === currentPlanId) || 
                        allHybridPlans?.find(p => p.id === currentPlanId || p.name === currentPlanId);
 
@@ -142,15 +150,15 @@ export function useSubscription() {
         suggestions: baseLimits.suggestions === -1 ? -1 : (baseLimits.suggestions + (extras.suggestions || 0)),
     };
 
-    const planType = currentPlanId.toLowerCase();
+    const planType = (details?.name || currentPlanId).toLowerCase();
 
     return {
-      plan: currentPlanId,
-      isActive: !!businessPlanName || subscription?.status === 'active',
+      plan: details?.name || currentPlanId,
+      isActive: !!details || subscription?.status === 'active',
       limits: mergedLimits,
-      isFree: planType === 'free',
+      isFree: planType.includes('gratuito') || planType === 'free',
       isPro: planType.includes('pro'),
-      isEnterprise: planType.includes('enterprise'),
+      isEnterprise: planType.includes('enterprise') || planType.includes('estándar') || planType.includes('estandar'),
       planDetails: details || null,
     };
   }, [subscription, allPlans, allHybridPlans, businessData]);
