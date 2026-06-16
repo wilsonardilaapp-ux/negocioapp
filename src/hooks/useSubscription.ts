@@ -118,13 +118,16 @@ export function useSubscription() {
   const isLoading = timedOut || error ? false : rawIsLoading;
 
   const { plan, isActive, limits, isFree, isPro, isEnterprise } = useMemo(() => {
-    const currentPlanId = (businessData as any)?.planName ?? subscription?.plan ?? 'free';
+    const businessPlanName = (businessData as any)?.planName;
+    const subscriptionPlan = subscription?.plan;
     
-    // Buscar en planes normales o híbridos
-    const planDetails = allPlans?.find(p => p.id === currentPlanId) || 
+    // planName híbrido tiene prioridad absoluta
+    const currentPlanId = businessPlanName ?? subscriptionPlan ?? 'free';
+    
+    const planDetails = allPlans?.find(p => p.id === currentPlanId || p.name === currentPlanId) || 
                        allHybridPlans?.find(p => p.id === currentPlanId || p.name === currentPlanId);
 
-    const defaultLimits: PlanLimits = { products: 0, blogPosts: 0, landingPages: 0, coupons: 0, promotions: 0, orders: -1, suggestions: 0 };
+    const defaultLimits: PlanLimits = { products: 4, blogPosts: 4, landingPages: 1, coupons: 0, promotions: 0, orders: -1, suggestions: 0 };
 
     const extras = (businessData as any)?.limitesExtra || {};
     const baseLimits = planDetails?.limits ?? defaultLimits;
