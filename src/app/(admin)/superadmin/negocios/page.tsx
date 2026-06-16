@@ -35,6 +35,7 @@ import type { SubscriptionPlan } from '@/models/subscription-plan';
 import type { SystemService } from '@/models/system-service';
 import type { Module } from '@/models/module';
 import type { HybridPlan } from '@/models/hybrid-plan';
+import { useToast } from '@/hooks/use-toast';
 
 const iconMap: { [key: string]: React.ReactNode } = {
   catalogo: <Building2 className="w-4 h-4" />,
@@ -84,6 +85,7 @@ const StatusBadge = ({ status }: { status: EntityStatus | string | undefined }) 
 export default function BusinessesPage() {
   const router = useRouter();
   const firestore = useFirestore();
+  const { toast } = useToast();
 
   // Data fetching
   const { data: businesses, isLoading: businessesLoading } = useCollection<Business>(useMemoFirebase(() => collection(firestore, 'businesses'), [firestore]));
@@ -104,6 +106,7 @@ export default function BusinessesPage() {
   const [showBusinessModal, setShowBusinessModal] = useState(false);
   const [showManageModal, setShowManageModal] = useState(false);
   const [isManaging, setIsManaging] = useState(false);
+  const [isSavingChanges, setIsSavingChanges] = useState(false);
   const [selectedBusiness, setSelectedBusiness] = useState<Business | null>(null);
   
   // Modules State
@@ -163,7 +166,6 @@ export default function BusinessesPage() {
   const openManageBusiness = async (business: Business) => {
     setIsManaging(true);
     try {
-        // 0. Fetch the actual subscription from subcollection (Source of Truth)
         const subSnap = await getDoc(doc(firestore, `businesses/${business.id}/subscription`, 'current'));
         const subData = subSnap.exists() ? subSnap.data() as any : null;
         const actualPlanId = subData?.plan || 'free';
@@ -171,9 +173,7 @@ export default function BusinessesPage() {
         const currentPlanDetails = allPlans.find(p => p.id === actualPlanId || p.name === business.planName);
         const resolvedPlanName = currentPlanDetails?.name || business.planName || 'Plan Gratuito';
 
-        // --- LÓGICA DE AUTOSANACIÓN ---
         if (business.planName !== resolvedPlanName) {
-            console.log(`[Autosanación] Corrigiendo plan para ${business.name}: ${business.planName} -> ${resolvedPlanName}`);
             updateDocumentNonBlocking(doc(firestore, 'businesses', business.id), { planName: resolvedPlanName });
         }
 
@@ -187,7 +187,6 @@ export default function BusinessesPage() {
             productLimit: business.productLimit ?? undefined 
         });
         
-        // 1. Load assigned modules and services
         const modulesSnapshot = await getDocs(collection(firestore, `businesses/${business.id}/modules`));
         const activeModuleIds: string[] = [];
         const extras: Record<string, number> = {};
@@ -206,7 +205,6 @@ export default function BusinessesPage() {
         const servicesSnapshot = await getDocs(collection(firestore, `businesses/${business.id}/services`));
         setAssignedServices(servicesSnapshot.docs.filter(doc => doc.data().status === 'active').map(doc => doc.id));
 
-        // 2. Load Plan Limits and Hierarchy
         if (currentPlanDetails && 'limits' in currentPlanDetails) {
             setCurrentPlanLimits(currentPlanDetails.limits);
             
@@ -232,7 +230,6 @@ export default function BusinessesPage() {
             setNextPlanLimits(null);
         }
 
-        // 3. Load existing LimitesExtra from Business document
         const businessDoc = business as any;
         if (businessDoc?.limitesExtra) {
             setLimitesExtra({
@@ -257,57 +254,82 @@ export default function BusinessesPage() {
   };
   
   const handleSaveManageBusiness = async () => {
-    if (!selectedBusiness) return;
+    if (!selectedBusiness || !firestore) return;
     
-    // 1. Validate module extras
-    for (const moduleId of assignedModules) {
-      const extra = moduleExtras[moduleId] || 0;
-      const validation = validateModuleExtra(selectedBusiness.planName, extra);
-      if (!validation.valid) {
-        alert(`Error en módulo ${moduleId}: ${validation.error}`);
-        return;
-      }
+    setIsSavingChanges(true);
+
+    try {
+        // 1. Validar extras de módulos
+        for (const moduleId of assignedModules) {
+          const extra = moduleExtras[moduleId] || 0;
+          const validation = validateModuleExtra(selectedBusiness.planName, extra);
+          if (!validation.valid) {
+            throw new Error(`Error en módulo ${moduleId}: ${validation.error}`);
+          }
+        }
+
+        // 2. Validar límites de plan
+        const validation = validateLimitesExtra(
+          nextPlanName || 'Superior',
+          currentPlanLimits,
+          nextPlanLimits,
+          limitesExtra
+        );
+
+        if (!validation.valid) {
+          const errorMsg = Object.values(validation.errors).join('\n');
+          throw new Error(`Error en Límites Extra:\n${errorMsg}`);
+        }
+        
+        const batch = writeBatch(firestore);
+
+        // 3. Actualizar documento principal del negocio
+        const businessRef = doc(firestore, 'businesses', selectedBusiness.id);
+        const businessUpdateData: any = {
+          status: selectedBusiness.status,
+          planName: selectedBusiness.planName,
+          imageLimit: selectedBusiness.imageLimit ? Number(selectedBusiness.imageLimit) : null,
+          productLimit: selectedBusiness.productLimit ? Number(selectedBusiness.productLimit) : null,
+          limitesExtra: limitesExtra
+        };
+        batch.update(businessRef, businessUpdateData);
+        
+        // 4. Desactivar todos los módulos y servicios existentes para limpieza
+        const currentModules = await getDocs(collection(firestore, `businesses/${selectedBusiness.id}/modules`));
+        currentModules.forEach(mDoc => batch.update(mDoc.ref, { status: 'inactive' }));
+        
+        const currentServices = await getDocs(collection(firestore, `businesses/${selectedBusiness.id}/services`));
+        currentServices.forEach(sDoc => batch.update(sDoc.ref, { status: 'inactive' }));
+        
+        // 5. Activar módulos y servicios seleccionados
+        assignedModules.forEach(id => {
+          const extra = moduleExtras[id] || 0;
+          batch.set(doc(firestore, `businesses/${selectedBusiness.id}/modules`, id), { status: 'active', extra }, { merge: true });
+        });
+        
+        assignedServices.forEach(id => {
+            batch.set(doc(firestore, `businesses/${selectedBusiness.id}/services`, id), { status: 'active' }, { merge: true });
+        });
+
+        // 6. Ejecutar cambios atómicos
+        await batch.commit();
+        
+        toast({ 
+            title: "Configuración guardada", 
+            description: `Se han actualizado los parámetros para ${selectedBusiness.name}.` 
+        });
+        
+        setShowManageModal(false);
+    } catch (e: any) {
+        console.error("Error al guardar gestión de negocio:", e);
+        toast({ 
+            variant: 'destructive', 
+            title: 'Error al guardar', 
+            description: e.message || 'Ocurrió un error inesperado al intentar guardar.' 
+        });
+    } finally {
+        setIsSavingChanges(false);
     }
-
-    // 2. Validate Plan Limits Extra
-    const validation = validateLimitesExtra(
-      nextPlanName || 'Superior',
-      currentPlanLimits,
-      nextPlanLimits,
-      limitesExtra
-    );
-
-    if (!validation.valid) {
-      const errorMsg = Object.values(validation.errors).join('\n');
-      alert(`Error en Límites Extra:\n${errorMsg}`);
-      return;
-    }
-    
-    const businessUpdateData: any = {
-      status: selectedBusiness.status,
-      planName: selectedBusiness.planName,
-      imageLimit: selectedBusiness.imageLimit && Number(selectedBusiness.imageLimit) > 0 ? Number(selectedBusiness.imageLimit) : null,
-      productLimit: selectedBusiness.productLimit && Number(selectedBusiness.productLimit) > 0 ? Number(selectedBusiness.productLimit) : null,
-      limitesExtra: limitesExtra
-    };
-
-    await updateDocumentNonBlocking(doc(firestore, `businesses/${selectedBusiness.id}`), businessUpdateData);
-    
-    const batch = writeBatch(firestore);
-    const currentModules = await getDocs(collection(firestore, `businesses/${selectedBusiness.id}/modules`));
-    currentModules.forEach(doc => batch.update(doc.ref, { status: 'inactive' }));
-    
-    const currentServices = await getDocs(collection(firestore, `businesses/${selectedBusiness.id}/services`));
-    currentServices.forEach(doc => batch.update(doc.ref, { status: 'inactive' }));
-    
-    assignedModules.forEach(id => {
-      const extra = moduleExtras[id] || 0;
-      batch.set(doc(firestore, `businesses/${selectedBusiness.id}/modules`, id), { status: 'active', extra }, { merge: true });
-    });
-    assignedServices.forEach(id => batch.set(doc(firestore, `businesses/${selectedBusiness.id}/services`, id), { status: 'active' }, { merge: true }));
-
-    await batch.commit();
-    setShowManageModal(false);
   };
   
   const toggleModuleAssignment = (moduleId: string) => {
@@ -540,7 +562,17 @@ export default function BusinessesPage() {
                 </div>
                 <div className="mt-2">
                     <p className="text-[10px] uppercase font-bold text-muted-foreground mb-1">Estado en Plataforma</p>
-                    <StatusBadge status={selectedBusiness.status} />
+                    <Select value={selectedBusiness.status} onValueChange={(v: EntityStatus) => setSelectedBusiness({...selectedBusiness, status: v})}>
+                        <SelectTrigger className="w-full h-8">
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="active">Activo</SelectItem>
+                            <SelectItem value="pending_payment">Pago Pendiente</SelectItem>
+                            <SelectItem value="inactive">Inactivo</SelectItem>
+                            <SelectItem value="suspended">Suspendido</SelectItem>
+                        </SelectContent>
+                    </Select>
                 </div>
               </div>
 
@@ -630,26 +662,12 @@ export default function BusinessesPage() {
                   </p>
                 )}
               </div>
-
-              <div className="border-t pt-6">
-                <h4 className="font-bold mb-3 text-gray-800">Estado Maestro del Negocio</h4>
-                <Select value={selectedBusiness.status} onValueChange={(v: EntityStatus) => setSelectedBusiness(prev => prev ? {...prev, status: v} : null)}>
-                    <SelectTrigger className="w-full font-semibold">
-                        <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="active" className="font-bold text-green-700">Activo (Acceso Total)</SelectItem>
-                        <SelectItem value="pending_payment" className="font-bold text-yellow-700">Pago Pendiente (Restringido)</SelectItem>
-                        <SelectItem value="inactive" className="font-bold text-gray-700">Inactivo (Suspendido)</SelectItem>
-                        <SelectItem value="suspended" className="font-bold text-red-700">Bloqueado (Acción Manual)</SelectItem>
-                    </SelectContent>
-                </Select>
-              </div>
             </div>
           )}
           <DialogFooter className="bg-muted/30 p-6 -mx-6 -mb-6 border-t">
-            <Button variant="ghost" className="font-bold" onClick={() => setShowManageModal(false)}>Cancelar</Button>
-            <Button onClick={handleSaveManageBusiness} className="bg-primary hover:bg-primary/90 font-black px-8">
+            <Button variant="ghost" className="font-bold" onClick={() => setShowManageModal(false)} disabled={isSavingChanges}>Cancelar</Button>
+            <Button onClick={handleSaveManageBusiness} className="bg-primary hover:bg-primary/90 font-black px-8" disabled={isSavingChanges}>
+                {isSavingChanges ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
                 Guardar Configuración de Plan
             </Button>
           </DialogFooter>
