@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from 'react';
@@ -19,12 +20,11 @@ import Link from 'next/link';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
-import type { Subscription } from '@/models/subscription';
 import { useFirestore, useUser, updateDocumentNonBlocking } from '@/firebase';
 import { doc } from 'firebase/firestore';
 
 export interface CurrentPlanInfo {
-  plan: 'free' | 'pro' | 'enterprise';
+  plan: string;
   status: 'active' | 'canceled' | 'past_due' | 'trialing';
   currentPeriodEnd: Date | null;
   isExpiringSoon: boolean;
@@ -37,17 +37,11 @@ interface CurrentPlanCardProps {
   planInfo: CurrentPlanInfo;
 }
 
-const planConfig = {
-    free: { name: 'Plan Gratuito', badge: 'secondary' as const },
-    pro: { name: 'Plan Profesional', badge: 'default' as const },
-    enterprise: { name: 'Plan Empresarial', badge: 'destructive' as const },
-};
-
-const statusConfig = {
-    active: { label: 'Activo', variant: 'default' as const }, // Success would be green
-    canceled: { label: 'Cancelado', variant: 'destructive' as const },
-    past_due: { label: 'Pago Vencido', variant: 'destructive' as const },
-    trialing: { label: 'En Prueba', variant: 'secondary' as const },
+// Configuración visual para planes conocidos.
+const planConfig: Record<string, { name: string; badge: "default" | "secondary" | "destructive" | "outline" }> = {
+    free: { name: 'Plan Gratuito', badge: 'secondary' },
+    pro: { name: 'Plan Profesional', badge: 'default' },
+    enterprise: { name: 'Plan Empresarial', badge: 'destructive' },
 };
 
 export default function CurrentPlanCard({ planInfo }: CurrentPlanCardProps) {
@@ -78,7 +72,6 @@ export default function CurrentPlanCard({ planInfo }: CurrentPlanCardProps) {
             throw new Error(error || 'Error en el servidor al cancelar.');
         }
         
-        // Update Firestore status
         const subDocRef = doc(firestore, `businesses/${user.uid}/subscription`, 'current');
         await updateDocumentNonBlocking(subDocRef, { status: 'canceled' });
 
@@ -97,28 +90,46 @@ export default function CurrentPlanCard({ planInfo }: CurrentPlanCardProps) {
         setCancelConfirmOpen(false);
     }
   };
+
+  // Buscamos en el mapeo, o usamos valores por defecto si es un plan híbrido/desconocido
+  const currentPlanKey = planInfo.plan.toLowerCase();
+  const displayConfig = planConfig[currentPlanKey] || { 
+      name: planInfo.displayName || planInfo.plan, 
+      badge: 'outline' as const 
+  };
   
   return (
     <Card>
       <CardHeader>
         <div className="flex justify-between items-start">
           <CardTitle>Tu Plan Actual</CardTitle>
-           <Badge variant={planConfig[planInfo.plan].badge} className="capitalize text-lg px-4 py-1">{planInfo.plan}</Badge>
+           <Badge variant={displayConfig.badge} className="capitalize text-lg px-4 py-1">
+             {displayConfig.name}
+           </Badge>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
         <div>
-            <p className="text-4xl font-bold">${planInfo.price}<span className="text-lg font-normal text-muted-foreground">/mes</span></p>
-            <p className="text-muted-foreground">{planConfig[planInfo.plan].name}</p>
+            <p className="text-4xl font-bold">${planInfo.price.toLocaleString('es-CO')}<span className="text-lg font-normal text-muted-foreground">/mes</span></p>
+            <p className="text-muted-foreground">{displayConfig.name}</p>
         </div>
         <div className="flex items-center gap-2">
             <p className="text-sm font-medium">Estado:</p>
-            <Badge variant={statusConfig[planInfo.status].variant}>{statusConfig[planInfo.status].label}</Badge>
+            <Badge variant={
+                planInfo.status === 'active' ? 'default' : 
+                planInfo.status === 'trialing' ? 'secondary' : 'destructive'
+            }>
+                {planInfo.status === 'active' ? 'Activo' : 
+                 planInfo.status === 'canceled' ? 'Cancelado' :
+                 planInfo.status === 'past_due' ? 'Vencido' : 
+                 planInfo.status === 'trialing' ? 'En Prueba' : planInfo.status}
+            </Badge>
         </div>
-        {planInfo.currentPeriodEnd && planInfo.status === 'active' && (
-            <div className={cn("text-sm", planInfo.isExpiringSoon && "text-destructive font-bold")}>
-                <p>{planInfo.isExpiringSoon && "⚠️ "}
-                {planInfo.plan === 'free' ? 'Nunca expira' : `Se renueva el ${format(planInfo.currentPeriodEnd, "d 'de' MMMM 'de' yyyy", { locale: es })}.`}
+        {planInfo.currentPeriodEnd && (
+            <div className={cn("text-sm", planInfo.isExpiringSoon && planInfo.status === 'active' && "text-destructive font-bold")}>
+                <p>
+                  {planInfo.isExpiringSoon && planInfo.status === 'active' && "⚠️ "}
+                  {planInfo.plan === 'free' ? 'Nunca expira' : `Vence el ${format(planInfo.currentPeriodEnd, "d 'de' MMMM 'de' yyyy", { locale: es })}.`}
                 </p>
             </div>
         )}
@@ -129,12 +140,7 @@ export default function CurrentPlanCard({ planInfo }: CurrentPlanCardProps) {
                 <Link href="/pricing">Actualizar a PRO →</Link>
             </Button>
         )}
-        {planInfo.plan === 'pro' && (
-            <Button className="w-full" asChild>
-                <Link href="/pricing">Actualizar a ENTERPRISE →</Link>
-            </Button>
-        )}
-         {planInfo.plan !== 'free' && (
+         {planInfo.stripeSubscriptionId && planInfo.status === 'active' && (
             <>
                 <Button variant="destructive" className="w-full" onClick={() => setCancelConfirmOpen(true)}>Cancelar Suscripción</Button>
                 <AlertDialog open={isCancelConfirmOpen} onOpenChange={setCancelConfirmOpen}>

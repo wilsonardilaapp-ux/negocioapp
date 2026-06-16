@@ -18,7 +18,7 @@ export interface UsageMetric {
 
 interface UsageLimitsCardProps {
   usage: UsageMetric[];
-  currentPlan: 'free' | 'pro' | 'enterprise';
+  currentPlan: string;
 }
 
 export default function UsageLimitsCard({ usage, currentPlan }: UsageLimitsCardProps) {

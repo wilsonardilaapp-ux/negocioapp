@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -79,7 +80,7 @@ export default function SubscriptionPage() {
     const price = 'basePrice' in planDetails ? (planDetails as any).basePrice : (planDetails as any).price;
 
     const currentPlanInfo: CurrentPlanInfo = {
-      plan: plan as 'free' | 'pro' | 'enterprise',
+      plan: plan,
       status: subscription?.status ?? 'active',
       currentPeriodEnd: periodEndDate,
       isExpiringSoon,
