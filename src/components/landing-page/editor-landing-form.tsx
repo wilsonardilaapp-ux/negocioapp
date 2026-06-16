@@ -11,8 +11,8 @@ import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { AlignCenter, AlignLeft, AlignRight, GripVertical, PlusCircle, Trash2, X, Star, UploadCloud, Loader2, Pencil, Youtube, Linkedin, Facebook } from "lucide-react";
-import type { LandingPageData, NavLink, ContentSection, TestimonialSection, FormField, SubSection, FooterLink } from "@/models/landing-page";
+import { AlignCenter, AlignLeft, AlignRight, GripVertical, PlusCircle, Trash2, X, Star, UploadCloud, Loader2, Pencil } from "lucide-react";
+import type { LandingPageData, NavLink, ContentSection, TestimonialSection, FormField, SubSection, FooterLink, CustomPlan } from "@/models/landing-page";
 import type { GlobalConfig } from "@/models/global-config";
 import { Badge } from "../ui/badge";
 import RichTextEditor from "../editor/RichTextEditor";
@@ -21,8 +21,8 @@ import EditorHeaderConfigForm from "./editor-header-config-form";
 import { useToast } from "@/hooks/use-toast";
 import { uploadMedia } from "@/ai/flows/upload-media-flow";
 import Image from 'next/image';
-import { TikTokIcon, WhatsAppIcon, XIcon, FacebookIcon, InstagramIcon } from '@/components/icons';
-import { useFirestore, useDoc, useMemoFirebase, setDocumentNonBlocking, useUser } from "@/firebase";
+import { TikTokIcon, WhatsAppIcon, XIcon, FacebookIcon, InstagramIcon, YoutubeIcon } from '@/components/icons';
+import { useFirestore, useDoc, useMemoFirebase, useUser } from "@/firebase";
 import { doc } from "firebase/firestore";
 import type { SubscriptionPlan } from "@/models/subscription-plan";
 
@@ -32,18 +32,6 @@ interface EditorLandingFormProps {
   setData: React.Dispatch<React.SetStateAction<LandingPageData>>;
   plans: SubscriptionPlan[];
   loadingPlans: boolean;
-}
-
-interface PlanButton {
-  label: string;
-  onClick: () => void;
-  variant: 'free' | 'popular' | 'paid';
-}
-
-interface HotmartLink {
-  planId: string;
-  planName: string;
-  hotmartUrl: string;
 }
 
 const MediaUploader = ({
@@ -131,71 +119,6 @@ export default function EditorLandingForm({ data, setData, plans, loadingPlans }
 
     const globalConfigRef = useMemoFirebase(() => !firestore ? null : doc(firestore, 'globalConfig/system'), [firestore]);
     const { data: globalConfig } = useDoc<GlobalConfig>(globalConfigRef);
-
-    const [hotmartLinks, setHotmartLinks] = useState<HotmartLink[]>([]);
-    
-    useEffect(() => {
-        if (plans) {
-            const links = plans.map(p => ({
-                planId: p.id,
-                planName: p.name,
-                hotmartUrl: (p as any).hotmartUrl || '',
-            }));
-            setHotmartLinks(links);
-        }
-    }, [plans]);
-
-    const getPlanButtonConfig = (plan: SubscriptionPlan): PlanButton => {
-        const hotmartLink = hotmartLinks.find((h) => h.planId === plan.id);
-      
-        if (plan.price === 0) {
-          return {
-            label: 'Empezar Gratis',
-            variant: 'free',
-            onClick: () => {
-              const url = hotmartLink?.hotmartUrl || '/register';
-              window.open(url, '_blank');
-            },
-          };
-        }
-      
-        return {
-          label: 'Suscribirse',
-          variant: plan.isMostPopular ? 'popular' : 'paid',
-          onClick: async () => {
-            if (hotmartLink?.hotmartUrl) {
-              window.open(hotmartLink.hotmartUrl, '_blank');
-              return;
-            }
-            if (plan.stripePriceId && !plan.stripePriceId.includes('placeholder') && user) {
-              try {
-                const res = await fetch('/api/stripe/create-checkout-session', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    priceId: plan.stripePriceId,
-                    businessId: user.uid,
-                    userId: user.uid,
-                    email: user.email,
-                  }),
-                });
-                if (!res.ok) throw new Error('Error en la creación de la sesión de checkout.');
-                const data: { url?: string } = await res.json();
-                if (data.url) {
-                  window.open(data.url, '_blank');
-                } else {
-                  throw new Error('URL de checkout no recibida.');
-                }
-              } catch (e) {
-                console.error(e);
-                window.location.href = '/contacto';
-              }
-              return;
-            }
-            window.location.href = '/contacto';
-          },
-        };
-      };
 
     const handleFileUpload = async (file: File): Promise<{ secure_url: string, mediaType: 'image' | 'video' } | null> => {
         return new Promise((resolve) => {
@@ -410,6 +333,73 @@ export default function EditorLandingForm({ data, setData, plans, loadingPlans }
 
     const removeTestimonial = (id: string) => {
         setData((prevData) => ({ ...prevData, testimonials: prevData.testimonials.filter(testimonial => testimonial.id !== id) }));
+    };
+
+    // PLAN MANAGEMENT LOGIC
+    const addPlan = () => {
+        const newPlan: CustomPlan = {
+            id: uuidv4(),
+            name: 'Nuevo Plan',
+            description: 'Descripción breve del plan o servicio.',
+            price: 0,
+            currency: '$',
+            period: '/mes',
+            features: [{ id: uuidv4(), value: 'Característica 1' }],
+            buttonText: 'Comprar ahora',
+            buttonUrl: '#',
+            isPopular: false,
+        };
+        setData(prev => ({ ...prev, plans: [...(prev.plans || []), newPlan] }));
+    };
+
+    const updatePlan = (id: string, field: keyof CustomPlan, value: any) => {
+        setData(prev => ({
+            ...prev,
+            plans: (prev.plans || []).map(p => p.id === id ? { ...p, [field]: value } : p)
+        }));
+    };
+
+    const removePlan = (id: string) => {
+        setData(prev => ({ ...prev, plans: (prev.plans || []).filter(p => p.id !== id) }));
+    };
+
+    const addPlanFeature = (planId: string) => {
+        setData(prev => ({
+            ...prev,
+            plans: (prev.plans || []).map(p => {
+                if (p.id === planId) {
+                    return { ...p, features: [...p.features, { id: uuidv4(), value: '' }] };
+                }
+                return p;
+            })
+        }));
+    };
+
+    const updatePlanFeature = (planId: string, featureId: string, value: string) => {
+        setData(prev => ({
+            ...prev,
+            plans: (prev.plans || []).map(p => {
+                if (p.id === planId) {
+                    return {
+                        ...p,
+                        features: p.features.map(f => f.id === featureId ? { ...f, value } : f)
+                    };
+                }
+                return p;
+            })
+        }));
+    };
+
+    const removePlanFeature = (planId: string, featureId: string) => {
+        setData(prev => ({
+            ...prev,
+            plans: (prev.plans || []).map(p => {
+                if (p.id === planId) {
+                    return { ...p, features: p.features.filter(f => f.id !== featureId) };
+                }
+                return p;
+            })
+        }));
     };
 
     const addFormField = () => {
@@ -920,112 +910,111 @@ export default function EditorLandingForm({ data, setData, plans, loadingPlans }
                     </div>
                 </TabsContent>
 
-                {/* PLANS TAB */}
+                {/* PLANES TAB */}
                 <TabsContent value="planes">
-                  <div className="space-y-4">
-                    <div>
-                      <h3 className="text-lg font-semibold text-gray-800">
-                        Planes de Suscripción
-                      </h3>
-                      <p className="text-sm text-gray-500">
-                        Se muestran debajo de Testimonios en tu página pública. Para editar los planes ve a: Superadmin → Planes.
-                      </p>
-                    </div>
+                    <div className="space-y-4">
+                        <div className="flex justify-between items-center">
+                            <CardTitle className="text-lg">Configuración de Planes/Precios</CardTitle>
+                            <Button onClick={addPlan} size="sm">
+                                <PlusCircle className="mr-2 h-4 w-4" />
+                                Agregar Plan
+                            </Button>
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                            Define los productos o servicios con precio que quieres ofrecer en tu página.
+                        </p>
+                        
+                        {(data.plans && data.plans.length > 0) ? (
+                            <Accordion type="multiple" className="w-full space-y-4">
+                                {data.plans.map((plan, index) => (
+                                    <AccordionItem key={plan.id} value={`plan-${index}`} className="border rounded-lg bg-background">
+                                        <AccordionTrigger className="p-4 text-base font-semibold hover:no-underline">
+                                            <div className="flex items-center gap-2 flex-1 truncate">
+                                                <GripVertical className="h-5 w-5 text-muted-foreground cursor-grab" />
+                                                <span className="truncate">{plan.name || 'Sin nombre'} - {plan.currency}{plan.price}</span>
+                                            </div>
+                                        </AccordionTrigger>
+                                        <AccordionContent className="p-4 pt-0 space-y-4">
+                                            <div className="flex justify-end">
+                                                <Button variant="destructive" size="sm" onClick={() => removePlan(plan.id)}>
+                                                    <Trash2 className="mr-2 h-4 w-4" />
+                                                    Eliminar Plan
+                                                </Button>
+                                            </div>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                <div>
+                                                    <Label>Nombre del Plan</Label>
+                                                    <Input value={plan.name} onChange={(e) => updatePlan(plan.id, 'name', e.target.value)} />
+                                                </div>
+                                                <div className="grid grid-cols-3 gap-2">
+                                                    <div>
+                                                        <Label>Moneda</Label>
+                                                        <Input value={plan.currency} onChange={(e) => updatePlan(plan.id, 'currency', e.target.value)} />
+                                                    </div>
+                                                    <div>
+                                                        <Label>Precio</Label>
+                                                        <Input type="number" value={plan.price} onChange={(e) => updatePlan(plan.id, 'price', Number(e.target.value))} />
+                                                    </div>
+                                                    <div>
+                                                        <Label>Periodo</Label>
+                                                        <Input value={plan.period} onChange={(e) => updatePlan(plan.id, 'period', e.target.value)} placeholder="/mes" />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <Label>Descripción</Label>
+                                                <Input value={plan.description} onChange={(e) => updatePlan(plan.id, 'description', e.target.value)} />
+                                            </div>
+                                            
+                                            <div className="space-y-4 p-4 border rounded-lg">
+                                                <div className="flex justify-between items-center">
+                                                    <h4 className="text-sm font-semibold">Características</h4>
+                                                    <Button variant="outline" size="sm" type="button" onClick={() => addPlanFeature(plan.id)}>
+                                                        <PlusCircle className="mr-2 h-3 w-3" /> Añadir
+                                                    </Button>
+                                                </div>
+                                                <div className="space-y-2">
+                                                    {plan.features.map((feature) => (
+                                                        <div key={feature.id} className="flex gap-2">
+                                                            <Input 
+                                                                value={feature.value} 
+                                                                onChange={(e) => updatePlanFeature(plan.id, feature.id, e.target.value)} 
+                                                                placeholder="Ej: Acceso ilimitado"
+                                                            />
+                                                            <Button variant="ghost" size="icon" type="button" onClick={() => removePlanFeature(plan.id, feature.id)}>
+                                                                <X className="h-4 w-4 text-destructive" />
+                                                            </Button>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
 
-                    {loadingPlans ? (
-                      <div className="flex justify-center py-8">
-                        <Loader2 className="animate-spin h-8 w-8 text-primary" />
-                      </div>
-                    ) : (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {(plans || []).map((plan) => {
-                           const btn = getPlanButtonConfig(plan);
-                           return (
-                              <div
-                                key={plan.id}
-                                className={cn(
-                                  "border rounded-xl p-5 bg-white shadow-sm relative",
-                                  plan.isMostPopular && "border-primary border-2"
-                                )}
-                              >
-                                {plan.isMostPopular && (
-                                  <span className="absolute top-4 right-4 bg-primary text-primary-foreground text-xs font-bold px-2 py-1 rounded-full">
-                                    Más Popular
-                                  </span>
-                                )}
-                                <h4 className="text-xl font-bold text-gray-800">
-                                  {plan.name}
-                                </h4>
-                                <p className="text-sm text-gray-500 mt-1 h-10">
-                                  {plan.description}
-                                </p>
-                                <div className="mt-3">
-                                  <span className="text-3xl font-bold text-gray-900">
-                                    ${plan.price.toFixed(2)}
-                                  </span>
-                                  <span className="text-gray-500 text-sm">
-                                    /mes
-                                  </span>
-                                </div>
-                                <div className="mt-4">
-                                  <p className="text-sm font-semibold text-gray-700 mb-2">
-                                    Características:
-                                  </p>
-                                  <ul className="space-y-1">
-                                    {(plan.features || []).map((feature, idx) => (
-                                      <li
-                                        key={idx}
-                                        className="flex items-center gap-2 text-sm text-gray-600"
-                                      >
-                                        <span className="text-primary font-bold">✓</span>
-                                        {feature.value}
-                                      </li>
-                                    ))}
-                                  </ul>
-                                </div>
-                                <div className="mt-4 pt-4 border-t border-gray-100">
-                                  <p className="text-sm font-semibold text-gray-700 mb-2">
-                                    Límites:
-                                  </p>
-                                  <div className="space-y-1 text-sm text-gray-600">
-                                    <div className="flex justify-between">
-                                      <span>Productos:</span>
-                                      <span className="font-medium">
-                                        {plan.limits.products === -1 ? 'Ilimitados' : plan.limits.products}
-                                      </span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                      <span>Posts de Blog:</span>
-                                      <span className="font-medium">
-                                        {plan.limits.blogPosts === -1 ? 'Ilimitados' : plan.limits.blogPosts}
-                                      </span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                      <span>Landing Pages:</span>
-                                      <span className="font-medium">
-                                        {plan.limits.landingPages === -1 ? 'Ilimitadas' : plan.limits.landingPages}
-                                      </span>
-                                    </div>
-                                  </div>
-                                </div>
-                                <button
-                                  type="button"
-                                  onClick={btn.onClick}
-                                  className={cn(
-                                    "mt-4 w-full py-2 px-4 rounded-lg text-white text-sm font-semibold transition-colors duration-200",
-                                    btn.variant === 'free' ? 'bg-green-500 hover:bg-green-600' :
-                                    btn.variant === 'popular' ? 'bg-green-500 hover:bg-green-600' :
-                                    'bg-blue-600 hover:bg-blue-700'
-                                  )}
-                                >
-                                  {btn.label}
-                                </button>
-                              </div>
-                           )
-                        })}
-                      </div>
-                    )}
-                  </div>
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div>
+                                                    <Label>Texto del Botón</Label>
+                                                    <Input value={plan.buttonText} onChange={(e) => updatePlan(plan.id, 'buttonText', e.target.value)} />
+                                                </div>
+                                                <div>
+                                                    <Label>URL del Botón</Label>
+                                                    <Input value={plan.buttonUrl} onChange={(e) => updatePlan(plan.id, 'buttonUrl', e.target.value)} />
+                                                </div>
+                                            </div>
+                                            
+                                            <div className="flex items-center gap-2 bg-primary/5 p-3 rounded-lg border border-primary/20">
+                                                <Switch id={`popular-${plan.id}`} checked={plan.isPopular} onCheckedChange={(val) => updatePlan(plan.id, 'isPopular', val)} />
+                                                <Label htmlFor={`popular-${plan.id}`} className="font-bold text-primary cursor-pointer">Marcar como plan recomendado / popular</Label>
+                                            </div>
+                                        </AccordionContent>
+                                    </AccordionItem>
+                                ))}
+                            </Accordion>
+                        ) : (
+                            <div className="flex flex-col items-center justify-center text-center p-10 h-64 border rounded-md bg-muted/20">
+                                <p className="text-muted-foreground font-medium">No has configurado planes todavía.</p>
+                                <p className="text-sm text-muted-foreground">¡Crea tu primer plan de precios para tu landing!</p>
+                            </div>
+                        )}
+                    </div>
                 </TabsContent>
 
                 {/* SEO TAB */}

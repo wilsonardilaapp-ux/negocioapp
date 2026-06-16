@@ -7,11 +7,25 @@ export type LandingPageData = {
   form: FormSection;
   header: LandingHeaderConfigData; // New section
   footer: FooterSection;
+  plans: CustomPlan[]; // Added for custom pricing sections
   chatbot?: {
     greeting: string;
     avatarUrl: string;
   };
   updatedAt?: number;
+};
+
+export type CustomPlan = {
+  id: string;
+  name: string;
+  description: string;
+  price: number;
+  currency: string;
+  period: string;
+  features: { id: string; value: string }[];
+  buttonText: string;
+  buttonUrl: string;
+  isPopular: boolean;
 };
 
 export type HeroSection = {

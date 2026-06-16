@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useRouter, useSearchParams } from "next/navigation";
@@ -81,6 +80,7 @@ const initialLandingPageData: LandingPageData = {
   },
   sections: [],
   testimonials: [],
+  plans: [],
   seo: {
     title: 'Mi Negocio | Soluciones Innovadoras',
     description: 'Ofrecemos soluciones innovadoras para impulsar tu negocio al siguiente nivel.',
@@ -305,6 +305,7 @@ function RegisterForm() {
         header: { ...initialLandingPageData.header, businessInfo: { ...initialLandingPageData.header.businessInfo, name: businessData.name, email: values.email }},
         form: { ...initialLandingPageData.form, destinationEmail: values.email },
         footer: { ...initialLandingPageData.footer, contactInfo: { ...initialLandingPageData.footer.contactInfo, email: values.email }, copyright: { ...initialLandingPageData.footer.copyright, companyName: businessData.name }},
+        plans: [],
       });
 
       // Configuración de Pagos

@@ -1,4 +1,3 @@
-
 import { getLandingData } from '../../../../lib/get-landing-data';
 import LandingEditorClient from './EditorClient';
 import type { LandingPageData } from '../../../../models/landing-page';
@@ -40,6 +39,7 @@ const fallbackData: LandingPageData = {
   },
   sections: [],
   testimonials: [],
+  plans: [],
   seo: {
     title: 'Zentry | Plataforma SaaS de Gestión Empresarial',
     description: 'Centraliza y automatiza tu negocio con Zentry. Catálogos, IA, Blog y más.',

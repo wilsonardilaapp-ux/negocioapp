@@ -30,6 +30,7 @@ const initialLandingData: LandingPageData = {
   navigation: { enabled: true, logoUrl: '', businessName: 'Mi Negocio', logoAlt: 'Logo', logoWidth: 120, logoAlignment: 'left', links: [], backgroundColor: '#FFFFFF', textColor: '#000000', hoverColor: '#4CAF50', fontSize: 16, spacing: 4, useShadow: true },
   sections: [], 
   testimonials: [], 
+  plans: [],
   seo: { title: 'Mi Negocio', description: '', keywords: [] }, 
   form: { fields: [], destinationEmail: '' }, 
   header: { 
@@ -79,6 +80,7 @@ export default function LandingPageBuilder() {
             header: { ...initialLandingData.header, ...savedData.header },
             navigation: { ...initialLandingData.navigation, ...savedData.navigation },
             footer: { ...initialLandingData.footer, ...savedData.footer },
+            plans: savedData.plans || [],
           };
           setData(mergedData);
         }

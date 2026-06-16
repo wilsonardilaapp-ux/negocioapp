@@ -2,10 +2,10 @@
 
 import React, { useMemo, useState } from 'react';
 import Link from 'next/link';
-import type { LandingPageData, NavLink } from '@/models/landing-page';
+import type { LandingPageData, NavLink, CustomPlan } from '@/models/landing-page';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { MessageCircle, Phone, Mail, Clock, MapPin, Youtube, Linkedin, Star, Loader2 } from 'lucide-react';
+import { MessageCircle, Phone, Mail, Clock, MapPin, Youtube, Linkedin, Star, Loader2, Check } from 'lucide-react';
 import { PublicContactForm } from './public-contact-form';
 import { TikTokIcon, WhatsAppIcon, XIcon, FacebookIcon, InstagramIcon, YoutubeIcon } from '@/components/icons';
 import { cn } from '@/lib/utils';
@@ -45,6 +45,60 @@ const getLinkUrl = (link: NavLink, currentBusinessId: string | undefined): strin
   if (text.includes('contacto')) return '/contacto';
   if (text.includes('inicio')) return currentBusinessId ? `/landing/${currentBusinessId}` : '/';
   return '#';
+};
+
+const CustomPlanCard = ({ plan }: { plan: CustomPlan }) => {
+    return (
+        <div
+            className={cn(
+                "rounded-2xl p-6 bg-white relative flex flex-col h-full transition-all hover:shadow-lg",
+                plan.isPopular ? 'border-2 border-primary shadow-md scale-105 z-10' : 'border border-gray-200'
+            )}
+        >
+            {plan.isPopular && (
+                <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-wider">
+                    Recomendado
+                </span>
+            )}
+            <div className="flex-grow">
+                <h3 className="text-xl font-bold text-gray-800 text-center mb-1">
+                    {plan.name}
+                </h3>
+                <p className="text-xs text-center text-gray-500 mb-4 line-clamp-2 h-8">
+                    {plan.description}
+                </p>
+                <div className="text-center mb-6">
+                    <span className="text-sm font-bold text-gray-500 mr-1">{plan.currency}</span>
+                    <span className="text-4xl font-black text-gray-900">
+                        {plan.price.toLocaleString('es-CO')}
+                    </span>
+                    <span className="text-gray-400 text-sm ml-1">
+                        {plan.period}
+                    </span>
+                </div>
+                <ul className="space-y-3 mb-6 border-t pt-4">
+                    {plan.features.map((feature, idx) => (
+                        <li key={feature.id || idx} className="flex items-start gap-2 text-sm text-gray-600">
+                            <Check className="text-primary h-4 w-4 mt-0.5 shrink-0" />
+                            <span>{feature.value}</span>
+                        </li>
+                    ))}
+                </ul>
+            </div>
+            <div className="mt-auto">
+                <Button 
+                    className={cn(
+                        "w-full py-6 rounded-xl font-bold transition-all",
+                        plan.isPopular ? "bg-primary text-white shadow-lg" : "variant-outline"
+                    )}
+                    onClick={() => window.open(plan.buttonUrl, '_self')}
+                    variant={plan.isPopular ? 'default' : 'outline'}
+                >
+                    {plan.buttonText}
+                </Button>
+            </div>
+        </div>
+    );
 };
 
 const getPlanButtonConfig = (plan: SubscriptionPlan | HybridPlan, hotmartLinks: HotmartLink[], user: any): PlanButton => {
@@ -237,7 +291,7 @@ const PlanCard = ({
 };
 
 export default function LandingPageContent({ data, plans = [], hybridPlans = [], businessId, logoUrl }: LandingPageContentProps) {
-  const { hero, navigation, sections, testimonials, form, footer, header } = data;
+  const { hero, navigation, sections, testimonials, form, footer, header, plans: customPlans } = data;
 
   const finalLogoUrl = logoUrl || navigation.logoUrl;
 
@@ -259,7 +313,7 @@ export default function LandingPageContent({ data, plans = [], hybridPlans = [],
     const all = [...(plans || []), ...(hybridPlans || [])];
     return all.sort((a, b) => {
       const priceA = 'price' in a ? a.price : (a as HybridPlan).basePrice;
-      const priceB = 'price' in b ? b.price : (b as HybridPlan).basePrice;
+      const priceB = 'price' in b ? b.price : (a as HybridPlan).basePrice;
       return priceA - priceB;
     });
   }, [plans, hybridPlans]);
@@ -489,7 +543,21 @@ export default function LandingPageContent({ data, plans = [], hybridPlans = [],
       )}
 
       {/* Plans Section */}
-      {sortedPlans.length > 0 && (
+      {(customPlans?.length ?? 0) > 0 ? (
+          <section className="py-16 px-4 bg-gray-50" id="precios">
+             <div className="max-w-6xl mx-auto">
+                <div className="text-center mb-10">
+                    <h2 className="text-3xl font-bold text-gray-900">Nuestros Planes</h2>
+                    <p className="text-gray-500 mt-2">Elige la opción que mejor se adapte a lo que buscas.</p>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 justify-center items-stretch">
+                    {customPlans?.map((plan) => (
+                        <CustomPlanCard key={plan.id} plan={plan} />
+                    ))}
+                </div>
+             </div>
+          </section>
+      ) : sortedPlans.length > 0 ? (
           <section className="py-16 px-4 bg-gray-50" id="precios">
             <div className="max-w-6xl mx-auto">
               <div className="text-center mb-10">
@@ -513,7 +581,7 @@ export default function LandingPageContent({ data, plans = [], hybridPlans = [],
               </div>
             </div>
           </section>
-        )}
+        ) : null}
 
       {/* Formulario */}
       <section id="contact" className="py-24 bg-gray-50 flex-grow">
