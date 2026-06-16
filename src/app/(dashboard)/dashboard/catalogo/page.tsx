@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -25,7 +24,7 @@ import {
 import type { LandingHeaderConfigData } from '../../../../models/landing-page';
 import { v4 as uuidv4 } from 'uuid';
 import { useUser, useFirestore, setDocumentNonBlocking, deleteDocumentNonBlocking, useCollection, useMemoFirebase } from '../../../../firebase';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, collection } from 'firebase/firestore'; // SE AÑADE collection AQUÍ
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '../../../../components/ui/tooltip';
 import { useToast } from '../../../../hooks/use-toast';
 import { useSubscription } from '../../../../hooks/useSubscription';
@@ -79,6 +78,7 @@ export default function CatalogoPage() {
         isLoading: isSubscriptionLoading 
     } = useSubscription();
 
+    // Verificación de autorización basada en el plan (Zentry Standard / Híbrido incluido)
     const isAuthorized = useMemo(() => isModuleAuthorized('catalogo'), [isModuleAuthorized]);
 
     const productsQuery = useMemoFirebase(() => 
@@ -93,6 +93,7 @@ export default function CatalogoPage() {
         const fetchConfig = async () => {
             if (!isMounted) return;
             
+            // Si el hook central dice que no está autorizado, dejamos de cargar
             if (!isAuthorized) {
                 setInitialLoading(false);
                 return;
@@ -223,7 +224,7 @@ export default function CatalogoPage() {
                 </CardHeader>
                 <CardContent className="flex flex-col items-center justify-center text-center gap-4 min-h-[400px]">
                     <Frown className="h-12 w-12 text-muted-foreground" />
-                    <h3 className="text-xl font-semibold">Funcionalidad en Mantenimiento</h3>
+                    <h3 className="text-xl font-semibold">Funcionalidad no disponible</h3>
                     <p className="text-muted-foreground max-w-sm">
                         El módulo de "Catálogo de Productos" no está activo en tu plan actual. Por favor, contacta al administrador de la plataforma para más información.
                     </p>
@@ -334,7 +335,6 @@ export default function CatalogoPage() {
                             </p>
                         </CardContent>
                     </Card>
-
                 )}
             </div>
             
