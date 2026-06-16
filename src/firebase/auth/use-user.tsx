@@ -1,15 +1,14 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { onAuthStateChanged, type User } from 'firebase/auth';
-import { doc, onSnapshot, getDoc, setDoc } from 'firebase/firestore';
+import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 import { useFirebase } from '@/firebase/provider';
 import { updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import type { User as UserProfile } from '@/models/user';
 
 // --- LISTA BLANCA ESTRICTA DE SUPER ADMINISTRADORES ---
-// Solo estos correos pueden tener acceso total a la infraestructura SaaS.
 const SUPER_ADMIN_EMAILS = [
   'allseosoporte@gmail.com',
   'admin@zentry.com',
@@ -24,31 +23,33 @@ export function useUser() {
     error: null,
   });
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [isProfileLoading, setProfileLoading] = useState(false);
+  const [isProfileLoading, setProfileLoading] = useState(true);
 
   const router = useRouter();
   const pathname = usePathname();
+  const isRedirecting = useRef(false);
 
-  // Effect 1: Monitorear cambios en Firebase Auth
+  // 1. Monitorear cambios en Firebase Auth
   useEffect(() => {
     if (!auth || !isNetworkEnabled) return;
     
     const unsubscribe = onAuthStateChanged(auth, (user) => {
         setAuthState({ user, isLoading: false, error: null });
+        if (!user) {
+            setProfile(null);
+            setProfileLoading(false);
+        }
     }, (error) => {
         setAuthState({ user: null, isLoading: false, error });
+        setProfileLoading(false);
     });
 
     return () => unsubscribe();
   }, [auth, isNetworkEnabled]);
 
-  // Effect 2: Obtener Perfil y Auto-Corrección de Roles
+  // 2. Obtener Perfil y Autosanación de Roles
   useEffect(() => {
-    if (!firestore || !authState.user) {
-        setProfile(null);
-        setProfileLoading(false);
-        return;
-    }
+    if (!firestore || !authState.user) return;
 
     setProfileLoading(true);
     const userDocRef = doc(firestore, 'users', authState.user.uid);
@@ -58,76 +59,90 @@ export function useUser() {
         if (docSnap.exists()) {
             const data = docSnap.data() as UserProfile;
             
-            // --- LÓGICA DE SEGURIDAD: AUTOSANACIÓN DE ROLES ---
-            // Si el usuario es super_admin en DB pero su email NO está en la lista blanca: DEGRADAR.
-            if (data.role === 'super_admin' && !SUPER_ADMIN_EMAILS.includes(userEmail)) {
-                console.warn(`[Seguridad] El usuario ${userEmail} no está autorizado como super_admin. Degradando a cliente_admin.`);
+            // --- LÓGICA DE SEGURIDAD: AUTOSANACIÓN ---
+            const isAuthorizedAdmin = SUPER_ADMIN_EMAILS.includes(userEmail);
+            
+            if (data.role === 'super_admin' && !isAuthorizedAdmin) {
+                console.warn(`[Seguridad] Degradando usuario no autorizado: ${userEmail}`);
                 const correctedProfile = { ...data, role: 'cliente_admin' as const };
                 setProfile(correctedProfile);
-                // Corregir en la base de datos de forma no bloqueante
                 updateDocumentNonBlocking(userDocRef, { role: 'cliente_admin' });
+            } else if (data.role !== 'super_admin' && isAuthorizedAdmin) {
+                // Auto-ascensión si está en la lista blanca pero no tiene el rol
+                const correctedProfile = { ...data, role: 'super_admin' as const };
+                setProfile(correctedProfile);
+                updateDocumentNonBlocking(userDocRef, { role: 'super_admin' });
             } else {
                 setProfile(data);
             }
-            setProfileLoading(false);
-        } else if (authState.user) {
-            try {
-                // Auto-creación de perfil si no existe
-                const isAdmin = SUPER_ADMIN_EMAILS.includes(userEmail);
-                const assignedRole = isAdmin ? 'super_admin' : 'cliente_admin';
-                
-                const newProfile: UserProfile = {
-                    id: authState.user.uid,
-                    name: authState.user.displayName || 'Usuario',
-                    email: userEmail,
-                    role: assignedRole,
-                    status: 'active',
-                    createdAt: new Date().toISOString(),
-                    lastLogin: new Date().toISOString(),
-                };
-                
-                await setDoc(userDocRef, newProfile, { merge: true });
-                setProfile(newProfile);
-            } catch (e) {
-                console.error("Error al crear perfil automático:", e);
-            } finally {
-                setProfileLoading(false);
-            }
+        } else {
+            // Auto-creación si el documento no existe
+            const isAdmin = SUPER_ADMIN_EMAILS.includes(userEmail);
+            const newProfile: UserProfile = {
+                id: authState.user!.uid,
+                name: authState.user!.displayName || 'Usuario',
+                email: userEmail,
+                role: isAdmin ? 'super_admin' : 'cliente_admin',
+                status: 'active',
+                createdAt: new Date().toISOString(),
+                lastLogin: new Date().toISOString(),
+            };
+            await setDoc(userDocRef, newProfile, { merge: true });
+            setProfile(newProfile);
         }
+        setProfileLoading(false);
     }, (error) => {
-        console.error("Error en el listener de perfil:", error);
+        console.error("Error en listener de perfil:", error);
         setProfileLoading(false);
     });
 
     return () => unsubscribe();
   }, [firestore, authState.user]);
 
-  // Effect 3: Lógica de Redirección Automática por Rol
+  // 3. Lógica de Redirección Robusta
   useEffect(() => {
-    if (authState.isLoading || isProfileLoading) return;
+    if (authState.isLoading || isProfileLoading || isRedirecting.current) return;
 
     const isAuthPage = pathname === '/login' || pathname === '/register' || pathname === '/forgot-password';
     const isDashboardPage = pathname.startsWith('/dashboard');
     const isSuperAdminPage = pathname.startsWith('/superadmin');
 
-    if (authState.user) {
-        const role = profile?.role;
+    // Caso: No hay usuario autenticado
+    if (!authState.user) {
+        if (isDashboardPage || isSuperAdminPage) {
+            isRedirecting.current = true;
+            router.replace('/login');
+        }
+        return;
+    }
 
-        if (role === 'super_admin') {
+    // Caso: Usuario autenticado con perfil cargado
+    if (profile) {
+        const role = profile.role;
+        const isAdmin = role === 'super_admin';
+
+        if (isAdmin) {
+            // Super Admin solo debe estar en /superadmin
             if (isAuthPage || isDashboardPage) {
+                isRedirecting.current = true;
                 router.replace('/superadmin');
             }
         } else {
-            // Usuarios cliente_admin o staff
+            // Cliente/Staff solo debe estar en /dashboard
             if (isAuthPage || isSuperAdminPage) {
+                isRedirecting.current = true;
                 router.replace('/dashboard');
             }
         }
-    } else {
-        if (isDashboardPage || isSuperAdminPage) {
-            router.replace('/login');
-        }
     }
+
+    // Resetear flag de redirección tras el ciclo de renderizado
+    const timer = setTimeout(() => {
+        isRedirecting.current = false;
+    }, 500);
+    
+    return () => clearTimeout(timer);
+
   }, [authState.isLoading, authState.user, profile, isProfileLoading, pathname, router]);
 
   return {

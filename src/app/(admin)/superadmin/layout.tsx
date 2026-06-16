@@ -1,9 +1,7 @@
-
 'use client';
 
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -32,38 +30,33 @@ const LoadingScreen = () => (
     <div className="flex justify-center items-center h-screen bg-background">
         <div className="text-center flex flex-col items-center gap-4">
             <Loader2 className="h-10 w-10 animate-spin text-primary" />
-            <p className="text-muted-foreground font-medium">Cargando y verificando acceso...</p>
+            <p className="text-muted-foreground font-medium">Verificando credenciales de administrador...</p>
         </div>
     </div>
 );
 
 export default function SuperAdminLayout({ children }: { children: ReactNode }) {
-  const { user, isUserLoading, profile } = useUser();
+  const { user, isUserLoading, profile, isProfileLoading } = useUser();
   const auth = useAuth();
-  const router = useRouter();
 
   const handleLogout = async () => {
     if (!auth) return;
     try {
       await auth.signOut();
-      // The FirebaseProvider will redirect to /login on auth state change.
     } catch (error) {
       console.error("Error signing out: ", error);
     }
   };
   
-  if (isUserLoading) {
+  // Mostrar pantalla de carga solo mientras los datos esenciales se obtienen
+  if (isUserLoading || isProfileLoading) {
     return <LoadingScreen />;
   }
 
-  // If loading is done and there's no user, the provider will redirect.
-  // Render nothing to avoid a flash of content.
-  if (!user) {
+  // Si no es un super_admin confirmado, no renderizar nada (el hook useUser manejará la patada a /dashboard)
+  if (!user || profile?.role !== 'super_admin') {
     return null;
   }
-  
-  // We now TRUST that the FirebaseProvider will handle redirection for non-super_admins.
-  // This layout no longer needs to check the role, which prevents race conditions.
 
   return (
     <SidebarProvider>
@@ -88,7 +81,7 @@ export default function SuperAdminLayout({ children }: { children: ReactNode }) 
                   </Avatar>
                   <div className="text-left">
                     <p className="text-sm font-medium">{profile?.name ?? "Super Admin"}</p>
-                    <p className="text-xs text-muted-foreground">{user?.email}</p>
+                    <p className="text-xs text-muted-foreground">Super Administrador</p>
                   </div>
                 </div>
               </Button>
@@ -103,7 +96,7 @@ export default function SuperAdminLayout({ children }: { children: ReactNode }) 
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem asChild><Link href="/">Página principal</Link></DropdownMenuItem>
+              <DropdownMenuItem asChild><Link href="/">Ir al sitio público</Link></DropdownMenuItem>
               <DropdownMenuItem onClick={handleLogout}>Cerrar sesión</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -114,8 +107,8 @@ export default function SuperAdminLayout({ children }: { children: ReactNode }) 
           <div className="md:hidden">
             <SidebarTrigger />
           </div>
-          <div className="ml-auto">
-            {/* Header content for admin panel can go here */}
+          <div className="ml-auto text-xs text-muted-foreground font-mono bg-muted/50 px-2 py-1 rounded">
+            Panel de Control Global
           </div>
         </header>
         <main className="flex-1 p-4 md:p-6">{children}</main>
