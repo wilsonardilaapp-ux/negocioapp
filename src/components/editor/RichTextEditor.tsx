@@ -1,15 +1,14 @@
 'use client';
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { uploadMedia } from '@/ai/flows/upload-media-flow';
 import { useToast } from '@/hooks/use-toast';
 import 'quill/dist/quill.snow.css';
 
-// Using a more explicit dynamic import to resolve the module correctly.
-// This pattern helps Next.js's bundler handle non-standard module exports.
+// Importación dinámica robusta para evitar errores de carga de chunks en entornos de red específicos
 const QuillEditor = dynamic(
-  () => import('react-quill'),
+  () => import('react-quill').then((mod) => mod.default),
   {
     ssr: false,
     loading: () => <div className="h-[200px] w-full animate-pulse rounded-md bg-muted" />,
@@ -24,6 +23,12 @@ interface RichTextEditorProps {
 
 const RichTextEditor: React.FC<RichTextEditorProps> = ({ value, onChange, placeholder }) => {
   const { toast } = useToast();
+  const [mounted, setMounted] = useState(false);
+
+  // Asegurar que el componente solo se renderice en el cliente tras el montaje inicial
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const modules = useMemo(() => ({
     toolbar: {
@@ -41,9 +46,8 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({ value, onChange, placeh
         ['clean'],
       ],
       handlers: {
-        // Use a standard function to get the correct `this` context from Quill
         image: function imageHandler() {
-          // @ts-ignore - `this.quill` is the Quill instance bound by the library.
+          // @ts-ignore - Acceso interno al objeto quill de la instancia
           const quill = this.quill;
           if (!quill) return;
 
@@ -98,8 +102,12 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({ value, onChange, placeh
     },
   }), [toast]);
 
+  if (!mounted) {
+    return <div className="h-[200px] w-full rounded-md bg-muted animate-pulse" />;
+  }
+
   return (
-    <div className="rich-editor-wrapper">
+    <div className="rich-editor-wrapper text-foreground">
       <QuillEditor
         theme="snow"
         value={value}
