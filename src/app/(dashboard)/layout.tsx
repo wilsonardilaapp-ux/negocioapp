@@ -23,6 +23,14 @@ import {
   SidebarInset,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardFooter,
+} from "@/components/ui/card";
 import { Logo } from "@/components/icons";
 import { ClientNav } from "@/components/layout/client-nav";
 import { useAuth, useUser, useFirestore, useDoc, useMemoFirebase, setDocumentNonBlocking } from "@/firebase";
@@ -30,7 +38,7 @@ import { doc } from "firebase/firestore";
 import type { Business } from "@/models/business";
 import { uploadMedia } from "@/ai/flows/upload-media-flow";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2 } from "lucide-react";
+import { Loader2, XCircle } from "lucide-react";
 import { NotificationBell } from "@/components/layout/NotificationBell";
 import FaviconInjector from "@/components/layout/FaviconInjector";
 
@@ -44,7 +52,7 @@ const LoadingScreen = () => (
 );
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
-  const { user, isUserLoading } = useUser();
+  const { user, isUserLoading, profile } = useUser();
   const auth = useAuth();
   const firestore = useFirestore();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -96,6 +104,45 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   
   if (!user) {
       return null;
+  }
+
+  // VALIDACIÓN DE NEGOCIO DESACTIVADO
+  // Si el negocio está inactivo y el usuario no es super_admin, bloqueamos el acceso.
+  if (business?.status === 'inactive' && profile?.role !== 'super_admin') {
+      return (
+          <div className="flex flex-col items-center justify-center min-h-screen bg-background p-6 text-center">
+              <FaviconInjector 
+                faviconUrl={business?.faviconUrl || business?.logoURL} 
+                title="Negocio Desactivado" 
+              />
+              <Card className="max-w-md w-full border-destructive/50 shadow-xl animate-in fade-in zoom-in duration-300">
+                  <CardHeader>
+                      <div className="flex justify-center mb-4">
+                          <div className="p-3 bg-destructive/10 rounded-full">
+                              <XCircle className="h-12 w-12 text-destructive" />
+                          </div>
+                      </div>
+                      <CardTitle className="text-2xl font-bold">Negocio Desactivado</CardTitle>
+                      <CardDescription>
+                          Este negocio ha sido desactivado temporalmente por el administrador de la plataforma.
+                      </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                      <p className="text-sm text-muted-foreground">
+                          Actualmente no tiene acceso a las funcionalidades del sistema. Para obtener más información, comuníquese con el administrador de la plataforma.
+                      </p>
+                      <div className="p-2 bg-muted rounded text-xs font-mono font-bold text-destructive uppercase">
+                          Estado: Desactivado
+                      </div>
+                  </CardContent>
+                  <CardFooter>
+                      <Button variant="default" className="w-full font-bold" onClick={handleLogout}>
+                          Cerrar Sesión
+                      </Button>
+                  </CardFooter>
+              </Card>
+          </div>
+      );
   }
 
   return (

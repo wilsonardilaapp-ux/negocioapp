@@ -34,6 +34,7 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
 import { Check, Plus, Search, Building2, Eye, Puzzle, Tag, AlertCircle, TrendingUp, Mail, User, ShieldCheck, Loader2, Sparkles, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Label } from '@/components/ui/label';
@@ -119,6 +120,10 @@ export default function BusinessesPage() {
   const [isSavingChanges, setIsSavingChanges] = useState(false);
   const [selectedBusiness, setSelectedBusiness] = useState<Business | null>(null);
   
+  // Status Toggle State
+  const [businessToDeactivate, setBusinessToDeactivate] = useState<Business | null>(null);
+  const [isStatusDialogOpen, setIsStatusDialogOpen] = useState(false);
+
   // Modules State
   const [assignedModules, setAssignedModules] = useState<string[]>([]);
   const [moduleExtras, setModuleExtras] = useState<Record<string, number>>({});
@@ -192,6 +197,53 @@ export default function BusinessesPage() {
         title: "Error al eliminar",
         description: error.message || "No se pudo eliminar el negocio.",
       });
+    }
+  };
+
+  const handleToggleStatus = async (business: Business, checked: boolean) => {
+    if (!firestore) return;
+    
+    if (!checked) {
+      // Intenta desactivar: abrir diálogo
+      setBusinessToDeactivate(business);
+      setIsStatusDialogOpen(true);
+    } else {
+      // Activar directamente
+      try {
+        const businessRef = doc(firestore, 'businesses', business.id);
+        await updateDocumentNonBlocking(businessRef, { status: 'active' });
+        toast({
+          title: "Negocio Activado",
+          description: `${business.name} ahora tiene acceso a la plataforma.`,
+        });
+      } catch (error) {
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "No se pudo activar el negocio.",
+        });
+      }
+    }
+  };
+
+  const confirmDeactivate = async () => {
+    if (!businessToDeactivate || !firestore) return;
+    try {
+      const businessRef = doc(firestore, 'businesses', businessToDeactivate.id);
+      await updateDocumentNonBlocking(businessRef, { status: 'inactive' });
+      toast({
+        title: "Negocio Desactivado",
+        description: `Se ha bloqueado el acceso a ${businessToDeactivate.name}.`,
+      });
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "No se pudo desactivar el negocio.",
+      });
+    } finally {
+      setIsStatusDialogOpen(false);
+      setBusinessToDeactivate(null);
     }
   };
 
@@ -495,7 +547,16 @@ export default function BusinessesPage() {
                         {business.phone || 'N/A'}
                     </td>
                     <td className="px-6 py-4">
-                      <div className="flex items-center justify-end gap-2">
+                      <div className="flex items-center justify-end gap-3">
+                        {/* SWITCH DE ACTIVACIÓN/DESACTIVACIÓN */}
+                        <div className="flex items-center gap-2 mr-1">
+                          <Label className="text-[10px] font-bold text-muted-foreground uppercase">{business.status === 'active' ? 'ON' : 'OFF'}</Label>
+                          <Switch 
+                            checked={business.status === 'active'}
+                            onCheckedChange={(checked) => handleToggleStatus(business, checked)}
+                          />
+                        </div>
+
                         <Button size="sm" variant="outline" className="font-bold" onClick={() => openManageBusiness(business)} disabled={isManaging}>
                             {isManaging && selectedBusiness?.id === business.id ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <Eye className="w-4 h-4 mr-1.5" />}
                             Gestionar
@@ -574,6 +635,28 @@ export default function BusinessesPage() {
         </DialogContent>
       </Dialog>
       
+      {/* Alerta de Desactivación */}
+      <AlertDialog open={isStatusDialogOpen} onOpenChange={setIsStatusDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Desactivar Negocio</AlertDialogTitle>
+            <AlertDialogDescription>
+              ¿Está seguro de que desea desactivar este negocio?
+              <br /><br />
+              Mientras el negocio permanezca desactivado, sus administradores y usuarios no podrán acceder a la plataforma.
+              <br /><br />
+              Esta acción puede revertirse en cualquier momento desde el panel de Super Administración.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setBusinessToDeactivate(null)}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDeactivate} className="bg-destructive hover:bg-destructive/90">
+              Desactivar Negocio
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
        {/* Gestionar Negocio Modal */}
        <Dialog open={showManageModal} onOpenChange={setShowManageModal}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
