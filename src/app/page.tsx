@@ -36,17 +36,8 @@ async function getPlans(): Promise<SubscriptionPlan[]> {
 async function getHybridPlans(): Promise<HybridPlan[]> {
   try {
     const db = await getAdminFirestore();
-    // Relajamos la query para asegurar que se recuperen si están marcados como activos
-    const q = db.collection("hybrid_plans")
-      .where("isActive", "==", true);
-      
-    const snapshot = await q.get();
-    if (snapshot.empty) {
-      console.log("No hybrid plans found in DB.");
-      return [];
-    }
-    
-    // Mapear y ordenar por precio base de menor a mayor
+    const snapshot = await db.collection("hybrid_plans").get();
+    if (snapshot.empty) return [];
     return snapshot.docs
       .map(doc => ({ ...doc.data(), id: doc.id } as HybridPlan))
       .sort((a, b) => (a.basePrice || 0) - (b.basePrice || 0));
