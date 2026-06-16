@@ -7,6 +7,7 @@ import { useUser, useFirestore, useMemoFirebase, useCollection } from "@/firebas
 import { collection, query, where } from "firebase/firestore";
 import type { Module } from "@/models/module";
 import { useMemo } from 'react';
+import { useSubscription } from "@/hooks/useSubscription";
 import {
   LayoutDashboard,
   FileText,
@@ -27,7 +28,6 @@ import {
   ScanLine,
   Tag,
   Ticket,
-  Loader2,
 } from "lucide-react";
 import { MessageCircle as MessageCircleIcon } from "@/components/icons";
 
@@ -65,6 +65,7 @@ export function ClientNav() {
   const { setOpenMobile } = useSidebar();
   const firestore = useFirestore();
   const { user } = useUser();
+  const { planDetails, isLoading: isSubLoading } = useSubscription();
 
   // Consulta dinámica de módulos asignados al negocio con estado activo
   const modulesQuery = useMemoFirebase(() => {
@@ -75,24 +76,42 @@ export function ClientNav() {
     );
   }, [firestore, user]);
 
-  const { data: activeModules, isLoading } = useCollection<Module>(modulesQuery);
+  const { data: activeModules, isLoading: isModulesLoading } = useCollection<Module>(modulesQuery);
 
   const activeModuleIds = useMemo(() => {
-    if (!activeModules) return new Set<string>();
-    return new Set(activeModules.map(m => m.id));
-  }, [activeModules]);
+    const ids = new Set<string>();
+    
+    // 1. Módulos habilitados explícitamente en la base de datos del cliente
+    if (activeModules) {
+        activeModules.forEach(m => ids.add(m.id));
+    }
+    
+    // 2. Módulos incluidos implícitamente por la definición del plan contratado
+    if (planDetails?.includedModuleKeys) {
+        planDetails.includedModuleKeys.forEach(key => ids.add(key));
+    }
 
-  // Filtrar los elementos del menú según los módulos activos
+    // 3. Regla de autosanación SaaS: Si el plan es Estándar o superior, asegurar visibilidad de módulos base
+    const planName = planDetails?.name?.toLowerCase() || '';
+    if (planName.includes('estándar') || planName.includes('pro') || planName.includes('enterprise')) {
+        ids.add('catalogo');
+        ids.add('blog');
+    }
+
+    return ids;
+  }, [activeModules, planDetails]);
+
+  // Filtrar los elementos del menú según los módulos autorizados
   const navItems = useMemo(() => {
     return allNavItems.filter(item => {
-      // Si el ítem no tiene moduleId, es un elemento base visible para todos
+      // Si el ítem no tiene moduleId, es base y se muestra siempre
       if (!item.moduleId) return true;
-      // Si tiene moduleId, solo se muestra si el módulo está activo para el negocio
+      // Si tiene moduleId, se muestra si está en el set de autorizados (DB o Plan)
       return activeModuleIds.has(item.moduleId);
     });
   }, [activeModuleIds]);
 
-  if (isLoading && !activeModules) {
+  if ((isModulesLoading || isSubLoading) && !activeModules && !planDetails) {
     return (
       <div className="flex flex-col gap-2 p-4">
         {[...Array(6)].map((_, i) => (
