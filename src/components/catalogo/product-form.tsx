@@ -56,11 +56,30 @@ const isVideo = (url: string) => {
     return videoExtensions.some(ext => url.toLowerCase().includes(ext));
 };
 
-const MediaPreview = ({ item, alt, objectFit = 'cover' }: { item: MediaItem, alt: string, objectFit?: 'cover' | 'contain' }) => {
+const MediaPreview = ({ 
+    item, 
+    alt, 
+    objectFit = 'cover',
+    sizes = "10rem" 
+}: { 
+    item: MediaItem, 
+    alt: string, 
+    objectFit?: 'cover' | 'contain',
+    sizes?: string
+}) => {
     if (item.type === 'video') {
         return <video src={item.url} className="rounded-md object-cover w-full h-full" autoPlay loop muted />;
     }
-    return <Image src={item.url} alt={alt} fill sizes="10rem" className={cn('rounded-md', objectFit === 'contain' ? 'object-contain' : 'object-cover')} />;
+    return (
+        <Image 
+            src={item.url} 
+            alt={alt} 
+            fill 
+            sizes={sizes}
+            unoptimized={true} // Para la vista de edición queremos ver el archivo original nítido
+            className={cn('rounded-md', objectFit === 'contain' ? 'object-contain' : 'object-cover')} 
+        />
+    );
 };
 
 
@@ -117,7 +136,12 @@ const Lightbox = ({
             <div className="flex-1 relative flex items-center justify-center">
               {items[currentIndex] && (
                 <div className="relative w-full h-full max-h-[70vh]">
-                  <MediaPreview item={items[currentIndex]!} alt={`Imagen ${currentIndex + 1}`} objectFit="contain" />
+                  <MediaPreview 
+                    item={items[currentIndex]!} 
+                    alt={`Imagen ${currentIndex + 1}`} 
+                    objectFit="contain" 
+                    sizes="100vw"
+                  />
                 </div>
               )}
               {items.length > 1 && (
@@ -270,7 +294,12 @@ export default function ProductForm({ product, onSave, onCancel, imageLimit }: P
                     <div className="relative w-full aspect-[4/3] border-2 border-dashed rounded-md flex items-center justify-center p-2 bg-muted/30">
                         {mainImage ? (
                             <div className="group relative w-full h-full">
-                                <MediaPreview item={mainImage} alt="Producto Principal" objectFit="contain" />
+                                <MediaPreview 
+                                    item={mainImage} 
+                                    alt="Producto Principal" 
+                                    objectFit="contain" 
+                                    sizes="(max-width: 768px) 100vw, 600px" // Mejor resolución para el preview
+                                />
                             </div>
                         ) : (
                             <label className={cn("flex flex-col items-center justify-center w-full h-full cursor-pointer hover:bg-muted", isLimitReached && "cursor-not-allowed opacity-50")}>
@@ -306,7 +335,7 @@ export default function ProductForm({ product, onSave, onCancel, imageLimit }: P
                                                         mainImage?.url === currentItem.url && "ring-2 ring-primary"
                                                     )}
                                                 >
-                                                    <MediaPreview item={currentItem} alt={`Producto ${i + 1}`} />
+                                                    <MediaPreview item={currentItem} alt={`Producto ${i + 1}`} sizes="80px" />
                                                 </button>
                                                 <Button type="button" variant="destructive" size="icon" className="absolute -top-1 -right-1 h-5 w-5 opacity-0 group-hover:opacity-100 rounded-full" onClick={() => removeMedia(i)}><X className="h-3 w-3" /></Button>
                                             </div>
@@ -391,4 +420,3 @@ export default function ProductForm({ product, onSave, onCancel, imageLimit }: P
         </>
     );
 }
-
