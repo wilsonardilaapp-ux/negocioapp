@@ -117,20 +117,20 @@ export function useSubscription() {
 
   const isLoading = timedOut || error ? false : rawIsLoading;
 
-  const { plan, isActive, limits, isFree, isPro, isEnterprise } = useMemo(() => {
+  const { plan, isActive, limits, isFree, isPro, isEnterprise, planDetails } = useMemo(() => {
     const businessPlanName = (businessData as any)?.planName;
     const subscriptionPlan = subscription?.plan;
     
     // planName híbrido tiene prioridad absoluta
     const currentPlanId = businessPlanName ?? subscriptionPlan ?? 'free';
     
-    const planDetails = allPlans?.find(p => p.id === currentPlanId || p.name === currentPlanId) || 
+    const details = allPlans?.find(p => p.id === currentPlanId || p.name === currentPlanId) || 
                        allHybridPlans?.find(p => p.id === currentPlanId || p.name === currentPlanId);
 
     const defaultLimits: PlanLimits = { products: 4, blogPosts: 4, landingPages: 1, coupons: 0, promotions: 0, orders: -1, suggestions: 0 };
 
     const extras = (businessData as any)?.limitesExtra || {};
-    const baseLimits = planDetails?.limits ?? defaultLimits;
+    const baseLimits = details?.limits ?? defaultLimits;
 
     const mergedLimits: PlanLimits = {
         products: baseLimits.products === -1 ? -1 : (baseLimits.products + (extras.products || 0)),
@@ -146,11 +146,12 @@ export function useSubscription() {
 
     return {
       plan: currentPlanId,
-      isActive: subscription?.status === 'active',
+      isActive: !!businessPlanName || subscription?.status === 'active',
       limits: mergedLimits,
       isFree: planType === 'free',
       isPro: planType.includes('pro'),
       isEnterprise: planType.includes('enterprise'),
+      planDetails: details || null,
     };
   }, [subscription, allPlans, allHybridPlans, businessData]);
 
@@ -185,7 +186,9 @@ export function useSubscription() {
   return {
     subscription,
     allPlans,
+    allHybridPlans,
     plan,
+    planDetails,
     isActive,
     isLoading,
     error,

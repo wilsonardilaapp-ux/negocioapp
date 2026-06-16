@@ -22,7 +22,9 @@ export default function SubscriptionPage() {
   const { 
     subscription,
     allPlans,
+    allHybridPlans,
     plan,
+    planDetails,
     limits,
     productsCount,
     blogPostsCount,
@@ -62,10 +64,6 @@ export default function SubscriptionPage() {
 
   // --- Memoized Derived State ---
   const { currentPlanInfo, usageMetrics } = useMemo(() => {
-    const planDetails = allPlans?.find(p => p.id === plan);
-    
-    // FIX: Si no hay suscripción pero tampoco está cargando,
-    // construimos un plan free por defecto en lugar de retornar null
     if (!planDetails) {
       return { currentPlanInfo: null, usageMetrics: [] };
     }
@@ -77,13 +75,15 @@ export default function SubscriptionPage() {
       ? periodEndDate < new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) 
       : false;
 
+    // Detectar precio basado en el tipo de plan (estándar vs híbrido)
+    const price = 'basePrice' in planDetails ? (planDetails as any).basePrice : (planDetails as any).price;
+
     const currentPlanInfo: CurrentPlanInfo = {
       plan: plan as 'free' | 'pro' | 'enterprise',
-      // FIX: Si no hay documento de suscripción, el estado es 'active' en plan free
       status: subscription?.status ?? 'active',
       currentPeriodEnd: periodEndDate,
       isExpiringSoon,
-      price: planDetails.price,
+      price: price ?? 0,
       displayName: planDetails.name,
       stripeSubscriptionId: subscription?.stripeSubscriptionId ?? null,
     };
@@ -100,7 +100,7 @@ export default function SubscriptionPage() {
     }));
     
     return { currentPlanInfo, usageMetrics };
-  }, [subscription, allPlans, productsCount, blogPostsCount, landingPagesCount, plan, limits]);
+  }, [subscription, planDetails, productsCount, blogPostsCount, landingPagesCount, plan, limits]);
 
   // --- Render: Loading global ---
   if (isLoading) {
@@ -110,6 +110,8 @@ export default function SubscriptionPage() {
       </div>
     );
   }
+
+  const combinedPlans = [...(allPlans || []), ...(allHybridPlans || [])];
 
   return (
     <div className="flex flex-col gap-6">
@@ -127,7 +129,6 @@ export default function SubscriptionPage() {
         </Alert>
       )}
 
-      {/* FIX: Reemplaza spinner infinito por mensaje real cuando no hay datos */}
       {!currentPlanInfo ? (
         <Card>
           <CardHeader>
@@ -141,7 +142,7 @@ export default function SubscriptionPage() {
           </CardHeader>
           <CardContent>
             <p className="text-sm text-muted-foreground">
-              Si crees que esto es un error, contacta al soporte.
+              Si crees que esto es un error, contacta al soporte técnico.
             </p>
           </CardContent>
         </Card>
@@ -156,7 +157,7 @@ export default function SubscriptionPage() {
             </div>
           </div>
 
-          <PlanComparisonTable currentPlan={currentPlanInfo.plan} allPlans={allPlans || []} />
+          <PlanComparisonTable currentPlan={plan} allPlans={combinedPlans as any} />
 
           <BillingHistoryCard billingHistory={billingHistory} isLoading={isBillingLoading} />
         </>
