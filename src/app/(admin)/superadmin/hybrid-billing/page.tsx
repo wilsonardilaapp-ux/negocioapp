@@ -82,7 +82,9 @@ export default function HybridBillingPage() {
   const calculateBilling = async () => {
     if (!firestore || !businesses || !hybridPlans) return;
     setIsCalculating(true);
-    const results: HybridBillingResult[] = [];
+    
+    // Usamos un Map para asegurar unicidad por nombre de negocio (case insensitive)
+    const resultsMap = new Map<string, HybridBillingResult>();
 
     try {
       const now = new Date();
@@ -90,6 +92,9 @@ export default function HybridBillingPage() {
       const referenceMonth = startOfMonth(now);
 
       for (const business of businesses) {
+        // Normalizamos el nombre para detectar duplicados visuales
+        const businessKey = business.name.toLowerCase().trim();
+
         // Encontrar si el negocio tiene un plan híbrido asignado
         const plan = hybridPlans.find(p => p.name === business.planName || p.id === business.planName);
         if (!plan) continue;
@@ -99,13 +104,6 @@ export default function HybridBillingPage() {
         const ordersSnap = await getDocs(ordersRef);
         const allOrders = ordersSnap.docs.map(doc => ({ ...doc.data(), id: doc.id } as Order));
         
-        // Debug Log solicitado
-        console.log(`[Debug] ${business.name} - Total órdenes: ${allOrders.length}`);
-        allOrders.forEach(o => {
-          const parsed = parseAnyDate(o.orderDate ?? (o as any).createdAt ?? (o as any).date ?? (o as any).fecha);
-          console.log(`  Orden: ${o.id}, orderDate raw: ${JSON.stringify(o.orderDate)}, parsed: ${parsed}, isSameMonth: ${parsed ? isSameMonth(parsed, referenceMonth) : 'N/A'}, status: ${o.orderStatus}`);
-        });
-
         // Filtrar por mes actual y excluir cancelados
         const currentMonthOrders = allOrders.filter(o => {
             const orderDate = parseAnyDate(o.orderDate);
@@ -132,21 +130,19 @@ export default function HybridBillingPage() {
         if (plan.commissionType === 'percent') {
           const comisionCalculada = totalSalesValue * (commissionConfig / 100);
           const tope = parseAmount(plan.maxCommissionPerOrder);
-          // Si hay tope, se aplica por cada pedido o al total? 
-          // Según el modelo actual de Negocio V03, es un tope por el total de la transacción
           variableAmount = (tope > 0 && orderCount > 0) ? Math.min(comisionCalculada, tope * orderCount) : comisionCalculada;
         } else {
           variableAmount = orderCount * commissionConfig;
         }
 
-        results.push({
+        const billingResult: HybridBillingResult = {
           businessId: business.id,
           businessName: business.name,
           ownerEmail: business.ownerEmail,
           phone: business.phone,
           planName: plan.name,
           basePrice: parseAmount(plan.basePrice),
-          orderCount, // Aquí va el número de documentos encontrados
+          orderCount,
           ordersTotalValue: totalSalesValue,
           variableAmount,
           totalAmount: parseAmount(plan.basePrice) + variableAmount,
@@ -154,13 +150,19 @@ export default function HybridBillingPage() {
           paymentMethod: 'Nequi',
           commissionType: plan.commissionType || 'fixed',
           maxCommissionPerOrder: parseAmount(plan.maxCommissionPerOrder),
-        });
+        };
+
+        // Lógica de Deduplicación: Si ya existe el nombre, conservamos el registro con más pedidos (el más activo)
+        const existing = resultsMap.get(businessKey);
+        if (!existing || billingResult.orderCount > existing.orderCount) {
+          resultsMap.set(businessKey, billingResult);
+        }
       }
 
-      setBillingResults(results);
+      setBillingResults(Array.from(resultsMap.values()));
       toast({ 
         title: 'Cálculo completado', 
-        description: `Se procesaron ${results.length} negocios para el período de ${format(now, 'MMMM', { locale: es })}.` 
+        description: `Se procesaron ${resultsMap.size} negocios únicos para el período de ${format(now, 'MMMM', { locale: es })}.` 
       });
     } catch (e: any) {
       console.error("[Billing Error]", e);
