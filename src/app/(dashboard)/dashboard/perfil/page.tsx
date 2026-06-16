@@ -1,7 +1,6 @@
-
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useUser, useFirestore, useDoc, useMemoFirebase, setDocumentNonBlocking } from '@/firebase';
 import { doc } from 'firebase/firestore';
 import { useForm } from 'react-hook-form';
@@ -22,7 +21,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, AlertTriangle, UploadCloud, Pencil, Trash2 } from 'lucide-react';
 import type { Business } from '@/models/business';
-import type { Subscription } from '@/models/subscription';
+import { useSubscription } from '@/hooks/useSubscription';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 
 const profileSchema = z.object({
@@ -95,10 +94,16 @@ export default function ClientProfilePage() {
   const [uploadingField, setUploadingField] = useState<string | null>(null);
 
   const businessDocRef = useMemoFirebase(() => user ? doc(firestore, 'businesses', user.uid) : null, [firestore, user]);
-  const subscriptionDocRef = useMemoFirebase(() => user ? doc(firestore, `businesses/${user.uid}/subscription`, 'current') : null, [firestore, user]);
   
   const { data: business, isLoading: isBusinessLoading } = useDoc<Business>(businessDocRef);
-  const { data: subscription, isLoading: isSubLoading } = useDoc<Subscription>(subscriptionDocRef);
+  
+  // Usamos el hook de suscripción centralizado para obtener nombres comerciales y planes correctos
+  const { 
+    subscription, 
+    plan, 
+    planDetails, 
+    isLoading: isSubLoading 
+  } = useSubscription();
 
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<z.infer<typeof profileSchema>>({
     resolver: zodResolver(profileSchema),
@@ -200,8 +205,16 @@ export default function ClientProfilePage() {
             <h1 className="text-2xl font-bold">{business?.name}</h1>
             <p className="text-muted-foreground">{user?.email}</p>
             <div className="flex items-center justify-center md:justify-start gap-2 mt-2">
-              <Badge variant={subscription?.plan === 'free' ? 'secondary' : 'default'} className="capitalize">{subscription?.plan || 'Free'}</Badge>
-              <Badge variant={subscription?.status === 'active' ? 'default' : 'destructive'} className="capitalize">{subscription?.status || 'Inactive'}</Badge>
+              {/* CORRECCIÓN: Mostramos el nombre amigable del plan en lugar del ID técnico */}
+              <Badge variant={plan === 'free' ? 'secondary' : 'default'} className="capitalize">
+                {planDetails?.name || plan || 'Plan Gratuito'}
+              </Badge>
+              <Badge variant={subscription?.status === 'active' ? 'default' : 'destructive'} className="capitalize">
+                {subscription?.status === 'active' ? 'Activo' : 
+                 subscription?.status === 'canceled' ? 'Cancelado' :
+                 subscription?.status === 'past_due' ? 'Vencido' : 
+                 subscription?.status === 'trialing' ? 'Prueba' : (subscription?.status || 'Inactivo')}
+              </Badge>
             </div>
           </div>
         </CardContent>
@@ -240,11 +253,11 @@ export default function ClientProfilePage() {
                   </div>
                   <div>
                       <Label htmlFor="deliveryFee">Domicilio ($)</Label>
-                      <Input id="deliveryFee" type="number" {...register('deliveryFee')} placeholder="ej. 5000" />
+                      <Input id="deliveryFee" type="number" {...register('deliveryFee')} placeholder="ej. 6000" />
                   </div>
                   <div>
                       <Label htmlFor="packagingFee">Paquete ($)</Label>
-                      <Input id="packagingFee" type="number" {...register('packagingFee')} placeholder="ej. 1000"/>
+                      <Input id="packagingFee" type="number" {...register('packagingFee')} placeholder="ej. 500"/>
                   </div>
                 </div>
               </CardContent>
@@ -317,7 +330,7 @@ export default function ClientProfilePage() {
                   {passwordErrors.confirmPassword && <p className="text-sm text-destructive mt-1">{passwordErrors.confirmPassword.message}</p>}
                 </div>
                  <p className="text-xs text-muted-foreground">
-                    Último acceso: {user?.metadata.lastSignInTime ? new Date(user.metadata.lastSignInTime).toLocaleString() : 'N/A'}
+                    Último acceso: {user?.metadata.lastSignInTime ? new Date(user.metadata.lastSignInTime).toLocaleString('es-CO') : 'N/A'}
                 </p>
               </CardContent>
               <CardFooter>
