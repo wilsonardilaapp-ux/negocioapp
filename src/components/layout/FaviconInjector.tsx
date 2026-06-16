@@ -4,7 +4,8 @@ import { useEffect } from 'react';
 
 /**
  * Inyecta dinámicamente el favicon y el título en el head del documento.
- * Maneja URLs externas y Base64.
+ * Utiliza una estrategia de actualización (update-or-append) para evitar errores 
+ * de reconciliación en React (removeChild on null).
  */
 export default function FaviconInjector({ 
   faviconUrl, 
@@ -14,29 +15,44 @@ export default function FaviconInjector({
   title?: string | null;
 }) {
   useEffect(() => {
-    // 1. Actualizar el título de la pestaña
-    if (title) {
+    if (typeof window === 'undefined') return;
+
+    // 1. Actualizar el título de la pestaña de forma segura
+    if (title && document.title !== title) {
       document.title = title;
     }
 
     // 2. Actualizar el Favicon
     if (!faviconUrl) return;
 
-    // Eliminar favicons y apple-touch-icons previos para evitar conflictos de caché
-    const existingIcons = document.querySelectorAll("link[rel~='icon'], link[rel='apple-touch-icon']");
-    existingIcons.forEach(el => el.parentNode?.removeChild(el));
+    const updateFavicon = (url: string) => {
+      // Intentar encontrar el link existente de favicon (rel icon o shortcut icon)
+      let link = document.querySelector("link[rel*='icon']") as HTMLLinkElement;
+      
+      if (link) {
+        // Si existe, solo actualizamos el href (esto no rompe la reconciliación de React)
+        link.href = url;
+      } else {
+        // Si no existe, crear uno nuevo y añadirlo al head
+        link = document.createElement('link');
+        link.rel = 'icon';
+        link.href = url;
+        document.getElementsByTagName('head')[0].appendChild(link);
+      }
 
-    // Crear e inyectar el nuevo favicon (soporta URL y Base64)
-    const link = document.createElement('link');
-    link.rel = 'icon';
-    link.href = faviconUrl;
-    document.head.appendChild(link);
+      // Repetir para apple-touch-icon (Branding en iOS)
+      let appleLink = document.querySelector("link[rel='apple-touch-icon']") as HTMLLinkElement;
+      if (appleLink) {
+        appleLink.href = url;
+      } else {
+        appleLink = document.createElement('link');
+        appleLink.rel = 'apple-touch-icon';
+        appleLink.href = url;
+        document.getElementsByTagName('head')[0].appendChild(appleLink);
+      }
+    };
 
-    // Inyectar apple-touch-icon para dispositivos iOS
-    const appleLink = document.createElement('link');
-    appleLink.rel = 'apple-touch-icon';
-    appleLink.href = faviconUrl;
-    document.head.appendChild(appleLink);
+    updateFavicon(faviconUrl);
     
   }, [faviconUrl, title]);
 
