@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useRouter, useSearchParams } from "next/navigation";
@@ -345,6 +344,7 @@ function RegisterForm() {
                 title: "Cuenta Creada con Plan Híbrido",
                 description: `Bienvenido. Se ha activado el plan ${hybridPlanData.name}.`,
             });
+            router.push('/dashboard');
             return;
         }
       }
