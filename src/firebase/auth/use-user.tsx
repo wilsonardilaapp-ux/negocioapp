@@ -5,9 +5,11 @@ import { useRouter, usePathname } from 'next/navigation';
 import { onAuthStateChanged, type User } from 'firebase/auth';
 import { doc, onSnapshot, getDoc, setDoc } from 'firebase/firestore';
 import { useFirebase } from '@/firebase/provider';
+import { updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import type { User as UserProfile } from '@/models/user';
 
-// EMAILS CON ACCESO TOTAL DE ADMINISTRADOR DE PLATAFORMA
+// --- LISTA BLANCA ESTRICTA DE SUPER ADMINISTRADORES ---
+// Solo estos correos pueden tener acceso total a la infraestructura SaaS.
 const SUPER_ADMIN_EMAILS = [
   'allseosoporte@gmail.com',
   'admin@zentry.com',
@@ -40,7 +42,7 @@ export function useUser() {
     return () => unsubscribe();
   }, [auth, isNetworkEnabled]);
 
-  // Effect 2: Obtener Perfil y Auto-Recuperación
+  // Effect 2: Obtener Perfil y Auto-Corrección de Roles
   useEffect(() => {
     if (!firestore || !authState.user) {
         setProfile(null);
@@ -50,79 +52,76 @@ export function useUser() {
 
     setProfileLoading(true);
     const userDocRef = doc(firestore, 'users', authState.user.uid);
+    const userEmail = authState.user.email || '';
 
     const unsubscribe = onSnapshot(userDocRef, async (docSnap) => {
         if (docSnap.exists()) {
-            setProfile(docSnap.data() as UserProfile);
+            const data = docSnap.data() as UserProfile;
+            
+            // --- LÓGICA DE SEGURIDAD: AUTOSANACIÓN DE ROLES ---
+            // Si el usuario es super_admin en DB pero su email NO está en la lista blanca: DEGRADAR.
+            if (data.role === 'super_admin' && !SUPER_ADMIN_EMAILS.includes(userEmail)) {
+                console.warn(`[Seguridad] El usuario ${userEmail} no está autorizado como super_admin. Degradando a cliente_admin.`);
+                const correctedProfile = { ...data, role: 'cliente_admin' as const };
+                setProfile(correctedProfile);
+                // Corregir en la base de datos de forma no bloqueante
+                updateDocumentNonBlocking(userDocRef, { role: 'cliente_admin' });
+            } else {
+                setProfile(data);
+            }
             setProfileLoading(false);
         } else if (authState.user) {
             try {
-                // BYPASS INMEDIATO PARA ADMINS DE PLATAFORMA
-                if (SUPER_ADMIN_EMAILS.includes(authState.user.email || '')) {
-                    const adminProfile: UserProfile = {
-                        id: authState.user.uid,
-                        name: authState.user.displayName || 'Super Admin',
-                        email: authState.user.email!,
-                        role: 'super_admin',
-                        status: 'active',
-                        createdAt: new Date().toISOString(),
-                        lastLogin: new Date().toISOString(),
-                    };
-                    setProfile(adminProfile);
-                    setDoc(userDocRef, adminProfile, { merge: true }).catch(() => {});
-                } else {
-                    const businessDocRef = doc(firestore, 'businesses', authState.user.uid);
-                    const businessSnap = await getDoc(businessDocRef);
-
-                    if (businessSnap.exists()) {
-                        const businessData = businessSnap.data();
-                        const newUserProfile: UserProfile = {
-                            id: authState.user.uid,
-                            name: businessData.ownerName || authState.user.displayName || 'Usuario',
-                            email: authState.user.email!,
-                            role: 'cliente_admin',
-                            status: 'active',
-                            createdAt: new Date().toISOString(),
-                            lastLogin: new Date().toISOString(),
-                        };
-                        setDoc(userDocRef, newUserProfile).catch(() => {});
-                        setProfile(newUserProfile);
-                    }
-                }
+                // Auto-creación de perfil si no existe
+                const isAdmin = SUPER_ADMIN_EMAILS.includes(userEmail);
+                const assignedRole = isAdmin ? 'super_admin' : 'cliente_admin';
+                
+                const newProfile: UserProfile = {
+                    id: authState.user.uid,
+                    name: authState.user.displayName || 'Usuario',
+                    email: userEmail,
+                    role: assignedRole,
+                    status: 'active',
+                    createdAt: new Date().toISOString(),
+                    lastLogin: new Date().toISOString(),
+                };
+                
+                await setDoc(userDocRef, newProfile, { merge: true });
+                setProfile(newProfile);
+            } catch (e) {
+                console.error("Error al crear perfil automático:", e);
             } finally {
                 setProfileLoading(false);
             }
         }
-    }, () => {
+    }, (error) => {
+        console.error("Error en el listener de perfil:", error);
         setProfileLoading(false);
     });
 
     return () => unsubscribe();
   }, [firestore, authState.user]);
 
-  // Effect 3: Lógica de Redirección Automática
+  // Effect 3: Lógica de Redirección Automática por Rol
   useEffect(() => {
-    if (authState.isLoading) return;
+    if (authState.isLoading || isProfileLoading) return;
 
     const isAuthPage = pathname === '/login' || pathname === '/register' || pathname === '/forgot-password';
     const isDashboardPage = pathname.startsWith('/dashboard');
     const isSuperAdminPage = pathname.startsWith('/superadmin');
 
     if (authState.user) {
-        const userEmail = authState.user.email || '';
-        const isPlatformAdmin = SUPER_ADMIN_EMAILS.includes(userEmail);
         const role = profile?.role;
 
-        // Redirección basada en rol
-        if (role) {
-            if (role === 'super_admin' && (isAuthPage || isDashboardPage)) {
+        if (role === 'super_admin') {
+            if (isAuthPage || isDashboardPage) {
                 router.replace('/superadmin');
-            } else if ((role === 'cliente_admin' || role === 'staff') && (isAuthPage || isSuperAdminPage)) {
+            }
+        } else {
+            // Usuarios cliente_admin o staff
+            if (isAuthPage || isSuperAdminPage) {
                 router.replace('/dashboard');
             }
-        } else if (isAuthPage && !isProfileLoading) {
-            // Si el login terminó pero no hay perfil aún, enviar a dashboard
-            router.replace('/dashboard');
         }
     } else {
         if (isDashboardPage || isSuperAdminPage) {
