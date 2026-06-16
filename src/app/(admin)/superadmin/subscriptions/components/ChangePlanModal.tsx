@@ -38,6 +38,7 @@ import { doc, Timestamp } from "firebase/firestore";
 import type { ClientWithSubscription } from "../hooks/useAllSubscriptions";
 import { format } from "date-fns";
 import type { SubscriptionPlan } from "@/models/subscription-plan";
+import type { HybridPlan } from "@/models/hybrid-plan";
 
 const changePlanSchema = z.object({
   plan: z.string().min(1, { message: 'Debes seleccionar un plan.' }),
@@ -50,7 +51,7 @@ type ChangePlanFormData = z.infer<typeof changePlanSchema>;
 
 interface ChangePlanModalProps {
   client: ClientWithSubscription | null;
-  allPlans: SubscriptionPlan[];
+  allPlans: (SubscriptionPlan | HybridPlan)[];
   isOpen: boolean;
   onClose: () => void;
 }
@@ -143,7 +144,7 @@ export function ChangePlanModal({ client, allPlans, isOpen, onClose }: ChangePla
                     </SelectTrigger>
                     <SelectContent>
                       {allPlans.map((plan) => (
-                        <SelectItem key={plan.id} value={plan.id}>{plan.name}</SelectItem>
+                        <SelectItem key={plan.id} value={plan.id!}>{plan.name}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>

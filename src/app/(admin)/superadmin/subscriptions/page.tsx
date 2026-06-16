@@ -15,16 +15,27 @@ import { SubscriptionTable } from "./components/SubscriptionTable";
 import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
 import { collection } from 'firebase/firestore';
 import type { SubscriptionPlan } from '@/models/subscription-plan';
+import type { HybridPlan } from "@/models/hybrid-plan";
 
 export default function SubscriptionsPage() {
   const { clients, isLoading: areClientsLoading, error } = useAllSubscriptions();
   const firestore = useFirestore();
 
-  const { data: allPlans, isLoading: arePlansLoading } = useCollection<SubscriptionPlan>(
+  const { data: standardPlans, isLoading: arePlansLoading } = useCollection<SubscriptionPlan>(
     useMemoFirebase(() => (firestore ? collection(firestore, 'plans') : null), [firestore])
   );
 
-  const isLoading = areClientsLoading || arePlansLoading;
+  const { data: hybridPlans, isLoading: areHybridPlansLoading } = useCollection<HybridPlan>(
+    useMemoFirebase(() => (firestore ? collection(firestore, 'hybrid_plans') : null), [firestore])
+  );
+
+  const allPlans = useMemo(() => {
+    const sPlans = standardPlans || [];
+    const hPlans = hybridPlans || [];
+    return [...sPlans, ...hPlans];
+  }, [standardPlans, hybridPlans]);
+
+  const isLoading = areClientsLoading || arePlansLoading || areHybridPlansLoading;
 
   const summary = useMemo(() => {
     const counts: Record<string, number> = {
@@ -107,7 +118,7 @@ export default function SubscriptionsPage() {
                     <p className="text-sm">{error.message}</p>
                  </div>
             ) : (
-                 <SubscriptionTable clients={clients} allPlans={allPlans || []} isLoading={isLoading} />
+                 <SubscriptionTable clients={clients} allPlans={allPlans} isLoading={isLoading} />
             )}
         </CardContent>
       </Card>

@@ -26,11 +26,12 @@ import type { ClientWithSubscription } from "../hooks/useAllSubscriptions";
 import { ChangePlanModal } from "./ChangePlanModal";
 import { cn } from "@/lib/utils";
 import type { SubscriptionPlan } from "@/models/subscription-plan";
+import type { HybridPlan } from "@/models/hybrid-plan";
 
 interface SubscriptionTableProps {
   clients: ClientWithSubscription[];
   isLoading: boolean;
-  allPlans: SubscriptionPlan[];
+  allPlans: (SubscriptionPlan | HybridPlan)[];
 }
 
 export function SubscriptionTable({ clients, isLoading, allPlans }: SubscriptionTableProps) {
@@ -52,7 +53,7 @@ export function SubscriptionTable({ clients, isLoading, allPlans }: Subscription
 
   const getPlanVariant = (plan: string | null | undefined) => {
     const planDetails = allPlans.find(p => p.id === plan);
-    if (planDetails?.isMostPopular) return "default";
+    if ((planDetails as any)?.isMostPopular) return "default";
     switch (plan) {
       case "pro": return "default";
       case "enterprise": return "destructive"; // You can define a gold/yellow variant
@@ -95,7 +96,7 @@ export function SubscriptionTable({ clients, isLoading, allPlans }: Subscription
             <SelectContent>
                 <SelectItem value="all">Todos los Planes</SelectItem>
                 {allPlans.map(plan => (
-                  <SelectItem key={plan.id} value={plan.id}>{plan.name}</SelectItem>
+                  <SelectItem key={plan.id} value={plan.id!}>{plan.name}</SelectItem>
                 ))}
             </SelectContent>
         </Select>
