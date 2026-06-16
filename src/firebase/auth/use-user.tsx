@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -8,12 +7,11 @@ import { doc, onSnapshot, getDoc, setDoc } from 'firebase/firestore';
 import { useFirebase } from '@/firebase/provider';
 import type { User as UserProfile } from '@/models/user';
 
-// EMAILS CON ACCESO TOTAL DE ADMINISTRADOR
+// EMAILS CON ACCESO TOTAL DE ADMINISTRADOR DE PLATAFORMA
 const SUPER_ADMIN_EMAILS = [
   'allseosoporte@gmail.com',
   'admin@zentry.com',
-  'admin@ecosalud.com',
-  'pcuser@gmail.com'
+  'admin@ecosalud.com'
 ];
 
 export function useUser() {
@@ -59,7 +57,7 @@ export function useUser() {
             setProfileLoading(false);
         } else if (authState.user) {
             try {
-                // BYPASS INMEDIATO PARA ADMINS
+                // BYPASS INMEDIATO PARA ADMINS DE PLATAFORMA
                 if (SUPER_ADMIN_EMAILS.includes(authState.user.email || '')) {
                     const adminProfile: UserProfile = {
                         id: authState.user.uid,
@@ -71,7 +69,6 @@ export function useUser() {
                         lastLogin: new Date().toISOString(),
                     };
                     setProfile(adminProfile);
-                    // Persistencia asíncrona (no bloqueante)
                     setDoc(userDocRef, adminProfile, { merge: true }).catch(() => {});
                 } else {
                     const businessDocRef = doc(firestore, 'businesses', authState.user.uid);
@@ -103,7 +100,7 @@ export function useUser() {
     return () => unsubscribe();
   }, [firestore, authState.user]);
 
-  // Effect 3: Lógica de Redirección Automática (AGRESIVA)
+  // Effect 3: Lógica de Redirección Automática
   useEffect(() => {
     if (authState.isLoading) return;
 
@@ -113,18 +110,10 @@ export function useUser() {
 
     if (authState.user) {
         const userEmail = authState.user.email || '';
-        const isAdmin = SUPER_ADMIN_EMAILS.includes(userEmail);
+        const isPlatformAdmin = SUPER_ADMIN_EMAILS.includes(userEmail);
         const role = profile?.role;
 
-        // REDIRECCIÓN DE VÍA RÁPIDA PARA ADMINS
-        if (isAdmin) {
-            if (isAuthPage || isDashboardPage) {
-                router.replace('/superadmin');
-                return;
-            }
-        }
-
-        // Redirección normal basada en perfil
+        // Redirección basada en rol
         if (role) {
             if (role === 'super_admin' && (isAuthPage || isDashboardPage)) {
                 router.replace('/superadmin');

@@ -33,7 +33,6 @@ import Link from "next/link";
 import { v4 as uuidv4 } from "uuid";
 import type { LandingPageData, NavLink } from "../../../models/landing-page";
 import type { PaymentSettings } from "../../../models/payment-settings";
-import { isFirstUser } from '../../../actions/user';
 import { Eye, EyeOff, Loader2 } from 'lucide-react';
 import type { Subscription } from "../../../models/subscription";
 import { STRIPE_PRICE_IDS } from "../../../lib/stripe";
@@ -155,7 +154,7 @@ const initialLandingPageData: LandingPageData = {
     },
     certifications: [],
     copyright: {
-      companyName: 'Tu Empresa',
+      companyName: 'Zentry',
       additionalText: 'Todos los derechos reservados.',
     },
     cta: {
@@ -205,7 +204,6 @@ function RegisterForm() {
   const { user, isUserLoading } = useUser();
   const [showPassword, setShowPassword] = useState(false);
 
-  // INICIALIZACIÓN DEL FORMULARIO - CORRECCIÓN DEL ERROR DE REFERENCIA
   const form = useForm<z.infer<typeof registerSchema>>({
     resolver: zodResolver(registerSchema),
     defaultValues: {
@@ -224,8 +222,8 @@ function RegisterForm() {
       
       const batch = writeBatch(firestore);
 
-      const isFirst = await isFirstUser();
-      const userRole = isFirst ? 'super_admin' : 'cliente_admin';
+      // CRÍTICO: Todo usuario que se registra desde el formulario público es un cliente_admin (Administrador de su negocio)
+      const userRole: 'cliente_admin' = 'cliente_admin';
 
       const userDocRef = doc(firestore, 'users', newUser.uid);
       const userData: AppUser = {
@@ -362,7 +360,7 @@ function RegisterForm() {
       
       toast({
           title: "Cuenta Creada con Éxito",
-          description: `Se te ha asignado el rol de ${userRole.replace('_', ' ')}.`,
+          description: `Se te ha asignado el rol de Administrador.`,
       });
       
     } catch (error: any) {
