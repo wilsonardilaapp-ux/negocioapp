@@ -93,8 +93,8 @@ const MediaUploader = ({
                 <video src={mediaUrl} controls className="w-full h-full rounded-md" />
               )}
               <div className="absolute top-2 right-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                <Button variant="outline" size="icon" onClick={() => fileInputRef.current?.click()}><Pencil className="h-4 w-4" /></Button>
-                <Button variant="destructive" size="icon" onClick={onRemove}><Trash2 className="h-4 w-4" /></Button>
+                <Button variant="outline" size="icon" className="h-7 w-7 bg-background" onClick={() => fileInputRef.current?.click()}><Pencil className="h-4 w-4" /></Button>
+                <Button variant="destructive" size="icon" className="h-7 w-7" onClick={onRemove}><Trash2 className="h-4 w-4" /></Button>
               </div>
             </>
           ) : (
@@ -165,6 +165,15 @@ export default function EditorLandingForm({ data, setData, plans, loadingPlans }
                 return section;
             });
             setData((prevData) => ({ ...prevData, sections: updatedSections }));
+        }
+    };
+
+    const handlePlanImageUpload = async (planId: string, file: File) => {
+        const uploadResult = await handleFileUpload(file);
+        if (uploadResult && uploadResult.mediaType === 'image') {
+            updatePlan(planId, 'imageUrl', uploadResult.secure_url);
+        } else if (uploadResult) {
+            toast({ variant: 'destructive', title: 'Error de formato', description: 'Solo se pueden subir imágenes para los planes.' });
         }
     };
     
@@ -348,6 +357,7 @@ export default function EditorLandingForm({ data, setData, plans, loadingPlans }
             buttonText: 'Comprar ahora',
             buttonUrl: '#',
             isPopular: false,
+            imageUrl: null,
         };
         setData(prev => ({ ...prev, plans: [...(prev.plans || []), newPlan] }));
     };
@@ -941,29 +951,46 @@ export default function EditorLandingForm({ data, setData, plans, loadingPlans }
                                                     Eliminar Plan
                                                 </Button>
                                             </div>
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                <div>
-                                                    <Label>Nombre del Plan</Label>
-                                                    <Input value={plan.name} onChange={(e) => updatePlan(plan.id, 'name', e.target.value)} />
+                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                                <div className="md:col-span-1">
+                                                    <Label>Imagen del Plan / Producto</Label>
+                                                    <MediaUploader
+                                                        mediaUrl={plan.imageUrl || null}
+                                                        mediaType={plan.imageUrl ? 'image' : null}
+                                                        onUpload={(file) => handlePlanImageUpload(plan.id, file)}
+                                                        onRemove={() => updatePlan(plan.id, 'imageUrl', null)}
+                                                        aspectRatio="aspect-square"
+                                                        dimensions="400x400px"
+                                                        description="Imagen"
+                                                        accept="image/*"
+                                                    />
                                                 </div>
-                                                <div className="grid grid-cols-3 gap-2">
-                                                    <div>
-                                                        <Label>Moneda</Label>
-                                                        <Input value={plan.currency} onChange={(e) => updatePlan(plan.id, 'currency', e.target.value)} />
+                                                <div className="md:col-span-2 space-y-4">
+                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                        <div>
+                                                            <Label>Nombre del Plan</Label>
+                                                            <Input value={plan.name} onChange={(e) => updatePlan(plan.id, 'name', e.target.value)} />
+                                                        </div>
+                                                        <div className="grid grid-cols-3 gap-2">
+                                                            <div>
+                                                                <Label>Moneda</Label>
+                                                                <Input value={plan.currency} onChange={(e) => updatePlan(plan.id, 'currency', e.target.value)} />
+                                                            </div>
+                                                            <div>
+                                                                <Label>Precio</Label>
+                                                                <Input type="number" value={plan.price} onChange={(e) => updatePlan(plan.id, 'price', Number(e.target.value))} />
+                                                            </div>
+                                                            <div>
+                                                                <Label>Periodo</Label>
+                                                                <Input value={plan.period} onChange={(e) => updatePlan(plan.id, 'period', e.target.value)} placeholder="/mes" />
+                                                            </div>
+                                                        </div>
                                                     </div>
                                                     <div>
-                                                        <Label>Precio</Label>
-                                                        <Input type="number" value={plan.price} onChange={(e) => updatePlan(plan.id, 'price', Number(e.target.value))} />
-                                                    </div>
-                                                    <div>
-                                                        <Label>Periodo</Label>
-                                                        <Input value={plan.period} onChange={(e) => updatePlan(plan.id, 'period', e.target.value)} placeholder="/mes" />
+                                                        <Label>Descripción</Label>
+                                                        <Input value={plan.description} onChange={(e) => updatePlan(plan.id, 'description', e.target.value)} />
                                                     </div>
                                                 </div>
-                                            </div>
-                                            <div>
-                                                <Label>Descripción</Label>
-                                                <Input value={plan.description} onChange={(e) => updatePlan(plan.id, 'description', e.target.value)} />
                                             </div>
                                             
                                             <div className="space-y-4 p-4 border rounded-lg">

@@ -60,7 +60,18 @@ const CustomPlanCard = ({ plan }: { plan: CustomPlan }) => {
                     Recomendado
                 </span>
             )}
-            <div className="flex-grow">
+            <div className="flex-grow flex flex-col">
+                {plan.imageUrl && (
+                    <div className="relative aspect-square w-full mb-6 rounded-xl overflow-hidden border border-gray-100 shadow-sm">
+                        <Image 
+                          src={plan.imageUrl} 
+                          alt={plan.name} 
+                          fill 
+                          sizes="(max-width: 768px) 100vw, 30vw"
+                          className="object-cover" 
+                        />
+                    </div>
+                )}
                 <h3 className="text-xl font-bold text-gray-800 text-center mb-1">
                     {plan.name}
                 </h3>

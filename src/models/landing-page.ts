@@ -8,6 +8,7 @@ export type LandingPageData = {
   header: LandingHeaderConfigData; // New section
   footer: FooterSection;
   plans: CustomPlan[]; // Added for custom pricing sections
+  bannerPosition?: 'above' | 'below';
   chatbot?: {
     greeting: string;
     avatarUrl: string;
@@ -26,6 +27,7 @@ export type CustomPlan = {
   buttonText: string;
   buttonUrl: string;
   isPopular: boolean;
+  imageUrl?: string | null;
 };
 
 export type HeroSection = {
