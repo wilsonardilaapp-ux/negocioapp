@@ -23,7 +23,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { Check, Plus, Search, Building2, Eye, Puzzle, Tag, AlertCircle, TrendingUp } from 'lucide-react';
+import { Check, Plus, Search, Building2, Eye, Puzzle, Tag, AlertCircle, TrendingUp, Mail, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Label } from '@/components/ui/label';
 import { validateModuleExtra, validateLimitesExtra } from '@/utils/validateModuleExtra';
@@ -33,6 +33,7 @@ import type { Business, EntityStatus } from '@/models/business';
 import type { SubscriptionPlan } from '@/models/subscription-plan';
 import type { SystemService } from '@/models/system-service';
 import type { Module } from '@/models/module';
+import type { HybridPlan } from '@/models/hybrid-plan';
 
 const iconMap: { [key: string]: React.ReactNode } = {
   catalogo: <Building2 className="w-4 h-4" />,
@@ -41,27 +42,41 @@ const iconMap: { [key: string]: React.ReactNode } = {
   default: <Puzzle className="w-4 h-4" />,
 };
 
-const StatusBadge = ({ status }: { status: EntityStatus | undefined }) => {
-  if (!status) {
-    return <Badge className="bg-gray-100 text-gray-800">Indefinido</Badge>;
-  }
-  const statusConfig = {
-    active: 'bg-green-100 text-green-800',
-    inactive: 'bg-gray-100 text-gray-800',
-    suspended: 'bg-red-100 text-red-800',
-    pending_payment: 'bg-yellow-100 text-yellow-800',
+const StatusBadge = ({ status }: { status: EntityStatus | string | undefined }) => {
+  // Resiliencia para estados nulos o no normalizados
+  const currentStatus = status || 'inactive';
+  
+  const statusConfig: Record<string, string> = {
+    active: 'bg-green-100 text-green-800 border-green-200',
+    inactive: 'bg-gray-100 text-gray-800 border-gray-200',
+    suspended: 'bg-red-100 text-red-800 border-red-200',
+    pending_payment: 'bg-yellow-100 text-yellow-800 border-yellow-200',
   };
-  return <Badge className={cn('capitalize', statusConfig[status])}>{status.replace('_', ' ')}</Badge>;
+
+  const label: Record<string, string> = {
+    active: 'Activo',
+    inactive: 'Inactivo',
+    suspended: 'Suspendido',
+    pending_payment: 'Pago Pendiente',
+  };
+
+  return (
+    <Badge variant="outline" className={cn('capitalize font-medium', statusConfig[currentStatus] || statusConfig.inactive)}>
+      {label[currentStatus] || currentStatus.replace('_', ' ')}
+    </Badge>
+  );
 };
 
 export default function BusinessesPage() {
   const router = useRouter();
-  // Data State
   const firestore = useFirestore();
+
+  // Data fetching
   const { data: businesses, isLoading: businessesLoading } = useCollection<Business>(useMemoFirebase(() => collection(firestore, 'businesses'), [firestore]));
-  const { data: plans, isLoading: plansLoading } = useCollection<SubscriptionPlan>(useMemoFirebase(() => collection(firestore, 'plans'), [firestore]));
-  const { data: services, isLoading: servicesLoading } = useCollection<SystemService>(useMemoFirebase(() => collection(firestore, 'systemServices'), [firestore]));
-  const { data: modules, isLoading: modulesLoading } = useCollection<Module>(useMemoFirebase(() => collection(firestore, 'modules'), [firestore]));
+  const { data: plans } = useCollection<SubscriptionPlan>(useMemoFirebase(() => collection(firestore, 'plans'), [firestore]));
+  const { data: hybridPlans } = useCollection<HybridPlan>(useMemoFirebase(() => collection(firestore, 'hybrid_plans'), [firestore]));
+  const { data: services } = useCollection<SystemService>(useMemoFirebase(() => collection(firestore, 'systemServices'), [firestore]));
+  const { data: modules } = useCollection<Module>(useMemoFirebase(() => collection(firestore, 'modules'), [firestore]));
 
   // Filter State
   const [searchBusiness, setSearchBusiness] = useState('');
@@ -78,7 +93,7 @@ export default function BusinessesPage() {
   const [moduleExtras, setModuleExtras] = useState<Record<string, number>>({});
   const [assignedServices, setAssignedServices] = useState<string[]>([]);
 
-  // NEW: Limits Extra State
+  // Limits Extra State
   const [limitesExtra, setLimitesExtra] = useState<Record<string, number>>({
     products: 0,
     blogPosts: 0,
@@ -101,7 +116,8 @@ export default function BusinessesPage() {
     return (businesses || []).filter(business => {
       const searchMatch = searchBusiness === '' ||
         business.name.toLowerCase().includes(searchBusiness.toLowerCase()) ||
-        (business.ownerName && business.ownerName.toLowerCase().includes(searchBusiness.toLowerCase()));
+        (business.ownerName && business.ownerName.toLowerCase().includes(searchBusiness.toLowerCase())) ||
+        (business.ownerEmail && business.ownerEmail.toLowerCase().includes(searchBusiness.toLowerCase()));
       const planMatch = filterPlan === 'all' || business.planName === plans?.find(p => p.id === filterPlan)?.name;
       const statusMatch = filterStatus === 'all' || business.status === filterStatus;
       return searchMatch && planMatch && statusMatch;
@@ -118,8 +134,8 @@ export default function BusinessesPage() {
     const newBusiness: Omit<Business, 'id'> = {
       ...businessForm,
       planName: selectedPlan?.name,
-      logoURL: 'https://seeklogo.com/images/E/eco-friendly-logo-7087A22106-seeklogo.com.png', // Default logo
-      description: 'Descripción por defecto', // Default description
+      logoURL: 'https://seeklogo.com/images/E/eco-friendly-logo-7087A22106-seeklogo.com.png',
+      description: 'Bienvenido a Negocio V03',
     };
     await setDocumentNonBlocking(newBusinessRef, newBusiness);
     setBusinessForm(initialFormState);
@@ -132,12 +148,17 @@ export default function BusinessesPage() {
     const subData = subSnap.exists() ? subSnap.data() as any : null;
     const actualPlanId = subData?.plan || 'free';
 
-    // Find the current plan details in the global plans collection
-    const currentPlan = plans?.find(p => p.id === actualPlanId);
+    // Unify all plans for lookup
+    const allAvailablePlans = [...(plans || []), ...(hybridPlans || [])];
+    const currentPlanDetails = allAvailablePlans.find(p => p.id === actualPlanId || p.name === business.planName);
 
+    // Ensure we have a robust object for the modal
     setSelectedBusiness({ 
       ...business, 
-      planName: currentPlan?.name || business.planName || 'Free', // Sync displayed plan name
+      status: business.status || 'active', // Fallback for undefined status
+      ownerName: business.ownerName || (business as any).name || 'N/A',
+      ownerEmail: business.ownerEmail || (business as any).email || 'N/A',
+      planName: currentPlanDetails?.name || business.planName || 'Plan Gratuito', 
       imageLimit: business.imageLimit ?? undefined,
       productLimit: business.productLimit ?? undefined 
     });
@@ -162,13 +183,11 @@ export default function BusinessesPage() {
     setAssignedServices(servicesSnapshot.docs.filter(doc => doc.data().status === 'active').map(doc => doc.id));
 
     // 2. Load Plan Limits and Hierarchy
-    if (currentPlan) {
-      setCurrentPlanLimits(currentPlan.limits);
+    if (currentPlanDetails && 'limits' in currentPlanDetails) {
+      setCurrentPlanLimits(currentPlanDetails.limits);
       
-      // Hierarchical order
       const tiers = ['FREE', 'BASIC', 'PRO', 'ENTERPRISE'];
-      // Normalize ID to check tier
-      const currentTierId = currentPlan.id.toUpperCase();
+      const currentTierId = currentPlanDetails.id?.toUpperCase() || '';
       const tierIndex = tiers.findIndex(t => currentTierId.includes(t));
       
       if (tierIndex !== -1 && tierIndex < tiers.length - 1) {
@@ -235,22 +254,15 @@ export default function BusinessesPage() {
       return;
     }
     
-    // Prepare business document update
     const businessUpdateData: any = {
       status: selectedBusiness.status,
-      imageLimit: selectedBusiness.imageLimit && Number(selectedBusiness.imageLimit) > 0 
-        ? Number(selectedBusiness.imageLimit) 
-        : null,
-      productLimit: selectedBusiness.productLimit && Number(selectedBusiness.productLimit) > 0 
-        ? Number(selectedBusiness.productLimit) 
-        : null,
-      limitesExtra: limitesExtra // Save new limits extra
+      imageLimit: selectedBusiness.imageLimit && Number(selectedBusiness.imageLimit) > 0 ? Number(selectedBusiness.imageLimit) : null,
+      productLimit: selectedBusiness.productLimit && Number(selectedBusiness.productLimit) > 0 ? Number(selectedBusiness.productLimit) : null,
+      limitesExtra: limitesExtra
     };
 
-    // Update business document
     await updateDocumentNonBlocking(doc(firestore, `businesses/${selectedBusiness.id}`), businessUpdateData);
     
-    // Deactivate all first, then activate selected in a batch
     const batch = writeBatch(firestore);
     const currentModules = await getDocs(collection(firestore, `businesses/${selectedBusiness.id}/modules`));
     currentModules.forEach(doc => batch.update(doc.ref, { status: 'inactive' }));
@@ -258,7 +270,6 @@ export default function BusinessesPage() {
     const currentServices = await getDocs(collection(firestore, `businesses/${selectedBusiness.id}/services`));
     currentServices.forEach(doc => batch.update(doc.ref, { status: 'inactive' }));
     
-    // Activate selected
     assignedModules.forEach(id => {
       const extra = moduleExtras[id] || 0;
       batch.set(doc(firestore, `businesses/${selectedBusiness.id}/modules`, id), { status: 'active', extra }, { merge: true });
@@ -266,20 +277,11 @@ export default function BusinessesPage() {
     assignedServices.forEach(id => batch.set(doc(firestore, `businesses/${selectedBusiness.id}/services`, id), { status: 'active' }, { merge: true }));
 
     await batch.commit();
-
     setShowManageModal(false);
   };
   
   const toggleModuleAssignment = (moduleId: string) => {
-    setAssignedModules(prev => {
-      const isRemoving = prev.includes(moduleId);
-      if (isRemoving) {
-        return prev.filter(id => id !== moduleId);
-      } else {
-        return [...prev, moduleId];
-      }
-    });
-    
+    setAssignedModules(prev => prev.includes(moduleId) ? prev.filter(id => id !== moduleId) : [...prev, moduleId]);
     if (assignedModules.includes(moduleId)) {
       setModuleExtras(prev => {
         const newExtras = { ...prev };
@@ -303,10 +305,6 @@ export default function BusinessesPage() {
 
   const toggleServiceAssignment = (serviceId: string) => {
     setAssignedServices(prev => prev.includes(serviceId) ? prev.filter(id => id !== serviceId) : [...prev, serviceId]);
-  };
-
-  const handleImpersonate = (business: Business) => {
-    router.push(`/landing/${business.id}`);
   };
 
   const limiteFields = [
@@ -386,29 +384,28 @@ export default function BusinessesPage() {
                         </div>
                         <div>
                           <p className="font-medium">{business.name}</p>
-                          <p className="text-sm text-gray-500">{business.ownerName}</p>
+                          <p className="text-sm text-gray-500">{business.ownerName || 'N/A'}</p>
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4"><Badge variant="outline">{business.planName}</Badge></td>
+                    <td className="px-6 py-4"><Badge variant="outline">{business.planName || 'Plan Gratuito'}</Badge></td>
                     <td className="px-6 py-4"><StatusBadge status={business.status} /></td>
-                    <td className="px-6 py-4 text-gray-600">{business.phone}</td>
+                    <td className="px-6 py-4 text-gray-600">{business.phone || 'N/A'}</td>
                     <td className="px-6 py-4">
                       <div className="flex items-center justify-end gap-2">
                         <Button size="sm" variant="outline" onClick={() => openManageBusiness(business)}><Eye className="w-4 h-4 mr-1" />Gestionar</Button>
-                        <Button size="sm" variant="outline" onClick={() => handleImpersonate(business)} className="text-primary hover:text-primary hover:bg-primary/5">Ingresar</Button>
+                        <Button size="sm" variant="outline" onClick={() => router.push(`/landing/${business.id}`)} className="text-primary hover:text-primary hover:bg-primary/5">Ingresar</Button>
                       </div>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
-            {filteredBusinesses.length === 0 && <div className="text-center py-12 text-gray-500">No se encontraron negocios</div>}
           </div>
         </CardContent>
       </Card>
       
-      {/* Modals */}
+      {/* Nuevo Negocio Modal */}
       <Dialog open={showBusinessModal} onOpenChange={setShowBusinessModal}>
         <DialogContent className="max-w-lg">
           <DialogHeader><DialogTitle>Nuevo Negocio</DialogTitle><DialogDescription>Registra un nuevo negocio en la plataforma</DialogDescription></DialogHeader>
@@ -428,7 +425,6 @@ export default function BusinessesPage() {
                 </Select>
               </div>
             </div>
-            <div><Label>Dirección</Label><Input value={businessForm.address} onChange={e => setBusinessForm(prev => ({ ...prev, address: e.target.value }))} placeholder="Calle 123 #45-67, Bogotá" /></div>
             <div>
               <Label>Estado</Label>
               <Select value={businessForm.status} onValueChange={(v: EntityStatus) => setBusinessForm(prev => ({ ...prev, status: v }))}>
@@ -443,14 +439,18 @@ export default function BusinessesPage() {
         </DialogContent>
       </Dialog>
       
+       {/* Gestionar Negocio Modal */}
        <Dialog open={showManageModal} onOpenChange={setShowManageModal}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader><DialogTitle>Gestionar Negocio</DialogTitle><DialogDescription>{selectedBusiness?.name} - Asigna módulos y servicios</DialogDescription></DialogHeader>
+          <DialogHeader>
+            <DialogTitle>Gestionar Negocio</DialogTitle>
+            <DialogDescription>{selectedBusiness?.ownerName || 'Pc Users'} - Asigna módulos y servicios</DialogDescription>
+          </DialogHeader>
           {selectedBusiness && (
             <div className="space-y-6 py-4">
               <div className="grid grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg">
-                <div><p className="text-sm text-gray-500">Propietario</p><p className="font-medium">{selectedBusiness.ownerName}</p></div>
-                <div><p className="text-sm text-gray-500">Email</p><p className="font-medium">{selectedBusiness.ownerEmail}</p></div>
+                <div><p className="text-sm text-gray-500">Propietario</p><p className="font-medium flex items-center gap-2"><User className="w-3 h-3 text-muted-foreground"/> {selectedBusiness.ownerName}</p></div>
+                <div><p className="text-sm text-gray-500">Email</p><p className="font-medium flex items-center gap-2"><Mail className="w-3 h-3 text-muted-foreground"/> {selectedBusiness.ownerEmail}</p></div>
                 <div><p className="text-sm text-gray-500">Plan Actual (Sincronizado)</p><p className="font-medium">{selectedBusiness.planName}</p></div>
                 <div><p className="text-sm text-gray-500">Estado</p><StatusBadge status={selectedBusiness.status} /></div>
               </div>
@@ -461,7 +461,6 @@ export default function BusinessesPage() {
                   {(modules || []).map(moduleItem => {
                     const isActive = assignedModules.includes(moduleItem.id);
                     const validation = validateModuleExtra(selectedBusiness.planName, moduleExtras[moduleItem.id] || 0);
-                    
                     return (
                       <div key={moduleItem.id} className={cn('flex flex-col p-3 border rounded-lg transition-colors', isActive ? 'border-primary bg-primary/5' : 'hover:bg-gray-50', moduleItem.status === 'inactive' && 'opacity-60')}>
                         <div className="flex items-center justify-between cursor-pointer" onClick={() => moduleItem.status !== 'inactive' && toggleModuleAssignment(moduleItem.id)}>
@@ -471,34 +470,11 @@ export default function BusinessesPage() {
                           </div>
                           {isActive && <Check className="w-5 h-5 text-primary" />}
                         </div>
-                        
                         {isActive && (
-                          <div className="mt-3 pt-3 border-t grid grid-cols-1 sm:grid-cols-3 items-end gap-4 animate-in fade-in slide-in-from-top-1 duration-200">
-                            <div>
-                              <Label className="text-[10px] uppercase font-bold text-muted-foreground">Base (Plan)</Label>
-                              <div className="h-9 flex items-center px-3 bg-muted rounded-md font-bold">{validation.baseLimit}</div>
-                            </div>
-                            <div>
-                              <Label className="text-[10px] uppercase font-bold text-muted-foreground">Unidades Extra</Label>
-                              <Input
-                                type="number"
-                                className={cn("h-9", !validation.valid && "border-destructive ring-destructive")}
-                                value={moduleExtras[moduleItem.id] ?? 0}
-                                onChange={(e) => handleExtraChange(moduleItem.id, e.target.value)}
-                              />
-                            </div>
-                            <div>
-                              <Label className="text-[10px] uppercase font-bold text-muted-foreground">Límite Real</Label>
-                              <div className={cn("h-9 flex items-center px-3 rounded-md font-bold", validation.valid ? "bg-primary/20 text-primary" : "bg-destructive/10 text-destructive")}>
-                                {validation.totalLimit}
-                              </div>
-                            </div>
-                            {!validation.valid && (
-                               <div className="sm:col-span-3 flex items-center gap-1.5 text-xs text-destructive font-semibold">
-                                 <AlertCircle className="w-3.5 h-3.5" />
-                                 {validation.error}
-                               </div>
-                            )}
+                          <div className="mt-3 pt-3 border-t grid grid-cols-3 items-end gap-4">
+                            <div><Label className="text-[10px] uppercase font-bold text-muted-foreground">Base</Label><div className="h-9 flex items-center px-3 bg-muted rounded-md font-bold">{validation.baseLimit}</div></div>
+                            <div><Label className="text-[10px] uppercase font-bold text-muted-foreground">Extra</Label><Input type="number" className="h-9" value={moduleExtras[moduleItem.id] ?? 0} onChange={(e) => handleExtraChange(moduleItem.id, e.target.value)} /></div>
+                            <div><Label className="text-[10px] uppercase font-bold text-muted-foreground">Real</Label><div className="h-9 flex items-center px-3 bg-primary/20 text-primary rounded-md font-bold">{validation.totalLimit}</div></div>
                           </div>
                         )}
                       </div>
@@ -508,13 +484,7 @@ export default function BusinessesPage() {
               </div>
 
               <div className="border-t pt-6">
-                <h4 className="font-bold flex items-center gap-2 mb-4 text-lg">
-                  <TrendingUp className="w-5 h-5 text-primary" />
-                  Límites Extra del Plan
-                </h4>
-                <p className="text-xs text-muted-foreground mb-4">
-                  Define recursos adicionales que anulan los límites base del plan contratado.
-                </p>
+                <h4 className="font-bold flex items-center gap-2 mb-4 text-lg"><TrendingUp className="w-5 h-5 text-primary" /> Límites Extra del Plan</h4>
                 <div className="space-y-4">
                   {limiteFields.map((field) => {
                     const base = currentPlanLimits[field.key] || 0;
@@ -522,43 +492,12 @@ export default function BusinessesPage() {
                     const total = base + extra;
                     const nextLimit = nextPlanLimits?.[field.key];
                     const isOverLimit = nextLimit !== undefined && nextLimit !== -1 && total >= nextLimit;
-
                     return (
-                      <div key={field.key} className="grid grid-cols-1 sm:grid-cols-4 items-end gap-3 p-3 border rounded-lg bg-white shadow-sm">
-                        <div className="sm:col-span-1">
-                          <Label className="text-sm font-bold">{field.label}</Label>
-                        </div>
-                        <div>
-                          <Label className="text-[10px] uppercase text-muted-foreground">Base</Label>
-                          <div className="h-9 flex items-center px-3 bg-muted rounded-md font-medium text-sm">
-                            {base === -1 ? '∞' : base}
-                          </div>
-                        </div>
-                        <div>
-                          <Label className="text-[10px] uppercase text-muted-foreground">Extra</Label>
-                          <Input
-                            type="number"
-                            min="0"
-                            className={cn("h-9", isOverLimit && "border-destructive ring-destructive")}
-                            value={limitesExtra[field.key] || 0}
-                            onChange={(e) => handleLimiteExtraChange(field.key, e.target.value)}
-                          />
-                        </div>
-                        <div>
-                          <Label className="text-[10px] uppercase text-muted-foreground">Total Real</Label>
-                          <div className={cn(
-                            "h-9 flex items-center px-3 rounded-md font-bold text-sm",
-                            isOverLimit ? "bg-destructive/10 text-destructive" : "bg-primary/10 text-primary"
-                          )}>
-                            {total}
-                          </div>
-                        </div>
-                        {isOverLimit && (
-                          <div className="sm:col-span-4 flex items-center gap-1.5 text-[10px] text-destructive font-bold uppercase mt-1">
-                            <AlertCircle className="w-3 h-3" />
-                            {field.label}: el total ({total}) no puede igualar ni superar el límite de {nextPlanName} ({nextLimit})
-                          </div>
-                        )}
+                      <div key={field.key} className="grid grid-cols-4 items-end gap-3 p-3 border rounded-lg bg-white shadow-sm">
+                        <Label className="text-sm font-bold">{field.label}</Label>
+                        <div><Label className="text-[10px] uppercase">Base</Label><div className="h-9 flex items-center px-3 bg-muted rounded-md text-sm">{base === -1 ? '∞' : base}</div></div>
+                        <div><Label className="text-[10px] uppercase">Extra</Label><Input type="number" min="0" className={cn("h-9", isOverLimit && "border-destructive")} value={limitesExtra[field.key] || 0} onChange={(e) => handleLimiteExtraChange(field.key, e.target.value)} /></div>
+                        <div><Label className="text-[10px] uppercase">Total</Label><div className={cn("h-9 flex items-center px-3 rounded-md font-bold text-sm", isOverLimit ? "bg-destructive/10 text-destructive" : "bg-primary/10 text-primary")}>{total}</div></div>
                       </div>
                     );
                   })}
@@ -569,19 +508,12 @@ export default function BusinessesPage() {
                 <h4 className="font-medium mb-3">Servicios Adicionales</h4>
                 <div className="grid grid-cols-2 gap-2">
                   {(services || []).map(serviceItem => (
-                    <div key={serviceItem.id} className={cn('flex items-center justify-between p-3 border rounded-lg cursor-pointer transition-colors', assignedServices.includes(serviceItem.id) ? 'border-primary bg-primary/5' : 'hover:bg-gray-50')} onClick={() => toggleServiceAssignment(serviceItem.id)}>
-                      <div><p className="text-sm font-medium">{serviceItem.name}</p><p className="text-xs text-gray-500">Límite Global: {serviceItem.limit}</p></div>
+                    <div key={serviceItem.id} className={cn('flex items-center justify-between p-3 border rounded-lg cursor-pointer', assignedServices.includes(serviceItem.id) ? 'border-primary bg-primary/5' : 'hover:bg-gray-50')} onClick={() => toggleServiceAssignment(serviceItem.id)}>
+                      <div><p className="text-sm font-medium">{serviceItem.name}</p><p className="text-xs text-gray-500">Límite: {serviceItem.limit}</p></div>
                       {assignedServices.includes(serviceItem.id) && <Check className="w-5 h-5 text-primary" />}
                     </div>
                   ))}
                 </div>
-              </div>
-              <div>
-                <h4 className="font-medium mb-3">Cambiar Estado</h4>
-                <Select value={selectedBusiness.status} onValueChange={(v: EntityStatus) => setSelectedBusiness(prev => prev ? { ...prev, status: v } : null)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent><SelectItem value="active">Activo</SelectItem><SelectItem value="inactive">Inactivo</SelectItem><SelectItem value="suspended">Suspendido</SelectItem><SelectItem value="pending_payment">Pago Pendiente</SelectItem></SelectContent>
-                </Select>
               </div>
             </div>
           )}
