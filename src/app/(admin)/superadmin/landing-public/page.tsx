@@ -29,6 +29,7 @@ const fallbackData: LandingPageData = {
       { id: 'nav-link-2', text: 'Planes', url: '#precios', openInNewTab: false, enabled: true },
       { id: 'nav-link-3', text: 'Servicios', url: '/servicios', openInNewTab: false, enabled: true },
       { id: 'nav-link-4', text: 'Contacto', url: '/contact', openInNewTab: false, enabled: true },
+      { id: 'nav-link-5', text: 'Iniciar Sesión', url: '/login', openInNewTab: false, enabled: true },
     ],
     backgroundColor: '#FFFFFF',
     textColor: '#000000',

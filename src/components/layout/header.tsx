@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from "react";
@@ -18,6 +19,7 @@ const getLinkUrl = (link: NavLink, currentBusinessId: string | null | undefined)
   if (text.includes('blog')) return currentBusinessId ? `/blog/${currentBusinessId}` : '/blog';
   if (text.includes('catálogo')) return currentBusinessId ? `/catalog/${currentBusinessId}` : '#';
   if (text.includes('contacto')) return currentBusinessId ? `/contacto-cliente/${currentBusinessId}` : '/contacto';
+  if (text.includes('sesión') || text.includes('acceder') || text.includes('login')) return '/login';
   
   // Platform-wide pages
   if (text.includes('servicios')) return '/servicios';
