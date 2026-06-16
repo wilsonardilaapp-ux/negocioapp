@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useEffect } from 'react';
 import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
-import { doc, collection, query, where, type Timestamp } from 'firebase/firestore';
+import { doc, collection, query, where, limit, type Timestamp } from 'firebase/firestore';
 import type { Subscription } from '@/models/subscription';
 import type { SubscriptionPlan, PlanLimits } from '@/models/subscription-plan';
 import type { Product } from '@/models/product';
@@ -27,8 +27,8 @@ export function useSubscription() {
     [user?.uid, firestore]
   );
   
-  const businessRef = useMemoFirebase(
-    () => (user?.uid ? doc(firestore, 'businesses', user.uid) : null),
+  const businessQuery = useMemoFirebase(
+    () => (user?.uid ? query(collection(firestore, 'businesses'), where('userId', '==', user.uid), limit(1)) : null),
     [user?.uid, firestore]
   );
 
@@ -75,7 +75,8 @@ export function useSubscription() {
   );
 
   const { data: subscription, isLoading: isSubLoading, error: subError } = useDoc<Subscription>(subscriptionRef);
-  const { data: businessData, isLoading: isBusinessDataLoading } = useDoc<Business>(businessRef);
+  const { data: businessDataArr, isLoading: isBusinessDataLoading } = useCollection<Business>(businessQuery);
+  const businessData = businessDataArr?.[0] ?? null;
   const { data: allPlans, isLoading: arePlansLoading, error: plansError } = useCollection<SubscriptionPlan>(plansRef);
   const { data: allHybridPlans, isLoading: areHybridPlansLoading } = useCollection<HybridPlan>(hybridPlansRef);
   
