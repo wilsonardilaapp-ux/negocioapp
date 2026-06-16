@@ -38,9 +38,36 @@ service cloud.firestore {
       return isOwner(businessId);
     }
 
+    // --- REGLAS PÚBLICAS CRÍTICAS ---
+    
+    match /{path=**}/shareConfig/{docId} {
+      allow read, list: if true;
+    }
+
+    match /paymentSettings/{userId} {
+      allow read: if true;
+      allow write: if isSuperAdmin() || (isAuthenticated() && request.auth.uid == userId);
+    }
+
+    match /promotions/{promoId} {
+      allow read, list: if true;
+      allow write: if isSuperAdmin() || isOwner(request.resource.data.companyId || resource.data.companyId);
+    }
+
+    match /cupones/{couponId} {
+      allow read, list: if true;
+      allow write: if isSuperAdmin() || isOwner(request.resource.data.businessId || resource.data.businessId);
+    }
+
+    match /blog_posts/{postId} {
+      // CRÍTICO: Se requiere 'list' para que el dashboard pueda contar los posts y validar límites
+      allow read, list: if true;
+      allow write: if isSuperAdmin() || isOwner(request.resource.data.businessId || resource.data.businessId);
+    }
+
     // --- REGLAS POR COLECCIÓN ---
 
-    // Planes Híbridos (Menfy)
+    // Planes Híbridos (Zentry)
     match /hybrid_plans/{planId} {
       allow read, list: if true;
       allow write: if isSuperAdmin();

@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useTransition, useEffect, useMemo } from 'react';
@@ -83,7 +82,7 @@ export default function HybridPlansPage() {
       <Card>
         <CardHeader className="flex flex-row justify-between items-center">
           <div>
-            <CardTitle>Planes Híbridos (Menfy)</CardTitle>
+            <CardTitle>Planes Híbridos (Zentry)</CardTitle>
             <CardDescription>Tarifa base + Comisión por transacción.</CardDescription>
           </div>
           <Button onClick={() => handleOpenDialog(null)}>
@@ -339,12 +338,12 @@ function HybridPlanDialog({ isOpen, onClose, plan }: { isOpen: boolean, onClose:
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Nombre del Plan</Label>
-                  <Input {...register('name')} placeholder="Ej: Menfy Flexible" />
+                  <Input {...register('name')} placeholder="Ej: Zentry Flexible" />
                   {errors.name && <p className="text-xs text-destructive font-semibold">{errors.name.message}</p>}
                 </div>
                 <div className="space-y-2">
                   <Label>Slug (URL amistosa)</Label>
-                  <Input {...register('slug')} placeholder="menfy-flexible" />
+                  <Input {...register('slug')} placeholder="zentry-flexible" />
                   <p className="text-[10px] text-muted-foreground italic">Se normalizará automáticamente al guardar.</p>
                   {errors.slug && <p className="text-xs text-destructive font-semibold">{errors.slug.message}</p>}
                 </div>

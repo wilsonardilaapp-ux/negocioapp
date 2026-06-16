@@ -227,7 +227,7 @@ Gracias por tu puntualidad! 🚀`;
               <Calculator className="text-primary" />
               Panel de Cobros Masivos
             </CardTitle>
-            <CardDescription>Gestión de comisiones para planes híbridos (Menfy)</CardDescription>
+            <CardDescription>Gestión de comisiones para planes híbridos (Zentry)</CardDescription>
           </div>
           <div className="flex gap-2">
             <Button onClick={calculateBilling} disabled={isCalculating || loadingBusinesses} className="shadow-sm">

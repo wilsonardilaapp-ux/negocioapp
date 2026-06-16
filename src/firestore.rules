@@ -1,3 +1,4 @@
+
 rules_version = '2';
 
 service cloud.firestore {
@@ -66,27 +67,32 @@ service cloud.firestore {
 
     // --- REGLAS POR COLECCIÓN ---
 
+    // Planes Híbridos (Zentry)
     match /hybrid_plans/{planId} {
       allow read, list: if true;
       allow write: if isSuperAdmin();
     }
 
+    // Planes Estándar
     match /plans/{planId} {
       allow read, list: if true;
       allow write: if isSuperAdmin();
     }
 
+    // Configuración Global
     match /globalConfig/{document=**} {
       allow read, list: if true;
       allow write: if isSuperAdmin();
     }
 
+    // Usuarios y Perfiles
     match /users/{userId} {
       allow get: if isAuthenticated() && (request.auth.uid == userId || isSuperAdmin());
       allow list: if isSuperAdmin();
       allow write: if isSuperAdmin() || (isAuthenticated() && request.auth.uid == userId);
     }
 
+    // Negocios y sus recursos
     match /businesses/{businessId} {
       allow get, list: if true;
       allow write: if isSuperAdmin() || isBusinessMember(businessId);
@@ -121,11 +127,13 @@ service cloud.firestore {
       }
     }
 
+    // Mensajes de contacto globales
     match /contactMessages/{messageId} {
       allow create: if true;
       allow read, write: if isSuperAdmin();
     }
 
+    // --- REGLA POR DEFECTO ---
     match /{document=**} {
       allow read, write: if isSuperAdmin();
     }
