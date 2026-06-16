@@ -14,6 +14,7 @@ import type { SuggestionRule } from '@/models/suggestion-rule';
 import type { Coupon } from '@/models/coupon';
 import type { Promotion } from '@/models/promotion';
 import type { HybridPlan } from '@/models/hybrid-plan';
+import type { Module } from '@/models/module';
 
 const LOADING_TIMEOUT_MS = 10_000;
 
@@ -40,6 +41,11 @@ export function useSubscription() {
   const hybridPlansRef = useMemoFirebase(
     () => (firestore ? collection(firestore, 'hybrid_plans') : null),
     [firestore]
+  );
+
+  const modulesRef = useMemoFirebase(
+    () => (user?.uid ? collection(firestore, `businesses/${user.uid}/modules`) : null),
+    [user?.uid, firestore]
   );
 
   const productsRef = useMemoFirebase(
@@ -79,6 +85,7 @@ export function useSubscription() {
   const businessData = businessDataArr?.[0] ?? null;
   const { data: allPlans, isLoading: arePlansLoading, error: plansError } = useCollection<SubscriptionPlan>(plansRef);
   const { data: allHybridPlans, isLoading: areHybridPlansLoading } = useCollection<HybridPlan>(hybridPlansRef);
+  const { data: dbModules, isLoading: areModulesLoading } = useCollection<Module>(modulesRef);
   
   const { data: products, isLoading: isProductsLoading, error: productsError } = useCollection<Product>(productsRef);
   const { data: blogPosts, isLoading: isBlogPostsLoading, error: blogPostsError } = useCollection<BlogPost>(blogPostsQuery);
@@ -96,6 +103,7 @@ export function useSubscription() {
     isBusinessDataLoading ||
     arePlansLoading ||
     areHybridPlansLoading ||
+    areModulesLoading ||
     isProductsLoading ||
     isBlogPostsLoading ||
     isLandingPagesLoading ||
@@ -117,19 +125,19 @@ export function useSubscription() {
 
   const isLoading = timedOut || error ? false : rawIsLoading;
 
-  const { plan, isActive, limits, isFree, isPro, isEnterprise, planDetails } = useMemo(() => {
+  const memoizedSubscriptionValues = useMemo(() => {
     // FUENTE DE VERDAD: Priorizar la suscripción activa si existe
-    const subscriptionPlan = subscription?.plan;
+    const subscriptionPlanId = subscription?.plan;
     const businessPlanName = (businessData as any)?.planName;
     
     let currentPlanId = 'free';
 
-    if (subscriptionPlan && subscription?.status === 'active') {
-        currentPlanId = subscriptionPlan;
+    if (subscriptionPlanId && subscription?.status === 'active') {
+        currentPlanId = subscriptionPlanId;
     } else if (businessPlanName && businessPlanName !== 'Plan Gratuito') {
         currentPlanId = businessPlanName;
-    } else if (businessPlanName === 'Plan Gratuito' && subscriptionPlan) {
-        currentPlanId = subscriptionPlan;
+    } else if (businessPlanName === 'Plan Gratuito' && subscriptionPlanId) {
+        currentPlanId = subscriptionPlanId;
     }
 
     const details = allPlans?.find(p => p.id === currentPlanId || p.name === currentPlanId) || 
@@ -152,6 +160,26 @@ export function useSubscription() {
 
     const planType = (details?.name || currentPlanId).toLowerCase();
 
+    // LÓGICA CENTRALIZADA DE MÓDULOS ACTIVOS (DERECHOS)
+    const activeModuleIds = new Set<string>();
+    
+    // 1. Módulos incluidos en el plan
+    details?.includedModuleKeys?.forEach(key => activeModuleIds.add(key));
+
+    // 2. Módulos activados/desactivados manualmente en la DB del cliente
+    dbModules?.forEach(m => {
+        if (m.status === 'active') activeModuleIds.add(m.id);
+        else if (m.status === 'inactive') activeModuleIds.delete(m.id);
+    });
+
+    // 3. SaaS Autosanación: Si el plan es Estándar o superior, garantizar Catálogo y Blog
+    const planName = details?.name || currentPlanId;
+    const normalizedName = planName.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    if (normalizedName.includes('estandar') || normalizedName.includes('pro') || normalizedName.includes('enterprise')) {
+        activeModuleIds.add('catalogo');
+        activeModuleIds.add('blog');
+    }
+
     return {
       plan: details?.name || currentPlanId,
       isActive: !!details || subscription?.status === 'active',
@@ -160,8 +188,9 @@ export function useSubscription() {
       isPro: planType.includes('pro'),
       isEnterprise: planType.includes('enterprise') || planType.includes('estándar') || planType.includes('estandar'),
       planDetails: details || null,
+      activeModuleIds,
     };
-  }, [subscription, allPlans, allHybridPlans, businessData]);
+  }, [subscription, allPlans, allHybridPlans, businessData, dbModules]);
 
   const productsCount = products?.length ?? 0;
   const blogPostsCount = blogPosts?.length ?? 0;
@@ -172,38 +201,36 @@ export function useSubscription() {
   const promotionsCount = promotions?.length ?? 0;
 
   const canAddBlogPosts = (currentCount: number): boolean => {
-    if (limits.blogPosts === -1) return true;
-    return currentCount < limits.blogPosts;
+    if (memoizedSubscriptionValues.limits.blogPosts === -1) return true;
+    return currentCount < memoizedSubscriptionValues.limits.blogPosts;
   };
 
   const canAddProducts = (currentCount: number): boolean => {
-    if (limits.products === -1) return true;
-    return currentCount < limits.products;
+    if (memoizedSubscriptionValues.limits.products === -1) return true;
+    return currentCount < memoizedSubscriptionValues.limits.products;
   };
 
   const canAddOrders = (currentCount: number): boolean => {
-    if (limits.orders === -1) return true;
-    return currentCount < limits.orders;
+    if (memoizedSubscriptionValues.limits.orders === -1) return true;
+    return currentCount < memoizedSubscriptionValues.limits.orders;
   };
   
   const canAddSuggestions = (currentCount: number): boolean => {
-    if (limits.suggestions === -1) return true;
-    return currentCount < limits.suggestions;
+    if (memoizedSubscriptionValues.limits.suggestions === -1) return true;
+    return currentCount < memoizedSubscriptionValues.limits.suggestions;
+  };
+
+  const isModuleAuthorized = (moduleId: string): boolean => {
+      return memoizedSubscriptionValues.activeModuleIds.has(moduleId);
   };
 
   return {
     subscription,
     allPlans,
     allHybridPlans,
-    plan,
-    planDetails,
-    isActive,
+    ...memoizedSubscriptionValues,
     isLoading,
     error,
-    isFree,
-    isPro,
-    isEnterprise,
-    limits,
     productsCount,
     blogPostsCount,
     landingPagesCount,
@@ -215,5 +242,6 @@ export function useSubscription() {
     canAddProducts,
     canAddOrders,
     canAddSuggestions,
+    isModuleAuthorized,
   };
 }

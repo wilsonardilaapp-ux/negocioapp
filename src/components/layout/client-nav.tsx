@@ -2,9 +2,6 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useUser, useFirestore, useMemoFirebase, useCollection } from "@/firebase";
-import { collection, query, where } from "firebase/firestore";
-import type { Module } from "@/models/module";
 import { useMemo } from 'react';
 import { useSubscription } from "@/hooks/useSubscription";
 import {
@@ -62,57 +59,17 @@ const allNavItems = [
 export function ClientNav() {
   const pathname = usePathname();
   const { setOpenMobile } = useSidebar();
-  const firestore = useFirestore();
-  const { user } = useUser();
-  const { planDetails, isLoading: isSubLoading } = useSubscription();
+  const { isModuleAuthorized, isLoading: isSubLoading } = useSubscription();
 
-  // Consulta dinámica de módulos asignados al negocio con estado activo
-  const modulesQuery = useMemoFirebase(() => {
-    if (!firestore || !user) return null;
-    return query(
-      collection(firestore, `businesses/${user.uid}/modules`),
-      where("status", "==", "active")
-    );
-  }, [firestore, user]);
-
-  const { data: activeModules, isLoading: isModulesLoading } = useCollection<Module>(modulesQuery);
-
-  const activeModuleIds = useMemo(() => {
-    const ids = new Set<string>();
-    
-    // 1. Módulos habilitados explícitamente en la base de datos del cliente
-    if (activeModules) {
-        activeModules.forEach(m => ids.add(m.id));
-    }
-    
-    // 2. Módulos incluidos implícitamente por la definición del plan contratado
-    if (planDetails?.includedModuleKeys) {
-        planDetails.includedModuleKeys.forEach(key => ids.add(key));
-    }
-
-    // 3. Regla de autosanación SaaS: Si el plan es Estándar o superior, asegurar visibilidad de módulos base
-    const rawPlanName = planDetails?.name || '';
-    const normalizedPlanName = rawPlanName.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-    
-    if (normalizedPlanName.includes('estandar') || normalizedPlanName.includes('pro') || normalizedPlanName.includes('enterprise')) {
-        ids.add('catalogo');
-        ids.add('blog');
-    }
-
-    return ids;
-  }, [activeModules, planDetails]);
-
-  // Filtrar los elementos del menú según los módulos autorizados
+  // Filtrar los elementos del menú según los módulos autorizados por el hook central
   const navItems = useMemo(() => {
     return allNavItems.filter(item => {
-      // Si el ítem no tiene moduleId, es base y se muestra siempre
       if (!item.moduleId) return true;
-      // Si tiene moduleId, se muestra si está en el set de autorizados (DB o Plan)
-      return activeModuleIds.has(item.moduleId);
+      return isModuleAuthorized(item.moduleId);
     });
-  }, [activeModuleIds]);
+  }, [isModuleAuthorized]);
 
-  if ((isModulesLoading || isSubLoading) && !activeModules && !planDetails) {
+  if (isSubLoading && navItems.length === 0) {
     return (
       <div className="flex flex-col gap-2 p-4">
         {[...Array(6)].map((_, i) => (

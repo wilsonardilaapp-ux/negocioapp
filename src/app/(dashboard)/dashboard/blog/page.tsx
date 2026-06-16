@@ -10,13 +10,12 @@ import {
   CardFooter,
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Frown, Save, Loader2, Image as ImageIcon, UploadCloud, Trash2, Pencil, Info } from 'lucide-react';
+import { PlusCircle, Frown, Save, Loader2, UploadCloud, Trash2, Pencil, Info } from 'lucide-react';
 import Link from 'next/link';
 import { useCollection, useFirestore, useMemoFirebase, useUser, useDoc, setDocumentNonBlocking } from '@/firebase';
 import { collection, query, where, doc, type Timestamp, getDoc } from 'firebase/firestore';
 import type { BlogPost, BlogAppearanceConfig } from '@/models/blog-post';
 import { PostsTable } from '@/components/blog/posts-table';
-import type { Module } from '@/models/module';
 import { useSubscription } from '@/hooks/useSubscription';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -218,12 +217,6 @@ export default function BlogPage() {
   const { user } = useUser();
   const { toast } = useToast();
 
-  const blogModuleQuery = useMemoFirebase(() => 
-    !firestore ? null : doc(firestore, 'modules', 'blog'), 
-  [firestore]);
-  
-  const { data: blogModule, isLoading: isModuleLoading } = useDoc<Module>(blogModuleQuery);
-
   const postsQuery = useMemoFirebase(() => 
     !firestore || !user
       ? null 
@@ -242,9 +235,9 @@ export default function BlogPage() {
     });
   }, [unsortedPosts]);
 
-  const { plan, canAddBlogPosts, limits, blogPostsCount, isLoading: isSubscriptionLoading } = useSubscription();
+  const { plan, canAddBlogPosts, limits, blogPostsCount, isModuleAuthorized, isLoading: isSubscriptionLoading } = useSubscription();
   
-  const isLoading = isModuleLoading || arePostsLoading || isSubscriptionLoading;
+  const isLoading = arePostsLoading || isSubscriptionLoading;
 
   const handleDeletePost = async (postId: string) => {
     const result = await deletePost(postId);
@@ -259,7 +252,8 @@ export default function BlogPage() {
       return <div>Cargando...</div>
   }
 
-  if (!blogModule || blogModule.status === 'inactive') {
+  // Usar el hook de suscripción centralizado para verificar autorización
+  if (!isModuleAuthorized('blog')) {
       return (
           <Card>
               <CardHeader>

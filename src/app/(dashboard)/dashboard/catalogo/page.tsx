@@ -25,7 +25,6 @@ import type { LandingHeaderConfigData } from '../../../../models/landing-page';
 import { v4 as uuidv4 } from 'uuid';
 import { useUser, useFirestore, setDocumentNonBlocking, deleteDocumentNonBlocking, useDoc, useCollection, useMemoFirebase } from '../../../../firebase';
 import { doc, collection, getDoc } from 'firebase/firestore';
-import type { Module } from '../../../../models/module';
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '../../../../components/ui/tooltip';
 import { useToast } from '../../../../hooks/use-toast';
 import { useSubscription } from '../../../../hooks/useSubscription';
@@ -65,7 +64,6 @@ export default function CatalogoPage() {
     const [productToDelete, setProductToDelete] = useState<Product | null>(null);
     
     const [headerConfig, setHeaderConfig] = useState<LandingHeaderConfigData>(initialHeaderConfig);
-    const [moduleInactive, setModuleInactive] = useState(false);
     const [isInitialLoading, setInitialLoading] = useState(true);
 
     const { user, isUserLoading } = useUser();
@@ -76,6 +74,7 @@ export default function CatalogoPage() {
         canAddProducts, 
         limits, 
         plan,
+        isModuleAuthorized,
         isLoading: isSubscriptionLoading 
     } = useSubscription();
 
@@ -84,25 +83,21 @@ export default function CatalogoPage() {
     [firestore, user]);
     const { data: products, isLoading: areProductsLoading } = useCollection<Product>(productsQuery);
     
-    const catalogModuleRef = useMemoFirebase(() => 
-        user ? doc(firestore, 'businesses', user.uid, 'modules', 'catalogo') : null,
-    [firestore, user]);
-    
     useEffect(() => {
         if (isUserLoading || !user || !firestore) return;
 
         let isMounted = true;
         const fetchConfig = async () => {
             if (!isMounted) return;
+            
+            // Si el módulo no está autorizado por el plan ni por DB, no seguimos
+            if (!isModuleAuthorized('catalogo')) {
+                setInitialLoading(false);
+                return;
+            }
+
             setInitialLoading(true);
             try {
-                const moduleSnap = await getDoc(catalogModuleRef!);
-                if (!moduleSnap.exists() || moduleSnap.data().status === 'inactive') {
-                    if (isMounted) setModuleInactive(true);
-                    return;
-                }
-                if (isMounted) setModuleInactive(false);
-                
                 const headerConfigRef = doc(firestore, 'businesses', user.uid, 'landingConfig', 'header');
                 const headerConfigSnap = await getDoc(headerConfigRef);
                 
@@ -131,7 +126,7 @@ export default function CatalogoPage() {
 
         fetchConfig();
         return () => { isMounted = false; };
-    }, [user, firestore, isUserLoading, toast, catalogModuleRef]);
+    }, [user, firestore, isUserLoading, toast, isModuleAuthorized]);
     
     const isLoading = isUserLoading || isSubscriptionLoading || areProductsLoading || isInitialLoading;
     const productCount = products?.length ?? 0;
@@ -219,7 +214,8 @@ export default function CatalogoPage() {
         return <div className="flex items-center justify-center h-64"><Loader2 className="h-8 w-8 animate-spin" /> Cargando tu catálogo...</div>
     }
 
-    if (moduleInactive) {
+    // Usamos el hook central para verificar autorización en lugar de la DB manual
+    if (!isModuleAuthorized('catalogo')) {
         return (
             <Card>
                 <CardHeader>
@@ -229,7 +225,7 @@ export default function CatalogoPage() {
                     <Frown className="h-12 w-12 text-muted-foreground" />
                     <h3 className="text-xl font-semibold">Funcionalidad en Mantenimiento</h3>
                     <p className="text-muted-foreground max-w-sm">
-                        El módulo de "Catálogo de Productos" no está activo. Por favor, contacta al administrador de la plataforma para más información.
+                        El módulo de "Catálogo de Productos" no está activo en tu plan actual. Por favor, contacta al administrador de la plataforma para más información.
                     </p>
                 </CardContent>
             </Card>
