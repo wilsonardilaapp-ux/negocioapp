@@ -24,7 +24,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { Check, Plus, Search, Building2, Eye, Puzzle, Tag, AlertCircle, TrendingUp, Mail, User, ShieldCheck, Loader2 } from 'lucide-react';
+import { Check, Plus, Search, Building2, Eye, Puzzle, Tag, AlertCircle, TrendingUp, Mail, User, ShieldCheck, Loader2, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Label } from '@/components/ui/label';
 import { validateModuleExtra, validateLimitesExtra } from '@/utils/validateModuleExtra';
@@ -172,7 +172,6 @@ export default function BusinessesPage() {
         const resolvedPlanName = currentPlanDetails?.name || business.planName || 'Plan Gratuito';
 
         // --- LÓGICA DE AUTOSANACIÓN ---
-        // Si detectamos que el planName en el doc principal no coincide con la suscripción real, lo corregimos silenciosamente.
         if (business.planName !== resolvedPlanName) {
             console.log(`[Autosanación] Corrigiendo plan para ${business.name}: ${business.planName} -> ${resolvedPlanName}`);
             updateDocumentNonBlocking(doc(firestore, 'businesses', business.id), { planName: resolvedPlanName });
@@ -364,7 +363,7 @@ export default function BusinessesPage() {
             <Input
               placeholder="Buscar negocios..."
               value={searchBusiness}
-              onChange={e => setSearchTerm(e.target.value)}
+              onChange={e => setSearchBusiness(e.target.value)}
               className="pl-10"
             />
           </div>
@@ -501,7 +500,7 @@ export default function BusinessesPage() {
                 <ShieldCheck className="text-primary h-5 w-5" />
                 Gestionar Negocio
             </DialogTitle>
-            <DialogDescription>{selectedBusiness?.name} - Asigna módulos y servicios</DialogDescription>
+            <DialogDescription>{selectedBusiness?.name} - Valida características y permisos del plan</DialogDescription>
           </DialogHeader>
           {selectedBusiness && (
             <div className="space-y-6 py-4">
@@ -519,7 +518,7 @@ export default function BusinessesPage() {
                     </p>
                 </div>
                 <div className="mt-2 col-span-2">
-                    <p className="text-[10px] uppercase font-bold text-muted-foreground mb-1">Plan de Suscripción</p>
+                    <p className="text-[10px] uppercase font-bold text-muted-foreground mb-1">Plan de Suscripción (Fuente de Verdad)</p>
                     <Select 
                         value={allPlans.find(p => p.name === selectedBusiness.planName || p.id === selectedBusiness.planName)?.id || 'free'} 
                         onValueChange={(val) => {
@@ -546,43 +545,66 @@ export default function BusinessesPage() {
               </div>
 
               <div>
-                <h4 className="font-bold mb-3 flex items-center gap-2">
-                    <Puzzle className="h-4 w-4 text-primary" />
-                    Módulos Asignados
-                </h4>
+                <div className="flex items-center justify-between mb-3">
+                    <h4 className="font-bold flex items-center gap-2 text-gray-800">
+                        <Puzzle className="h-4 w-4 text-primary" />
+                        Módulos y Herramientas
+                    </h4>
+                    <span className="text-[10px] text-muted-foreground italic">Valida que coincidan con el plan contratado</span>
+                </div>
+                
                 <div className="grid grid-cols-1 gap-2">
-                  {(modules || []).map(moduleItem => {
-                    const isActive = assignedModules.includes(moduleItem.id);
-                    const validation = validateModuleExtra(selectedBusiness.planName, moduleExtras[moduleItem.id] || 0);
-                    return (
-                      <div key={moduleItem.id} className={cn('flex flex-col p-3 border rounded-lg transition-all', isActive ? 'border-primary bg-primary/5 shadow-sm' : 'hover:bg-muted/30', moduleItem.status === 'inactive' && 'opacity-60')}>
-                        <div className="flex items-center justify-between cursor-pointer" onClick={() => moduleItem.status !== 'inactive' && toggleModuleAssignment(moduleItem.id)}>
-                          <div className="flex items-center gap-3">
-                            <div className={cn('w-9 h-9 rounded-lg flex items-center justify-center', isActive ? 'bg-primary/20 text-primary' : 'bg-muted text-muted-foreground')}>{iconMap[moduleItem.id] || iconMap.default}</div>
-                            <div>
-                                <p className="text-sm font-bold">{moduleItem.name}</p>
-                                <p className="text-[10px] font-medium text-muted-foreground uppercase">{moduleItem.status}</p>
+                  {(() => {
+                    const currentPlan = allPlans.find(p => p.name === selectedBusiness.planName || p.id === selectedBusiness.planName);
+                    const includedModules = (currentPlan as any)?.includedModuleKeys || [];
+
+                    return (modules || []).map(moduleItem => {
+                      const isActive = assignedModules.includes(moduleItem.id);
+                      const isIncludedInPlan = includedModules.includes(moduleItem.id);
+                      const validation = validateModuleExtra(selectedBusiness.planName, moduleExtras[moduleItem.id] || 0);
+                      
+                      return (
+                        <div key={moduleItem.id} className={cn(
+                            'flex flex-col p-3 border rounded-lg transition-all', 
+                            isActive ? 'border-primary bg-primary/5 shadow-sm' : 'hover:bg-muted/30', 
+                            moduleItem.status === 'inactive' && 'opacity-60',
+                            isActive && !isIncludedInPlan && 'border-yellow-500 bg-yellow-50/30'
+                        )}>
+                          <div className="flex items-center justify-between cursor-pointer" onClick={() => moduleItem.status !== 'inactive' && toggleModuleAssignment(moduleItem.id)}>
+                            <div className="flex items-center gap-3">
+                              <div className={cn('w-9 h-9 rounded-lg flex items-center justify-center', isActive ? 'bg-primary/20 text-primary' : 'bg-muted text-muted-foreground')}>
+                                {iconMap[moduleItem.id] || iconMap.default}
+                              </div>
+                              <div>
+                                  <div className="flex items-center gap-2">
+                                      <p className="text-sm font-bold">{moduleItem.name}</p>
+                                      {isIncludedInPlan && <Badge className="text-[8px] h-4 bg-green-600">Incluido en Plan</Badge>}
+                                      {isActive && !isIncludedInPlan && <Badge variant="outline" className="text-[8px] h-4 border-yellow-500 text-yellow-700">Extra</Badge>}
+                                  </div>
+                                  <p className="text-[10px] font-medium text-muted-foreground uppercase">{moduleItem.status}</p>
+                              </div>
                             </div>
+                            {isActive && <Check className="w-5 h-5 text-primary" />}
                           </div>
-                          {isActive && <Check className="w-5 h-5 text-primary" />}
+                          
+                          {isActive && (
+                            <div className="mt-3 pt-3 border-t grid grid-cols-3 items-end gap-4 animate-in fade-in slide-in-from-top-1 duration-200">
+                              <div><Label className="text-[10px] uppercase font-bold text-muted-foreground">Límite Base</Label><div className="h-9 flex items-center px-3 bg-muted rounded-md font-bold text-xs">{validation.baseLimit === -1 ? '∞' : validation.baseLimit}</div></div>
+                              <div><Label className="text-[10px] uppercase font-bold text-muted-foreground">Extra (+)</Label><Input type="number" className="h-9 text-xs" value={moduleExtras[moduleItem.id] ?? 0} onChange={(e) => handleExtraChange(moduleItem.id, e.target.value)} /></div>
+                              <div><Label className="text-[10px] uppercase font-bold text-muted-foreground">Total Real</Label><div className="h-9 flex items-center px-3 bg-primary/20 text-primary rounded-md font-black text-xs">{validation.totalLimit === -1 ? '∞' : validation.totalLimit}</div></div>
+                            </div>
+                          )}
                         </div>
-                        {isActive && (
-                          <div className="mt-3 pt-3 border-t grid grid-cols-3 items-end gap-4 animate-in fade-in slide-in-from-top-1 duration-200">
-                            <div><Label className="text-[10px] uppercase font-bold text-muted-foreground">Base</Label><div className="h-9 flex items-center px-3 bg-muted rounded-md font-bold text-xs">{validation.baseLimit}</div></div>
-                            <div><Label className="text-[10px] uppercase font-bold text-muted-foreground">Extra</Label><Input type="number" className="h-9 text-xs" value={moduleExtras[moduleItem.id] ?? 0} onChange={(e) => handleExtraChange(moduleItem.id, e.target.value)} /></div>
-                            <div><Label className="text-[10px] uppercase font-bold text-muted-foreground">Total Real</Label><div className="h-9 flex items-center px-3 bg-primary/20 text-primary rounded-md font-black text-xs">{validation.totalLimit}</div></div>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
+                      );
+                    });
+                  })()}
                 </div>
               </div>
 
               <div className="border-t pt-6">
                 <h4 className="font-black flex items-center gap-2 mb-4 text-lg text-gray-800">
                     <TrendingUp className="w-5 h-5 text-primary" /> 
-                    Límites Extra del Plan
+                    Capacidades y Límites Adicionales
                 </h4>
                 <div className="space-y-4">
                   {limiteFields.map((field) => {
@@ -594,9 +616,9 @@ export default function BusinessesPage() {
                     return (
                       <div key={field.key} className="grid grid-cols-4 items-end gap-3 p-3 border rounded-xl bg-white shadow-sm hover:border-primary/30 transition-colors">
                         <Label className="text-sm font-bold text-gray-700 pb-2">{field.label}</Label>
-                        <div><Label className="text-[10px] uppercase font-bold text-muted-foreground">Base</Label><div className="h-9 flex items-center px-3 bg-muted rounded-md text-xs font-semibold">{base === -1 ? '∞' : base}</div></div>
-                        <div><Label className="text-[10px] uppercase font-bold text-muted-foreground">Extra</Label><Input type="number" min="0" className={cn("h-9 text-xs font-bold", isOverLimit && "border-destructive text-destructive")} value={limitesExtra[field.key] || 0} onChange={(e) => handleLimiteExtraChange(field.key, e.target.value)} /></div>
-                        <div><Label className="text-[10px] uppercase font-bold text-muted-foreground">Total</Label><div className={cn("h-9 flex items-center px-3 rounded-md font-black text-xs transition-colors", isOverLimit ? "bg-destructive/10 text-destructive" : "bg-primary/10 text-primary")}>{total === -1 ? '∞' : total}</div></div>
+                        <div><Label className="text-[10px] uppercase font-bold text-muted-foreground">Base Plan</Label><div className="h-9 flex items-center px-3 bg-muted rounded-md text-xs font-semibold">{base === -1 ? '∞' : base}</div></div>
+                        <div><Label className="text-[10px] uppercase font-bold text-muted-foreground">Aumento</Label><Input type="number" min="0" className={cn("h-9 text-xs font-bold", isOverLimit && "border-destructive text-destructive")} value={limitesExtra[field.key] || 0} onChange={(e) => handleLimiteExtraChange(field.key, e.target.value)} /></div>
+                        <div><Label className="text-[10px] uppercase font-bold text-muted-foreground">Total Final</Label><div className={cn("h-9 flex items-center px-3 rounded-md font-black text-xs transition-colors", isOverLimit ? "bg-destructive/10 text-destructive" : "bg-primary/10 text-primary")}>{total === -1 ? '∞' : total}</div></div>
                       </div>
                     );
                   })}
@@ -604,22 +626,22 @@ export default function BusinessesPage() {
                 {nextPlanName && (
                   <p className="mt-4 text-[11px] text-muted-foreground italic flex items-center gap-1.5">
                     <AlertCircle className="h-3 w-3" />
-                    El total real no puede igualar al plan superior ({nextPlanName}).
+                    Las características actuales se comparan con el plan superior ({nextPlanName}).
                   </p>
                 )}
               </div>
 
               <div className="border-t pt-6">
-                <h4 className="font-bold mb-3 text-gray-800">Estado del Negocio</h4>
+                <h4 className="font-bold mb-3 text-gray-800">Estado Maestro del Negocio</h4>
                 <Select value={selectedBusiness.status} onValueChange={(v: EntityStatus) => setSelectedBusiness(prev => prev ? {...prev, status: v} : null)}>
                     <SelectTrigger className="w-full font-semibold">
                         <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                        <SelectItem value="active" className="font-bold text-green-700">Activo (Full Access)</SelectItem>
-                        <SelectItem value="pending_payment" className="font-bold text-yellow-700">Pago Pendiente (Limitado)</SelectItem>
-                        <SelectItem value="inactive" className="font-bold text-gray-700">Inactivo (No accesible)</SelectItem>
-                        <SelectItem value="suspended" className="font-bold text-red-700">Suspendido (Bloqueado)</SelectItem>
+                        <SelectItem value="active" className="font-bold text-green-700">Activo (Acceso Total)</SelectItem>
+                        <SelectItem value="pending_payment" className="font-bold text-yellow-700">Pago Pendiente (Restringido)</SelectItem>
+                        <SelectItem value="inactive" className="font-bold text-gray-700">Inactivo (Suspendido)</SelectItem>
+                        <SelectItem value="suspended" className="font-bold text-red-700">Bloqueado (Acción Manual)</SelectItem>
                     </SelectContent>
                 </Select>
               </div>
@@ -628,7 +650,7 @@ export default function BusinessesPage() {
           <DialogFooter className="bg-muted/30 p-6 -mx-6 -mb-6 border-t">
             <Button variant="ghost" className="font-bold" onClick={() => setShowManageModal(false)}>Cancelar</Button>
             <Button onClick={handleSaveManageBusiness} className="bg-primary hover:bg-primary/90 font-black px-8">
-                Guardar Cambios Atómicos
+                Guardar Configuración de Plan
             </Button>
           </DialogFooter>
         </DialogContent>

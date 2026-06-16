@@ -20,6 +20,7 @@ export const SubscriptionPlanSchema = z.object({
   stripePriceId: z.string().min(1, { message: "El ID de precio de Stripe es requerido." }).regex(/^price_/, { message: "Debe ser un ID de precio de Stripe válido (ej. price_...)." }).describe("El ID del precio correspondiente en Stripe."),
   isMostPopular: z.boolean().optional().describe("Marcar para destacar el plan."),
   isActive: z.boolean().default(true).describe("Define si el plan está disponible para nuevas suscripciones."),
+  includedModuleKeys: z.array(z.string()).optional().describe("Lista de IDs de módulos incluidos por defecto en este plan."),
   features: z.array(z.object({ 
     value: z.string().min(1, 'La característica no puede estar vacía.'),
     displayOrder: z.number().optional()
@@ -38,6 +39,7 @@ export const DefaultSubscriptionPlans: SubscriptionPlan[] = [
     stripePriceId: 'price_free_placeholder',
     isMostPopular: false,
     isActive: true,
+    includedModuleKeys: ['catalogo', 'blog'],
     features: [
       { value: '10 productos en catálogo', displayOrder: 0 },
       { value: '5 posts de blog', displayOrder: 1 },
@@ -64,6 +66,7 @@ export const DefaultSubscriptionPlans: SubscriptionPlan[] = [
     stripePriceId: 'price_pro_placeholder',
     isMostPopular: true,
     isActive: true,
+    includedModuleKeys: ['catalogo', 'blog', 'promotions', 'chatbot-integrado-con-whatsapp-para-soporte-y-ventas', 'google-analytics'],
     features: [
       { value: 'Productos ilimitados', displayOrder: 0 },
       { value: 'Posts de blog ilimitados', displayOrder: 1 },
@@ -89,6 +92,7 @@ export const DefaultSubscriptionPlans: SubscriptionPlan[] = [
     stripePriceId: 'price_enterprise_placeholder',
     isMostPopular: false,
     isActive: true,
+    includedModuleKeys: ['catalogo', 'blog', 'promotions', 'chatbot-integrado-con-whatsapp-para-soporte-y-ventas', 'motor-de-sugerencias-inteligentes', 'google-analytics', 'cloudinary', 'pistola-escaner', 'contabilidad', 'inventario-kardex'],
     features: [
       { value: 'Todo lo del plan PRO', displayOrder: 0 },
       { value: 'Acceso a la API', displayOrder: 1 },
