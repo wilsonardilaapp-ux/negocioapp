@@ -23,7 +23,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { Check, Plus, Search, Building2, Eye, Puzzle, Tag, AlertCircle, TrendingUp, Mail, User } from 'lucide-react';
+import { Check, Plus, Search, Building2, Eye, Puzzle, Tag, AlertCircle, TrendingUp, Mail, User, ShieldCheck } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Label } from '@/components/ui/label';
 import { validateModuleExtra, validateLimitesExtra } from '@/utils/validateModuleExtra';
@@ -44,19 +44,34 @@ const iconMap: { [key: string]: React.ReactNode } = {
 
 const StatusBadge = ({ status }: { status: EntityStatus | string | undefined }) => {
   // Resiliencia para estados nulos o no normalizados
-  const currentStatus = status || 'inactive';
+  // Si no hay estado definido, pero el negocio existe, mostramos un estado neutral para evitar "Inactivo" falso
+  if (!status) {
+    return (
+      <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 font-medium">
+        Pendiente
+      </Badge>
+    );
+  }
+  
+  const currentStatus = status.toLowerCase();
   
   const statusConfig: Record<string, string> = {
     active: 'bg-green-100 text-green-800 border-green-200',
+    activo: 'bg-green-100 text-green-800 border-green-200',
     inactive: 'bg-gray-100 text-gray-800 border-gray-200',
+    inactivo: 'bg-gray-100 text-gray-800 border-gray-200',
     suspended: 'bg-red-100 text-red-800 border-red-200',
+    suspendido: 'bg-red-100 text-red-800 border-red-200',
     pending_payment: 'bg-yellow-100 text-yellow-800 border-yellow-200',
   };
 
   const label: Record<string, string> = {
     active: 'Activo',
+    activo: 'Activo',
     inactive: 'Inactivo',
+    inactivo: 'Inactivo',
     suspended: 'Suspendido',
+    suspendido: 'Suspendido',
     pending_payment: 'Pago Pendiente',
   };
 
@@ -144,6 +159,7 @@ export default function BusinessesPage() {
 
   const openManageBusiness = async (business: Business) => {
     // 0. Fetch the actual subscription from subcollection (Source of Truth)
+    // Esto asegura que si el plan real es Híbrido, el modal lo detecte aunque en el doc principal diga 'Gratuito'
     const subSnap = await getDoc(doc(firestore, `businesses/${business.id}/subscription`, 'current'));
     const subData = subSnap.exists() ? subSnap.data() as any : null;
     const actualPlanId = subData?.plan || 'free';
@@ -152,13 +168,13 @@ export default function BusinessesPage() {
     const allAvailablePlans = [...(plans || []), ...(hybridPlans || [])];
     const currentPlanDetails = allAvailablePlans.find(p => p.id === actualPlanId || p.name === business.planName);
 
-    // Ensure we have a robust object for the modal
+    // Aseguramos fallbacks para visualización en el modal
     setSelectedBusiness({ 
       ...business, 
-      status: business.status || 'active', // Fallback for undefined status
-      ownerName: business.ownerName || (business as any).name || 'N/A',
-      ownerEmail: business.ownerEmail || (business as any).email || 'N/A',
-      planName: currentPlanDetails?.name || business.planName || 'Plan Gratuito', 
+      status: business.status || subData?.status || 'active', 
+      ownerName: business.ownerName || business.name || 'N/A',
+      ownerEmail: business.ownerEmail || business.contactEmail || 'N/A',
+      planName: currentPlanDetails?.name || business.planName || (actualPlanId !== 'free' ? actualPlanId : 'Plan Gratuito'), 
       imageLimit: business.imageLimit ?? undefined,
       productLimit: business.productLimit ?? undefined 
     });
@@ -346,6 +362,7 @@ export default function BusinessesPage() {
             <SelectContent>
               <SelectItem value="all">Todos los planes</SelectItem>
               {(plans || []).map(plan => <SelectItem key={plan.id} value={plan.id}>{plan.name}</SelectItem>)}
+              {(hybridPlans || []).map(plan => <SelectItem key={plan.id} value={plan.id}>{plan.name}</SelectItem>)}
             </SelectContent>
           </Select>
           <Select value={filterStatus} onValueChange={setFilterStatus}>
@@ -383,18 +400,33 @@ export default function BusinessesPage() {
                           <Building2 className="w-5 h-5 text-primary" />
                         </div>
                         <div>
-                          <p className="font-medium">{business.name}</p>
-                          <p className="text-sm text-gray-500">{business.ownerName || 'N/A'}</p>
+                          <p className="font-bold text-gray-900">{business.name}</p>
+                          <p className="text-xs text-gray-500 font-medium">
+                            {business.ownerName || business.name || 'Propietario N/A'}
+                          </p>
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4"><Badge variant="outline">{business.planName || 'Plan Gratuito'}</Badge></td>
-                    <td className="px-6 py-4"><StatusBadge status={business.status} /></td>
-                    <td className="px-6 py-4 text-gray-600">{business.phone || 'N/A'}</td>
+                    <td className="px-6 py-4">
+                        <Badge variant="outline" className="font-semibold text-xs py-0.5 px-2 bg-muted/30">
+                            {business.planName || 'Plan Gratuito'}
+                        </Badge>
+                    </td>
+                    <td className="px-6 py-4">
+                        <StatusBadge status={business.status} />
+                    </td>
+                    <td className="px-6 py-4 text-gray-600 font-medium text-sm">
+                        {business.phone || 'N/A'}
+                    </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center justify-end gap-2">
-                        <Button size="sm" variant="outline" onClick={() => openManageBusiness(business)}><Eye className="w-4 h-4 mr-1" />Gestionar</Button>
-                        <Button size="sm" variant="outline" onClick={() => router.push(`/landing/${business.id}`)} className="text-primary hover:text-primary hover:bg-primary/5">Ingresar</Button>
+                        <Button size="sm" variant="outline" className="font-bold" onClick={() => openManageBusiness(business)}>
+                            <Eye className="w-4 h-4 mr-1.5" />
+                            Gestionar
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => router.push(`/landing/${business.id}`)} className="text-primary hover:text-primary hover:bg-primary/5 font-bold">
+                            Ingresar
+                        </Button>
                       </div>
                     </td>
                   </tr>
@@ -421,7 +453,10 @@ export default function BusinessesPage() {
                 <Label>Plan</Label>
                 <Select value={businessForm.planId} onValueChange={v => setBusinessForm(prev => ({ ...prev, planId: v }))}>
                   <SelectTrigger><SelectValue placeholder="Seleccionar plan" /></SelectTrigger>
-                  <SelectContent>{(plans || []).map(plan => <SelectItem key={plan.id} value={plan.id}>{plan.name}</SelectItem>)}</SelectContent>
+                  <SelectContent>
+                    {(plans || []).map(plan => <SelectItem key={plan.id} value={plan.id}>{plan.name}</SelectItem>)}
+                    {(hybridPlans || []).map(plan => <SelectItem key={plan.id} value={plan.id}>{plan.name}</SelectItem>)}
+                  </SelectContent>
                 </Select>
               </div>
             </div>
@@ -443,38 +478,63 @@ export default function BusinessesPage() {
        <Dialog open={showManageModal} onOpenChange={setShowManageModal}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Gestionar Negocio</DialogTitle>
-            <DialogDescription>{selectedBusiness?.ownerName || 'Pc Users'} - Asigna módulos y servicios</DialogDescription>
+            <DialogTitle className="flex items-center gap-2">
+                <ShieldCheck className="text-primary h-5 w-5" />
+                Gestionar Negocio
+            </DialogTitle>
+            <DialogDescription>{selectedBusiness?.name} - Asigna módulos y servicios</DialogDescription>
           </DialogHeader>
           {selectedBusiness && (
             <div className="space-y-6 py-4">
-              <div className="grid grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg">
-                <div><p className="text-sm text-gray-500">Propietario</p><p className="font-medium flex items-center gap-2"><User className="w-3 h-3 text-muted-foreground"/> {selectedBusiness.ownerName}</p></div>
-                <div><p className="text-sm text-gray-500">Email</p><p className="font-medium flex items-center gap-2"><Mail className="w-3 h-3 text-muted-foreground"/> {selectedBusiness.ownerEmail}</p></div>
-                <div><p className="text-sm text-gray-500">Plan Actual (Sincronizado)</p><p className="font-medium">{selectedBusiness.planName}</p></div>
-                <div><p className="text-sm text-gray-500">Estado</p><StatusBadge status={selectedBusiness.status} /></div>
+              <div className="grid grid-cols-2 gap-4 p-4 bg-muted/30 border rounded-lg">
+                <div>
+                    <p className="text-[10px] uppercase font-bold text-muted-foreground mb-1">Propietario</p>
+                    <p className="font-semibold flex items-center gap-2 text-sm">
+                        <User className="w-3.5 h-3.5 text-primary"/> {selectedBusiness.ownerName}
+                    </p>
+                </div>
+                <div>
+                    <p className="text-[10px] uppercase font-bold text-muted-foreground mb-1">Email Principal</p>
+                    <p className="font-semibold flex items-center gap-2 text-sm">
+                        <Mail className="w-3.5 h-3.5 text-primary"/> {selectedBusiness.ownerEmail}
+                    </p>
+                </div>
+                <div className="mt-2">
+                    <p className="text-[10px] uppercase font-bold text-muted-foreground mb-1">Plan de Suscripción</p>
+                    <p className="font-black text-primary text-sm">{selectedBusiness.planName}</p>
+                </div>
+                <div className="mt-2">
+                    <p className="text-[10px] uppercase font-bold text-muted-foreground mb-1">Estado en Plataforma</p>
+                    <StatusBadge status={selectedBusiness.status} />
+                </div>
               </div>
 
               <div>
-                <h4 className="font-medium mb-3">Módulos Asignados</h4>
+                <h4 className="font-bold mb-3 flex items-center gap-2">
+                    <Puzzle className="h-4 w-4 text-primary" />
+                    Módulos Asignados
+                </h4>
                 <div className="grid grid-cols-1 gap-2">
                   {(modules || []).map(moduleItem => {
                     const isActive = assignedModules.includes(moduleItem.id);
                     const validation = validateModuleExtra(selectedBusiness.planName, moduleExtras[moduleItem.id] || 0);
                     return (
-                      <div key={moduleItem.id} className={cn('flex flex-col p-3 border rounded-lg transition-colors', isActive ? 'border-primary bg-primary/5' : 'hover:bg-gray-50', moduleItem.status === 'inactive' && 'opacity-60')}>
+                      <div key={moduleItem.id} className={cn('flex flex-col p-3 border rounded-lg transition-all', isActive ? 'border-primary bg-primary/5 shadow-sm' : 'hover:bg-muted/30', moduleItem.status === 'inactive' && 'opacity-60')}>
                         <div className="flex items-center justify-between cursor-pointer" onClick={() => moduleItem.status !== 'inactive' && toggleModuleAssignment(moduleItem.id)}>
-                          <div className="flex items-center gap-2">
-                            <div className={cn('w-8 h-8 rounded flex items-center justify-center', isActive ? 'bg-primary/10' : 'bg-gray-100')}>{iconMap[moduleItem.id] || iconMap.default}</div>
-                            <div><p className="text-sm font-medium">{moduleItem.name}</p><p className="text-xs text-gray-500">{moduleItem.status}</p></div>
+                          <div className="flex items-center gap-3">
+                            <div className={cn('w-9 h-9 rounded-lg flex items-center justify-center', isActive ? 'bg-primary/20 text-primary' : 'bg-muted text-muted-foreground')}>{iconMap[moduleItem.id] || iconMap.default}</div>
+                            <div>
+                                <p className="text-sm font-bold">{moduleItem.name}</p>
+                                <p className="text-[10px] font-medium text-muted-foreground uppercase">{moduleItem.status}</p>
+                            </div>
                           </div>
                           {isActive && <Check className="w-5 h-5 text-primary" />}
                         </div>
                         {isActive && (
-                          <div className="mt-3 pt-3 border-t grid grid-cols-3 items-end gap-4">
-                            <div><Label className="text-[10px] uppercase font-bold text-muted-foreground">Base</Label><div className="h-9 flex items-center px-3 bg-muted rounded-md font-bold">{validation.baseLimit}</div></div>
-                            <div><Label className="text-[10px] uppercase font-bold text-muted-foreground">Extra</Label><Input type="number" className="h-9" value={moduleExtras[moduleItem.id] ?? 0} onChange={(e) => handleExtraChange(moduleItem.id, e.target.value)} /></div>
-                            <div><Label className="text-[10px] uppercase font-bold text-muted-foreground">Real</Label><div className="h-9 flex items-center px-3 bg-primary/20 text-primary rounded-md font-bold">{validation.totalLimit}</div></div>
+                          <div className="mt-3 pt-3 border-t grid grid-cols-3 items-end gap-4 animate-in fade-in slide-in-from-top-1 duration-200">
+                            <div><Label className="text-[10px] uppercase font-bold text-muted-foreground">Base</Label><div className="h-9 flex items-center px-3 bg-muted rounded-md font-bold text-xs">{validation.baseLimit}</div></div>
+                            <div><Label className="text-[10px] uppercase font-bold text-muted-foreground">Extra</Label><Input type="number" className="h-9 text-xs" value={moduleExtras[moduleItem.id] ?? 0} onChange={(e) => handleExtraChange(moduleItem.id, e.target.value)} /></div>
+                            <div><Label className="text-[10px] uppercase font-bold text-muted-foreground">Total Real</Label><div className="h-9 flex items-center px-3 bg-primary/20 text-primary rounded-md font-black text-xs">{validation.totalLimit}</div></div>
                           </div>
                         )}
                       </div>
@@ -484,7 +544,10 @@ export default function BusinessesPage() {
               </div>
 
               <div className="border-t pt-6">
-                <h4 className="font-bold flex items-center gap-2 mb-4 text-lg"><TrendingUp className="w-5 h-5 text-primary" /> Límites Extra del Plan</h4>
+                <h4 className="font-black flex items-center gap-2 mb-4 text-lg text-gray-800">
+                    <TrendingUp className="w-5 h-5 text-primary" /> 
+                    Límites Extra del Plan
+                </h4>
                 <div className="space-y-4">
                   {limiteFields.map((field) => {
                     const base = currentPlanLimits[field.key] || 0;
@@ -493,31 +556,45 @@ export default function BusinessesPage() {
                     const nextLimit = nextPlanLimits?.[field.key];
                     const isOverLimit = nextLimit !== undefined && nextLimit !== -1 && total >= nextLimit;
                     return (
-                      <div key={field.key} className="grid grid-cols-4 items-end gap-3 p-3 border rounded-lg bg-white shadow-sm">
-                        <Label className="text-sm font-bold">{field.label}</Label>
-                        <div><Label className="text-[10px] uppercase">Base</Label><div className="h-9 flex items-center px-3 bg-muted rounded-md text-sm">{base === -1 ? '∞' : base}</div></div>
-                        <div><Label className="text-[10px] uppercase">Extra</Label><Input type="number" min="0" className={cn("h-9", isOverLimit && "border-destructive")} value={limitesExtra[field.key] || 0} onChange={(e) => handleLimiteExtraChange(field.key, e.target.value)} /></div>
-                        <div><Label className="text-[10px] uppercase">Total</Label><div className={cn("h-9 flex items-center px-3 rounded-md font-bold text-sm", isOverLimit ? "bg-destructive/10 text-destructive" : "bg-primary/10 text-primary")}>{total}</div></div>
+                      <div key={field.key} className="grid grid-cols-4 items-end gap-3 p-3 border rounded-xl bg-white shadow-sm hover:border-primary/30 transition-colors">
+                        <Label className="text-sm font-bold text-gray-700 pb-2">{field.label}</Label>
+                        <div><Label className="text-[10px] uppercase font-bold text-muted-foreground">Base</Label><div className="h-9 flex items-center px-3 bg-muted rounded-md text-xs font-semibold">{base === -1 ? '∞' : base}</div></div>
+                        <div><Label className="text-[10px] uppercase font-bold text-muted-foreground">Extra</Label><Input type="number" min="0" className={cn("h-9 text-xs font-bold", isOverLimit && "border-destructive text-destructive")} value={limitesExtra[field.key] || 0} onChange={(e) => handleLimiteExtraChange(field.key, e.target.value)} /></div>
+                        <div><Label className="text-[10px] uppercase font-bold text-muted-foreground">Total</Label><div className={cn("h-9 flex items-center px-3 rounded-md font-black text-xs transition-colors", isOverLimit ? "bg-destructive/10 text-destructive" : "bg-primary/10 text-primary")}>{total === -1 ? '∞' : total}</div></div>
                       </div>
                     );
                   })}
                 </div>
+                {nextPlanName && (
+                  <p className="mt-4 text-[11px] text-muted-foreground italic flex items-center gap-1.5">
+                    <AlertCircle className="h-3 w-3" />
+                    El total real no puede igualar al plan superior ({nextPlanName}).
+                  </p>
+                )}
               </div>
 
-              <div>
-                <h4 className="font-medium mb-3">Servicios Adicionales</h4>
-                <div className="grid grid-cols-2 gap-2">
-                  {(services || []).map(serviceItem => (
-                    <div key={serviceItem.id} className={cn('flex items-center justify-between p-3 border rounded-lg cursor-pointer', assignedServices.includes(serviceItem.id) ? 'border-primary bg-primary/5' : 'hover:bg-gray-50')} onClick={() => toggleServiceAssignment(serviceItem.id)}>
-                      <div><p className="text-sm font-medium">{serviceItem.name}</p><p className="text-xs text-gray-500">Límite: {serviceItem.limit}</p></div>
-                      {assignedServices.includes(serviceItem.id) && <Check className="w-5 h-5 text-primary" />}
-                    </div>
-                  ))}
-                </div>
+              <div className="border-t pt-6">
+                <h4 className="font-bold mb-3 text-gray-800">Estado del Negocio</h4>
+                <Select value={selectedBusiness.status} onValueChange={(v: EntityStatus) => setSelectedBusiness(prev => prev ? {...prev, status: v} : null)}>
+                    <SelectTrigger className="w-full font-semibold">
+                        <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="active" className="font-bold text-green-700">Activo (Full Access)</SelectItem>
+                        <SelectItem value="pending_payment" className="font-bold text-yellow-700">Pago Pendiente (Limitado)</SelectItem>
+                        <SelectItem value="inactive" className="font-bold text-gray-700">Inactivo (No accesible)</SelectItem>
+                        <SelectItem value="suspended" className="font-bold text-red-700">Suspendido (Bloqueado)</SelectItem>
+                    </SelectContent>
+                </Select>
               </div>
             </div>
           )}
-          <DialogFooter><Button variant="outline" onClick={() => setShowManageModal(false)}>Cancelar</Button><Button onClick={handleSaveManageBusiness} className="bg-primary hover:bg-primary/90">Guardar Cambios</Button></DialogFooter>
+          <DialogFooter className="bg-muted/30 p-6 -mx-6 -mb-6 border-t">
+            <Button variant="ghost" className="font-bold" onClick={() => setShowManageModal(false)}>Cancelar</Button>
+            <Button onClick={handleSaveManageBusiness} className="bg-primary hover:bg-primary/90 font-black px-8">
+                Guardar Cambios Atómicos
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
