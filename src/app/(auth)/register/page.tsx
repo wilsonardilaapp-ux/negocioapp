@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useRouter, useSearchParams } from "next/navigation";
@@ -88,7 +89,7 @@ const initialLandingPageData: LandingPageData = {
     fields: [
         { id: uuidv4(), label: 'Nombre Completo', type: 'text', placeholder: 'ej. Juan Pérez', required: true },
         { id: uuidv4(), label: 'Correo Electrónico', type: 'email', placeholder: 'ej. juan.perez@correo.com', required: true },
-        { id: uuidv4(), label: 'WhatsApp', type: 'tel', placeholder: 'ej. 3001234567', required: false },
+        { id: uuidv4(), label: 'WhatsApp', type: 'tel', placeholder: 'ej. 300 123 4567', required: false },
         { id: uuidv4(), label: 'Mensaje', type: 'textarea', placeholder: 'Escribe tu consulta aquí...', required: true },
     ],
     destinationEmail: '',
@@ -123,7 +124,7 @@ const initialLandingPageData: LandingPageData = {
     contactInfo: {
       address: 'Calle Falsa 123, Ciudad, País',
       phone: '3228831634',
-      email: 'contacto@empresa.com',
+      email: 'allseosoporte@gmail.com',
       hours: 'Lunes a Viernes, 9am - 6pm',
     },
     quickLinks: [
@@ -240,6 +241,8 @@ function RegisterForm() {
       const businessDocRef = doc(firestore, 'businesses', newUser.uid);
       const businessData: Business = {
         id: newUser.uid,
+        // userId es CRÍTICO para que la consulta en useSubscription funcione
+        userId: newUser.uid,
         name: `${values.name}'s Business`,
         ownerName: values.name,
         ownerEmail: values.email,
@@ -324,7 +327,7 @@ function RegisterForm() {
             const hybridPlanData = hybridPlanSnap.data() as HybridPlan;
             const now = Timestamp.now();
             const hybridSubscription: Subscription = {
-                plan: planParam, // GUARDAR EL ID (SLUG) PARA QUE EL HOOK LO ENCUENTRE
+                plan: planParam, 
                 status: 'active',
                 stripeCustomerId: null,
                 stripeSubscriptionId: null,
@@ -334,6 +337,7 @@ function RegisterForm() {
                 paymentMethod: 'manual'
             };
             batch.set(subscriptionDocRef, hybridSubscription);
+            // Guardamos el nombre comercial del plan para fallback
             batch.update(businessDocRef, { planName: hybridPlanData.name });
             
             await batch.commit();
