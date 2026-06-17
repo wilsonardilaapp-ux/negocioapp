@@ -44,6 +44,7 @@ import { SuggestionModal } from '@/components/suggestions/suggestion-modal';
 import PublicNav from '@/components/layout/public-nav';
 import { promotionService } from '@/services/promotion-service';
 import type { Promotion } from '@/models/promotion';
+import type { CartItem } from '@/models/cart';
 
 const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('es-CO', {
@@ -51,18 +52,6 @@ const formatCurrency = (value: number) => {
         currency: 'COP',
         minimumFractionDigits: 0,
     }).format(value);
-};
-
-export interface AppliedPromotion {
-  type: '2x1' | 'percentage' | 'fixed';
-  originalPrice: number;
-  discountedPrice: number;
-  promotionId: string;
-}
-
-export type CartItem = Product & { 
-    quantity: number;
-    appliedPromotion?: AppliedPromotion;
 };
 
 type MediaItem = {
@@ -343,7 +332,6 @@ export default function CatalogPage() {
         if (sort === 'price_asc') { orderField = 'price'; orderDir = 'asc'; }
         else if (sort === 'price_desc') { orderField = 'price'; orderDir = 'desc'; }
         else if (sort === 'rating_desc') { orderField = 'rating'; orderDir = 'desc'; }
-        // Fallback to name for 'recent' if createdAt is missing, or just name asc
         
         let q = query(productsRef, orderBy(orderField, orderDir), orderBy('__name__', 'asc'));
 
@@ -361,8 +349,8 @@ export default function CatalogPage() {
         category: string,
         search: string,
         sort: SortOption,
-        fDoc: QueryDocumentSnapshot | null,
-        lDoc: QueryDocumentSnapshot | null
+        fDoc: QueryDocumentSnapshot<DocumentData> | null,
+        lDoc: QueryDocumentSnapshot<DocumentData> | null
     ) => {
         const qBase = getBaseQuery(busId, category, sort);
         if (!qBase) return;

@@ -16,7 +16,6 @@ import type { TipoEntrega } from '@/models/order';
 import { useFirestore, addDocumentNonBlocking } from '@/firebase';
 import { collection, doc } from 'firebase/firestore';
 import { cn } from '@/lib/utils';
-import type { CartItem } from '@/app/(public)/catalog/[businessId]/page';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import type { LandingHeaderConfigData } from '@/models/landing-page';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
@@ -28,6 +27,7 @@ import { WhatsAppIcon } from '@/components/icons';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Image from 'next/image';
+import type { CartItem } from '@/models/cart';
 
 const purchaseSchema = z.object({
   fullName: z.string().min(3, { message: 'El nombre es requerido.' }),
@@ -179,7 +179,6 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
     orderSummary += `${separator}\n`;
     orderSummary += `🛒 *ITEMS*\n`;
     
-    // Preparar guardado en Firestore
     const ordersCollectionRef = collection(firestore, `businesses/${businessId}/orders`);
     const now = new Date().toISOString();
 
@@ -188,7 +187,6 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
         const itemSubtotal = itemUnitPrice * item.quantity;
         orderSummary += `• ${item.quantity}x ${item.name} - ${formatCurrency(itemSubtotal)}\n`;
 
-        // Registrar en base de datos
         const orderDocData = {
             businessId,
             customerName: data.fullName,
@@ -272,7 +270,6 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
     
     window.open(whatsappUrl, '_blank');
     
-    // Limpiar carrito y cerrar modal
     onClearCart();
     onOpenChange(false);
   };
@@ -319,7 +316,6 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
                 {cartItems.map(item => (
                 <div key={item.id} className="flex items-center justify-between p-4 bg-white/50">
                     <div className="flex items-center flex-1 min-w-0 pr-4 gap-4">
-                        {/* IMAGEN DEL PRODUCTO EN EL CARRITO */}
                         <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-lg border bg-white">
                             <Image 
                                 src={item.images?.[0] || 'https://picsum.photos/seed/placeholder/200/200'} 
@@ -467,7 +463,7 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
                     </div>
                 )}
             </div>
-          </form>
+          </div >
 
           <div className="space-y-4">
                 <h4 className="font-bold text-lg flex items-center gap-2">
