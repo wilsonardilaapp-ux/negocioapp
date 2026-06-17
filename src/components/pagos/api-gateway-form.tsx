@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -7,15 +6,17 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Textarea } from "@/components/ui/textarea";
 import type { ApiGatewayConfig } from "@/models/global-payment-config";
-import { Link2, Webhook } from "lucide-react";
+import { Link2, Webhook, ShieldCheck } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface ApiGatewayFormProps {
   data: ApiGatewayConfig;
   setData: (data: ApiGatewayConfig) => void;
   fields: Array<'publicKey' | 'secretKey' | 'clientId' | 'clientSecret' | 'accessToken'>;
+  showWebhookSecret?: boolean;
 }
 
-export default function ApiGatewayForm({ data, setData, fields }: ApiGatewayFormProps) {
+export default function ApiGatewayForm({ data, setData, fields, showWebhookSecret = false }: ApiGatewayFormProps) {
   const handleInputChange = (field: keyof ApiGatewayConfig, value: string | 'sandbox' | 'production') => {
     setData({ ...data, [field]: value });
   };
@@ -50,23 +51,54 @@ export default function ApiGatewayForm({ data, setData, fields }: ApiGatewayForm
             </p>
         </div>
 
-        {/* Webhook URL Field */}
-        <div className="bg-blue-50 p-4 rounded-lg border border-blue-200 space-y-2">
-            <Label htmlFor="webhookUrl" className="flex items-center gap-2 text-blue-700 font-bold">
-                <Webhook className="h-4 w-4" />
-                Webhook URL
-            </Label>
-            <Input
-            id="webhookUrl"
-            type="url"
-            placeholder="https://tu-dominio.com/api/webhooks/..."
-            value={data.webhookUrl || ''}
-            onChange={(e) => handleInputChange('webhookUrl', e.target.value)}
-            className="bg-white border-blue-300 focus-visible:ring-blue-500"
-            />
-            <p className="text-[10px] text-muted-foreground italic">
-                URL para recibir notificaciones automáticas de pago desde la plataforma del proveedor.
-            </p>
+        {/* Webhook Configuration Section */}
+        <div className={cn(
+          "p-4 rounded-lg border space-y-4",
+          showWebhookSecret ? "bg-orange-50 border-orange-200" : "bg-blue-50 border-blue-200"
+        )}>
+            <div className="space-y-2">
+              <Label htmlFor="webhookUrl" className={cn(
+                "flex items-center gap-2 font-bold",
+                showWebhookSecret ? "text-orange-700" : "text-blue-700"
+              )}>
+                  <Webhook className="h-4 w-4" />
+                  Webhook URL
+              </Label>
+              <Input
+              id="webhookUrl"
+              type="url"
+              placeholder="https://tu-dominio.com/api/webhooks/..."
+              value={data.webhookUrl || ''}
+              onChange={(e) => handleInputChange('webhookUrl', e.target.value)}
+              className="bg-white border-muted focus-visible:ring-primary"
+              />
+            </div>
+
+            {showWebhookSecret && (
+              <div className="space-y-2 animate-in fade-in slide-in-from-top-1">
+                <Label htmlFor="webhookSecret" className="flex items-center gap-2 text-orange-700 font-bold">
+                    <ShieldCheck className="h-4 w-4" />
+                    Webhook Secret (Signing Secret)
+                </Label>
+                <Input
+                  id="webhookSecret"
+                  type="password"
+                  placeholder="whsec_..."
+                  value={data.webhookSecret || ''}
+                  onChange={(e) => handleInputChange('webhookSecret', e.target.value)}
+                  className="bg-white border-orange-300 focus-visible:ring-orange-500"
+                />
+                <p className="text-[10px] text-muted-foreground italic">
+                    Requerido por Stripe para verificar la autenticidad de las notificaciones.
+                </p>
+              </div>
+            )}
+            
+            {!showWebhookSecret && (
+              <p className="text-[10px] text-muted-foreground italic">
+                  URL para recibir notificaciones automáticas de pago desde la plataforma del proveedor.
+              </p>
+            )}
         </div>
       </div>
 
@@ -78,7 +110,7 @@ export default function ApiGatewayForm({ data, setData, fields }: ApiGatewayForm
                 id={field}
                 type="password"
                 value={data[field] || ''}
-                onChange={(e) => handleInputChange(field, e.target.value)}
+                onChange={(e) => handleInputChange(field as any, e.target.value)}
             />
             </div>
         ))}

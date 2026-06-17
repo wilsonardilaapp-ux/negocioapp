@@ -1,4 +1,3 @@
-
 import { z } from 'zod';
 
 // For QR-based payments like Nequi, Bancolombia, Daviplata
@@ -38,6 +37,7 @@ export const ApiGatewayConfigSchema = z.object({
   instructions: z.string().optional(),
   checkoutUrl: z.string().optional(), // Added for custom redirection
   webhookUrl: z.string().optional(), // Added for webhook notification handling
+  webhookSecret: z.string().optional(), // Added for signature verification (Stripe specific)
 });
 export type ApiGatewayConfig = z.infer<typeof ApiGatewayConfigSchema>;
 

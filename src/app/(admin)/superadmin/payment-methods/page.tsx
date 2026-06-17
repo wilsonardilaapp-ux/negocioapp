@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useMemo } from 'react';
@@ -23,9 +22,9 @@ const initialConfig: GlobalPaymentConfig = {
     bancolombia: { enabled: false, accountNumber: '', holderName: '', instructions: '', qrImageUrl: null },
     daviplata: { enabled: false, accountNumber: '', holderName: '', instructions: '', qrImageUrl: null },
     breB: { enabled: false, holderName: '', keyType: 'Celular', keyValue: '', instructions: '', qrImageUrl: null, commerceCode: '' },
-    stripe: { enabled: false, mode: 'sandbox', secretKey: '', instructions: '', checkoutUrl: '' },
-    paypal: { enabled: false, mode: 'sandbox', clientId: '', clientSecret: '', instructions: '', checkoutUrl: '' },
-    mercadoPago: { enabled: false, mode: 'sandbox', publicKey: '', accessToken: '', instructions: '', checkoutUrl: '' },
+    stripe: { enabled: false, mode: 'sandbox', secretKey: '', instructions: '', checkoutUrl: '', webhookUrl: '', webhookSecret: '' },
+    paypal: { enabled: false, mode: 'sandbox', clientId: '', clientSecret: '', instructions: '', checkoutUrl: '', webhookUrl: '' },
+    mercadoPago: { enabled: false, mode: 'sandbox', publicKey: '', accessToken: '', instructions: '', checkoutUrl: '', webhookUrl: '' },
 };
 
 const PaymentMethodCard = ({ title, children, icon: Icon }: { title: string, children: React.ReactNode, icon: React.ElementType }) => (
@@ -225,7 +224,7 @@ export default function PaymentMethodsPage() {
                             <Switch id="stripe-enabled" checked={config.stripe.enabled} onCheckedChange={checked => handleConfigChange('stripe', {...config.stripe, enabled: checked})} />
                             <Label htmlFor="stripe-enabled">Habilitar Stripe</Label>
                         </div>
-                        {config.stripe.enabled && <ApiGatewayForm data={config.stripe} setData={(data) => handleConfigChange('stripe', data)} fields={['secretKey']} />}
+                        {config.stripe.enabled && <ApiGatewayForm data={config.stripe} setData={(data) => handleConfigChange('stripe', data)} fields={['secretKey']} showWebhookSecret={true} />}
                     </PaymentMethodCard>
 
                     <PaymentMethodCard title="PayPal" icon={DollarSign}>
