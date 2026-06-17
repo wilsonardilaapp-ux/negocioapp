@@ -16,6 +16,7 @@ import ApiGatewayForm from '@/components/pagos/api-gateway-form';
 import { useCollection, useFirestore, useMemoFirebase, setDocumentNonBlocking, useDoc } from '@/firebase';
 import { collection, doc, writeBatch } from 'firebase/firestore';
 import type { SubscriptionPlan } from '@/models/subscription-plan';
+import type { HybridPlan } from '@/models/hybrid-plan';
 
 const initialConfig: GlobalPaymentConfig = {
     nequi: { enabled: false, accountNumber: '', holderName: '', instructions: '', qrImageUrl: null },
@@ -55,6 +56,9 @@ export default function PaymentMethodsPage() {
     const plansQuery = useMemoFirebase(() => !firestore ? null : collection(firestore, 'plans'), [firestore]);
     const { data: plans, isLoading: plansLoading } = useCollection<SubscriptionPlan>(plansQuery);
 
+    const hybridPlansQuery = useMemoFirebase(() => !firestore ? null : collection(firestore, 'hybrid_plans'), [firestore]);
+    const { data: hybridPlans, isLoading: hybridPlansLoading } = useCollection<HybridPlan>(hybridPlansQuery);
+
     useEffect(() => {
         if (savedConfig) {
             // Deep merge to ensure all keys from initialConfig are present, even if not in DB
@@ -72,15 +76,34 @@ export default function PaymentMethodsPage() {
     }, [savedConfig]);
 
     useEffect(() => {
+        const combinedLinks: HotmartPlanLink[] = [];
+        
+        // Agregar planes estándar
         if (plans) {
-            const initialLinks = plans.map(p => ({
-                planId: p.id,
-                planName: p.name,
-                hotmartUrl: (p as any).hotmartUrl || '',
-            }));
-            setHotmartLinks(initialLinks);
+            plans.forEach(p => {
+                combinedLinks.push({
+                    planId: p.id,
+                    planName: p.name,
+                    hotmartUrl: (p as any).hotmartUrl || '',
+                });
+            });
         }
-    }, [plans]);
+        
+        // Agregar planes híbridos
+        if (hybridPlans) {
+            hybridPlans.forEach(p => {
+                if (p.id) {
+                    combinedLinks.push({
+                        planId: p.id,
+                        planName: `${p.name} (Híbrido)`,
+                        hotmartUrl: (p as any).hotmartUrl || '',
+                    });
+                }
+            });
+        }
+        
+        setHotmartLinks(combinedLinks);
+    }, [plans, hybridPlans]);
 
     const handleConfigChange = (method: keyof GlobalPaymentConfig, newConfig: any) => {
         setConfig(prev => ({
@@ -108,17 +131,30 @@ export default function PaymentMethodsPage() {
                 setDocumentNonBlocking(paymentConfigDocRef, config);
             }
 
-            // 2. Save Hotmart links in a batch
+            // 2. Save Hotmart links in a batch for both collections
             const batch = writeBatch(firestore);
             hotmartLinks.forEach(link => {
-                if (link.hotmartUrl !== (plans?.find(p => p.id === link.planId) as any)?.hotmartUrl) {
-                    const planRef = doc(firestore, 'plans', link.planId);
-                    batch.update(planRef, { hotmartUrl: link.hotmartUrl });
+                // Verificar en planes estándar
+                const stdPlan = plans?.find(p => p.id === link.planId);
+                if (stdPlan) {
+                    if (link.hotmartUrl !== (stdPlan as any).hotmartUrl) {
+                        batch.update(doc(firestore, 'plans', link.planId), { hotmartUrl: link.hotmartUrl });
+                    }
+                    return;
+                }
+                
+                // Verificar en planes híbridos
+                const hybPlan = hybridPlans?.find(p => p.id === link.planId);
+                if (hybPlan) {
+                    if (link.hotmartUrl !== (hybPlan as any).hotmartUrl) {
+                        batch.update(doc(firestore, 'hybrid_plans', link.planId), { hotmartUrl: link.hotmartUrl });
+                    }
+                    return;
                 }
             });
             await batch.commit();
 
-            toast({ title: 'Configuración Guardada', description: 'Las pasarelas de pago han sido actualizadas.' });
+            toast({ title: 'Configuración Guardada', description: 'Las pasarelas de pago y enlaces de Hotmart han sido actualizados.' });
             setHasChanges(false);
 
         } catch (error) {
@@ -129,7 +165,7 @@ export default function PaymentMethodsPage() {
         }
     };
     
-    const isLoading = isConfigLoading || plansLoading;
+    const isLoading = isConfigLoading || plansLoading || hybridPlansLoading;
 
     if (isLoading) {
         return (
@@ -213,12 +249,12 @@ export default function PaymentMethodsPage() {
                      <Card>
                         <CardHeader>
                             <CardTitle>Enlaces de Pago de Hotmart</CardTitle>
-                            <CardDescription>Configura los links de checkout para cada plan.</CardDescription>
+                            <CardDescription>Configura los links de checkout para cada plan (incluyendo híbridos).</CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-4">
-                            {plansLoading ? (
+                            {isLoading ? (
                                 <p className="text-sm text-muted-foreground">Cargando planes...</p>
-                            ) : plans && plans.length > 0 ? (
+                            ) : hotmartLinks.length > 0 ? (
                                 hotmartLinks.map(plan => (
                                     <div key={plan.planId}>
                                         <Label htmlFor={`hotmart-${plan.planId}`}>{plan.planName}</Label>
@@ -226,7 +262,7 @@ export default function PaymentMethodsPage() {
                                     </div>
                                 ))
                             ) : (
-                                <p className="text-sm text-muted-foreground">No hay planes de suscripción configurados. Ve a la sección "Planes" para crearlos.</p>
+                                <p className="text-sm text-muted-foreground">No hay planes configurados. Ve a las secciones de Planes para crearlos.</p>
                             )}
                         </CardContent>
                     </Card>
