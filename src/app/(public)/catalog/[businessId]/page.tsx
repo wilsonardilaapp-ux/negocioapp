@@ -15,7 +15,6 @@ import {
     startAfter, 
     endBefore, 
     limitToLast, 
-    CollectionReference, 
     DocumentData, 
     QueryDocumentSnapshot,
     collection 
@@ -29,9 +28,8 @@ import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { Star, Loader2, PackageSearch, Tag, ShoppingCart, Image as ImageIcon, ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Product } from '@/models/product';
-import type { Module } from '@/models/module';
 import type { LandingPageData, LandingHeaderConfigData } from '@/models/landing-page';
-import { WhatsAppIcon, TikTokIcon, InstagramIcon, FacebookIcon, XIcon } from '@/components/icons';
+import { WhatsAppIcon } from '@/components/icons';
 import { useParams } from 'next/navigation';
 import { rateProduct } from '@/ai/flows/rate-product-flow';
 import { useToast } from '@/hooks/use-toast';
@@ -44,7 +42,6 @@ import { SuggestionModal } from '@/components/suggestions/suggestion-modal';
 import PublicNav from '@/components/layout/public-nav';
 import { promotionService } from '@/services/promotion-service';
 import type { Promotion } from '@/models/promotion';
-import { format } from 'date-fns';
 
 const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('es-CO', {
@@ -292,7 +289,6 @@ export default function CatalogPage() {
     const params = useParams();
     const slug = params.businessId as string;
     
-    // Pagination state
     const [products, setProducts] = useState<Product[]>([]);
     const [firstDoc, setFirstDoc] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
     const [lastDoc, setLastDoc] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
@@ -330,13 +326,10 @@ export default function CatalogPage() {
 
             if (direction === 'initial') {
                 q = query(productsRef, orderBy('name', 'asc'), limit(PAGE_SIZE));
-                setCurrentPage(1);
             } else if (direction === 'next' && lastDoc) {
                 q = query(productsRef, orderBy('name', 'asc'), startAfter(lastDoc), limit(PAGE_SIZE));
-                setCurrentPage(prev => prev + 1);
             } else if (direction === 'prev' && firstDoc) {
                 q = query(productsRef, orderBy('name', 'asc'), endBefore(firstDoc), limitToLast(PAGE_SIZE));
-                setCurrentPage(prev => prev - 1);
             } else {
                 return;
             }
@@ -350,10 +343,12 @@ export default function CatalogPage() {
             setLastDoc(docs[docs.length - 1] || null);
             
             setHasNextPage(docs.length === PAGE_SIZE);
+
+            if (direction === 'next') setCurrentPage(prev => prev + 1);
+            if (direction === 'prev') setCurrentPage(prev => prev - 1);
+            if (direction === 'initial') setCurrentPage(1);
+
             setHasPrevPage(direction === 'initial' ? false : (direction === 'next' ? true : (currentPage > 1)));
-            
-            if (direction === 'initial') setHasPrevPage(false);
-            if (direction === 'prev' && currentPage === 2) setHasPrevPage(false);
 
         } catch (e: any) {
             console.error("Error paginating products:", e);
@@ -407,7 +402,20 @@ export default function CatalogPage() {
                     paymentSettings: paymentSettingsSnap?.exists() ? paymentSettingsSnap.data() as any : null,
                 });
 
-                await fetchProducts('initial', businessId);
+                // Initial products fetch
+                const productsRef = collection(firestore, `businesses/${businessId}/products`);
+                const q = query(productsRef, orderBy('name', 'asc'), limit(PAGE_SIZE));
+                const snap = await getDocs(q);
+                const docs = snap.docs;
+                const data = docs.map(d => ({ ...d.data(), id: d.id } as Product));
+                
+                setProducts(data);
+                setFirstDoc(docs[0] || null);
+                setLastDoc(docs[docs.length - 1] || null);
+                setHasNextPage(docs.length === PAGE_SIZE);
+                setHasPrevPage(false);
+                setCurrentPage(1);
+
                 promotionService.getActivePromotions(businessId).then(setActivePromotions);
 
             } catch (e: any) { 
@@ -418,7 +426,7 @@ export default function CatalogPage() {
         };
 
         initializePage();
-    }, [firestore, slug, isNetworkEnabled, fetchProducts]);
+    }, [firestore, slug, isNetworkEnabled]);
 
     const handleAddToCart = (itemsToAdd: CartItem[]) => {
         setCart(prev => {
