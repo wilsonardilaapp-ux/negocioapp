@@ -46,6 +46,9 @@ const defaultShareConfig: Omit<MenuShare, 'id' | 'businessId' | 'createdAt' | 'u
     errorCorrectionLevel: 'L',
     style: 'squares',
     logoSize: 0.2,
+    errorCorrectionLevel: 'L',
+    style: 'squares',
+    logoSize: 0.2,
     frameEnabled: false,
     frameText: 'Escanea',
     frameColor: '#000000',
@@ -129,7 +132,7 @@ const SocialPreviewImageUploader = ({ imageUrl, onUpload, onRemove }: {
                         <NextImage src={imageUrl} alt="Vista previa" layout="fill" className="object-contain rounded-md" />
                         <div className="absolute top-2 right-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                             <Button variant="outline" size="icon" onClick={() => fileInputRef.current?.click()}><Pencil className="h-4 w-4" /></Button>
-                            <Button variant="destructive" size="icon" onClick={onRemove}><Trash2 className="h-4 w-4" /></Button>
+                            <Button variant="destructive" size="icon" className="h-7 w-7" onClick={onRemove}><Trash2 className="h-4 w-4" /></Button>
                         </div>
                     </>
                 ) : (
@@ -201,7 +204,7 @@ export default function SharePage() {
   };
   
   const handleManualSave = async () => {
-    if (!shareConfig || !shareConfigRef || !firestore) return;
+    if (!shareConfig || !shareConfigRef || !firestore || !user) return;
     setIsSaving(true);
     try {
       // 1. Limpieza y validación final del slug
