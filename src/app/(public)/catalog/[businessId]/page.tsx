@@ -1,7 +1,6 @@
-
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useFirebase } from '@/firebase';
 import { 
     doc, 
@@ -82,15 +81,16 @@ const MediaPreview = ({ item, alt, objectFit = 'cover', priority = false }: { it
         return <video src={item.url} className={cn('rounded-md object-cover w-full h-full')} autoPlay loop muted />;
     }
     return (
-        <Image 
-            key={item.url}
-            src={item.url} 
-            alt={alt} 
-            fill 
-            sizes="(max-width: 768px) 100vw, 700px"
-            className={cn('rounded-md', objectFit === 'contain' ? 'object-contain' : 'object-cover')} 
-            priority={priority}
-        />
+        <div className="relative w-full h-full">
+            <Image 
+                src={item.url} 
+                alt={alt} 
+                fill 
+                sizes="(max-width: 768px) 100vw, 700px"
+                className={cn('rounded-md', objectFit === 'contain' ? 'object-contain' : 'object-cover')} 
+                priority={priority}
+            />
+        </div>
     );
 };
 
@@ -296,13 +296,20 @@ export default function CatalogPage() {
     const params = useParams();
     const slug = params.businessId as string;
     
-    // States
+    // UI States
     const [products, setProducts] = useState<Product[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [isPaginating, setIsPaginating] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+    const [isPurchaseModalOpen, setIsPurchaseModalOpen] = useState(false);
+    const [cart, setCart] = useState<CartItem[]>([]);
+
+    // Pagination States
     const [firstDoc, setFirstDoc] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
     const [lastDoc, setLastDoc] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
     const [currentPage, setCurrentPage] = useState(1);
     const [hasNextPage, setHasNextPage] = useState(false);
-    const [isPaginating, setIsPaginating] = useState(false);
     
     // Search & Sort States
     const [searchQuery, setSearchQuery] = useState('');
@@ -324,60 +331,56 @@ export default function CatalogPage() {
     });
 
     const [activePromotions, setActivePromotions] = useState<Promotion[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
-    const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-    const [isPurchaseModalOpen, setIsPurchaseModalOpen] = useState(false);
-    const [cart, setCart] = useState<CartItem[]>([]);
 
-    // Función de carga de productos (ESTABLE: No depende de estados circulares)
-    const fetchProducts = useCallback(async (
-        direction: 'next' | 'prev' | 'initial', 
-        busId: string, 
-        category: string = 'all', 
-        search: string = '',
-        sort: SortOption = 'recent'
+    // Función estable para construir la consulta base
+    const getBaseQuery = useCallback((busId: string, category: string, sort: SortOption) => {
+        if (!firestore) return null;
+        const productsRef = collection(firestore, `businesses/${busId}/products`);
+        
+        let orderField = 'name';
+        let orderDir: OrderByDirection = 'asc';
+
+        if (sort === 'price_asc') { orderField = 'price'; orderDir = 'asc'; }
+        else if (sort === 'price_desc') { orderField = 'price'; orderDir = 'desc'; }
+        else if (sort === 'rating_desc') { orderField = 'rating'; orderDir = 'desc'; }
+        // Fallback to name for 'recent' if createdAt is missing, or just name asc
+        
+        let q = query(productsRef, orderBy(orderField, orderDir), orderBy('__name__', 'asc'));
+
+        if (category !== 'all') {
+            q = query(q, where('category', '==', category));
+        }
+
+        return q;
+    }, [firestore]);
+
+    // Función central de carga de productos
+    const loadProducts = useCallback(async (
+        direction: 'next' | 'prev' | 'initial',
+        busId: string,
+        category: string,
+        search: string,
+        sort: SortOption,
+        fDoc: QueryDocumentSnapshot | null,
+        lDoc: QueryDocumentSnapshot | null
     ) => {
-        if (!firestore) return;
+        const qBase = getBaseQuery(busId, category, sort);
+        if (!qBase) return;
+
         setIsPaginating(true);
         try {
-            const productsRef = collection(firestore, `businesses/${busId}/products`);
-            
-            let orderField = 'name';
-            let orderDir: OrderByDirection = 'asc';
+            let q = qBase;
 
-            if (sort === 'recent') {
-                orderField = 'name'; 
-                orderDir = 'asc';
-            } else if (sort === 'price_asc') {
-                orderField = 'price';
-                orderDir = 'asc';
-            } else if (sort === 'price_desc') {
-                orderField = 'price';
-                orderDir = 'desc';
-            } else if (sort === 'rating_desc') {
-                orderField = 'rating';
-                orderDir = 'desc';
-            }
-
-            let q = query(productsRef, orderBy(orderField, orderDir), orderBy('__name__', 'asc'));
-
-            if (category !== 'all') {
-                q = query(q, where('category', '==', category));
-            }
-
-            // Aplicar cursores solo en navegación, no en carga inicial
-            if (direction === 'next' && lastDoc) {
-                q = query(q, startAfter(lastDoc), limit(PAGE_SIZE));
-            } else if (direction === 'prev' && firstDoc) {
-                q = query(q, endBefore(firstDoc), limitToLast(PAGE_SIZE));
+            if (direction === 'next' && lDoc) {
+                q = query(q, startAfter(lDoc), limit(PAGE_SIZE));
+            } else if (direction === 'prev' && fDoc) {
+                q = query(q, endBefore(fDoc), limitToLast(PAGE_SIZE));
             } else {
                 q = query(q, limit(PAGE_SIZE));
             }
 
             const snap = await getDocs(q);
             const docsSnap = snap.docs;
-            
             let data = docsSnap.map(d => ({ ...d.data(), id: d.id } as Product));
             
             if (search.trim()) {
@@ -399,95 +402,82 @@ export default function CatalogPage() {
             else setCurrentPage(1);
 
         } catch (e: any) {
-            console.error("Error fetching products:", e);
-            toast({ variant: 'destructive', title: 'Error de consulta', description: 'No se pudieron cargar los productos.' });
+            console.error("Error loading products:", e);
+            toast({ variant: 'destructive', title: 'Error', description: 'No se pudieron cargar los productos.' });
         } finally {
             setIsPaginating(false);
+            setIsLoading(false);
         }
-    }, [firestore, toast, lastDoc, firstDoc]); // lastDoc/firstDoc solo afectan cuando se llama a la función
+    }, [getBaseQuery, toast]);
 
-    const handleSearch = (e?: React.FormEvent) => {
-        if (e) e.preventDefault();
-        setSearchQuery(tempSearchQuery);
-        if (pageData.resolvedBusinessId) {
-            fetchProducts('initial', pageData.resolvedBusinessId, selectedCategory, tempSearchQuery, sortOrder);
-        }
-    };
-
-    // Efecto de inicialización (CRÍTICO: No depende de fetchProducts para evitar bucle)
+    // Inicialización de la página
     useEffect(() => {
         if (!firestore || !slug || !isNetworkEnabled) return;
         
         let isMounted = true;
-
-        const initializePage = async () => {
+        const initialize = async () => {
             setIsLoading(true);
             try {
-                let businessId = slug;
+                let busId = slug;
                 const cleanSlug = slug.trim().toLowerCase();
                 
-                const directBusinessDoc = await getDoc(doc(firestore, 'businesses', businessId));
+                const directBusinessDoc = await getDoc(doc(firestore, 'businesses', busId));
                 if (!directBusinessDoc.exists()) {
-                    const shareConfigQuery = query(
-                        collectionGroup(firestore, 'shareConfig'), 
-                        where('slug', '==', cleanSlug), 
-                        limit(1)
-                    );
+                    const shareConfigQuery = query(collectionGroup(firestore, 'shareConfig'), where('slug', '==', cleanSlug), limit(1));
                     const querySnapshot = await getDocs(shareConfigQuery);
                     if (!querySnapshot.empty) {
                         const businessDoc = querySnapshot.docs[0].ref.parent.parent;
-                        if (businessDoc) businessId = businessDoc.id;
+                        if (businessDoc) busId = businessDoc.id;
                     }
                 }
 
                 if (!isMounted) return;
 
                 const [publicDataSnap, landingPageSnap, paymentSettingsSnap, allProductsSnap] = await Promise.all([
-                    getDoc(doc(firestore, `businesses/${businessId}/publicData`, 'catalog')),
-                    getDoc(doc(firestore, `businesses/${businessId}/landingPages`, 'main')),
-                    getDoc(doc(firestore, 'paymentSettings', businessId)),
-                    getDocs(collection(firestore, `businesses/${businessId}/products`))
+                    getDoc(doc(firestore, `businesses/${busId}/publicData`, 'catalog')),
+                    getDoc(doc(firestore, `businesses/${busId}/landingPages`, 'main')),
+                    getDoc(doc(firestore, 'paymentSettings', busId)),
+                    getDocs(collection(firestore, `businesses/${busId}/products`))
                 ]);
 
-                if (!publicDataSnap.exists()) throw new Error("El catálogo solicitado no existe.");
+                if (!publicDataSnap.exists()) throw new Error("El catálogo no existe.");
 
                 const allItems = allProductsSnap.docs.map(d => d.data() as Product);
                 const uniqueCats = Array.from(new Set(allItems.map(p => p.category).filter(Boolean)));
                 setCategories(uniqueCats);
 
                 const catalogData = publicDataSnap.data() as any;
-
                 setPageData({
-                    resolvedBusinessId: businessId,
+                    resolvedBusinessId: busId,
                     headerConfig: catalogData.headerConfig || null,
                     landingPageData: landingPageSnap?.exists() ? landingPageSnap.data() as any : null,
                     paymentSettings: paymentSettingsSnap?.exists() ? paymentSettingsSnap.data() as any : null,
                 });
 
-                // Carga inicial explícita de productos para evitar bucles
-                const productsRef = collection(firestore, `businesses/${businessId}/products`);
-                const initialQ = query(productsRef, orderBy('name', 'asc'), orderBy('__name__', 'asc'), limit(PAGE_SIZE));
-                const snap = await getDocs(initialQ);
-                
-                if (isMounted) {
-                    setProducts(snap.docs.map(d => ({ ...d.data(), id: d.id } as Product)));
-                    setFirstDoc(snap.docs[0] || null);
-                    setLastDoc(snap.docs[snap.docs.length - 1] || null);
-                    setHasNextPage(snap.docs.length === PAGE_SIZE);
-                    
-                    promotionService.getActivePromotions(businessId).then(setActivePromotions);
-                }
+                promotionService.getActivePromotions(busId).then(setActivePromotions);
+
+                // Carga inicial
+                await loadProducts('initial', busId, 'all', '', 'recent', null, null);
 
             } catch (e: any) { 
-                if (isMounted) setError(e.message); 
-            } finally { 
-                if (isMounted) setIsLoading(false); 
+                if (isMounted) {
+                    setError(e.message);
+                    setIsLoading(false);
+                }
             }
         };
 
-        initializePage();
+        initialize();
         return () => { isMounted = false; };
-    }, [firestore, slug, isNetworkEnabled]); // Solo re-ejecutar si el slug o firestore cambian
+    }, [firestore, slug, isNetworkEnabled]);
+
+    const handleSearch = (e?: React.FormEvent) => {
+        if (e) e.preventDefault();
+        setSearchQuery(tempSearchQuery);
+        if (pageData.resolvedBusinessId) {
+            loadProducts('initial', pageData.resolvedBusinessId, selectedCategory, tempSearchQuery, sortOrder, null, null);
+        }
+    };
 
     const handleAddToCart = (itemsToAdd: CartItem[]) => {
         setCart(prev => {
@@ -526,7 +516,7 @@ export default function CatalogPage() {
                             value={selectedCategory} 
                             onValueChange={(val) => {
                                 setSelectedCategory(val);
-                                fetchProducts('initial', pageData.resolvedBusinessId!, val, searchQuery, sortOrder);
+                                if (pageData.resolvedBusinessId) loadProducts('initial', pageData.resolvedBusinessId, val, searchQuery, sortOrder, null, null);
                             }}
                         >
                             <SelectTrigger className="w-full lg:w-[180px] bg-muted/50 border-none rounded-none focus:ring-0 focus:ring-offset-0 h-12 font-medium">
@@ -554,7 +544,7 @@ export default function CatalogPage() {
                                 value={sortOrder} 
                                 onValueChange={(val: SortOption) => {
                                     setSortOrder(val);
-                                    fetchProducts('initial', pageData.resolvedBusinessId!, selectedCategory, searchQuery, val);
+                                    if (pageData.resolvedBusinessId) loadProducts('initial', pageData.resolvedBusinessId, selectedCategory, searchQuery, val, null, null);
                                 }}
                             >
                                 <SelectTrigger className="w-full sm:w-[200px] border-none rounded-none focus:ring-0 focus:ring-offset-0 h-12 bg-white sm:border-r border-gray-200">
@@ -605,7 +595,7 @@ export default function CatalogPage() {
                         <div className="flex items-center gap-4">
                             <Button
                                 variant="outline"
-                                onClick={() => fetchProducts('prev', pageData.resolvedBusinessId!, selectedCategory, searchQuery, sortOrder)}
+                                onClick={() => loadProducts('prev', pageData.resolvedBusinessId!, selectedCategory, searchQuery, sortOrder, firstDoc, lastDoc)}
                                 disabled={currentPage === 1 || isPaginating}
                                 className="w-32 shadow-sm font-bold"
                             >
@@ -613,7 +603,7 @@ export default function CatalogPage() {
                             </Button>
                             <Button
                                 variant="outline"
-                                onClick={() => fetchProducts('next', pageData.resolvedBusinessId!, selectedCategory, searchQuery, sortOrder)}
+                                onClick={() => loadProducts('next', pageData.resolvedBusinessId!, selectedCategory, searchQuery, sortOrder, firstDoc, lastDoc)}
                                 disabled={!hasNextPage || isPaginating}
                                 className="w-32 shadow-sm font-bold"
                             >
