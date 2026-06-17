@@ -3,7 +3,23 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useFirebase } from '@/firebase';
-import { doc, getDoc, collectionGroup, query, where, getDocs, limit, orderBy, startAfter, endBefore, limitToLast, CollectionReference, DocumentData, QueryDocumentSnapshot } from 'firebase/firestore';
+import { 
+    doc, 
+    getDoc, 
+    collectionGroup, 
+    query, 
+    where, 
+    getDocs, 
+    limit, 
+    orderBy, 
+    startAfter, 
+    endBefore, 
+    limitToLast, 
+    CollectionReference, 
+    DocumentData, 
+    QueryDocumentSnapshot,
+    collection 
+} from 'firebase/firestore';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -272,6 +288,7 @@ const ProductViewModal = ({ product, isOpen, onOpenChange, businessId, onAddToCa
 
 export default function CatalogPage() {
     const { firestore, isNetworkEnabled } = useFirebase();
+    const { toast } = useToast();
     const params = useParams();
     const slug = params.businessId as string;
     
@@ -332,7 +349,6 @@ export default function CatalogPage() {
             setFirstDoc(docs[0] || null);
             setLastDoc(docs[docs.length - 1] || null);
             
-            // Si trajimos exactamente el PAGE_SIZE, asumimos que puede haber más
             setHasNextPage(docs.length === PAGE_SIZE);
             setHasPrevPage(direction === 'initial' ? false : (direction === 'next' ? true : (currentPage > 1)));
             
@@ -345,7 +361,7 @@ export default function CatalogPage() {
         } finally {
             setIsPaginating(false);
         }
-    }, [firestore, lastDoc, firstDoc, currentPage]);
+    }, [firestore, lastDoc, firstDoc, currentPage, toast]);
 
     useEffect(() => {
         if (!firestore || !slug || !isNetworkEnabled) return;
@@ -356,7 +372,6 @@ export default function CatalogPage() {
                 let businessId = slug;
                 const cleanSlug = slug.trim().toLowerCase();
                 
-                // Resolve Slug to UID if necessary
                 try {
                     const directBusinessDoc = await getDoc(doc(firestore, 'businesses', businessId));
                     if (!directBusinessDoc.exists()) {
@@ -373,7 +388,6 @@ export default function CatalogPage() {
                     }
                 } catch (e) { console.warn("Slug resolution warning"); }
 
-                // Fetch metadata
                 const [publicDataSnap, landingPageSnap, paymentSettingsSnap] = await Promise.all([
                     getDoc(doc(firestore, `businesses/${businessId}/publicData`, 'catalog')),
                     getDoc(doc(firestore, `businesses/${businessId}/landingPages`, 'main')),
@@ -393,10 +407,7 @@ export default function CatalogPage() {
                     paymentSettings: paymentSettingsSnap?.exists() ? paymentSettingsSnap.data() as any : null,
                 });
 
-                // Load initial products
                 await fetchProducts('initial', businessId);
-
-                // Load promotions
                 promotionService.getActivePromotions(businessId).then(setActivePromotions);
 
             } catch (e: any) { 
@@ -407,7 +418,7 @@ export default function CatalogPage() {
         };
 
         initializePage();
-    }, [firestore, slug, isNetworkEnabled]);
+    }, [firestore, slug, isNetworkEnabled, fetchProducts]);
 
     const handleAddToCart = (itemsToAdd: CartItem[]) => {
         setCart(prev => {
@@ -454,7 +465,6 @@ export default function CatalogPage() {
                     </div>
                 )}
 
-                {/* PAGINATION UI */}
                 <div className="mt-12 flex flex-col items-center gap-4">
                     <p className="text-sm text-muted-foreground font-medium">Página {currentPage}</p>
                     <div className="flex items-center gap-4">
