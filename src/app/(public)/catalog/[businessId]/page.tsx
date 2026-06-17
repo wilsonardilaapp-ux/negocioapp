@@ -1,15 +1,16 @@
+
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useFirebase } from '@/firebase';
-import { doc, getDoc, collectionGroup, query, where, getDocs, limit } from 'firebase/firestore';
+import { doc, getDoc, collectionGroup, query, where, getDocs, limit, orderBy, startAfter, endBefore, limitToLast, CollectionReference, DocumentData, QueryDocumentSnapshot } from 'firebase/firestore';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
-import { Star, Loader2, PackageSearch, Tag, ShoppingCart, Image as ImageIcon } from 'lucide-react';
+import { Star, Loader2, PackageSearch, Tag, ShoppingCart, Image as ImageIcon, ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Product } from '@/models/product';
 import type { Module } from '@/models/module';
@@ -274,23 +275,77 @@ export default function CatalogPage() {
     const params = useParams();
     const slug = params.businessId as string;
     
+    // Pagination state
+    const [products, setProducts] = useState<Product[]>([]);
+    const [firstDoc, setFirstDoc] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
+    const [lastDoc, setLastDoc] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [hasNextPage, setHasNextPage] = useState(false);
+    const [hasPrevPage, setHasPrevPage] = useState(false);
+    const [isPaginating, setIsPaginating] = useState(false);
+    const PAGE_SIZE = 12;
+
     const [pageData, setPageData] = useState<{
         resolvedBusinessId: string | null;
-        publicData: { products: Product[], headerConfig: LandingHeaderConfigData } | null;
+        headerConfig: LandingHeaderConfigData | null;
         paymentSettings: PaymentSettings | null;
         landingPageData: LandingPageData | null;
     }>({
         resolvedBusinessId: null,
-        publicData: null,
+        headerConfig: null,
         paymentSettings: null,
         landingPageData: null,
     });
+
     const [activePromotions, setActivePromotions] = useState<Promotion[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
     const [isPurchaseModalOpen, setIsPurchaseModalOpen] = useState(false);
     const [cart, setCart] = useState<CartItem[]>([]);
+
+    const fetchProducts = useCallback(async (direction: 'next' | 'prev' | 'initial', busId: string) => {
+        if (!firestore) return;
+        setIsPaginating(true);
+        try {
+            const productsRef = collection(firestore, `businesses/${busId}/products`);
+            let q;
+
+            if (direction === 'initial') {
+                q = query(productsRef, orderBy('name', 'asc'), limit(PAGE_SIZE));
+                setCurrentPage(1);
+            } else if (direction === 'next' && lastDoc) {
+                q = query(productsRef, orderBy('name', 'asc'), startAfter(lastDoc), limit(PAGE_SIZE));
+                setCurrentPage(prev => prev + 1);
+            } else if (direction === 'prev' && firstDoc) {
+                q = query(productsRef, orderBy('name', 'asc'), endBefore(firstDoc), limitToLast(PAGE_SIZE));
+                setCurrentPage(prev => prev - 1);
+            } else {
+                return;
+            }
+
+            const snap = await getDocs(q);
+            const docs = snap.docs;
+            const data = docs.map(d => ({ ...d.data(), id: d.id } as Product));
+
+            setProducts(data);
+            setFirstDoc(docs[0] || null);
+            setLastDoc(docs[docs.length - 1] || null);
+            
+            // Si trajimos exactamente el PAGE_SIZE, asumimos que puede haber más
+            setHasNextPage(docs.length === PAGE_SIZE);
+            setHasPrevPage(direction === 'initial' ? false : (direction === 'next' ? true : (currentPage > 1)));
+            
+            if (direction === 'initial') setHasPrevPage(false);
+            if (direction === 'prev' && currentPage === 2) setHasPrevPage(false);
+
+        } catch (e: any) {
+            console.error("Error paginating products:", e);
+            toast({ variant: 'destructive', title: 'Error', description: 'No se pudieron cargar más productos.' });
+        } finally {
+            setIsPaginating(false);
+        }
+    }, [firestore, lastDoc, firstDoc, currentPage]);
 
     useEffect(() => {
         if (!firestore || !slug || !isNetworkEnabled) return;
@@ -301,79 +356,57 @@ export default function CatalogPage() {
                 let businessId = slug;
                 const cleanSlug = slug.trim().toLowerCase();
                 
-                console.log("🔍 Intentando cargar catálogo para:", cleanSlug);
-
-                // 1. ESTRATEGIA: Primero intentar como ID directo (UID) para mayor velocidad
+                // Resolve Slug to UID if necessary
                 try {
                     const directBusinessDoc = await getDoc(doc(firestore, 'businesses', businessId));
-                    if (directBusinessDoc.exists()) {
-                        console.log("✅ ID directo validado:", businessId);
-                    } else {
-                        // 2. Si no es UID, buscar por ALIAS (slug)
-                        console.log("ℹ️ No es ID directo, buscando en alias (shareConfig)...");
+                    if (!directBusinessDoc.exists()) {
                         const shareConfigQuery = query(
                             collectionGroup(firestore, 'shareConfig'), 
                             where('slug', '==', cleanSlug), 
                             limit(1)
                         );
-                        
-                        const querySnapshot = await getDocs(shareConfigQuery).catch(err => {
-                            console.warn("⚠️ Fallo consulta de grupo (permisos):", err.message);
-                            return null;
-                        });
-                        
-                        if (querySnapshot && !querySnapshot.empty) {
-                            const customSlugDoc = querySnapshot.docs[0];
-                            const businessDoc = customSlugDoc.ref.parent.parent;
-                            if (businessDoc) {
-                                businessId = businessDoc.id;
-                                console.log("✅ Alias resuelto con éxito:", cleanSlug, "->", businessId);
-                            }
+                        const querySnapshot = await getDocs(shareConfigQuery);
+                        if (!querySnapshot.empty) {
+                            const businessDoc = querySnapshot.docs[0].ref.parent.parent;
+                            if (businessDoc) businessId = businessDoc.id;
                         }
                     }
-                } catch (e) {
-                    console.warn("⚠️ Fallo en fase inicial de resolución.");
-                }
+                } catch (e) { console.warn("Slug resolution warning"); }
 
-                // 3. CARGA FINAL: Intentar cargar los documentos con el ID resuelto
-                const results = await Promise.allSettled([
+                // Fetch metadata
+                const [publicDataSnap, landingPageSnap, paymentSettingsSnap] = await Promise.all([
                     getDoc(doc(firestore, `businesses/${businessId}/publicData`, 'catalog')),
                     getDoc(doc(firestore, `businesses/${businessId}/landingPages`, 'main')),
                     getDoc(doc(firestore, 'paymentSettings', businessId))
                 ]);
 
-                const publicDataSnap = results[0].status === 'fulfilled' ? results[0].value : null;
-                const landingPageSnap = results[1].status === 'fulfilled' ? results[1].value : null;
-                const paymentSettingsSnap = results[2].status === 'fulfilled' ? results[2].value : null;
-
-                if (!publicDataSnap?.exists()) {
-                    throw new Error("El catálogo solicitado no existe o su alias no es válido.");
+                if (!publicDataSnap.exists()) {
+                    throw new Error("El catálogo solicitado no existe.");
                 }
+
+                const catalogData = publicDataSnap.data() as any;
 
                 setPageData({
                     resolvedBusinessId: businessId,
-                    publicData: publicDataSnap.data() as any,
+                    headerConfig: catalogData.headerConfig || null,
                     landingPageData: landingPageSnap?.exists() ? landingPageSnap.data() as any : null,
                     paymentSettings: paymentSettingsSnap?.exists() ? paymentSettingsSnap.data() as any : null,
                 });
 
-                // Cargar promociones con manejo de error explícito para evitar Uncaught Promises
-                await promotionService.getActivePromotions(businessId)
-                    .then(setActivePromotions)
-                    .catch(err => console.warn("No se cargaron promociones:", err.message));
+                // Load initial products
+                await fetchProducts('initial', businessId);
+
+                // Load promotions
+                promotionService.getActivePromotions(businessId).then(setActivePromotions);
 
             } catch (e: any) { 
-                console.error("🚨 Error de inicialización:", e);
                 setError(e.message); 
+            } finally { 
+                setIsLoading(false); 
             }
-            finally { setIsLoading(false); }
         };
 
-        initializePage().catch(err => {
-            console.error("🔥 Error crítico de carga:", err);
-            setError("Ocurrió un error inesperado al cargar la página.");
-            setIsLoading(false);
-        });
+        initializePage();
     }, [firestore, slug, isNetworkEnabled]);
 
     const handleAddToCart = (itemsToAdd: CartItem[]) => {
@@ -401,19 +434,58 @@ export default function CatalogPage() {
         </div>
     );
 
-    const products = pageData.publicData?.products || [];
-    const headerConfig = pageData.publicData?.headerConfig || null;
+    const headerConfig = pageData.headerConfig;
 
     return (
-        <div className="bg-muted/40 min-h-screen">
+        <div className="bg-muted/40 min-h-screen pb-20">
             <PublicNav navigation={pageData.landingPageData?.navigation} businessId={pageData.resolvedBusinessId ?? undefined} />
             <CatalogHeader config={headerConfig} cartItemCount={cart.reduce((acc, item) => acc + item.quantity, 0)} onCartClick={() => setIsPurchaseModalOpen(true)} />
+            
             <main className="container mx-auto py-8 px-4">
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-                    {products.map(p => <PublicProductCard key={p.id} product={p} onOpenModal={setSelectedProduct} activePromotions={activePromotions} />)}
+                {isPaginating ? (
+                    <div className="flex justify-center items-center h-64">
+                        <Loader2 className="h-10 w-10 animate-spin text-primary" />
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                        {products.map(p => (
+                            <PublicProductCard key={p.id} product={p} onOpenModal={setSelectedProduct} activePromotions={activePromotions} />
+                        ))}
+                    </div>
+                )}
+
+                {/* PAGINATION UI */}
+                <div className="mt-12 flex flex-col items-center gap-4">
+                    <p className="text-sm text-muted-foreground font-medium">Página {currentPage}</p>
+                    <div className="flex items-center gap-4">
+                        <Button
+                            variant="outline"
+                            onClick={() => fetchProducts('prev', pageData.resolvedBusinessId!)}
+                            disabled={!hasPrevPage || isPaginating}
+                            className="w-32 shadow-sm font-bold"
+                        >
+                            <ChevronLeft className="mr-2 h-4 w-4" /> Anterior
+                        </Button>
+                        <Button
+                            variant="outline"
+                            onClick={() => fetchProducts('next', pageData.resolvedBusinessId!)}
+                            disabled={!hasNextPage || isPaginating}
+                            className="w-32 shadow-sm font-bold"
+                        >
+                            Siguiente <ChevronRight className="ml-2 h-4 w-4" />
+                        </Button>
+                    </div>
                 </div>
             </main>
-            <ProductViewModal product={selectedProduct} isOpen={!!selectedProduct} onOpenChange={(o) => !o && setSelectedProduct(null)} businessId={pageData.resolvedBusinessId} onAddToCart={handleAddToCart} />
+
+            <ProductViewModal 
+                product={selectedProduct} 
+                isOpen={!!selectedProduct} 
+                onOpenChange={(o) => !o && setSelectedProduct(null)} 
+                businessId={pageData.resolvedBusinessId} 
+                onAddToCart={handleAddToCart} 
+            />
+
             {pageData.resolvedBusinessId && (
                 <PurchaseModal 
                     isOpen={isPurchaseModalOpen} 
