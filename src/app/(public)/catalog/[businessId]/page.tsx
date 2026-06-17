@@ -17,7 +17,8 @@ import {
     limitToLast, 
     DocumentData, 
     QueryDocumentSnapshot,
-    collection 
+    collection,
+    type OrderByDirection
 } from 'firebase/firestore';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
@@ -27,7 +28,7 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
-import { Star, Loader2, PackageSearch, Tag, ShoppingCart, Image as ImageIcon, ChevronLeft, ChevronRight, Search } from 'lucide-react';
+import { Star, Loader2, PackageSearch, Tag, ShoppingCart, Image as ImageIcon, ChevronLeft, ChevronRight, Search, SortDesc } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Product } from '@/models/product';
 import type { LandingPageData, LandingHeaderConfigData } from '@/models/landing-page';
@@ -287,6 +288,8 @@ const ProductViewModal = ({ product, isOpen, onOpenChange, businessId, onAddToCa
 
 const PAGE_SIZE = 12;
 
+type SortOption = 'recent' | 'price_asc' | 'price_desc' | 'rating_desc';
+
 export default function CatalogPage() {
     const { firestore, isNetworkEnabled } = useFirebase();
     const { toast } = useToast();
@@ -299,13 +302,13 @@ export default function CatalogPage() {
     const [lastDoc, setLastDoc] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
     const [currentPage, setCurrentPage] = useState(1);
     const [hasNextPage, setHasNextPage] = useState(false);
-    const [hasPrevPage, setHasPrevPage] = useState(false);
     const [isPaginating, setIsPaginating] = useState(false);
     
-    // Search States
+    // Search & Sort States
     const [searchQuery, setSearchQuery] = useState('');
     const [tempSearchQuery, setTempSearchQuery] = useState('');
     const [selectedCategory, setSelectedCategory] = useState('all');
+    const [sortOrder, setSortOrder] = useState<SortOption>('recent');
     const [categories, setCategories] = useState<string[]>([]);
     
     const [pageData, setPageData] = useState<{
@@ -327,13 +330,38 @@ export default function CatalogPage() {
     const [isPurchaseModalOpen, setIsPurchaseModalOpen] = useState(false);
     const [cart, setCart] = useState<CartItem[]>([]);
 
-    // Función de carga de productos (separada de la inicialización)
-    const fetchProducts = useCallback(async (direction: 'next' | 'prev' | 'initial', busId: string, category: string = 'all', search: string = '') => {
+    // Función de carga de productos
+    const fetchProducts = useCallback(async (
+        direction: 'next' | 'prev' | 'initial', 
+        busId: string, 
+        category: string = 'all', 
+        search: string = '',
+        sort: SortOption = 'recent'
+    ) => {
         if (!firestore) return;
         setIsPaginating(true);
         try {
             const productsRef = collection(firestore, `businesses/${busId}/products`);
-            let q = query(productsRef, orderBy('name', 'asc'));
+            
+            // Determinar campo y dirección de ordenamiento
+            let orderField = 'name';
+            let orderDir: OrderByDirection = 'asc';
+
+            if (sort === 'recent') {
+                orderField = 'name'; // Fallback to name if createdAt is missing, or change to createdAt
+                orderDir = 'asc';
+            } else if (sort === 'price_asc') {
+                orderField = 'price';
+                orderDir = 'asc';
+            } else if (sort === 'price_desc') {
+                orderField = 'price';
+                orderDir = 'desc';
+            } else if (sort === 'rating_desc') {
+                orderField = 'rating';
+                orderDir = 'desc';
+            }
+
+            let q = query(productsRef, orderBy(orderField, orderDir), orderBy('__name__', 'asc'));
 
             if (category !== 'all') {
                 q = query(q, where('category', '==', category));
@@ -348,9 +376,9 @@ export default function CatalogPage() {
             }
 
             const snap = await getDocs(q);
-            const docs = snap.docs;
+            const docsSnap = snap.docs;
             
-            let data = docs.map(d => ({ ...d.data(), id: d.id } as Product));
+            let data = docsSnap.map(d => ({ ...d.data(), id: d.id } as Product));
             
             if (search.trim()) {
                 const term = search.toLowerCase().trim();
@@ -362,19 +390,17 @@ export default function CatalogPage() {
             }
 
             setProducts(data);
-            setFirstDoc(docs[0] || null);
-            setLastDoc(docs[docs.length - 1] || null);
-            setHasNextPage(docs.length === PAGE_SIZE);
+            setFirstDoc(docsSnap[0] || null);
+            setLastDoc(docsSnap[docsSnap.length - 1] || null);
+            setHasNextPage(docsSnap.length === PAGE_SIZE);
 
             if (direction === 'next') setCurrentPage(prev => prev + 1);
             else if (direction === 'prev') setCurrentPage(prev => prev - 1);
             else setCurrentPage(1);
 
-            setHasPrevPage(direction === 'initial' ? false : true);
-
         } catch (e: any) {
             console.error("Error fetching products:", e);
-            toast({ variant: 'destructive', title: 'Error', description: 'No se pudieron cargar los productos.' });
+            toast({ variant: 'destructive', title: 'Error de consulta', description: 'No se pudieron ordenar los productos.' });
         } finally {
             setIsPaginating(false);
         }
@@ -384,11 +410,11 @@ export default function CatalogPage() {
         if (e) e.preventDefault();
         setSearchQuery(tempSearchQuery);
         if (pageData.resolvedBusinessId) {
-            fetchProducts('initial', pageData.resolvedBusinessId, selectedCategory, tempSearchQuery);
+            fetchProducts('initial', pageData.resolvedBusinessId, selectedCategory, tempSearchQuery, sortOrder);
         }
     };
 
-    // Inicialización de la página (Solo se ejecuta al cargar o cambiar el slug)
+    // Efecto de inicialización
     useEffect(() => {
         if (!firestore || !slug || !isNetworkEnabled) return;
         
@@ -400,22 +426,19 @@ export default function CatalogPage() {
                 let businessId = slug;
                 const cleanSlug = slug.trim().toLowerCase();
                 
-                // Resolver Slug/ID
-                try {
-                    const directBusinessDoc = await getDoc(doc(firestore, 'businesses', businessId));
-                    if (!directBusinessDoc.exists()) {
-                        const shareConfigQuery = query(
-                            collectionGroup(firestore, 'shareConfig'), 
-                            where('slug', '==', cleanSlug), 
-                            limit(1)
-                        );
-                        const querySnapshot = await getDocs(shareConfigQuery);
-                        if (!querySnapshot.empty) {
-                            const businessDoc = querySnapshot.docs[0].ref.parent.parent;
-                            if (businessDoc) businessId = businessDoc.id;
-                        }
+                const directBusinessDoc = await getDoc(doc(firestore, 'businesses', businessId));
+                if (!directBusinessDoc.exists()) {
+                    const shareConfigQuery = query(
+                        collectionGroup(firestore, 'shareConfig'), 
+                        where('slug', '==', cleanSlug), 
+                        limit(1)
+                    );
+                    const querySnapshot = await getDocs(shareConfigQuery);
+                    if (!querySnapshot.empty) {
+                        const businessDoc = querySnapshot.docs[0].ref.parent.parent;
+                        if (businessDoc) businessId = businessDoc.id;
                     }
-                } catch (e) { console.warn("Slug resolution warning"); }
+                }
 
                 if (!isMounted) return;
 
@@ -426,9 +449,7 @@ export default function CatalogPage() {
                     getDocs(collection(firestore, `businesses/${businessId}/products`))
                 ]);
 
-                if (!publicDataSnap.exists()) {
-                    throw new Error("El catálogo solicitado no existe.");
-                }
+                if (!publicDataSnap.exists()) throw new Error("El catálogo solicitado no existe.");
 
                 const allItems = allProductsSnap.docs.map(d => d.data() as Product);
                 const uniqueCats = Array.from(new Set(allItems.map(p => p.category).filter(Boolean)));
@@ -443,22 +464,9 @@ export default function CatalogPage() {
                     paymentSettings: paymentSettingsSnap?.exists() ? paymentSettingsSnap.data() as any : null,
                 });
 
-                // Carga inicial de productos directamente para evitar el loop infinito
-                const productsRef = collection(firestore, `businesses/${businessId}/products`);
-                const q = query(productsRef, orderBy('name', 'asc'), limit(PAGE_SIZE));
-                const productSnap = await getDocs(q);
-                
-                if (isMounted) {
-                    const docs = productSnap.docs;
-                    setProducts(docs.map(d => ({ ...d.data(), id: d.id } as Product)));
-                    setFirstDoc(docs[0] || null);
-                    setLastDoc(docs[docs.length - 1] || null);
-                    setHasNextPage(docs.length === PAGE_SIZE);
-                    setHasPrevPage(false);
-                    setCurrentPage(1);
-                    
-                    promotionService.getActivePromotions(businessId).then(setActivePromotions);
-                }
+                // Carga inicial
+                fetchProducts('initial', businessId, 'all', '', 'recent');
+                promotionService.getActivePromotions(businessId).then(setActivePromotions);
 
             } catch (e: any) { 
                 if (isMounted) setError(e.message); 
@@ -469,7 +477,7 @@ export default function CatalogPage() {
 
         initializePage();
         return () => { isMounted = false; };
-    }, [firestore, slug, isNetworkEnabled]);
+    }, [firestore, slug, isNetworkEnabled, fetchProducts]);
 
     const handleAddToCart = (itemsToAdd: CartItem[]) => {
         setCart(prev => {
@@ -503,15 +511,16 @@ export default function CatalogPage() {
             
             <div className="bg-white border-b sticky top-16 z-30 py-4 shadow-sm">
                 <div className="container mx-auto px-4">
-                    <form onSubmit={handleSearch} className="max-w-4xl mx-auto flex flex-col sm:flex-row gap-0 rounded-lg overflow-hidden border focus-within:ring-2 focus-within:ring-primary/50 transition-all">
+                    <form onSubmit={handleSearch} className="max-w-6xl mx-auto flex flex-col lg:flex-row gap-0 rounded-lg overflow-hidden border focus-within:ring-2 focus-within:ring-primary/50 transition-all bg-white">
+                        {/* Selector de Categorías */}
                         <Select 
                             value={selectedCategory} 
                             onValueChange={(val) => {
                                 setSelectedCategory(val);
-                                fetchProducts('initial', pageData.resolvedBusinessId!, val, searchQuery);
+                                fetchProducts('initial', pageData.resolvedBusinessId!, val, searchQuery, sortOrder);
                             }}
                         >
-                            <SelectTrigger className="w-full sm:w-[180px] bg-muted border-none rounded-none focus:ring-0 focus:ring-offset-0 h-12 font-medium">
+                            <SelectTrigger className="w-full lg:w-[180px] bg-muted/50 border-none rounded-none focus:ring-0 focus:ring-offset-0 h-12 font-medium">
                                 <SelectValue placeholder="Categorías" />
                             </SelectTrigger>
                             <SelectContent>
@@ -521,7 +530,9 @@ export default function CatalogPage() {
                                 ))}
                             </SelectContent>
                         </Select>
-                        <div className="relative flex-1 border-y sm:border-y-0 sm:border-x border-gray-200">
+
+                        {/* Campo de Búsqueda */}
+                        <div className="relative flex-1 border-y lg:border-y-0 lg:border-x border-gray-200">
                             <Input 
                                 placeholder="Busca productos, descripción o categorías..."
                                 className="w-full border-none rounded-none h-12 focus-visible:ring-0 focus-visible:ring-offset-0 bg-white"
@@ -529,10 +540,36 @@ export default function CatalogPage() {
                                 onChange={(e) => setTempSearchQuery(e.target.value)}
                             />
                         </div>
-                        <Button type="submit" className="h-12 px-8 rounded-none bg-primary hover:bg-primary/90 transition-colors">
-                            <Search className="h-5 w-5" />
-                            <span className="ml-2 hidden sm:inline">Buscar</span>
-                        </Button>
+
+                        {/* Selector de Ordenamiento */}
+                        <div className="flex flex-col sm:flex-row w-full lg:w-auto">
+                            <Select 
+                                value={sortOrder} 
+                                onValueChange={(val: SortOption) => {
+                                    setSortOrder(val);
+                                    fetchProducts('initial', pageData.resolvedBusinessId!, selectedCategory, searchQuery, val);
+                                }}
+                            >
+                                <SelectTrigger className="w-full sm:w-[200px] border-none rounded-none focus:ring-0 focus:ring-offset-0 h-12 bg-white sm:border-r border-gray-200">
+                                    <div className="flex items-center gap-2 font-medium">
+                                        <SortDesc className="h-4 w-4 text-muted-foreground" />
+                                        <SelectValue placeholder="Ordenar por" />
+                                    </div>
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="recent">Más recientes</SelectItem>
+                                    <SelectItem value="price_asc">Precio: Menor a Mayor</SelectItem>
+                                    <SelectItem value="price_desc">Precio: Mayor a Menor</SelectItem>
+                                    <SelectItem value="rating_desc">Mejor valorados</SelectItem>
+                                </SelectContent>
+                            </Select>
+
+                            {/* Botón de Búsqueda */}
+                            <Button type="submit" className="h-12 px-8 rounded-none bg-primary hover:bg-primary/90 transition-colors w-full sm:w-auto">
+                                <Search className="h-5 w-5" />
+                                <span className="ml-2">Buscar</span>
+                            </Button>
+                        </div>
                     </form>
                 </div>
             </div>
@@ -562,7 +599,7 @@ export default function CatalogPage() {
                         <div className="flex items-center gap-4">
                             <Button
                                 variant="outline"
-                                onClick={() => fetchProducts('prev', pageData.resolvedBusinessId!, selectedCategory, searchQuery)}
+                                onClick={() => fetchProducts('prev', pageData.resolvedBusinessId!, selectedCategory, searchQuery, sortOrder)}
                                 disabled={currentPage === 1 || isPaginating}
                                 className="w-32 shadow-sm font-bold"
                             >
@@ -570,7 +607,7 @@ export default function CatalogPage() {
                             </Button>
                             <Button
                                 variant="outline"
-                                onClick={() => fetchProducts('next', pageData.resolvedBusinessId!, selectedCategory, searchQuery)}
+                                onClick={() => fetchProducts('next', pageData.resolvedBusinessId!, selectedCategory, searchQuery, sortOrder)}
                                 disabled={!hasNextPage || isPaginating}
                                 className="w-32 shadow-sm font-bold"
                             >
