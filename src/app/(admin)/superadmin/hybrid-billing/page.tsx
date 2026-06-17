@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -7,6 +8,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { 
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { 
   Calculator, 
   Loader2, 
   Building2, 
@@ -14,7 +22,8 @@ import {
   AlertCircle, 
   DollarSign, 
   RefreshCw,
-  ArrowRight
+  ArrowRight,
+  FileDown
 } from 'lucide-react';
 import { useCollection, useFirestore, useMemoFirebase, useDoc } from '@/firebase';
 import { collection, getDocs, doc } from 'firebase/firestore';
@@ -23,15 +32,45 @@ import type { HybridPlan, HybridBillingResult } from '@/models/hybrid-plan';
 import type { Business } from '@/models/business';
 import type { Order } from '@/models/order';
 import type { GlobalPaymentConfig } from '@/models/global-payment-config';
-import { format, isSameMonth, parseISO, startOfMonth } from 'date-fns';
+import { format, isSameMonth, parseISO, startOfMonth, setMonth, setYear } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
+
+// Re-declare for TypeScript since jspdf-autotable extends jsPDF
+declare module 'jspdf' {
+  interface jsPDF {
+    autoTable: (options: any) => jsPDF;
+  }
+}
+
+const MONTHS = [
+  { value: '0', label: 'Enero' },
+  { value: '1', label: 'Febrero' },
+  { value: '2', label: 'Marzo' },
+  { value: '3', label: 'Abril' },
+  { value: '4', label: 'Mayo' },
+  { value: '5', label: 'Junio' },
+  { value: '6', label: 'Julio' },
+  { value: '7', label: 'Agosto' },
+  { value: '8', label: 'Septiembre' },
+  { value: '9', label: 'Octubre' },
+  { value: '10', label: 'Noviembre' },
+  { value: '11', label: 'Diciembre' },
+];
+
+const YEARS = Array.from({ length: 2040 - 2024 + 1 }, (_, i) => (2024 + i).toString());
 
 export default function HybridBillingPage() {
   const firestore = useFirestore();
   const { toast } = useToast();
   const [isCalculating, setIsCalculating] = useState(false);
   const [billingResults, setBillingResults] = useState<HybridBillingResult[]>([]);
+  
+  // Período seleccionado
+  const [selectedMonth, setSelectedMonth] = useState<string>(new Date().getMonth().toString());
+  const [selectedYear, setSelectedYear] = useState<string>(new Date().getFullYear().toString());
 
   // Data fetching
   const hybridPlansQuery = useMemoFirebase(() => !firestore ? null : collection(firestore, 'hybrid_plans'), [firestore]);
@@ -51,7 +90,7 @@ export default function HybridBillingPage() {
     }).format(value);
   };
 
-  // Helper robusto para parsear montos (limpia símbolos y maneja NaNs)
+  // Helpers robustos
   const parseAmount = (val: any): number => {
     if (typeof val === 'number') return val;
     if (typeof val === 'string') {
@@ -61,17 +100,12 @@ export default function HybridBillingPage() {
     return 0;
   };
 
-  // Helper robusto para parsear fechas de diversas fuentes (ISO Strings, Timestamps, etc.)
   const parseAnyDate = (val: any): Date | null => {
     if (!val) return null;
     try {
-      // Si es un Timestamp de Firebase
       if (typeof val?.toDate === 'function') return val.toDate();
-      // Si es un objeto con segundos (Admin SDK o similar)
       if (val?.seconds) return new Date(val.seconds * 1000);
-      // Si es un String ISO
       if (typeof val === 'string') return parseISO(val);
-      // Fallback
       const d = new Date(val);
       return isNaN(d.getTime()) ? null : d;
     } catch (e) {
@@ -83,47 +117,34 @@ export default function HybridBillingPage() {
     if (!firestore || !businesses || !hybridPlans) return;
     setIsCalculating(true);
     
-    // Usamos un Map para asegurar unicidad por nombre de negocio (case insensitive)
     const resultsMap = new Map<string, HybridBillingResult>();
 
     try {
-      const now = new Date();
-      // Usamos el inicio del mes actual como referencia de comparación
-      const referenceMonth = startOfMonth(now);
+      // Usamos el período seleccionado
+      const referenceDate = setYear(setMonth(new Date(), parseInt(selectedMonth)), parseInt(selectedYear));
+      const referenceMonth = startOfMonth(referenceDate);
 
       for (const business of businesses) {
-        // Normalizamos el nombre para detectar duplicados visuales
         const businessKey = business.name.toLowerCase().trim();
 
-        // Encontrar si el negocio tiene un plan híbrido asignado
         const plan = hybridPlans.find(p => p.name === business.planName || p.id === business.planName);
         if (!plan) continue;
 
-        // Consultar pedidos del negocio directamente de su subcolección
         const ordersRef = collection(firestore, `businesses/${business.id}/orders`);
         const ordersSnap = await getDocs(ordersRef);
         const allOrders = ordersSnap.docs.map(doc => ({ ...doc.data(), id: doc.id } as Order));
         
-        // Filtrar por mes actual y excluir cancelados
         const currentMonthOrders = allOrders.filter(o => {
             const orderDate = parseAnyDate(o.orderDate);
             if (!orderDate) return false;
-            
-            // Verificamos que sea el mismo mes y año
             const matchesMonth = isSameMonth(orderDate, referenceMonth);
             const notCancelled = o.orderStatus !== 'Cancelado';
-            
             return matchesMonth && notCancelled;
         });
         
         const orderCount = currentMonthOrders.length;
+        const totalSalesValue = currentMonthOrders.reduce((sum, o) => sum + parseAmount(o.subtotal), 0);
 
-        // Calcular valor total de ventas del mes
-        const totalSalesValue = currentMonthOrders.reduce((sum, o) => {
-          return sum + parseAmount(o.subtotal);
-        }, 0);
-
-        // Lógica de comisión
         let variableAmount = 0;
         const commissionConfig = parseAmount(plan.pricePerOrder);
 
@@ -152,7 +173,6 @@ export default function HybridBillingPage() {
           maxCommissionPerOrder: parseAmount(plan.maxCommissionPerOrder),
         };
 
-        // Lógica de Deduplicación: Si ya existe el nombre, conservamos el registro con más pedidos (el más activo)
         const existing = resultsMap.get(businessKey);
         if (!existing || billingResult.orderCount > existing.orderCount) {
           resultsMap.set(businessKey, billingResult);
@@ -162,7 +182,7 @@ export default function HybridBillingPage() {
       setBillingResults(Array.from(resultsMap.values()));
       toast({ 
         title: 'Cálculo completado', 
-        description: `Se procesaron ${resultsMap.size} negocios únicos para el período de ${format(now, 'MMMM', { locale: es })}.` 
+        description: `Se procesaron ${resultsMap.size} negocios para ${MONTHS[parseInt(selectedMonth)].label} ${selectedYear}.` 
       });
     } catch (e: any) {
       console.error("[Billing Error]", e);
@@ -170,6 +190,61 @@ export default function HybridBillingPage() {
     } finally {
       setIsCalculating(false);
     }
+  };
+
+  const handleDownloadPDF = () => {
+    if (billingResults.length === 0) {
+      toast({ variant: 'destructive', title: 'Sin datos', description: 'Realiza el cálculo primero para poder descargar el PDF.' });
+      return;
+    }
+
+    const doc = new jsPDF();
+    const monthLabel = MONTHS[parseInt(selectedMonth)].label;
+    const periodLabel = `${monthLabel} ${selectedYear}`;
+    const generationDate = format(new Date(), 'dd/MM/yyyy HH:mm');
+
+    // Título y Período
+    doc.setFontSize(18);
+    doc.text('Panel de Cobros Masivos', 14, 20);
+    doc.setFontSize(12);
+    doc.text(`Período: ${periodLabel}`, 14, 30);
+    doc.text(`Fecha de generación: ${generationDate}`, 14, 37);
+
+    // Resumen de KPIs
+    const totalBilling = billingResults.reduce((sum, r) => sum + r.totalAmount, 0);
+    const paidBilling = billingResults.filter(r => r.status === 'paid').reduce((sum, r) => sum + r.totalAmount, 0);
+    
+    doc.setFontSize(11);
+    doc.text(`Recaudado: ${formatCurrency(paidBilling)}`, 14, 50);
+    doc.text(`Por Recaudar: ${formatCurrency(totalBilling - paidBilling)}`, 14, 57);
+    doc.text(`Negocios Activos: ${billingResults.length}`, 14, 64);
+
+    // Tabla de Cobros
+    const tableData = billingResults.map(res => [
+      res.businessName,
+      res.planName,
+      res.orderCount,
+      `${formatCurrency(res.basePrice)} / ${res.commissionType === 'percent' ? res.variableAmount > 0 ? (res.variableAmount / (res.ordersTotalValue || 1) * 100).toFixed(1) + '%' : '0%' : formatCurrency(res.variableAmount)}`,
+      formatCurrency(res.totalAmount),
+      res.status === 'paid' ? 'Pagado' : 'Pendiente'
+    ]);
+
+    doc.autoTable({
+      startY: 75,
+      head: [['Empresa', 'Plan Híbrido', 'Pedidos', 'Base / Comisión', 'Total', 'Estado']],
+      body: tableData,
+      theme: 'striped',
+      headStyles: { fillColor: [74, 175, 80] },
+      styles: { fontSize: 9 }
+    });
+
+    // Pie de página
+    const finalY = (doc as any).lastAutoTable.finalY || 80;
+    doc.setFontSize(10);
+    doc.text('Generado por Menfy - SuperAdmin', 14, finalY + 15);
+
+    doc.save(`Cobros-Hibridos-${monthLabel}-${selectedYear}.pdf`);
+    toast({ title: 'Reporte Generado', description: 'El PDF se ha descargado correctamente.' });
   };
 
   const toggleStatus = (businessId: string) => {
@@ -186,9 +261,8 @@ export default function HybridBillingPage() {
       return;
     }
 
-    const currentMonth = format(new Date(), 'MMMM', { locale: es });
+    const currentMonthLabel = MONTHS[parseInt(selectedMonth)].label;
     let paymentDetails = "";
-    
     if (paymentConfig) {
         if (paymentConfig.nequi?.enabled) paymentDetails += `\n📲 Nequi: ${paymentConfig.nequi.accountNumber}`;
         if (paymentConfig.bancolombia?.enabled) paymentDetails += `\n🏦 Bancolombia: ${paymentConfig.bancolombia.accountNumber}`;
@@ -196,7 +270,7 @@ export default function HybridBillingPage() {
 
     const message = `Hola *${res.businessName}*! 👋 
 
-Aquí está tu resumen de facturación para el mes de *${currentMonth}*:
+Aquí está tu resumen de facturación para el mes de *${currentMonthLabel} ${selectedYear}*:
 
 📊 *Actividad del Mes:*
 - Pedidos realizados: ${res.orderCount}
@@ -231,10 +305,34 @@ Gracias por tu puntualidad! 🚀`;
             </CardTitle>
             <CardDescription>Gestión de comisiones para planes híbridos (Zentry)</CardDescription>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 items-center">
+            {/* SELECTORES DE MES Y AÑO */}
+            <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+              <SelectTrigger className="w-[140px]">
+                <SelectValue placeholder="Mes" />
+              </SelectTrigger>
+              <SelectContent>
+                {MONTHS.map(m => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}
+              </SelectContent>
+            </Select>
+
+            <Select value={selectedYear} onValueChange={setSelectedYear}>
+              <SelectTrigger className="w-[100px]">
+                <SelectValue placeholder="Año" />
+              </SelectTrigger>
+              <SelectContent>
+                {YEARS.map(y => <SelectItem key={y} value={y}>{y}</SelectItem>)}
+              </SelectContent>
+            </Select>
+
+            <Button variant="outline" onClick={handleDownloadPDF} disabled={billingResults.length === 0} className="shadow-sm">
+                <FileDown className="w-4 h-4 mr-2" />
+                Descargar PDF
+            </Button>
+
             <Button onClick={calculateBilling} disabled={isCalculating || loadingBusinesses} className="shadow-sm">
                 {isCalculating ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />}
-                {billingResults.length > 0 ? 'Recalcular Todo' : 'Iniciar Cálculo del Mes'}
+                {billingResults.length > 0 ? 'Recalcular Todo' : 'Iniciar Cálculo'}
             </Button>
           </div>
         </CardHeader>
@@ -257,7 +355,9 @@ Gracias por tu puntualidad! 🚀`;
           <CardHeader className="pb-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">Período</CardHeader>
           <CardContent className="flex items-center gap-2">
             <CalendarIcon className="w-5 h-5 text-primary" />
-            <div className="text-xl font-bold capitalize">{format(new Date(), 'MMMM yyyy', { locale: es })}</div>
+            <div className="text-xl font-bold capitalize">
+              {MONTHS[parseInt(selectedMonth)].label} {selectedYear}
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -343,8 +443,8 @@ Gracias por tu puntualidad! 🚀`;
                     <TableCell colSpan={7} className="h-48 text-center text-muted-foreground">
                       <div className="flex flex-col items-center justify-center gap-3">
                         <div className="bg-muted p-4 rounded-full"><AlertCircle className="w-8 h-8" /></div>
-                        <p className="font-medium">No se han calculado cobros para este período todavía.</p>
-                        <Button variant="ghost" onClick={calculateBilling}>Iniciar proceso ahora <ArrowRight className="ml-2 w-4 h-4"/></Button>
+                        <p className="font-medium">No se han calculado cobros para el período seleccionado.</p>
+                        <Button variant="ghost" onClick={calculateBilling}>Iniciar cálculo ahora <ArrowRight className="ml-2 w-4 h-4"/></Button>
                       </div>
                     </TableCell>
                   </TableRow>
