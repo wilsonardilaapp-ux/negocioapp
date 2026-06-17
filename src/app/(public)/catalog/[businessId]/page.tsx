@@ -285,6 +285,8 @@ const ProductViewModal = ({ product, isOpen, onOpenChange, businessId, onAddToCa
     )
 }
 
+const PAGE_SIZE = 12;
+
 export default function CatalogPage() {
     const { firestore, isNetworkEnabled } = useFirebase();
     const { toast } = useToast();
@@ -306,8 +308,6 @@ export default function CatalogPage() {
     const [selectedCategory, setSelectedCategory] = useState('all');
     const [categories, setCategories] = useState<string[]>([]);
     
-    const PAGE_SIZE = 12;
-
     const [pageData, setPageData] = useState<{
         resolvedBusinessId: string | null;
         headerConfig: LandingHeaderConfigData | null;
@@ -327,6 +327,7 @@ export default function CatalogPage() {
     const [isPurchaseModalOpen, setIsPurchaseModalOpen] = useState(false);
     const [cart, setCart] = useState<CartItem[]>([]);
 
+    // Función de carga de productos (separada de la inicialización)
     const fetchProducts = useCallback(async (direction: 'next' | 'prev' | 'initial', busId: string, category: string = 'all', search: string = '') => {
         if (!firestore) return;
         setIsPaginating(true);
@@ -334,12 +335,10 @@ export default function CatalogPage() {
             const productsRef = collection(firestore, `businesses/${busId}/products`);
             let q = query(productsRef, orderBy('name', 'asc'));
 
-            // Filter by category if selected
             if (category !== 'all') {
                 q = query(q, where('category', '==', category));
             }
 
-            // Directional constraints
             if (direction === 'next' && lastDoc) {
                 q = query(q, startAfter(lastDoc), limit(PAGE_SIZE));
             } else if (direction === 'prev' && firstDoc) {
@@ -351,7 +350,6 @@ export default function CatalogPage() {
             const snap = await getDocs(q);
             const docs = snap.docs;
             
-            // Client-side text search (Firestore lacks flexible partial matching)
             let data = docs.map(d => ({ ...d.data(), id: d.id } as Product));
             
             if (search.trim()) {
@@ -372,7 +370,7 @@ export default function CatalogPage() {
             else if (direction === 'prev') setCurrentPage(prev => prev - 1);
             else setCurrentPage(1);
 
-            setHasPrevPage(direction === 'initial' ? false : (direction === 'next' ? true : (currentPage > 1)));
+            setHasPrevPage(direction === 'initial' ? false : true);
 
         } catch (e: any) {
             console.error("Error fetching products:", e);
@@ -380,7 +378,7 @@ export default function CatalogPage() {
         } finally {
             setIsPaginating(false);
         }
-    }, [firestore, lastDoc, firstDoc, currentPage, toast]);
+    }, [firestore, lastDoc, firstDoc, toast]);
 
     const handleSearch = (e?: React.FormEvent) => {
         if (e) e.preventDefault();
@@ -390,15 +388,19 @@ export default function CatalogPage() {
         }
     };
 
+    // Inicialización de la página (Solo se ejecuta al cargar o cambiar el slug)
     useEffect(() => {
         if (!firestore || !slug || !isNetworkEnabled) return;
         
+        let isMounted = true;
+
         const initializePage = async () => {
             setIsLoading(true);
             try {
                 let businessId = slug;
                 const cleanSlug = slug.trim().toLowerCase();
                 
+                // Resolver Slug/ID
                 try {
                     const directBusinessDoc = await getDoc(doc(firestore, 'businesses', businessId));
                     if (!directBusinessDoc.exists()) {
@@ -415,18 +417,19 @@ export default function CatalogPage() {
                     }
                 } catch (e) { console.warn("Slug resolution warning"); }
 
+                if (!isMounted) return;
+
                 const [publicDataSnap, landingPageSnap, paymentSettingsSnap, allProductsSnap] = await Promise.all([
                     getDoc(doc(firestore, `businesses/${businessId}/publicData`, 'catalog')),
                     getDoc(doc(firestore, `businesses/${businessId}/landingPages`, 'main')),
                     getDoc(doc(firestore, 'paymentSettings', businessId)),
-                    getDocs(collection(firestore, `businesses/${businessId}/products`)) // For dynamic categories
+                    getDocs(collection(firestore, `businesses/${businessId}/products`))
                 ]);
 
                 if (!publicDataSnap.exists()) {
                     throw new Error("El catálogo solicitado no existe.");
                 }
 
-                // Extract unique categories
                 const allItems = allProductsSnap.docs.map(d => d.data() as Product);
                 const uniqueCats = Array.from(new Set(allItems.map(p => p.category).filter(Boolean)));
                 setCategories(uniqueCats);
@@ -440,20 +443,33 @@ export default function CatalogPage() {
                     paymentSettings: paymentSettingsSnap?.exists() ? paymentSettingsSnap.data() as any : null,
                 });
 
-                // Initial products fetch
-                await fetchProducts('initial', businessId);
+                // Carga inicial de productos directamente para evitar el loop infinito
+                const productsRef = collection(firestore, `businesses/${businessId}/products`);
+                const q = query(productsRef, orderBy('name', 'asc'), limit(PAGE_SIZE));
+                const productSnap = await getDocs(q);
                 
-                promotionService.getActivePromotions(businessId).then(setActivePromotions);
+                if (isMounted) {
+                    const docs = productSnap.docs;
+                    setProducts(docs.map(d => ({ ...d.data(), id: d.id } as Product)));
+                    setFirstDoc(docs[0] || null);
+                    setLastDoc(docs[docs.length - 1] || null);
+                    setHasNextPage(docs.length === PAGE_SIZE);
+                    setHasPrevPage(false);
+                    setCurrentPage(1);
+                    
+                    promotionService.getActivePromotions(businessId).then(setActivePromotions);
+                }
 
             } catch (e: any) { 
-                setError(e.message); 
+                if (isMounted) setError(e.message); 
             } finally { 
-                setIsLoading(false); 
+                if (isMounted) setIsLoading(false); 
             }
         };
 
         initializePage();
-    }, [firestore, slug, isNetworkEnabled, fetchProducts]);
+        return () => { isMounted = false; };
+    }, [firestore, slug, isNetworkEnabled]);
 
     const handleAddToCart = (itemsToAdd: CartItem[]) => {
         setCart(prev => {
@@ -480,12 +496,10 @@ export default function CatalogPage() {
         </div>
     );
 
-    const headerConfig = pageData.headerConfig;
-
     return (
         <div className="bg-muted/40 min-h-screen pb-20">
             <PublicNav navigation={pageData.landingPageData?.navigation} businessId={pageData.resolvedBusinessId ?? undefined} />
-            <CatalogHeader config={headerConfig} cartItemCount={cart.reduce((acc, item) => acc + item.quantity, 0)} onCartClick={() => setIsPurchaseModalOpen(true)} />
+            <CatalogHeader config={pageData.headerConfig} cartItemCount={cart.reduce((acc, item) => acc + item.quantity, 0)} onCartClick={() => setIsPurchaseModalOpen(true)} />
             
             <div className="bg-white border-b sticky top-16 z-30 py-4 shadow-sm">
                 <div className="container mx-auto px-4">
@@ -539,12 +553,6 @@ export default function CatalogPage() {
                         <PackageSearch className="h-20 w-20 text-muted-foreground/30 mb-4" />
                         <h2 className="text-xl font-bold text-gray-700">No se encontraron productos</h2>
                         <p className="text-muted-foreground mt-2">Intenta ajustar los filtros de búsqueda o categoría.</p>
-                        <Button variant="link" onClick={() => {
-                            setTempSearchQuery('');
-                            setSearchQuery('');
-                            setSelectedCategory('all');
-                            fetchProducts('initial', pageData.resolvedBusinessId!, 'all', '');
-                        }}>Limpiar filtros</Button>
                     </div>
                 )}
 
@@ -555,7 +563,7 @@ export default function CatalogPage() {
                             <Button
                                 variant="outline"
                                 onClick={() => fetchProducts('prev', pageData.resolvedBusinessId!, selectedCategory, searchQuery)}
-                                disabled={!hasPrevPage || isPaginating}
+                                disabled={currentPage === 1 || isPaginating}
                                 className="w-32 shadow-sm font-bold"
                             >
                                 <ChevronLeft className="mr-2 h-4 w-4" /> Anterior
@@ -590,7 +598,7 @@ export default function CatalogPage() {
                     onUpdateQuantity={(id, q) => setCart(c => c.map(i => i.id === id ? {...i, quantity: q} : i))}
                     onClearCart={() => setCart([])}
                     businessId={pageData.resolvedBusinessId} 
-                    businessInfo={headerConfig?.businessInfo ?? null} 
+                    businessInfo={pageData.headerConfig?.businessInfo ?? null} 
                     paymentSettings={pageData.paymentSettings} 
                 />
             )}
