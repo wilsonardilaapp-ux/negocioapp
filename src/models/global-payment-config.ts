@@ -36,6 +36,7 @@ export const ApiGatewayConfigSchema = z.object({
   clientSecret: z.string().optional(),
   accessToken: z.string().optional(),
   instructions: z.string().optional(),
+  checkoutUrl: z.string().optional(), // Added for custom redirection
 });
 export type ApiGatewayConfig = z.infer<typeof ApiGatewayConfigSchema>;
 

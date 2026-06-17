@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -6,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Textarea } from "@/components/ui/textarea";
 import type { ApiGatewayConfig } from "@/models/global-payment-config";
+import { Link2 } from "lucide-react";
 
 interface ApiGatewayFormProps {
   data: ApiGatewayConfig;
@@ -28,17 +30,38 @@ export default function ApiGatewayForm({ data, setData, fields }: ApiGatewayForm
 
   return (
     <div className="space-y-4 pt-4 border-t">
-      {fields.map(field => (
-        <div key={field}>
-          <Label htmlFor={field}>{fieldLabels[field]}</Label>
-          <Input
-            id={field}
-            type="password"
-            value={data[field] || ''}
-            onChange={(e) => handleInputChange(field, e.target.value)}
-          />
-        </div>
-      ))}
+      <div className="bg-primary/5 p-4 rounded-lg border border-primary/20 space-y-2">
+        <Label htmlFor="checkoutUrl" className="flex items-center gap-2 text-primary font-bold">
+            <Link2 className="h-4 w-4" />
+            URL de Página de Pago (Checkout Externo)
+        </Label>
+        <Input
+          id="checkoutUrl"
+          type="url"
+          placeholder="https://buy.stripe.com/..."
+          value={data.checkoutUrl || ''}
+          onChange={(e) => handleInputChange('checkoutUrl', e.target.value)}
+          className="bg-white border-primary/30 focus-visible:ring-primary"
+        />
+        <p className="text-[10px] text-muted-foreground italic">
+            Si se configura, los clientes serán redirigidos a esta URL al seleccionar este método.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4">
+        {fields.map(field => (
+            <div key={field}>
+            <Label htmlFor={field}>{fieldLabels[field]}</Label>
+            <Input
+                id={field}
+                type="password"
+                value={data[field] || ''}
+                onChange={(e) => handleInputChange(field, e.target.value)}
+            />
+            </div>
+        ))}
+      </div>
+
       <div>
         <Label>Modo de Operación</Label>
         <RadioGroup

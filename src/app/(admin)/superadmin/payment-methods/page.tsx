@@ -23,9 +23,9 @@ const initialConfig: GlobalPaymentConfig = {
     bancolombia: { enabled: false, accountNumber: '', holderName: '', instructions: '', qrImageUrl: null },
     daviplata: { enabled: false, accountNumber: '', holderName: '', instructions: '', qrImageUrl: null },
     breB: { enabled: false, holderName: '', keyType: 'Celular', keyValue: '', instructions: '', qrImageUrl: null, commerceCode: '' },
-    stripe: { enabled: false, mode: 'sandbox', secretKey: '', instructions: '' },
-    paypal: { enabled: false, mode: 'sandbox', clientId: '', clientSecret: '', instructions: '' },
-    mercadoPago: { enabled: false, mode: 'sandbox', publicKey: '', accessToken: '', instructions: '' },
+    stripe: { enabled: false, mode: 'sandbox', secretKey: '', instructions: '', checkoutUrl: '' },
+    paypal: { enabled: false, mode: 'sandbox', clientId: '', clientSecret: '', instructions: '', checkoutUrl: '' },
+    mercadoPago: { enabled: false, mode: 'sandbox', publicKey: '', accessToken: '', instructions: '', checkoutUrl: '' },
 };
 
 const PaymentMethodCard = ({ title, children, icon: Icon }: { title: string, children: React.ReactNode, icon: React.ElementType }) => (
