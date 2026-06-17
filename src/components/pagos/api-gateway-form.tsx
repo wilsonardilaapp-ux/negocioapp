@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Textarea } from "@/components/ui/textarea";
 import type { ApiGatewayConfig } from "@/models/global-payment-config";
-import { Link2 } from "lucide-react";
+import { Link2, Webhook } from "lucide-react";
 
 interface ApiGatewayFormProps {
   data: ApiGatewayConfig;
@@ -30,22 +30,44 @@ export default function ApiGatewayForm({ data, setData, fields }: ApiGatewayForm
 
   return (
     <div className="space-y-4 pt-4 border-t">
-      <div className="bg-primary/5 p-4 rounded-lg border border-primary/20 space-y-2">
-        <Label htmlFor="checkoutUrl" className="flex items-center gap-2 text-primary font-bold">
-            <Link2 className="h-4 w-4" />
-            URL de Página de Pago (Checkout Externo)
-        </Label>
-        <Input
-          id="checkoutUrl"
-          type="url"
-          placeholder="https://buy.stripe.com/..."
-          value={data.checkoutUrl || ''}
-          onChange={(e) => handleInputChange('checkoutUrl', e.target.value)}
-          className="bg-white border-primary/30 focus-visible:ring-primary"
-        />
-        <p className="text-[10px] text-muted-foreground italic">
-            Si se configura, los clientes serán redirigidos a esta URL al seleccionar este método.
-        </p>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Checkout URL Field */}
+        <div className="bg-primary/5 p-4 rounded-lg border border-primary/20 space-y-2">
+            <Label htmlFor="checkoutUrl" className="flex items-center gap-2 text-primary font-bold">
+                <Link2 className="h-4 w-4" />
+                URL de Página de Pago (Checkout Externo)
+            </Label>
+            <Input
+            id="checkoutUrl"
+            type="url"
+            placeholder="https://buy.stripe.com/..."
+            value={data.checkoutUrl || ''}
+            onChange={(e) => handleInputChange('checkoutUrl', e.target.value)}
+            className="bg-white border-primary/30 focus-visible:ring-primary"
+            />
+            <p className="text-[10px] text-muted-foreground italic">
+                Si se configura, los clientes serán redirigidos a esta URL al seleccionar este método.
+            </p>
+        </div>
+
+        {/* Webhook URL Field */}
+        <div className="bg-blue-50 p-4 rounded-lg border border-blue-200 space-y-2">
+            <Label htmlFor="webhookUrl" className="flex items-center gap-2 text-blue-700 font-bold">
+                <Webhook className="h-4 w-4" />
+                Webhook URL
+            </Label>
+            <Input
+            id="webhookUrl"
+            type="url"
+            placeholder="https://tu-dominio.com/api/webhooks/..."
+            value={data.webhookUrl || ''}
+            onChange={(e) => handleInputChange('webhookUrl', e.target.value)}
+            className="bg-white border-blue-300 focus-visible:ring-blue-500"
+            />
+            <p className="text-[10px] text-muted-foreground italic">
+                URL para recibir notificaciones automáticas de pago desde la plataforma del proveedor.
+            </p>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-4">

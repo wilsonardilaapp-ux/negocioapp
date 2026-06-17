@@ -37,6 +37,7 @@ export const ApiGatewayConfigSchema = z.object({
   accessToken: z.string().optional(),
   instructions: z.string().optional(),
   checkoutUrl: z.string().optional(), // Added for custom redirection
+  webhookUrl: z.string().optional(), // Added for webhook notification handling
 });
 export type ApiGatewayConfig = z.infer<typeof ApiGatewayConfigSchema>;
 
