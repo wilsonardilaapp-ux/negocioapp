@@ -330,7 +330,7 @@ export default function CatalogPage() {
     const [isPurchaseModalOpen, setIsPurchaseModalOpen] = useState(false);
     const [cart, setCart] = useState<CartItem[]>([]);
 
-    // Función de carga de productos
+    // Función de carga de productos (ESTABLE: No depende de estados circulares)
     const fetchProducts = useCallback(async (
         direction: 'next' | 'prev' | 'initial', 
         busId: string, 
@@ -343,12 +343,11 @@ export default function CatalogPage() {
         try {
             const productsRef = collection(firestore, `businesses/${busId}/products`);
             
-            // Determinar campo y dirección de ordenamiento
             let orderField = 'name';
             let orderDir: OrderByDirection = 'asc';
 
             if (sort === 'recent') {
-                orderField = 'name'; // Fallback to name if createdAt is missing, or change to createdAt
+                orderField = 'name'; 
                 orderDir = 'asc';
             } else if (sort === 'price_asc') {
                 orderField = 'price';
@@ -367,6 +366,7 @@ export default function CatalogPage() {
                 q = query(q, where('category', '==', category));
             }
 
+            // Aplicar cursores solo en navegación, no en carga inicial
             if (direction === 'next' && lastDoc) {
                 q = query(q, startAfter(lastDoc), limit(PAGE_SIZE));
             } else if (direction === 'prev' && firstDoc) {
@@ -400,11 +400,11 @@ export default function CatalogPage() {
 
         } catch (e: any) {
             console.error("Error fetching products:", e);
-            toast({ variant: 'destructive', title: 'Error de consulta', description: 'No se pudieron ordenar los productos.' });
+            toast({ variant: 'destructive', title: 'Error de consulta', description: 'No se pudieron cargar los productos.' });
         } finally {
             setIsPaginating(false);
         }
-    }, [firestore, lastDoc, firstDoc, toast]);
+    }, [firestore, toast, lastDoc, firstDoc]); // lastDoc/firstDoc solo afectan cuando se llama a la función
 
     const handleSearch = (e?: React.FormEvent) => {
         if (e) e.preventDefault();
@@ -414,7 +414,7 @@ export default function CatalogPage() {
         }
     };
 
-    // Efecto de inicialización
+    // Efecto de inicialización (CRÍTICO: No depende de fetchProducts para evitar bucle)
     useEffect(() => {
         if (!firestore || !slug || !isNetworkEnabled) return;
         
@@ -464,9 +464,19 @@ export default function CatalogPage() {
                     paymentSettings: paymentSettingsSnap?.exists() ? paymentSettingsSnap.data() as any : null,
                 });
 
-                // Carga inicial
-                fetchProducts('initial', businessId, 'all', '', 'recent');
-                promotionService.getActivePromotions(businessId).then(setActivePromotions);
+                // Carga inicial explícita de productos para evitar bucles
+                const productsRef = collection(firestore, `businesses/${businessId}/products`);
+                const initialQ = query(productsRef, orderBy('name', 'asc'), orderBy('__name__', 'asc'), limit(PAGE_SIZE));
+                const snap = await getDocs(initialQ);
+                
+                if (isMounted) {
+                    setProducts(snap.docs.map(d => ({ ...d.data(), id: d.id } as Product)));
+                    setFirstDoc(snap.docs[0] || null);
+                    setLastDoc(snap.docs[snap.docs.length - 1] || null);
+                    setHasNextPage(snap.docs.length === PAGE_SIZE);
+                    
+                    promotionService.getActivePromotions(businessId).then(setActivePromotions);
+                }
 
             } catch (e: any) { 
                 if (isMounted) setError(e.message); 
@@ -477,7 +487,7 @@ export default function CatalogPage() {
 
         initializePage();
         return () => { isMounted = false; };
-    }, [firestore, slug, isNetworkEnabled, fetchProducts]);
+    }, [firestore, slug, isNetworkEnabled]); // Solo re-ejecutar si el slug o firestore cambian
 
     const handleAddToCart = (itemsToAdd: CartItem[]) => {
         setCart(prev => {
@@ -512,7 +522,6 @@ export default function CatalogPage() {
             <div className="bg-white border-b sticky top-16 z-30 py-4 shadow-sm">
                 <div className="container mx-auto px-4">
                     <form onSubmit={handleSearch} className="max-w-6xl mx-auto flex flex-col lg:flex-row gap-0 rounded-lg overflow-hidden border focus-within:ring-2 focus-within:ring-primary/50 transition-all bg-white">
-                        {/* Selector de Categorías */}
                         <Select 
                             value={selectedCategory} 
                             onValueChange={(val) => {
@@ -531,7 +540,6 @@ export default function CatalogPage() {
                             </SelectContent>
                         </Select>
 
-                        {/* Campo de Búsqueda */}
                         <div className="relative flex-1 border-y lg:border-y-0 lg:border-x border-gray-200">
                             <Input 
                                 placeholder="Busca productos, descripción o categorías..."
@@ -541,7 +549,6 @@ export default function CatalogPage() {
                             />
                         </div>
 
-                        {/* Selector de Ordenamiento */}
                         <div className="flex flex-col sm:flex-row w-full lg:w-auto">
                             <Select 
                                 value={sortOrder} 
@@ -564,7 +571,6 @@ export default function CatalogPage() {
                                 </SelectContent>
                             </Select>
 
-                            {/* Botón de Búsqueda */}
                             <Button type="submit" className="h-12 px-8 rounded-none bg-primary hover:bg-primary/90 transition-colors w-full sm:w-auto">
                                 <Search className="h-5 w-5" />
                                 <span className="ml-2">Buscar</span>
@@ -593,7 +599,7 @@ export default function CatalogPage() {
                     </div>
                 )}
 
-                {products.length > 0 && (
+                {products.length > 0 && !isPaginating && (
                     <div className="mt-12 flex flex-col items-center gap-4">
                         <p className="text-sm text-muted-foreground font-medium">Página {currentPage}</p>
                         <div className="flex items-center gap-4">
