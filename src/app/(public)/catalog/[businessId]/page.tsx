@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useFirebase } from '@/firebase';
 import { 
     doc, 
@@ -30,7 +30,7 @@ import { Input } from '@/components/ui/input';
 import { Star, Loader2, PackageSearch, Tag, ShoppingCart, Image as ImageIcon, ChevronLeft, ChevronRight, Search, SortDesc } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Product } from '@/models/product';
-import type { LandingPageData, LandingHeaderConfigData } from '@/models/landing-page';
+import type { LandingHeaderConfigData, LandingPageData } from '@/models/landing-page';
 import { WhatsAppIcon } from '@/components/icons';
 import { useParams } from 'next/navigation';
 import { rateProduct } from '@/ai/flows/rate-product-flow';
@@ -177,10 +177,10 @@ const ProductViewModal = ({ product, isOpen, onOpenChange, businessId, onAddToCa
             const result = await rateProduct({ businessId, productId: product.id, rating });
             if (result.success) {
                 localStorage.setItem(`rated_${product.id}`, 'true');
-                toast({ title: '¡Gracias por tu opinión!', description: 'Tu calificación ha sido registrada.' });
+                toast({ title: '¡Gracias por tu opinión!' });
             } else throw new Error(result.message);
         } catch (error: any) {
-            toast({ variant: "destructive", title: 'Error al calificar', description: error.message || 'No se pudo registrar tu calificación.' });
+            toast({ variant: "destructive", title: 'Error', description: error.message });
             setUserRating(0);
         } finally { setIsRating(false); }
     };
@@ -285,7 +285,6 @@ export default function CatalogPage() {
     const params = useParams();
     const slug = params.businessId as string;
     
-    // UI States
     const [products, setProducts] = useState<Product[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isPaginating, setIsPaginating] = useState(false);
@@ -294,13 +293,11 @@ export default function CatalogPage() {
     const [isPurchaseModalOpen, setIsPurchaseModalOpen] = useState(false);
     const [cart, setCart] = useState<CartItem[]>([]);
 
-    // Pagination States
     const [firstDoc, setFirstDoc] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
     const [lastDoc, setLastDoc] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
     const [currentPage, setCurrentPage] = useState(1);
     const [hasNextPage, setHasNextPage] = useState(false);
     
-    // Search & Sort States
     const [searchQuery, setSearchQuery] = useState('');
     const [tempSearchQuery, setTempSearchQuery] = useState('');
     const [selectedCategory, setSelectedCategory] = useState('all');
@@ -321,7 +318,6 @@ export default function CatalogPage() {
 
     const [activePromotions, setActivePromotions] = useState<Promotion[]>([]);
 
-    // Función estable para construir la consulta base
     const getBaseQuery = useCallback((busId: string, category: string, sort: SortOption) => {
         if (!firestore) return null;
         const productsRef = collection(firestore, `businesses/${busId}/products`);
@@ -342,7 +338,6 @@ export default function CatalogPage() {
         return q;
     }, [firestore]);
 
-    // Función central de carga de productos
     const loadProducts = useCallback(async (
         direction: 'next' | 'prev' | 'initial',
         busId: string,
@@ -398,7 +393,6 @@ export default function CatalogPage() {
         }
     }, [getBaseQuery, toast]);
 
-    // Inicialización de la página
     useEffect(() => {
         if (!firestore || !slug || !isNetworkEnabled) return;
         
@@ -444,7 +438,6 @@ export default function CatalogPage() {
 
                 promotionService.getActivePromotions(busId).then(setActivePromotions);
 
-                // Carga inicial
                 await loadProducts('initial', busId, 'all', '', 'recent', null, null);
 
             } catch (e: any) { 
@@ -457,7 +450,7 @@ export default function CatalogPage() {
 
         initialize();
         return () => { isMounted = false; };
-    }, [firestore, slug, isNetworkEnabled]);
+    }, [firestore, slug, isNetworkEnabled, loadProducts]);
 
     const handleSearch = (e?: React.FormEvent) => {
         if (e) e.preventDefault();
@@ -507,7 +500,7 @@ export default function CatalogPage() {
                                 if (pageData.resolvedBusinessId) loadProducts('initial', pageData.resolvedBusinessId, val, searchQuery, sortOrder, null, null);
                             }}
                         >
-                            <SelectTrigger className="w-full lg:w-[180px] bg-muted/50 border-none rounded-none focus:ring-0 focus:ring-offset-0 h-12 font-medium">
+                            <SelectTrigger className="w-full lg:w-[180px] bg-muted/50 border-none rounded-none focus:ring-0 focus:ring-offset-0 h-12 font-medium text-foreground">
                                 <SelectValue placeholder="Categorías" />
                             </SelectTrigger>
                             <SelectContent>
@@ -520,7 +513,7 @@ export default function CatalogPage() {
 
                         <div className="relative flex-1 border-y lg:border-y-0 lg:border-x border-gray-200">
                             <Input 
-                                placeholder="Busca productos, descripción o categorías..."
+                                placeholder="Busca productos..."
                                 className="w-full border-none rounded-none h-12 focus-visible:ring-0 focus-visible:ring-offset-0 bg-white"
                                 value={tempSearchQuery}
                                 onChange={(e) => setTempSearchQuery(e.target.value)}
@@ -535,7 +528,7 @@ export default function CatalogPage() {
                                     if (pageData.resolvedBusinessId) loadProducts('initial', pageData.resolvedBusinessId, selectedCategory, searchQuery, val, null, null);
                                 }}
                             >
-                                <SelectTrigger className="w-full sm:w-[200px] border-none rounded-none focus:ring-0 focus:ring-offset-0 h-12 bg-white sm:border-r border-gray-200">
+                                <SelectTrigger className="w-full sm:w-[200px] border-none rounded-none focus:ring-0 focus:ring-offset-0 h-12 bg-white sm:border-r border-gray-200 text-foreground">
                                     <div className="flex items-center gap-2 font-medium">
                                         <SortDesc className="h-4 w-4 text-muted-foreground" />
                                         <SelectValue placeholder="Ordenar por" />
@@ -551,7 +544,7 @@ export default function CatalogPage() {
 
                             <Button type="submit" className="h-12 px-8 rounded-none bg-primary hover:bg-primary/90 transition-colors w-full sm:w-auto">
                                 <Search className="h-5 w-5" />
-                                <span className="ml-2">Buscar</span>
+                                <span className="ml-2 font-bold">Buscar</span>
                             </Button>
                         </div>
                     </form>
@@ -573,7 +566,7 @@ export default function CatalogPage() {
                     <div className="flex flex-col items-center justify-center py-20 text-center">
                         <PackageSearch className="h-20 w-20 text-muted-foreground/30 mb-4" />
                         <h2 className="text-xl font-bold text-gray-700">No se encontraron productos</h2>
-                        <p className="text-muted-foreground mt-2">Intenta ajustar los filtros de búsqueda o categoría.</p>
+                        <p className="text-muted-foreground mt-2">Intenta ajustar los filtros de búsqueda.</p>
                     </div>
                 )}
 
@@ -634,21 +627,15 @@ const CatalogHeader = ({ config, cartItemCount, onCartClick }: { config: any, ca
         <div className="w-full">
             {config.banner.mediaUrl && (
                 <div className="relative w-full h-[250px]">
-                    <Image 
-                        src={config.banner.mediaUrl} 
-                        alt="Banner" 
-                        fill 
-                        className="object-cover" 
-                        priority 
-                    />
+                    <Image src={config.banner.mediaUrl} alt="Banner" fill className="object-cover" priority />
                 </div>
             )}
             <div className="bg-card shadow-md p-4 sticky top-16 z-40 border-b">
                 <div className="container mx-auto flex justify-between items-center">
-                    <div><h1 className="text-xl font-bold">{config.businessInfo.name}</h1><p className="text-sm text-muted-foreground">{config.businessInfo.address}</p></div>
+                    <div><h1 className="text-xl font-bold text-foreground">{config.businessInfo.name}</h1><p className="text-sm text-muted-foreground">{config.businessInfo.address}</p></div>
                     <div className="flex items-center gap-3">
                         <Button asChild size="sm" variant="outline" className="hidden sm:flex"><a href={`https://api.whatsapp.com/send?phone=${cleanPhone}`} target="_blank"><WhatsAppIcon className="mr-2" /> Contactar</a></Button>
-                        <button onClick={onCartClick} className="relative p-2 hover:bg-muted rounded-full transition-colors"><ShoppingCart /><Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0">{cartItemCount}</Badge></button>
+                        <button onClick={onCartClick} className="relative p-2 hover:bg-muted rounded-full transition-colors text-foreground"><ShoppingCart /><Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0">{cartItemCount}</Badge></button>
                     </div>
                 </div>
             </div>

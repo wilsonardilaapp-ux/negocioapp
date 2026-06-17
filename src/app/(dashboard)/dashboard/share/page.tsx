@@ -13,7 +13,6 @@ import {
   Download,
   Copy,
   Check,
-  Eye,
   Image as ImageIcon,
   Pencil,
   Trash2,
@@ -204,7 +203,6 @@ export default function SharePage() {
     if (!shareConfig || !shareConfigRef || !firestore || !user) return;
     setIsSaving(true);
     try {
-      // 1. Limpieza y validación final del slug
       const finalSlug = shareConfig.slug.trim().toLowerCase().replace(/\s+/g, '-').replace(/^-+|-+$/g, '');
       
       const dataToSave = { 
@@ -216,7 +214,6 @@ export default function SharePage() {
       
       await setDoc(shareConfigRef, dataToSave);
 
-      // 2. IMPORTANTE: Forzar actualización del catálogo público con el nuevo slug para asegurar sincronía
       const publicCatalogRef = doc(firestore, `businesses/${user.uid}/publicData`, 'catalog');
       const publicCatalogSnap = await getDoc(publicCatalogRef);
       if (publicCatalogSnap.exists()) {
@@ -225,14 +222,14 @@ export default function SharePage() {
       
       toast({
         title: '¡Cambios Guardados!',
-        description: 'La configuración de tu enlace personalizado ha sido actualizada.',
+        description: 'La configuración de tu enlace ha sido actualizada.',
       });
     } catch (error: any) {
-      console.error("Error al guardar configuración de compartir:", error);
+      console.error("Error al guardar:", error);
       toast({
         variant: 'destructive',
-        title: 'Error al guardar',
-        description: 'No se pudo persistir la configuración. Intenta de nuevo.',
+        title: 'Error',
+        description: 'No se pudo guardar la configuración.',
       });
     } finally {
       setIsSaving(false);
@@ -270,9 +267,9 @@ export default function SharePage() {
         try {
             const result = await uploadMedia({ mediaDataUri });
             handleLocalChange({ socialPreviewImageUrl: result.secure_url });
-            toast({ title: "Imagen subida", description: "Recuerda presionar Guardar Cambios para finalizar." });
+            toast({ title: "Imagen subida" });
         } catch (error: any) {
-            toast({ variant: 'destructive', title: "Error al subir", description: error.message });
+            toast({ variant: 'destructive', title: "Error", description: error.message });
         }
     };
   };
@@ -301,146 +298,63 @@ export default function SharePage() {
       <Card>
         <CardHeader>
             <CardTitle className="flex items-center gap-2"><Link2 className="h-5 w-5" /> URL Personalizada</CardTitle>
-            <CardDescription>Activa y define tu alias para un enlace más profesional.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
             <div className="flex items-center justify-between rounded-lg border p-4 bg-muted/30">
                 <div className="space-y-0.5">
                     <Label htmlFor="custom-slug-switch" className="text-base">Usar alias personalizado</Label>
-                    <p className="text-sm text-muted-foreground">Permite que tus clientes usen un nombre fácil en lugar de tu ID.</p>
                 </div>
                 <Switch
                     id="custom-slug-switch"
                     checked={shareConfig.useCustomSlug === true}
-                    onCheckedChange={(checked) => {
-                        handleLocalChange({ useCustomSlug: checked });
-                    }}
+                    onCheckedChange={(checked) => handleLocalChange({ useCustomSlug: checked })}
                 />
             </div>
             {shareConfig.useCustomSlug && (
-                <div className="space-y-2 animate-in fade-in slide-in-from-top-2 duration-300">
-                    <Label htmlFor="slug-input">Tu Alias de Negocio</Label>
-                    <div className="flex items-center group">
-                        <span className="p-2 bg-muted border border-r-0 rounded-l-md text-sm text-muted-foreground">
-                            {typeof window !== 'undefined' ? window.location.host : ''}/catalog/
-                        </span>
+                <div className="space-y-2">
+                    <Label htmlFor="slug-input">Tu Alias</Label>
+                    <div className="flex items-center">
+                        <span className="p-2 bg-muted border border-r-0 rounded-l-md text-sm">/catalog/</span>
                         <Input
                             id="slug-input"
-                            className="rounded-none focus-visible:ring-0 focus-visible:ring-offset-0"
+                            className="rounded-none"
                             value={shareConfig.slug === user.uid ? '' : shareConfig.slug}
-                            placeholder="nombre-de-tu-negocio"
-                            onChange={(e) => {
-                                const rawValue = e.target.value;
-                                // Limpieza quirúrgica de espacios y caracteres raros
-                                const cleanValue = rawValue.trim().toLowerCase().replace(/\s+/g, '-').replace(/^-+|-+$/g, '');
-                                handleLocalChange({ slug: cleanValue });
-                            }}
+                            onChange={(e) => handleLocalChange({ slug: e.target.value })}
                         />
-                         <Button variant="outline" size="icon" className="rounded-l-none border-l-0" onClick={handleCopyLink}>
+                         <Button variant="outline" size="icon" className="rounded-l-none" onClick={handleCopyLink}>
                             {copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
                         </Button>
                     </div>
-                    <p className="text-xs text-muted-foreground">Solo letras, números y guiones centrales.</p>
                 </div>
             )}
         </CardContent>
       </Card>
       
       <Card>
-        <CardHeader>
-            <CardTitle className="flex items-center gap-2"><Share2 className="h-5 w-5" /> Vista Previa Social</CardTitle>
-            <CardDescription>Cómo se verá tu catálogo al compartirlo en WhatsApp o redes.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-            <div className="max-w-md mx-auto">
-              <SocialPreviewImageUploader
-                  imageUrl={shareConfig.socialPreviewImageUrl}
-                  onUpload={handleSocialImageUpload}
-                  onRemove={() => handleLocalChange({ socialPreviewImageUrl: null })}
-              />
-            </div>
-            <div className="space-y-2">
-                <Label htmlFor="social-message">Mensaje Predeterminado</Label>
-                <Textarea
-                    id="social-message"
-                    placeholder="¡Hola! Te invito a ver nuestro menú digital ✨"
-                    value={shareConfig.socialShareMessage || ''}
-                    onChange={(e) => handleLocalChange({ socialShareMessage: e.target.value })}
-                    rows={3}
+        <CardHeader><CardTitle className="flex items-center gap-2"><Share2 className="h-5 w-5" /> Compartir</CardTitle></CardHeader>
+        <CardContent className="space-y-6">
+            <div className="flex justify-center">
+                <SocialPreviewImageUploader
+                    imageUrl={shareConfig.socialPreviewImageUrl}
+                    onUpload={handleSocialImageUpload}
+                    onRemove={() => handleLocalChange({ socialPreviewImageUrl: null })}
                 />
             </div>
-            <Button className="w-full bg-green-600 hover:bg-green-700" onClick={() => {
-                const text = encodeURIComponent(`${shareConfig.socialShareMessage || '¡Mira mi catálogo!'} ${menuUrl}`);
-                window.open(`https://wa.me/?text=${text}`, '_blank');
-            }}>
-                <WhatsAppIcon className="h-5 w-5 mr-2" /> Compartir por WhatsApp
-            </Button>
+            <Textarea
+                placeholder="Mensaje de bienvenida..."
+                value={shareConfig.socialShareMessage || ''}
+                onChange={(e) => handleLocalChange({ socialShareMessage: e.target.value })}
+                rows={3}
+            />
+            <div className="flex justify-center p-6 border rounded-xl" ref={qrCodeRef} style={{ background: shareConfig.qrConfig.backgroundColor }}>
+                <QRCode value={menuUrl} size={180} bgColor={shareConfig.qrConfig.backgroundColor} fgColor={shareConfig.qrConfig.foregroundColor} />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+                <Button variant="outline" onClick={downloadQR}><Download className="mr-2 h-4 w-4" /> Bajar QR</Button>
+                <Button onClick={() => window.open(`https://wa.me/?text=${encodeURIComponent(menuUrl)}`, '_blank')}><WhatsAppIcon className="mr-2" /> WhatsApp</Button>
+            </div>
         </CardContent>
       </Card>
-      
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2">
-            <Tabs defaultValue="qr">
-                <TabsList className="grid w-full grid-cols-3">
-                <TabsTrigger value="qr"><QrCode className="w-4 h-4 mr-2" />Código QR</TabsTrigger>
-                <TabsTrigger value="link"><Link2 className="h-4 w-4 mr-2" />Enlace</TabsTrigger>
-                <TabsTrigger value="social"><Share2 className="w-4 h-4 mr-2" />Redes Sociales</TabsTrigger>
-                </TabsList>
-                <TabsContent value="qr" className="mt-4">
-                    <Card>
-                        <CardContent className="pt-6 flex flex-col items-center gap-4">
-                          <div ref={qrCodeRef} style={{ background: shareConfig.qrConfig.backgroundColor, padding: '16px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-                            <QRCode
-                              value={menuUrl}
-                              size={220}
-                              bgColor={shareConfig.qrConfig.backgroundColor}
-                              fgColor={shareConfig.qrConfig.foregroundColor}
-                              level={shareConfig.qrConfig.errorCorrectionLevel}
-                            />
-                          </div>
-                          <Button onClick={downloadQR} variant="secondary"><Download className="mr-2 h-4 w-4" /> Descargar Imagen QR</Button>
-                        </CardContent>
-                    </Card>
-                </TabsContent>
-                <TabsContent value="link" className="mt-4">
-                    <Card>
-                        <CardHeader><CardTitle>Enlace del Catálogo</CardTitle></CardHeader>
-                        <CardContent className="space-y-4">
-                            <div className="flex gap-2">
-                                <Input value={menuUrl} readOnly className="bg-muted" />
-                                <Button onClick={handleCopyLink} variant="outline">
-                                    {copied ? <Check className="h-4 w-4 mr-2" /> : <Copy className="h-4 w-4 mr-2" />}
-                                    {copied ? 'Copiado' : 'Copiar'}
-                                </Button>
-                            </div>
-                            <Button className="w-full" variant="default" onClick={() => window.open(menuUrl, '_blank')}>
-                                <ExternalLink className="h-4 w-4 mr-2" /> Previsualizar como Cliente
-                            </Button>
-                        </CardContent>
-                    </Card>
-                </TabsContent>
-                 <TabsContent value="social" className="mt-4">
-                    <Card>
-                         <CardHeader><CardTitle>Compartir Ahora</CardTitle></CardHeader>
-                         <CardContent className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                            <Button className="bg-[#1877F2] hover:bg-[#166fe5]" onClick={() => window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(menuUrl)}`, '_blank')}>
-                                <FacebookIcon className="h-4 w-4 mr-2" /> Facebook
-                            </Button>
-                            <Button className="bg-black hover:bg-zinc-800" onClick={() => window.open(`https://twitter.com/intent/tweet?url=${encodeURIComponent(menuUrl)}`, '_blank')}>
-                                <XIcon className="h-4 w-4 mr-2" /> Twitter / X
-                            </Button>
-                            <Button variant="outline" className="border-primary text-primary" onClick={handleCopyLink}>
-                                <Copy className="h-4 w-4 mr-2" /> Copiar Link
-                            </Button>
-                         </CardContent>
-                    </Card>
-                </TabsContent>
-            </Tabs>
-        </div>
-        <div className="lg:col-span-1">
-            <QRCodeCustomizer config={shareConfig.qrConfig} setConfig={(newQR) => handleLocalChange({ qrConfig: newQR })} />
-        </div>
-      </div>
     </div>
   );
 }
