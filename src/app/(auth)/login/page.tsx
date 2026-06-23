@@ -26,7 +26,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { useAuth, useUser, initiateEmailSignIn } from '@/firebase';
 import Link from 'next/link';
-import { Loader2, Eye, EyeOff, UserPlus } from 'lucide-react';
+import { Loader2, Eye, EyeOff, UserPlus, AlertCircle } from 'lucide-react';
 
 const loginSchema = z.object({
   email: z.string().email({ message: "Introduce un correo electrónico válido." }),
@@ -51,26 +51,29 @@ export default function LoginPage() {
   async function onSubmit(values: z.infer<typeof loginSchema>) {
     if (!auth) return;
     setIsSubmitting(true);
+    
+    // Normalización estricta: minúsculas y sin espacios
+    const normalizedEmail = values.email.toLowerCase().trim();
+
     try {
-      // Intentamos iniciar sesión. Firebase lanzará invalid-credential si el usuario no existe o el pass es erróneo.
-      await initiateEmailSignIn(auth, values.email.trim(), values.password);
+      await initiateEmailSignIn(auth, normalizedEmail, values.password);
     } catch (error: any) {
       console.error("Login Error:", error.code);
       setIsSubmitting(false);
       
       let description = "Revisa tu correo y contraseña.";
       
-      if (error.code === 'auth/wrong-password' || error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
-        description = "Credenciales incorrectas. Si no tienes una cuenta, por favor regístrate.";
+      if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
+        description = "Credenciales incorrectas. Si nunca te has registrado en este entorno, por favor crea una cuenta primero.";
       } else if (error.code === 'auth/too-many-requests') {
-        description = "Demasiados intentos fallidos. Por favor, intenta más tarde o restablece tu contraseña.";
-      } else if (error.code === 'auth/network-request-failed') {
-        description = "Error de red. Verifica tu conexión a internet.";
+        description = "Demasiados intentos. Intenta más tarde o restablece tu contraseña.";
+      } else if (error.code === 'auth/operation-not-allowed') {
+        description = "El acceso con contraseña no está habilitado en la consola de Firebase.";
       }
 
       toast({
         variant: "destructive",
-        title: "Error al acceder",
+        title: "Error de acceso",
         description,
       });
     }
@@ -80,7 +83,7 @@ export default function LoginPage() {
     return (
         <div className="flex flex-col items-center justify-center min-h-[400px] p-6 text-center space-y-4">
             <Loader2 className="h-10 w-10 animate-spin text-primary" />
-            <p className="text-muted-foreground animate-pulse">Verificando sesión y preparando tu panel...</p>
+            <p className="text-muted-foreground animate-pulse">Verificando sesión...</p>
         </div>
     );
   }
@@ -171,6 +174,13 @@ export default function LoginPage() {
                     Crea tu Cuenta Gratis
                 </Link>
             </Button>
+            
+            <div className="flex items-start gap-2 p-3 bg-blue-50 rounded-lg border border-blue-100 mt-2">
+              <AlertCircle className="h-4 w-4 text-blue-600 shrink-0 mt-0.5" />
+              <p className="text-[11px] text-blue-700 leading-tight">
+                <strong>Nota:</strong> Si cambiaste tu rol o es tu primera vez, asegúrate de haber usado el formulario de registro para que se creen tus credenciales.
+              </p>
+            </div>
           </CardFooter>
         </form>
       </Form>

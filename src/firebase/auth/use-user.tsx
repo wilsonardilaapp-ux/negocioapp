@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
@@ -9,6 +10,7 @@ import { updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import type { User as UserProfile } from '@/models/user';
 
 // --- LISTA BLANCA ESTRICTA DE SUPER ADMINISTRADORES ---
+// Cualquier correo en esta lista tendrá acceso total al panel /superadmin
 export const SUPER_ADMIN_EMAILS = [
   'allseosoporte@gmail.com',
   'admin@zentry.com',
@@ -41,6 +43,7 @@ export function useUser() {
             setProfileLoading(false);
         }
     }, (error) => {
+        console.error("Auth State Error:", error);
         setAuthState({ user: null, isLoading: false, error });
         setProfileLoading(false);
     });
@@ -60,16 +63,18 @@ export function useUser() {
         if (docSnap.exists()) {
             const data = docSnap.data() as UserProfile;
             
-            // --- LÓGICA DE SEGURIDAD: AUTOSANACIÓN ---
+            // --- LÓGICA DE SEGURIDAD: AUTOSANACIÓN DE ROLES ---
             const isAuthorizedAdmin = SUPER_ADMIN_EMAILS.includes(userEmail);
             
             if (data.role === 'super_admin' && !isAuthorizedAdmin) {
+                // Degradación de seguridad para usuarios no autorizados que intentan usurpar el rol
                 console.warn(`[Seguridad] Degradando usuario no autorizado: ${userEmail}`);
                 const correctedProfile = { ...data, role: 'cliente_admin' as const };
                 setProfile(correctedProfile);
                 updateDocumentNonBlocking(userDocRef, { role: 'cliente_admin' });
             } else if (data.role !== 'super_admin' && isAuthorizedAdmin) {
-                // Auto-ascensión si está en la lista blanca pero no tiene el rol
+                // Auto-ascensión para correos en la lista blanca
+                console.log(`[Seguridad] Elevando privilegios para admin autorizado: ${userEmail}`);
                 const correctedProfile = { ...data, role: 'super_admin' as const };
                 setProfile(correctedProfile);
                 updateDocumentNonBlocking(userDocRef, { role: 'super_admin' });
@@ -77,7 +82,7 @@ export function useUser() {
                 setProfile(data);
             }
         } else {
-            // Auto-creación si el documento no existe
+            // Auto-creación del perfil si el usuario existe en Auth pero no en Firestore
             const isAdmin = SUPER_ADMIN_EMAILS.includes(userEmail);
             const newProfile: UserProfile = {
                 id: authState.user!.uid,
@@ -93,7 +98,7 @@ export function useUser() {
         }
         setProfileLoading(false);
     }, (error) => {
-        console.error("Error en listener de perfil:", error);
+        console.error("Firestore Profile Listener Error:", error);
         setProfileLoading(false);
     });
 
@@ -123,13 +128,13 @@ export function useUser() {
         const isAdmin = role === 'super_admin';
 
         if (isAdmin) {
-            // Super Admin solo debe estar en /superadmin
-            if (isAuthPage || isDashboardPage) {
+            // El Super Admin siempre debe ser redirigido a /superadmin desde cualquier otra ruta protegida o de auth
+            if (isAuthPage || isDashboardPage || pathname === '/') {
                 isRedirecting.current = true;
                 router.replace('/superadmin');
             }
         } else {
-            // Cliente/Staff solo debe estar en /dashboard
+            // Los Clientes no pueden entrar en /superadmin
             if (isAuthPage || isSuperAdminPage) {
                 isRedirecting.current = true;
                 router.replace('/dashboard');
@@ -137,10 +142,10 @@ export function useUser() {
         }
     }
 
-    // Resetear flag de redirección tras el ciclo de renderizado
+    // Resetear flag de redirección tras el ciclo de renderizado para evitar bloqueos
     const timer = setTimeout(() => {
         isRedirecting.current = false;
-    }, 500);
+    }, 1000);
     
     return () => clearTimeout(timer);
 

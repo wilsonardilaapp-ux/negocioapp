@@ -1,10 +1,11 @@
+
 'use client';
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Button } from "../../../components/ui/button";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -12,8 +13,8 @@ import {
   CardFooter,
   CardHeader,
   CardTitle,
-} from "../../../components/ui/card";
-import { Input } from "../../../components/ui/input";
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import {
   Form,
   FormControl,
@@ -21,24 +22,24 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from "../../../components/ui/form";
-import { Checkbox } from "../../../components/ui/checkbox";
-import { useToast } from "../../../hooks/use-toast";
-import { ToastAction } from "../../../components/ui/toast";
-import { useAuth, useUser, useFirestore, initiateEmailSignUp } from "../../../firebase";
-import { SUPER_ADMIN_EMAILS } from "../../../firebase/auth/use-user";
+} from "@/components/ui/form";
+import { Checkbox } from "@/components/ui/checkbox";
+import { useToast } from "@/hooks/use-toast";
+import { ToastAction } from "@/components/ui/toast";
+import { useAuth, useUser, useFirestore, initiateEmailSignUp } from "@/firebase";
+import { SUPER_ADMIN_EMAILS } from "@/firebase/auth/use-user";
 import { useEffect, useState, Suspense } from "react";
 import { doc, setDoc, writeBatch, getDoc, Timestamp, collection } from 'firebase/firestore';
-import type { Business } from '../../../models/business';
-import type { User as AppUser } from "../../../models/user";
+import type { Business } from '@/models/business';
+import type { User as AppUser } from "@/models/user";
 import Link from "next/link";
 import { v4 as uuidv4 } from "uuid";
-import type { LandingPageData, NavLink } from "../../../models/landing-page";
-import type { PaymentSettings } from "../../../models/payment-settings";
+import type { LandingPageData, NavLink } from "@/models/landing-page";
+import type { PaymentSettings } from "@/models/payment-settings";
 import { Eye, EyeOff, Loader2, ShieldCheck } from 'lucide-react';
-import type { Subscription } from "../../../models/subscription";
-import type { HybridPlan } from "../../../models/hybrid-plan";
-import type { SubscriptionPlan } from "../../../models/subscription-plan";
+import type { Subscription } from "@/models/subscription";
+import type { HybridPlan } from "@/models/hybrid-plan";
+import type { SubscriptionPlan } from "@/models/subscription-plan";
 import { getClientIp } from "@/actions/get-client-ip";
 
 const registerSchema = z.object({
@@ -228,6 +229,9 @@ function RegisterForm() {
   async function onSubmit(values: z.infer<typeof registerSchema>) {
     if (!auth || !firestore) return;
     
+    // Normalización estricta del correo
+    const normalizedEmail = values.email.toLowerCase().trim();
+
     try {
       const clientIp = await getClientIp();
       const planParam = searchParams.get('plan');
@@ -250,7 +254,8 @@ function RegisterForm() {
           }
       }
 
-      const userCredential = await initiateEmailSignUp(auth, values.email, values.password);
+      // Registro en Firebase Auth con correo normalizado
+      const userCredential = await initiateEmailSignUp(auth, normalizedEmail, values.password);
       const newUser = userCredential.user;
       
       const batch = writeBatch(firestore);
@@ -258,7 +263,6 @@ function RegisterForm() {
       const nowTimestamp = Timestamp.now();
 
       // Determinar rol administrativo basándose en la lista blanca
-      const normalizedEmail = values.email.toLowerCase().trim();
       const isAdmin = SUPER_ADMIN_EMAILS.includes(normalizedEmail);
 
       const userDocRef = doc(firestore, 'users', newUser.uid);
@@ -270,7 +274,8 @@ function RegisterForm() {
         status: 'active',
         createdAt: nowISO,
         lastLogin: nowISO,
-        // @ts-ignore - Agregando metadatos legales requeridos
+        // Metadatos legales
+        // @ts-ignore
         legalAcceptance: {
           termsAccepted: true,
           feesAuthorized: true,
@@ -341,30 +346,15 @@ function RegisterForm() {
 
       await batch.commit();
 
-      if (planParam && planParam !== 'free' && planDetails && 'stripePriceId' in planDetails) {
-        const stripePriceId = (planDetails as SubscriptionPlan).stripePriceId;
-        if (stripePriceId && !stripePriceId.includes('placeholder')) {
-            const response = await fetch('/api/stripe/create-checkout-session', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ priceId: stripePriceId, businessId: newUser.uid, userId: newUser.uid, email: newUser.email }),
-            });
-            const session = await response.json();
-            if (session.url) {
-                window.location.href = session.url;
-                return;
-            }
-        }
-      }
-
       toast({
           title: "Cuenta Creada con Éxito",
-          description: `Bienvenido a Zentry. Tu plan ${planDetails?.name || 'Gratuito'} está activo.`,
+          description: `Bienvenido a Zentry. Tu entorno ha sido configurado.`,
       });
       
-      router.push('/dashboard');
+      // La redirección a /superadmin o /dashboard se manejará automáticamente por useUser tras el commit exitoso
       
     } catch (error: any) {
+      console.error("Registration Error:", error);
       if (error.code === 'auth/email-already-in-use') {
         toast({
           variant: "destructive",
