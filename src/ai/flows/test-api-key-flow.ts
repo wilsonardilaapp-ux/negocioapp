@@ -1,3 +1,4 @@
+
 'use server';
 
 import { ai } from '@/ai/genkit';
@@ -6,8 +7,9 @@ import { z } from 'zod';
 import { genkit } from 'genkit';
 
 const TestApiKeyInputSchema = z.object({
-  provider: z.enum(['google', 'openai', 'groq']),
+  provider: z.enum(['google', 'openai', 'groq', 'nanobanana', 'deepseek', 'qwen', 'zai', 'custom']),
   apiKey: z.string().min(1, 'API Key is required.'),
+  endpoint: z.string().optional(),
 });
 export type TestApiKeyInput = z.infer<typeof TestApiKeyInputSchema>;
 
@@ -21,28 +23,58 @@ const testApiKeyFlow = ai.defineFlow(
     inputSchema: TestApiKeyInputSchema,
     outputSchema: z.object({ success: z.boolean(), message: z.string() }),
   },
-  async ({ provider, apiKey }) => {
+  async (input) => {
+    const { provider, apiKey } = input;
     try {
       let success = false;
       let message = '';
       let providerName = '';
 
-      switch (provider) {
-        case 'google':
-          providerName = 'Google AI';
+      if (provider === 'google' || provider === 'nanobanana') {
+          providerName = provider === 'google' ? 'Google AI' : 'NanoBanana';
           const testAi = genkit({ plugins: [googleAI({ apiKey })] });
-          const { text: googleText } = await testAi.generate({ model: 'gemini-1.5-flash', prompt: 'Hi', config: { temperature: 0 } });
+          const { text: googleText } = await testAi.generate({ 
+            model: 'googleai/gemini-1.5-flash', 
+            prompt: 'Hi', 
+            config: { temperature: 0 } 
+          });
           if (googleText) {
             success = true;
             message = `Conexión exitosa con ${providerName}.`;
           } else {
             throw new Error(`No se recibió texto de ${providerName}.`);
           }
-          break;
-        
-        case 'openai':
-          providerName = 'OpenAI';
-          const openAIResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+      } else {
+          // OpenAI Compatible flow
+          let endpoint = '';
+          let model = 'gpt-4o-mini';
+
+          if (provider === 'openai') {
+            endpoint = 'https://api.openai.com/v1/chat/completions';
+            providerName = 'OpenAI';
+          } else if (provider === 'groq') {
+            endpoint = 'https://api.groq.com/openai/v1/chat/completions';
+            providerName = 'Groq';
+            model = 'llama-3.1-8b-instant';
+          } else if (provider === 'deepseek') {
+             endpoint = 'https://api.deepseek.com/v1/chat/completions';
+             providerName = 'DeepSeek';
+             model = 'deepseek-chat';
+          } else if (provider === 'qwen') {
+             endpoint = 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions';
+             providerName = 'Qwen';
+             model = 'qwen-plus';
+          } else if (provider === 'zai') {
+             endpoint = 'https://api.z-ai.io/v1/chat/completions'; // SaaS Internal AI
+             providerName = 'z.ai';
+             model = 'zai-v1';
+          } else if (provider === 'custom') {
+             if (!input.endpoint) throw new Error('Endpoint requerido para API personalizada.');
+             endpoint = input.endpoint;
+             providerName = 'Custom API';
+          }
+
+          const response = await fetch(endpoint, {
             method: 'POST',
             headers: {
               'Authorization': `Bearer ${apiKey}`,
@@ -50,55 +82,23 @@ const testApiKeyFlow = ai.defineFlow(
             },
             body: JSON.stringify({
               messages: [{ role: 'user', content: 'Hi' }],
-              model: 'gpt-4o-mini',
+              model: model,
               max_tokens: 5,
             }),
           });
           
-          if (!openAIResponse.ok) {
-             const errorText = await openAIResponse.text();
-             throw new Error(`OpenAI API Error (${openAIResponse.status}): ${errorText}`);
+          if (!response.ok) {
+             const errorText = await response.text();
+             throw new Error(`${providerName} API Error (${response.status}): ${errorText}`);
           }
           
-          const openAIData = await openAIResponse.json();
-          if (openAIData.choices && openAIData.choices.length > 0) {
+          const data = await response.json();
+          if (data.choices && data.choices.length > 0) {
             success = true;
             message = `Conexión exitosa con ${providerName}.`;
           } else {
             throw new Error(`Respuesta vacía de ${providerName}.`);
           }
-          break;
-
-        case 'groq':
-          providerName = 'Groq';
-          const groqResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${apiKey}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              messages: [{ role: 'user', content: 'Hi' }],
-              model: 'llama-3.1-8b-instant', 
-            }),
-          });
-
-          if (!groqResponse.ok) {
-             const errorText = await groqResponse.text();
-             throw new Error(`Groq API Error (${groqResponse.status}): ${errorText}`);
-          }
-
-          const groqData = await groqResponse.json();
-          if (groqData.choices && groqData.choices.length > 0) {
-            success = true;
-            message = `Conexión exitosa con ${providerName}.`;
-          } else {
-            throw new Error(`Respuesta vacía de ${providerName}.`);
-          }
-          break;
-
-        default:
-          throw new Error('Proveedor no soportado.');
       }
       
       return { success, message };
@@ -112,8 +112,8 @@ const testApiKeyFlow = ai.defineFlow(
         return { success: false, message: 'Clave inválida (401). Verifica tus credenciales.' };
       } 
       
-      if (errorMsg.includes('fetch failed') || errorMsg.includes('ENOTFOUND')) {
-         return { success: false, message: `Error de RED: El servidor no pudo contactar a la API. Detalle: ${errorMsg}` };
+      if (errorMsg.includes('fetch failed')) {
+         return { success: false, message: `Error de RED: El servidor no pudo contactar a la API de ${provider}.` };
       }
 
       return { success: false, message: `Error de conexión: ${errorMsg}` };

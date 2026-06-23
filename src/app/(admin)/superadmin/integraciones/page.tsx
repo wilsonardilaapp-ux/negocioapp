@@ -49,10 +49,10 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import {
   Tooltip,
-  TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 const CloudinaryForm = ({
   integration, onSave, onCancel, isSaving,
@@ -120,7 +120,7 @@ const CloudinaryForm = ({
   );
 };
 
-type Provider = 'google' | 'openai' | 'groq';
+type Provider = 'google' | 'openai' | 'groq' | 'nanobanana' | 'deepseek' | 'qwen' | 'zai' | 'custom';
 type TestStatus = 'idle' | 'testing' | 'success' | 'error';
 type ModalState = { isOpen: boolean; title: string; message: string };
 
@@ -132,6 +132,17 @@ const AIProviderForm = ({
   onCancel: () => void;
   isSaving: boolean;
 }) => {
+  const PROVIDER_LABELS: Record<Provider, string> = {
+    google: 'Google AI (Gemini)',
+    openai: 'OpenAI (GPT)',
+    groq: 'Groq (Llama/Mixtral)',
+    nanobanana: 'NanoBanana (Gemini 2.5 Flash)',
+    deepseek: 'DeepSeek',
+    qwen: 'Qwen (Alibaba)',
+    zai: 'z.ai (SaaS AI)',
+    custom: 'Custom API (OpenAI Compatible)'
+  };
+
   const [fields, setFields] = useState<AIProviderFields>(() => {
     let parsed: any = {};
     try {
@@ -145,17 +156,34 @@ const AIProviderForm = ({
       google: { apiKey: parsed?.google?.apiKey || '' },
       openai: { apiKey: parsed?.openai?.apiKey || '' },
       groq:   { apiKey: parsed?.groq?.apiKey   || '' },
+      nanobanana: { apiKey: parsed?.nanobanana?.apiKey || '' },
+      deepseek: { apiKey: parsed?.deepseek?.apiKey || '' },
+      qwen: { apiKey: parsed?.qwen?.apiKey || '' },
+      zai: { apiKey: parsed?.zai?.apiKey || '' },
+      custom: { endpoint: parsed?.custom?.endpoint || '', apiKey: parsed?.custom?.apiKey || '' },
     };
   });
-  const [testStatus, setTestStatus] = useState<Record<Provider, TestStatus>>({ google: 'idle', openai: 'idle', groq: 'idle' });
+
+  const [testStatus, setTestStatus] = useState<Record<Provider, TestStatus>>({ 
+    google: 'idle', openai: 'idle', groq: 'idle', 
+    nanobanana: 'idle', deepseek: 'idle', qwen: 'idle', 
+    zai: 'idle', custom: 'idle' 
+  });
+
   const [modalState, setModalState] = useState<ModalState>({ isOpen: false, title: '', message: '' });
 
   const handleTestConnection = async (provider: Provider) => {
-    const apiKey = fields[provider]?.apiKey;
-    if (!apiKey) { setModalState({ isOpen: true, title: 'API Key Requerida', message: `Introduce una API Key para ${provider}.` }); return; }
+    const config = fields[provider];
+    const apiKey = config?.apiKey;
+    if (!apiKey) { setModalState({ isOpen: true, title: 'API Key Requerida', message: `Introduce una API Key para ${PROVIDER_LABELS[provider]}.` }); return; }
+    
     setTestStatus(prev => ({ ...prev, [provider]: 'testing' }));
     try {
-      const result = await testApiKey({ provider, apiKey });
+      const result = await testApiKey({ 
+        provider, 
+        apiKey, 
+        endpoint: provider === 'custom' ? fields.custom?.endpoint : undefined 
+      });
       setTestStatus(prev => ({ ...prev, [provider]: result.success ? 'success' : 'error' }));
       setModalState({ isOpen: true, title: result.success ? 'Éxito' : 'Error', message: result.message });
     } catch (error: any) {
@@ -174,24 +202,48 @@ const AIProviderForm = ({
 
   return (
     <div className="space-y-6">
-      {(['google', 'openai', 'groq'] as Provider[]).map((p) => (
-        <Card key={p}>
-          <CardHeader><CardTitle className="text-lg capitalize">{p === 'google' ? 'Google AI Studio' : p}</CardTitle></CardHeader>
-          <CardContent className="space-y-3">
-            <Label>API Key</Label>
-            <Input type="password" value={fields[p]?.apiKey || ''} onChange={(e) => {
-              setFields(prev => ({ ...prev, [p]: { apiKey: e.target.value } }));
-              setTestStatus(prev => ({ ...prev, [p]: 'idle' }));
-            }} disabled={isSaving} />
-            <TestButton provider={p} />
-          </CardContent>
-        </Card>
-      ))}
-      <DialogFooter>
+      <ScrollArea className="h-[60vh] pr-4">
+        <div className="space-y-4">
+          {(Object.keys(PROVIDER_LABELS) as Provider[]).map((p) => (
+            <Card key={p} className={fields[p]?.apiKey ? 'border-primary/30 bg-primary/5' : ''}>
+              <CardHeader className="py-3"><CardTitle className="text-base">{PROVIDER_LABELS[p]}</CardTitle></CardHeader>
+              <CardContent className="space-y-3 pb-4">
+                {p === 'custom' && (
+                  <div className="space-y-1">
+                    <Label className="text-xs">Endpoint API (OpenAI Compatible)</Label>
+                    <Input 
+                      placeholder="https://api.tu-servicio.com/v1/chat/completions"
+                      value={fields.custom?.endpoint || ''} 
+                      onChange={(e) => {
+                        setFields(prev => ({ ...prev, custom: { ...prev.custom!, endpoint: e.target.value } }));
+                        setTestStatus(prev => ({ ...prev, custom: 'idle' }));
+                      }} 
+                      disabled={isSaving} 
+                    />
+                  </div>
+                )}
+                <div className="space-y-1">
+                  <Label className="text-xs">API Key</Label>
+                  <Input type="password" value={fields[p]?.apiKey || ''} onChange={(e) => {
+                    const val = e.target.value;
+                    setFields(prev => {
+                      if (p === 'custom') return { ...prev, custom: { ...prev.custom!, apiKey: val } };
+                      return { ...prev, [p]: { apiKey: val } };
+                    });
+                    setTestStatus(prev => ({ ...prev, [p]: 'idle' }));
+                  }} disabled={isSaving} />
+                </div>
+                <TestButton provider={p} />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </ScrollArea>
+      <DialogFooter className="border-t pt-4">
         <Button variant="outline" onClick={onCancel} disabled={isSaving}>Cancelar</Button>
         <Button onClick={() => onSave(fields)} disabled={isSaving}>
           {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          Guardar Cambios
+          Guardar Configuración IA
         </Button>
       </DialogFooter>
       <AlertDialog open={modalState.isOpen} onOpenChange={(open) => setModalState(prev => ({ ...prev, isOpen: open }))}>
@@ -269,7 +321,7 @@ type NewIntegrationFormData = z.infer<typeof newIntegrationSchema>;
 
 const REQUIRED_INTEGRATIONS: Array<{ id: string; name: string }> = [
     { id: 'cloudinary', name: 'Cloudinary' },
-    { id: 'chatbot-integrado-con-whatsapp-para-soporte-y-ventas', name: 'Chatbot IA (Google/OpenAI/Groq)' },
+    { id: 'chatbot-integrado-con-whatsapp-para-soporte-y-ventas', name: 'Chatbot IA (Google/OpenAI/Groq/NanoBanana/DeepSeek/Qwen/z.ai/Custom API)' },
     { id: 'whapi-whatsapp', name: 'WHAPI (WhatsApp)' },
 ];
 
@@ -300,7 +352,6 @@ export default function IntegrationsPage() {
   );
   const { data: modules, isLoading: areModulesLoading } = useCollection<Module>(modulesQuery);
 
-  // Self-healing useEffect to ensure required integrations exist
   useEffect(() => {
     if (isIntegrationsLoading || !firestore || !integrations) return;
 
@@ -309,7 +360,6 @@ export default function IntegrationsPage() {
             const exists = integrations.some(i => i.id === reqInt.id);
             if (!exists) {
                 console.log(`Integration "${reqInt.name}" missing, creating...`);
-                // Fire and forget server action call. `useCollection` will update the UI.
                 createIntegration({ name: reqInt.name, description: '' });
             }
         });
@@ -375,8 +425,6 @@ export default function IntegrationsPage() {
       }
   }
 
-  const anyTransitionActive = isCreating || isSaving || isUpdatingStatus || isDeleting;
-
   const isLoading = isIntegrationsLoading || areModulesLoading;
 
   if (isLoading && !integrations) {
@@ -428,7 +476,7 @@ export default function IntegrationsPage() {
         {(integrations ?? []).map((integration) => {
           const correspondingModule = modules?.find(m => m.id === integration.id);
           const isModuleActive = !!correspondingModule && correspondingModule.status === 'active';
-          const isControlDisabled = anyTransitionActive || !isModuleActive;
+          const isControlDisabled = isSaving || isUpdatingStatus || isDeleting || !isModuleActive;
           const tooltipMessage = !isModuleActive ? 'Activa el módulo correspondiente en la página de "Módulos" para habilitar esta integración.' : '';
 
           const icon =
@@ -449,7 +497,16 @@ export default function IntegrationsPage() {
             if (integration.id === 'cloudinary') {
               isConfigured = !!(fields.cloud_name && fields.api_key && fields.api_secret);
             } else if (integration.id === 'chatbot-integrado-con-whatsapp-para-soporte-y-ventas') {
-              isConfigured = !!(fields.google?.apiKey || fields.openai?.apiKey || fields.groq?.apiKey);
+              isConfigured = !!(
+                fields.google?.apiKey || 
+                fields.openai?.apiKey || 
+                fields.groq?.apiKey ||
+                fields.nanobanana?.apiKey ||
+                fields.deepseek?.apiKey ||
+                fields.qwen?.apiKey ||
+                fields.zai?.apiKey ||
+                (fields.custom?.apiKey && fields.custom?.endpoint)
+              );
             } else if (integration.id === 'whapi-whatsapp') {
               isConfigured = !!(fields.apiKey && fields.instanceId);
             } else {
@@ -558,22 +615,24 @@ export default function IntegrationsPage() {
         }}
       >
         {editingIntegration && (
-          <DialogContent className="max-w-2xl">
-            <DialogHeader><DialogTitle>Configurar {editingIntegration.name}</DialogTitle></DialogHeader>
-            {editingIntegration.id === 'cloudinary' && (
-              <CloudinaryForm integration={editingIntegration} onSave={handleSaveFields} onCancel={() => setEditingIntegration(null)} isSaving={isSaving} />
-            )}
-            {editingIntegration.id === 'chatbot-integrado-con-whatsapp-para-soporte-y-ventas' && (
-              <AIProviderForm integration={editingIntegration} onSave={handleSaveFields} onCancel={() => setEditingIntegration(null)} isSaving={isSaving} />
-            )}
-            {editingIntegration.id === 'whapi-whatsapp' && (
-              <WhapiForm integration={editingIntegration} onSave={handleSaveFields} onCancel={() => setEditingIntegration(null)} isSaving={isSaving} />
-            )}
-            {!['cloudinary', 'chatbot-integrado-con-whatsapp-para-soporte-y-ventas', 'whapi-whatsapp'].includes(editingIntegration.id) && (
-              <div className="p-4 text-center text-muted-foreground text-sm">
-                Esta es una integración personalizada. La configuración avanzada se realiza a través de la API.
-              </div>
-            )}
+          <DialogContent className="max-w-2xl overflow-hidden p-0">
+            <DialogHeader className="p-6 pb-0"><DialogTitle>Configurar {editingIntegration.name}</DialogTitle></DialogHeader>
+            <div className="p-6">
+              {editingIntegration.id === 'cloudinary' && (
+                <CloudinaryForm integration={editingIntegration} onSave={handleSaveFields} onCancel={() => setEditingIntegration(null)} isSaving={isSaving} />
+              )}
+              {editingIntegration.id === 'chatbot-integrado-con-whatsapp-para-soporte-y-ventas' && (
+                <AIProviderForm integration={editingIntegration} onSave={handleSaveFields} onCancel={() => setEditingIntegration(null)} isSaving={isSaving} />
+              )}
+              {editingIntegration.id === 'whapi-whatsapp' && (
+                <WhapiForm integration={editingIntegration} onSave={handleSaveFields} onCancel={() => setEditingIntegration(null)} isSaving={isSaving} />
+              )}
+              {!['cloudinary', 'chatbot-integrado-con-whatsapp-para-soporte-y-ventas', 'whapi-whatsapp'].includes(editingIntegration.id) && (
+                <div className="p-4 text-center text-muted-foreground text-sm">
+                  Esta es una integración personalizada. La configuración avanzada se realiza a través de la API.
+                </div>
+              )}
+            </div>
           </DialogContent>
         )}
       </Dialog>

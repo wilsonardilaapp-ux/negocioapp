@@ -11,15 +11,14 @@ export type WhapiFields = {
 };
 
 export type AIProviderFields = {
-    google: {
-        apiKey: string;
-    };
-    openai: {
-        apiKey: string;
-    };
-    groq: {
-        apiKey: string;
-    };
+    google?: { apiKey: string };
+    openai?: { apiKey: string };
+    groq?: { apiKey: string };
+    nanobanana?: { apiKey: string };
+    deepseek?: { apiKey: string };
+    qwen?: { apiKey: string };
+    zai?: { apiKey: string };
+    custom?: { endpoint: string; apiKey: string };
 };
 
 export type Integration = {
