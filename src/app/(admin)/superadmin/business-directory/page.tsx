@@ -13,17 +13,27 @@ import {
 import { DataTable } from "./data-table";
 import { columns } from "./columns";
 import type { Business } from "@/models/business";
-import { Search, ShieldAlert, Globe, Star, LayoutPanelTop } from "lucide-react";
+import { Search, ShieldAlert, Globe, Star, LayoutPanelTop, Share2, Copy } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
+import { useToast } from "@/hooks/use-toast";
+import { 
+  FacebookIcon, 
+  InstagramIcon, 
+  TikTokIcon, 
+  WhatsAppIcon, 
+  XIcon 
+} from "@/components/icons";
 
 export default function BusinessDirectoryAdminPage() {
   const firestore = useFirestore();
   const [searchTerm, setSearchTerm] = useState("");
+  const { toast } = useToast();
 
-  // Ahora consultamos directamente la colección de negocios
+  const directoryUrl = typeof window !== 'undefined' ? `${window.location.origin}/directorio` : '';
+
   const businessesQuery = useMemoFirebase(() => {
     if (!firestore) return null;
     return query(collection(firestore, "businesses"), orderBy("name", "asc"));
@@ -51,6 +61,14 @@ export default function BusinessDirectoryAdminPage() {
       hidden: businesses.filter(e => e.directoryStatus === 'hidden').length,
     };
   }, [businesses]);
+
+  const handleCopyLink = () => {
+    navigator.clipboard.writeText(directoryUrl);
+    toast({
+      title: "Enlace copiado",
+      description: "La URL del directorio está lista para compartir.",
+    });
+  };
 
   const kpiData = [
     { title: "Total Negocios", value: stats.total, icon: Search, color: "text-blue-600" },
@@ -117,7 +135,100 @@ export default function BusinessDirectoryAdminPage() {
           />
         </CardContent>
       </Card>
+
+      {/* NUEVA SESIÓN: COMPARTIR DIRECTORIO */}
+      <Card className="border-primary/20 bg-primary/5 shadow-lg overflow-hidden">
+        <CardHeader>
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-primary text-white rounded-xl">
+              <Share2 className="h-5 w-5" />
+            </div>
+            <div>
+              <CardTitle className="text-xl font-black text-gray-900">Compartir Directorio Zentry</CardTitle>
+              <CardDescription>Atrae más tráfico y genera más pedidos compartiendo el enlace global.</CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="flex flex-col md:flex-row items-center gap-4">
+            <div className="flex-1 w-full">
+              <div className="relative group">
+                <Input 
+                  value={directoryUrl} 
+                  readOnly 
+                  className="bg-white font-mono text-sm h-12 pr-12 focus-visible:ring-primary border-primary/20"
+                />
+                <Button 
+                  size="icon" 
+                  variant="ghost" 
+                  className="absolute right-1 top-1 h-10 w-10 hover:bg-primary/10"
+                  onClick={handleCopyLink}
+                >
+                  <Copy className="h-4 w-4 text-primary" />
+                </Button>
+              </div>
+            </div>
+            <div className="flex flex-wrap justify-center gap-2">
+              {/* FACEBOOK */}
+              <Button asChild variant="outline" className="bg-[#1877F2] text-white hover:bg-[#1877F2]/90 border-none h-12 px-6 shadow-sm">
+                <a href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(directoryUrl)}`} target="_blank" rel="noopener noreferrer">
+                  <FacebookIcon className="h-5 w-5 mr-2" /> Facebook
+                </a>
+              </Button>
+
+              {/* INSTAGRAM (Redirect) */}
+              <Button asChild variant="outline" className="bg-gradient-to-br from-[#833ab4] via-[#fd1d1d] to-[#fcb045] text-white hover:opacity-90 border-none h-12 px-6 shadow-sm">
+                <a href="https://www.instagram.com/" target="_blank" rel="noopener noreferrer">
+                  <InstagramIcon className="h-5 w-5 mr-2" /> Instagram
+                </a>
+              </Button>
+
+              {/* TWITTER / X */}
+              <Button asChild variant="outline" className="bg-black text-white hover:bg-black/90 border-none h-12 px-6 shadow-sm">
+                <a href={`https://twitter.com/intent/tweet?url=${encodeURIComponent(directoryUrl)}&text=${encodeURIComponent('¡Descubre los mejores negocios en el Directorio Zentry!')}`} target="_blank" rel="noopener noreferrer">
+                  <XIcon className="h-4 w-4 mr-2" /> Twitter/X
+                </a>
+              </Button>
+
+              {/* TIKTOK */}
+              <Button asChild variant="outline" className="bg-black text-white hover:bg-black/90 border-none h-12 px-6 shadow-sm">
+                <a href="https://www.tiktok.com/" target="_blank" rel="noopener noreferrer">
+                  <TikTokIcon className="h-5 w-5 mr-2" /> TikTok
+                </a>
+              </Button>
+
+              {/* WHATSAPP */}
+              <Button asChild variant="outline" className="bg-[#25D366] text-white hover:bg-[#25D366]/90 border-none h-12 px-6 shadow-sm">
+                <a href={`https://api.whatsapp.com/send?text=${encodeURIComponent(`🚀 ¡Mira el nuevo Directorio de Negocios Zentry! Encuentra todo lo que necesitas aquí: ${directoryUrl}`)}`} target="_blank" rel="noopener noreferrer">
+                  <WhatsAppIcon className="h-5 w-5 mr-2" /> WhatsApp
+                </a>
+              </Button>
+
+              {/* PINTEREST */}
+              <Button asChild variant="outline" className="bg-[#E60023] text-white hover:bg-[#E60023]/90 border-none h-12 px-6 shadow-sm">
+                <a href={`https://pinterest.com/pin/create/button/?url=${encodeURIComponent(directoryUrl)}&description=${encodeURIComponent('Directorio Zentry - Negocios Líderes')}`} target="_blank" rel="noopener noreferrer">
+                  <PinterestIcon className="h-5 w-5 mr-2" /> Pinterest
+                </a>
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
+  );
+}
+
+function PinterestIcon(props: any) {
+  return (
+    <svg 
+      viewBox="0 0 24 24" 
+      fill="currentColor" 
+      height="1em" 
+      width="1em" 
+      {...props}
+    >
+      <path d="M12.017 0C5.396 0 .029 5.367.029 11.987c0 5.079 3.158 9.417 7.618 11.162-.105-.949-.199-2.403.041-3.439.219-1.038 1.411-5.966 1.411-5.966s-.359-.72-.359-1.781c0-1.668.967-2.914 2.171-2.914 1.023 0 1.518.769 1.518 1.69 0 1.029-.655 2.568-.994 3.995-.283 1.194.305 2.169 1.482 2.169 1.778 0 3.144-1.875 3.144-4.579 0-2.393-1.72-4.068-4.176-4.068-2.847 0-4.518 2.135-4.518 4.341 0 .859.331 1.781.745 2.281a.238.213 0 01.063.226c-.031.129-.101.516-.131.642-.031.123-.105.151-.231.094-1.002-.465-1.632-1.921-1.632-3.098 0-3.447 2.503-6.613 7.222-6.613 3.793 0 6.74 2.704 6.74 6.315 0 3.766-2.373 6.797-5.665 6.797-1.106 0-2.146-.574-2.502-1.258 0 0-.547 2.083-.68 2.591-.247.946-.913 2.133-1.358 2.853a12.022 12.022 0 003.671.575c6.62 0 11.988-5.367 11.988-11.987.001-6.62-5.368-11.987-11.988-11.987z" />
+    </svg>
   );
 }
 
