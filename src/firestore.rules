@@ -14,7 +14,8 @@ service cloud.firestore {
       return isAuthenticated() && (
         request.auth.token.email == 'allseosoporte@gmail.com' ||
         request.auth.token.email == 'admin@zentry.com' ||
-        request.auth.token.email == 'admin@ecosalud.com'
+        request.auth.token.email == 'admin@ecosalud.com' ||
+        request.auth.token.email == 'alexjfweb@gmail.com'
       );
     }
 

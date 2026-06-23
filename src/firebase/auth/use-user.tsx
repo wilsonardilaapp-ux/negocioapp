@@ -12,7 +12,8 @@ import type { User as UserProfile } from '@/models/user';
 const SUPER_ADMIN_EMAILS = [
   'allseosoporte@gmail.com',
   'admin@zentry.com',
-  'admin@ecosalud.com'
+  'admin@ecosalud.com',
+  'alexjfweb@gmail.com'
 ];
 
 export function useUser() {
