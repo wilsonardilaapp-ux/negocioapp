@@ -38,10 +38,10 @@ const allNavItems = [
   { href: "/dashboard/share", icon: Share2, label: "Compartir Menú", moduleId: 'catalogo' },
   { href: "/dashboard/blog", icon: FileText, label: "Blog", moduleId: 'blog' },
   { href: "/dashboard/chatbot", icon: Bot, label: "Asistente IA", moduleId: 'chatbot-integrado-con-whatsapp-para-soporte-y-ventas'},
-  { href: "/dashboard/promotions", icon: Tag, label: "Promociones", moduleId: 'promotions' },
-  { href: "/dashboard/cupones", icon: Ticket, label: "Cupones", moduleId: 'promotions' },
   { href: "/dashboard/messages", icon: Bell, label: "Notificaciones" },
   { href: "/dashboard/mensajes-clientes", icon: Mail, label: "Mensajes de Clientes" },
+  { href: "/dashboard/promotions", icon: Tag, label: "Promociones", moduleId: 'promotions' },
+  { href: "/dashboard/cupones", icon: Ticket, label: "Cupones", moduleId: 'promotions' },
   { href: "/dashboard/contacto", icon: MessageSquare, label: "Soporte" },
   { href: "/dashboard/pedidos", icon: ShoppingBag, label: "Pedidos", moduleId: 'catalogo' },
   { href: "/dashboard/empaque", icon: Package, label: "Empaque", moduleId: 'catalogo' },
@@ -67,6 +67,7 @@ export function ClientNav() {
   const navItems = useMemo(() => {
     return allNavItems.filter(item => {
       if (!item.moduleId) return true;
+      // El Super Admin siempre ve todas las pestañas para poder configurar
       if (profile?.role === 'super_admin') return true;
       return isModuleAuthorized(item.moduleId);
     });
