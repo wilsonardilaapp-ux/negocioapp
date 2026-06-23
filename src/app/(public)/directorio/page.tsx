@@ -24,7 +24,7 @@ async function getDirectoryBusinesses() {
     try {
         const db = await getAdminFirestore();
         const snapshot = await db.collection('businesses')
-            .where('directoryStatus', '==', 'approved')
+            .where('status', '==', 'active')
             .limit(48)
             .get();
 
@@ -39,9 +39,7 @@ async function getDirectoryBusinesses() {
 }
 
 export default async function DirectoryPage() {
-    const allBusinesses = await getDirectoryBusinesses();
-    
-    const businesses = allBusinesses.filter(b => b.directoryEnabled !== false);
+    const businesses = await getDirectoryBusinesses();
 
     return (
         <div className="min-h-screen bg-gray-50/30 flex flex-col">
@@ -135,3 +133,4 @@ export default async function DirectoryPage() {
         </div>
     );
 }
+
