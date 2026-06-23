@@ -2,7 +2,7 @@
 "use client";
 
 import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
-import { collection, query, orderBy } from "firebase/firestore";
+import { collection, query, orderBy, doc, writeBatch } from "firebase/firestore";
 import {
   Card,
   CardContent,
@@ -13,22 +13,91 @@ import {
 import { DataTable } from "./data-table";
 import { columns } from "./columns";
 import type { BusinessDirectoryEntry } from "@/models/business-directory";
-import { Search, ShieldAlert, Globe, Star, LayoutPanelTop } from "lucide-react";
+import type { Business } from "@/models/business";
+import { Search, ShieldAlert, Globe, Star, LayoutPanelTop, RefreshCw, Loader2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
+import { useToast } from "@/hooks/use-toast";
 
 export default function BusinessDirectoryAdminPage() {
   const firestore = useFirestore();
+  const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
+  const [isSyncing, setIsSyncing] = useState(false);
 
+  // Consulta de entradas actuales del directorio
   const directoryQuery = useMemoFirebase(() => {
     if (!firestore) return null;
     return query(collection(firestore, "businessDirectory"), orderBy("updatedAt", "desc"));
   }, [firestore]);
 
+  // Consulta de TODOS los negocios del sistema para sincronización
+  const businessesQuery = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return collection(firestore, "businesses");
+  }, [firestore]);
+
   const { data: entries, isLoading } = useCollection<BusinessDirectoryEntry>(directoryQuery);
+  const { data: allBusinesses } = useCollection<Business>(businessesQuery);
+
+  const handleSync = async () => {
+    if (!firestore || !allBusinesses || !entries) return;
+    setIsSyncing(true);
+    try {
+      const batch = writeBatch(firestore);
+      let newEntriesCount = 0;
+
+      for (const business of allBusinesses) {
+        // Verificar si el negocio ya tiene una entrada en el directorio
+        const exists = entries.some(e => e.businessId === business.id);
+        if (!exists) {
+          const newEntryRef = doc(collection(firestore, "businessDirectory"));
+          const newEntry: BusinessDirectoryEntry = {
+            id: newEntryRef.id,
+            businessId: business.id,
+            name: business.name,
+            description: business.description || "Nuevo negocio registrado en la plataforma.",
+            logoUrl: business.logoURL || null,
+            category: 'Otro',
+            tags: [],
+            isVerified: false,
+            featured: false,
+            rating: 5,
+            reviewCount: 0,
+            listingDate: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            status: 'pending',
+            publicProfile: false, // Por defecto oculto hasta moderación
+          };
+          batch.set(newEntryRef, newEntry);
+          newEntriesCount++;
+        }
+      }
+
+      if (newEntriesCount > 0) {
+        await batch.commit();
+        toast({ 
+            title: "Sincronización Completada", 
+            description: `Se han añadido ${newEntriesCount} negocios para moderación.` 
+        });
+      } else {
+        toast({ 
+            title: "Directorio al día", 
+            description: "No se encontraron nuevos negocios para sincronizar." 
+        });
+      }
+    } catch (e: any) {
+      toast({ 
+          variant: "destructive", 
+          title: "Error de Sincronización", 
+          description: e.message 
+      });
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   const filteredEntries = useMemo(() => {
     if (!entries) return [];
@@ -61,19 +130,30 @@ export default function BusinessDirectoryAdminPage() {
   return (
     <div className="flex flex-col gap-6 animate-in fade-in duration-500">
       <Card className="border-none shadow-none bg-transparent">
-        <CardHeader className="px-0 pt-0 flex flex-row items-center justify-between">
+        <CardHeader className="px-0 pt-0 flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <CardTitle className="text-3xl font-black tracking-tight">Moderación del Directorio</CardTitle>
             <CardDescription>
               Gestiona la visibilidad, verificación y estatus de los negocios en el directorio público de Zentry.
             </CardDescription>
           </div>
-          <Button asChild variant="outline" className="font-bold border-primary text-primary hover:bg-primary/5">
-            <Link href="/superadmin/business-directory/ads">
-              <LayoutPanelTop className="mr-2 h-4 w-4" />
-              Gestionar Publicidad (Ads)
-            </Link>
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button 
+                variant="outline" 
+                onClick={handleSync} 
+                disabled={isSyncing || isLoading}
+                className="font-bold border-blue-200 text-blue-700 hover:bg-blue-50"
+            >
+                {isSyncing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+                Sincronizar Negocios
+            </Button>
+            <Button asChild variant="outline" className="font-bold border-primary text-primary hover:bg-primary/5">
+                <Link href="/superadmin/business-directory/ads">
+                <LayoutPanelTop className="mr-2 h-4 w-4" />
+                Gestionar Publicidad (Ads)
+                </Link>
+            </Button>
+          </div>
         </CardHeader>
       </Card>
 
