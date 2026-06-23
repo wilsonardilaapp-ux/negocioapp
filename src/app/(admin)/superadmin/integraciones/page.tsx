@@ -51,6 +51,7 @@ import {
   Tooltip,
   TooltipProvider,
   TooltipTrigger,
+  TooltipContent,
 } from "@/components/ui/tooltip";
 import { ScrollArea } from '@/components/ui/scroll-area';
 
