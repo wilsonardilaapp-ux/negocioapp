@@ -82,7 +82,7 @@ export default function BusinessCard({ entry }: BusinessCardProps) {
 
             <CardFooter className="p-5 pt-0">
                 <Button asChild className="w-full font-bold" variant="outline">
-                    <Link href={`/negocio/${entry.id}`}>
+                    <Link href={`/negocio/${entry.id}`} target="_blank" rel="noopener noreferrer">
                         Ver Perfil
                     </Link>
                 </Button>
