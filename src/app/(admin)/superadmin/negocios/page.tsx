@@ -472,7 +472,7 @@ export default function BusinessesPage() {
             <Input
               placeholder="Buscar negocios..."
               value={searchBusiness}
-              onChange={e => setSearchBusiness(e.target.value)}
+              onChange={e => setSearchTerm(e.target.value)}
               className="pl-10"
             />
           </div>
@@ -733,7 +733,20 @@ export default function BusinessesPage() {
                     const currentPlan = allPlans.find(p => p.name === selectedBusiness.planName || p.id === selectedBusiness.planName);
                     const includedModules = (currentPlan as any)?.includedModuleKeys || [];
 
-                    return (modules || []).map(moduleItem => {
+                    // Deduplicación lógica de módulos por nombre, priorizando el ID oficial
+                    const displayedModules = (modules || []).reduce((acc: Module[], current) => {
+                      const x = acc.find(item => item.name === current.name);
+                      if (!x) {
+                        return acc.concat([current]);
+                      } else {
+                        if (current.id === 'chatbot-integrado-con-whatsapp-para-soporte-y-ventas') {
+                            return acc.map(item => item.name === current.name ? current : item);
+                        }
+                        return acc;
+                      }
+                    }, []);
+
+                    return displayedModules.map(moduleItem => {
                       const isActive = assignedModules.includes(moduleItem.id);
                       const isIncludedInPlan = includedModules.includes(moduleItem.id);
                       const validation = validateModuleExtra(selectedBusiness.planName, moduleExtras[moduleItem.id] || 0);
