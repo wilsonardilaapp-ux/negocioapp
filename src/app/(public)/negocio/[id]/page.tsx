@@ -28,14 +28,15 @@ export const dynamic = 'force-dynamic';
 async function getBusinessEntry(id: string) {
     try {
         const db = await getAdminFirestore();
+        // Consultamos directamente por el ID del documento de Firestore
         const doc = await db.collection('businesses').doc(id).get();
         
         if (!doc.exists) return null;
         
         const data = doc.data() as Business;
         
-        // Verificación de visibilidad en directorio
-        if (data.directoryStatus !== 'approved' || data.directoryEnabled !== true) {
+        // El único campo obligatorio para visualización es que el negocio esté activo
+        if (data.status !== 'active') {
             return null;
         }
         
