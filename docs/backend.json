@@ -2,448 +2,41 @@
 {
   "entities": {
     "User": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "User",
       "type": "object",
       "description": "Represents a user of the Zentry platform.",
       "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the user entity."
-        },
-        "name": {
-          "type": "string",
-          "description": "The full name of the user."
-        },
-        "email": {
-          "type": "string",
-          "description": "The email address of the user.",
-          "format": "email"
-        },
-        "role": {
-          "type": "string",
-          "description": "The role of the user (e.g., cliente_admin, staff, super_admin)."
-        },
-        "status": {
-          "type": "string",
-          "description": "The status of the user (e.g., active, inactive)."
-        },
-        "createdAt": {
-          "type": "string",
-          "description": "The date and time when the user was registered.",
-          "format": "date-time"
-        },
-        "lastLogin": {
-          "type": "string",
-          "description": "The date and time of the user's last login.",
-          "format": "date-time"
-        },
-        "businessId": {
-          "type": "string",
-          "description": "The ID of the business this user belongs to (for 'staff' or 'cliente_admin' roles)."
-        }
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "role": { "type": "string" },
+        "status": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "lastLogin": { "type": "string", "format": "date-time" },
+        "businessId": { "type": "string" }
       },
-      "required": [
-        "id",
-        "name",
-        "email",
-        "role",
-        "status",
-        "createdAt",
-        "lastLogin"
-      ]
+      "required": ["id", "name", "email", "role", "status", "createdAt", "lastLogin"]
     },
-    "SystemService": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "SystemService",
+    "DirectoryAd": {
+      "title": "DirectoryAd",
       "type": "object",
-      "description": "Represents a system service within the Zentry platform.",
-      "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the system service entity."
-        },
-        "name": {
-          "type": "string",
-          "description": "The name of the system service."
-        },
-        "status": {
-          "type": "string",
-          "description": "The status of the system service (e.g., active, inactive)."
-        },
-        "limit": {
-          "type": "number",
-          "description": "The usage limit for the system service."
-        },
-        "lastUpdate": {
-          "type": "string",
-          "description": "The date and time when the system service was last updated.",
-          "format": "date-time"
-        }
-      },
-      "required": [
-        "id",
-        "name",
-        "status",
-        "limit",
-        "lastUpdate"
-      ]
-    },
-    "Module": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "Module",
-      "type": "object",
-      "description": "Represents a functional module within the Zentry platform.",
-      "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the module entity."
-        },
-        "name": {
-          "type": "string",
-          "description": "The name of the module."
-        },
-        "description": {
-          "type": "string",
-          "description": "A brief description of the module's functionality."
-        },
-        "status": {
-          "type": "string",
-          "description": "The status of the module (e.g., active, inactive).",
-          "enum": [
-            "active",
-            "inactive"
-          ]
-        },
-        "createdAt": {
-          "type": "string",
-          "description": "The date and time when the module was created.",
-          "format": "date-time"
-        }
-      },
-      "required": [
-        "id",
-        "name",
-        "description",
-        "status",
-        "createdAt"
-      ]
-    },
-    "GlobalConfig": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "GlobalConfig",
-      "type": "object",
-      "description": "Represents the global configuration settings for the Zentry platform.",
-      "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the global config entity."
-        },
-        "maintenance": {
-          "type": "boolean",
-          "description": "Indicates whether the platform is in maintenance mode."
-        },
-        "allowUserRegistration": {
-          "type": "boolean",
-          "description": "Controls if new users can register through the login page."
-        },
-        "logoURL": {
-          "type": "string",
-          "description": "The URL of the platform's logo."
-        },
-        "theme": {
-          "type": "string",
-          "description": "The theme settings for the platform (e.g., colors, fonts)."
-        },
-        "supportEmail": {
-          "type": "string",
-          "description": "The email address for platform support.",
-          "format": "email"
-        },
-        "defaultLimits": {
-          "type": "number",
-          "description": "The default limits for various services and modules."
-        },
-        "mainBusinessId": {
-          "type": "string",
-          "description": "The ID of the business to display on the main landing page (root)."
-        }
-      },
-      "required": [
-        "id",
-        "maintenance",
-        "logoURL",
-        "theme",
-        "supportEmail",
-        "defaultLimits"
-      ]
-    },
-    "Business": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "Business",
-      "type": "object",
-      "description": "Represents a business using the Zentry platform.",
-      "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the business entity."
-        },
-        "name": {
-          "type": "string",
-          "description": "The name of the business."
-        },
-        "logoURL": {
-          "type": "string",
-          "description": "The URL of the business's logo."
-        },
-        "description": {
-          "type": "string",
-          "description": "A description of the business."
-        },
-        "googleAnalyticsId": {
-          "type": "string",
-          "description": "The Google Analytics ID for the business."
-        }
-      },
-      "required": [
-        "id",
-        "name",
-        "logoURL",
-        "description"
-      ]
-    },
-    "LandingPage": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "LandingPage",
-      "type": "object",
-      "description": "Represents a landing page created by a business on the Zentry platform.",
-      "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the landing page entity."
-        },
-        "businessId": {
-          "type": "string",
-          "description": "Reference to Business. (Relationship: Business 1:N LandingPage)"
-        },
-        "title": {
-          "type": "string",
-          "description": "The title of the landing page."
-        },
-        "content": {
-          "type": "string",
-          "description": "The content of the landing page (e.g., HTML, JSON)."
-        },
-        "seoDescription": {
-          "type": "string",
-          "description": "The SEO description for the landing page."
-        }
-      },
-      "required": [
-        "id",
-        "businessId",
-        "title",
-        "content",
-        "seoDescription"
-      ]
-    },
-    "PublicLandingPage": {
-      "title": "Public Landing Page",
-      "description": "Stores the complete configuration for the main public-facing landing page.",
-      "type": "object",
-      "properties": {
-          "hero": { "type": "object", "description": "Hero section configuration." },
-          "navigation": { "type": "object", "description": "Navigation bar configuration." },
-          "sections": { "type": "array", "description": "Array of content sections." },
-          "testimonials": { "type": "array", "description": "Array of testimonials." },
-          "seo": { "type": "object", "description": "SEO configuration." },
-          "form": { "type": "object", "description": "Contact form configuration." },
-          "header": { "type": "object", "description": "Header configuration." },
-          "footer": { "type": "object", "description": "Footer configuration." }
-      }
-    },
-    "Product": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "Product",
-      "type": "object",
-      "description": "Represents a product listed in the Zentry platform's catalog.",
-      "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the product entity."
-        },
-        "businessId": {
-          "type": "string",
-          "description": "Reference to Business. (Relationship: Business 1:N Product)"
-        },
-        "name": {
-          "type": "string",
-          "description": "The name of the product."
-        },
-        "description": {
-          "type": "string",
-          "description": "A description of the product."
-        },
-        "price": {
-          "type": "number",
-          "description": "The price of the product."
-        },
-        "stock": {
-          "type": "number",
-          "description": "The stock quantity of the product."
-        },
-        "images": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "URLs of the product's images."
-        },
-        "rating": {
-          "type": "number",
-          "description": "Average product rating."
-        },
-        "ratingCount": {
-          "type": "number",
-          "description": "Number of ratings received."
-        },
-        "category": {
-            "type": "string",
-            "description": "Product category."
-        }
-      },
-      "required": [
-        "id",
-        "businessId",
-        "name",
-        "description",
-        "price",
-        "stock",
-        "images",
-        "rating",
-        "ratingCount",
-        "category"
-      ]
-    },
-    "Order": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "Order",
-      "type": "object",
-      "description": "Represents a customer order.",
-      "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the order."
-        },
-        "businessId": {
-          "type": "string",
-          "description": "The ID of the business this order belongs to."
-        },
-        "customerName": {
-          "type": "string",
-          "description": "Name of the customer who placed the order."
-        },
-        "customerEmail": {
-          "type": "string",
-          "description": "Email of the customer.",
-          "format": "email"
-        },
-        "customerPhone": {
-          "type": "string",
-          "description": "Phone number of the customer."
-        },
-        "customerAddress": {
-          "type": "string",
-          "description": "Shipping address for the order."
-        },
-        "productName": {
-          "type": "string",
-          "description": "Name of the product ordered."
-        },
-        "productId": {
-          "type": "string",
-          "description": "ID of the product ordered."
-        },
-        "quantity": {
-          "type": "number",
-          "description": "Quantity of the product ordered."
-        },
-        "unitPrice": {
-          "type": "number",
-          "description": "Price of a single unit of the product."
-        },
-        "subtotal": {
-          "type": "number",
-          "description": "Total price for the ordered quantity (quantity * unitPrice)."
-        },
-        "unitPrice": {
-          "type": "number",
-          "description": "Price of a single unit of the product."
-        },
-        "subtotal": {
-          "type": "number",
-          "description": "Total price for the ordered quantity (quantity * unitPrice)."
-        },
-        "paymentMethod": {
-          "type": "string",
-          "description": "Payment method chosen by the customer."
-        },
-        "orderDate": {
-          "type": "string",
-          "description": "Date and time when the order was placed.",
-          "format": "date-time"
-        },
-        "orderStatus": {
-          "type": "string",
-          "description": "Current status of the order.",
-          "enum": ["Pendiente", "En proceso", "Enviado", "Entregado", "Cancelado"]
-        }
-      },
-      "required": [
-        "id",
-        "businessId",
-        "customerName",
-        "customerEmail",
-        "customerPhone",
-        "productName",
-        "productId",
-        "quantity",
-        "unitPrice",
-        "subtotal",
-        "paymentMethod",
-        "orderDate",
-        "orderStatus"
-      ]
-    },
-    "BusinessDirectoryEntry": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "BusinessDirectoryEntry",
-      "type": "object",
-      "description": "Represents an entry in the public business directory.",
+      "description": "Represents an advertisement in the business directory.",
       "properties": {
         "id": { "type": "string" },
-        "businessId": { "type": "string" },
-        "name": { "type": "string" },
-        "description": { "type": "string" },
-        "logoUrl": { "type": "string", "format": "uri" },
-        "category": { "type": "string" },
-        "tags": { "type": "array", "items": { "type": "string" } },
-        "isVerified": { "type": "boolean" },
-        "featured": { "type": "boolean" },
-        "publicProfile": { "type": "boolean", "description": "Mandatory flag for public visibility." },
-        "rating": { "type": "number" },
-        "reviewCount": { "type": "number" },
-        "listingDate": { "type": "string", "format": "date-time" },
-        "status": { "type": "string", "enum": ["published", "hidden", "pending"] },
-        "internalNotes": { "type": "string", "description": "Private administrative notes." }
-      },
-      "required": ["id", "businessId", "name", "category", "status", "publicProfile"]
+        "title": { "type": "string" },
+        "imageUrl": { "type": "string", "format": "uri" },
+        "linkUrl": { "type": "string", "format": "uri" },
+        "format": { "type": "string", "enum": ["google_display", "meta_feed", "meta_story"] },
+        "position": { "type": "string", "enum": ["top", "mid", "grid", "sidebar"] },
+        "active": { "type": "boolean" },
+        "views": { "type": "number" },
+        "clicks": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      }
     }
   },
   "auth": {
-    "providers": [
-      "password"
-    ]
+    "providers": ["password"]
   },
   "firestore": {
     "structure": [
@@ -451,95 +44,18 @@
         "path": "/users/{userId}",
         "definition": {
           "entityName": "User",
-          "schema": {
-            "$ref": "#/backend/entities/User"
-          },
-          "description": "Stores user profiles. Includes standard user information like name, email, role, and status.",
-          "params": [
-            {
-              "name": "userId",
-              "description": "The unique identifier for the user."
-            }
-          ]
+          "schema": { "$ref": "#/backend/entities/User" },
+          "description": "Stores user profiles."
         }
       },
       {
-        "path": "/businessDirectory/{entryId}",
+        "path": "/directoryAds/{adId}",
         "definition": {
-          "entityName": "BusinessDirectoryEntry",
-          "schema": { "$ref": "#/backend/entities/BusinessDirectoryEntry" },
-          "description": "Stores entries for the public business directory. Visible only if status='published' and publicProfile=true."
-        }
-      },
-      {
-        "path": "/systemServices/{serviceId}",
-        "definition": {
-          "entityName": "SystemService",
-          "schema": {
-            "$ref": "#/backend/entities/SystemService"
-          },
-          "description": "Stores system service configurations. Allows admins to manage service status and limits.",
-          "params": [
-            {
-              "name": "serviceId",
-              "description": "The unique identifier for the system service."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/modules/{moduleId}",
-        "definition": {
-          "entityName": "Module",
-          "schema": {
-            "$ref": "#/backend/entities/Module"
-          },
-          "description": "Stores platform modules. Allows super admins to manage module status.",
-          "params": [
-            {
-              "name": "moduleId",
-              "description": "The unique identifier for the module."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/globalConfig/system",
-        "definition": {
-          "entityName": "GlobalConfig",
-          "schema": {
-            "$ref": "#/backend/entities/GlobalConfig"
-          },
-          "description": "Stores global configuration settings for the platform, such as maintenance mode, logo URL, and theme settings."
-        }
-      },
-      {
-        "path": "/landing_configs/main",
-        "definition": {
-          "entityName": "PublicLandingPage",
-          "schema": {
-            "$ref": "#/backend/entities/PublicLandingPage"
-          },
-          "description": "Stores the configuration for the main public landing page."
-        }
-      },
-      {
-        "path": "/businesses/{businessId}",
-        "definition": {
-          "entityName": "Business",
-          "schema": {
-            "$ref": "#/backend/entities/Business"
-          },
-          "description": "Stores business profiles. Contains business details like name, logo URL, and description.",
-          "params": [
-            {
-              "name": "businessId",
-              "description": "The unique identifier for the business."
-            }
-          ]
+          "entityName": "DirectoryAd",
+          "schema": { "$ref": "#/backend/entities/DirectoryAd" },
+          "description": "Stores advertisements for the directory."
         }
       }
-    ],
-    "reasoning": "The Firestore structure is designed to ensure Authorization Independence and support the application's QAPs (Queries are not Filters). Authorization Independence is achieved by avoiding `get()` calls in security rules through denormalization.  Specifically, the `LandingPage`, `Product`, `ContactForm`, `ContactSubmission` and `ChatbotConfig` subcollections under `/businesses/{businessId}` include the `businessId` field, which duplicates the parent document's ID, but allows security rules to validate access without requiring a `get()` call to the parent `business` document.\n\nStructural Segregation is applied by separating user-specific data (`/users/{userId}`) from business-related data (`/businesses/{businessId}/...`).  Each collection has a homogeneous security posture. Path-based ownership (`/users/{userId}`) is used for private user data like payment settings.\n\nThe membership model is implicitly supported through the businessId on resources linked to each business.\n\nGlobal roles are managed using content over existence, within the User document under role (e.g., `/users/{uid}` has `role: 'super_admin'`).\n\nQAPs (Rules are not Filters) are supported through structural segregation. Listing operations are secured based on the path and, where applicable, the denormalized `businessId` field in subcollections, allowing secure querying without filtering on insecure data.\n\nExplicit state modeling is used through the `status` field in entities like `User` and `SystemService`."
+    ]
   }
 }

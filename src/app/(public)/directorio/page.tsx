@@ -1,13 +1,13 @@
-
 import React from 'react';
 import { getAdminFirestore } from '@/firebase/server-init';
 import Header from '@/components/layout/header';
 import Footer from '@/components/layout/footer';
 import BusinessCard from '@/components/directory/BusinessCard';
+import DirectoryAdSlot from '@/components/directory/DirectoryAdSlot';
 import { DIRECTORY_CATEGORIES, type BusinessDirectoryEntry } from '@/models/business-directory';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Search, Filter, LayoutGrid } from 'lucide-react';
+import { Search, Filter, LayoutGrid, Sparkles } from 'lucide-react';
 import Link from 'next/link';
 import type { Metadata } from 'next';
 
@@ -77,7 +77,10 @@ export default async function DirectoryPage() {
                     </div>
                 </section>
 
-                <section className="container mx-auto px-4 py-12">
+                <section className="container mx-auto px-4 py-8">
+                    {/* Publicidad Superior */}
+                    <DirectoryAdSlot position="top" format="google_display" className="mb-10" />
+
                     <div className="flex flex-col lg:flex-row gap-8">
                         {/* Sidebar Filters */}
                         <aside className="lg:w-64 space-y-8">
@@ -97,15 +100,18 @@ export default async function DirectoryPage() {
                                     ))}
                                 </div>
                             </div>
+                            
+                            {/* Publicidad Sidebar */}
+                            <DirectoryAdSlot position="sidebar" format="meta_feed" />
                         </aside>
 
                         {/* Results Grid */}
                         <div className="flex-1 space-y-8">
                             <div className="flex items-center justify-between">
-                                <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                                <div className="flex items-center gap-2">
                                     <LayoutGrid className="h-5 w-5 text-primary" />
-                                    Explorar Negocios
-                                </h2>
+                                    <h2 className="text-xl font-bold text-gray-900">Explorar Negocios</h2>
+                                </div>
                                 <span className="text-sm text-gray-500">
                                     Mostrando {entries.length} resultados
                                 </span>
@@ -113,8 +119,16 @@ export default async function DirectoryPage() {
 
                             {entries.length > 0 ? (
                                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                                    {entries.map(entry => (
-                                        <BusinessCard key={entry.id} entry={entry} />
+                                    {entries.map((entry, index) => (
+                                        <React.Fragment key={entry.id}>
+                                            <BusinessCard entry={entry} />
+                                            {/* Inserción de anuncio en el medio de la rejilla cada 6 elementos */}
+                                            {index === 5 && (
+                                                <div className="col-span-full">
+                                                    <DirectoryAdSlot position="mid" format="google_display" />
+                                                </div>
+                                            )}
+                                        </React.Fragment>
                                     ))}
                                 </div>
                             ) : (
