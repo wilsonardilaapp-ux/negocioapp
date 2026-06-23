@@ -176,7 +176,7 @@ export default function BusinessesPage() {
       ...businessForm,
       planName: selectedPlan?.name || businessForm.planId,
       logoURL: 'https://seeklogo.com/images/E/eco-friendly-logo-7087A22106-seeklogo.com.png',
-      description: 'Bienvenido a Negocio V03',
+      description: 'Bienvenido a Zentry',
     };
     await setDocumentNonBlocking(newBusinessRef, newBusiness);
     setBusinessForm(initialFormState);
@@ -472,7 +472,7 @@ export default function BusinessesPage() {
             <Input
               placeholder="Buscar negocios..."
               value={searchBusiness}
-              onChange={e => setSearchTerm(e.target.value)}
+              onChange={e => setSearchBusiness(e.target.value)}
               className="pl-10"
             />
           </div>
