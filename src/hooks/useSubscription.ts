@@ -168,12 +168,15 @@ export function useSubscription() {
         else if (m.status === 'inactive') activeModuleIds.delete(m.id);
     });
 
-    const PREMIUM_PLAN_IDS = new Set(['pro', 'enterprise', 'estandar']);
+    const PREMIUM_PLAN_IDS = new Set([
+      'AoKkP9RLp517Nl11aNxt', // Plan Estándar
+      'KmDDgHJW2H2e8I69Owud', // Plan Profesional
+    ]);
     const planName = details?.name || currentPlanId;
     const normalizedName = planName.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
     // Verificación robusta por ID con fallback por nombre para máxima seguridad
-    const hasPremiumId = details?.id && PREMIUM_PLAN_IDS.has(details.id.toLowerCase());
+    const hasPremiumId = details?.id && PREMIUM_PLAN_IDS.has(details.id);
     const hasPremiumName = normalizedName.includes('estandar') || normalizedName.includes('pro') || normalizedName.includes('enterprise');
 
     if (hasPremiumId || hasPremiumName) {
