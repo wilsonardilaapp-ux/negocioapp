@@ -25,6 +25,7 @@ async function getDirectoryBusinesses() {
         const db = await getAdminFirestore();
         const snapshot = await db.collection('businesses')
             .where('status', '==', 'active')
+            .where('directoryEnabled', '==', true)
             .limit(48)
             .get();
 
@@ -133,4 +134,3 @@ export default async function DirectoryPage() {
         </div>
     );
 }
-
