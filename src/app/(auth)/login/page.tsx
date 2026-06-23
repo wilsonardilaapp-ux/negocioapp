@@ -1,8 +1,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -27,7 +26,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { useAuth, useUser, initiateEmailSignIn } from '@/firebase';
 import Link from 'next/link';
-import { Loader2, Eye, EyeOff } from 'lucide-react';
+import { Loader2, Eye, EyeOff, UserPlus } from 'lucide-react';
 
 const loginSchema = z.object({
   email: z.string().email({ message: "Introduce un correo electrónico válido." }),
@@ -53,15 +52,22 @@ export default function LoginPage() {
     if (!auth) return;
     setIsSubmitting(true);
     try {
+      // Intentamos iniciar sesión. Firebase lanzará invalid-credential si el usuario no existe o el pass es erróneo.
       await initiateEmailSignIn(auth, values.email.trim(), values.password);
-      // El hook useUser detectará el cambio y redirigirá automáticamente.
     } catch (error: any) {
       console.error("Login Error:", error.code);
       setIsSubmitting(false);
+      
       let description = "Revisa tu correo y contraseña.";
+      
       if (error.code === 'auth/wrong-password' || error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
-        description = "Credenciales incorrectas.";
+        description = "Credenciales incorrectas. Si no tienes una cuenta, por favor regístrate.";
+      } else if (error.code === 'auth/too-many-requests') {
+        description = "Demasiados intentos fallidos. Por favor, intenta más tarde o restablece tu contraseña.";
+      } else if (error.code === 'auth/network-request-failed') {
+        description = "Error de red. Verifica tu conexión a internet.";
       }
+
       toast({
         variant: "destructive",
         title: "Error al acceder",
@@ -70,20 +76,19 @@ export default function LoginPage() {
     }
   }
 
-  // Si ya hay un usuario o estamos en proceso, mostramos el cargando
-  if (user || isUserLoading || isSubmitting) {
+  if (user || isUserLoading) {
     return (
         <div className="flex flex-col items-center justify-center min-h-[400px] p-6 text-center space-y-4">
             <Loader2 className="h-10 w-10 animate-spin text-primary" />
-            <p className="text-muted-foreground animate-pulse">Autenticando y preparando tu panel...</p>
+            <p className="text-muted-foreground animate-pulse">Verificando sesión y preparando tu panel...</p>
         </div>
     );
   }
 
   return (
-    <Card className="shadow-lg">
-      <CardHeader className="text-center">
-        <CardTitle className="text-2xl font-bold">Zentry</CardTitle>
+    <Card className="shadow-lg border-none">
+      <CardHeader className="text-center space-y-1">
+        <CardTitle className="text-3xl font-black tracking-tight text-primary">Zentry</CardTitle>
         <CardDescription>Accede con tu cuenta de administrador</CardDescription>
       </CardHeader>
       <Form {...form}>
@@ -96,7 +101,12 @@ export default function LoginPage() {
                 <FormItem>
                   <FormLabel>Correo Electrónico</FormLabel>
                   <FormControl>
-                    <Input placeholder="admin@zentry.com" {...field} />
+                    <Input 
+                      type="email" 
+                      placeholder="nombre@ejemplo.com" 
+                      autoComplete="email"
+                      {...field} 
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -107,12 +117,18 @@ export default function LoginPage() {
               name="password"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Contraseña</FormLabel>
+                  <div className="flex items-center justify-between">
+                    <FormLabel>Contraseña</FormLabel>
+                    <Link href="/forgot-password" title="Recuperar acceso" className="text-xs text-primary hover:underline font-medium">
+                        ¿Olvidaste tu contraseña?
+                    </Link>
+                  </div>
                   <div className="relative">
                     <FormControl>
                       <Input
                         type={showPassword ? 'text' : 'password'}
                         placeholder="••••••••"
+                        autoComplete="current-password"
                         {...field}
                       />
                     </FormControl>
@@ -120,7 +136,7 @@ export default function LoginPage() {
                       type="button"
                       variant="ghost"
                       size="icon"
-                      className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                      className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent text-muted-foreground"
                       onClick={() => setShowPassword(!showPassword)}
                     >
                       {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -132,14 +148,29 @@ export default function LoginPage() {
             />
           </CardContent>
           <CardFooter className="flex flex-col gap-4">
-            <Button className="w-full" type="submit" disabled={isSubmitting}>
-              Acceder al Sistema
+            <Button className="w-full font-bold h-12 text-lg shadow-sm" type="submit" disabled={isSubmitting}>
+              {isSubmitting ? (
+                <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Verificando...</>
+              ) : (
+                "Acceder al Sistema"
+              )}
             </Button>
-            <div className="text-center text-sm">
-                <Link href="/forgot-password" title="Recuperar acceso" className="text-primary hover:underline">
-                    ¿Olvidaste tu contraseña?
-                </Link>
+            
+            <div className="relative w-full py-2">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t border-muted" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-background px-2 text-muted-foreground">¿Eres nuevo?</span>
+              </div>
             </div>
+
+            <Button variant="outline" className="w-full h-11 font-semibold" asChild>
+                <Link href="/register">
+                    <UserPlus className="mr-2 h-4 w-4" />
+                    Crea tu Cuenta Gratis
+                </Link>
+            </Button>
           </CardFooter>
         </form>
       </Form>
