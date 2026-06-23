@@ -23,11 +23,12 @@ export const metadata: Metadata = {
 async function getDirectoryBusinesses() {
     try {
         const db = await getAdminFirestore();
-        // Consultamos directamente la colección de negocios con los filtros de visibilidad
+        // Consultamos la colección 'businesses' directamente.
+        // Relajamos un poco el filtro para incluir negocios que tengan status 'approved' 
+        // aunque el flag enabled sea undefined (por migración).
         const snapshot = await db.collection('businesses')
-            .where('directoryEnabled', '==', true)
             .where('directoryStatus', '==', 'approved')
-            .limit(24)
+            .limit(48)
             .get();
 
         return snapshot.docs.map(doc => ({
@@ -41,7 +42,10 @@ async function getDirectoryBusinesses() {
 }
 
 export default async function DirectoryPage() {
-    const businesses = await getDirectoryBusinesses();
+    const allBusinesses = await getDirectoryBusinesses();
+    
+    // Filtrado final en memoria para mayor seguridad y flexibilidad con datos antiguos
+    const businesses = allBusinesses.filter(b => b.directoryEnabled !== false);
 
     return (
         <div className="min-h-screen bg-gray-50/30 flex flex-col">
@@ -112,7 +116,7 @@ export default async function DirectoryPage() {
                                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                                     {businesses.map((business, index) => (
                                         <React.Fragment key={business.id}>
-                                            <BusinessCard entry={business as any} />
+                                            <BusinessCard entry={business} />
                                             {index === 5 && (
                                                 <div className="col-span-full">
                                                     <DirectoryAdSlot position="mid" format="google_display" />
