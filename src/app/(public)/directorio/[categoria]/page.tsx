@@ -25,6 +25,7 @@ async function getEntriesByCategory(category: string) {
 
         const snapshot = await db.collection('businessDirectory')
             .where('status', '==', 'published')
+            .where('publicProfile', '==', true) // Filtro de seguridad obligatorio
             .where('category', '==', normalizedCategory)
             .orderBy('featured', 'desc')
             .get();
@@ -77,7 +78,7 @@ export default async function CategoryPage({ params }: { params: { categoria: st
                     <div className="text-center py-32 bg-white rounded-3xl border border-dashed border-gray-200">
                         <p className="text-gray-400 font-bold text-lg">Aún no hay negocios en esta categoría.</p>
                         <Link href="/directorio">
-                            <Button variant="link" className="mt-2">Ver todas las categorías</Button>
+                            <Button variant="link" className="mt-2 text-primary">Ver todas las categorías</Button>
                         </Link>
                     </div>
                 )}

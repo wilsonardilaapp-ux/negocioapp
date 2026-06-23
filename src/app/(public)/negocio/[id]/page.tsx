@@ -12,7 +12,6 @@ import {
     Phone, 
     Mail, 
     CheckCircle2, 
-    ChevronLeft, 
     Instagram, 
     Facebook,
     ArrowRight
@@ -34,8 +33,10 @@ async function getEntry(id: string) {
         
         const data = doc.data() as BusinessDirectoryEntry;
         
-        // Solo permitir visualización si está publicado
-        if (data.status !== 'published') return null;
+        // Verificación estricta de visibilidad
+        if (data.status !== 'published' || data.publicProfile !== true) {
+            return null;
+        }
         
         return { id: doc.id, ...data };
     } catch (error) {
@@ -76,12 +77,12 @@ export default async function BusinessProfilePage({ params }: { params: { id: st
                                         {entry.name}
                                     </h1>
                                     {entry.isVerified && (
-                                        <Badge className="bg-blue-500 text-white gap-1 py-1">
+                                        <Badge className="bg-blue-500 text-white gap-1 py-1 border-none shadow-sm">
                                             <CheckCircle2 className="h-3 w-3" /> Verificado
                                         </Badge>
                                     )}
                                     {entry.featured && (
-                                        <Badge variant="outline" className="border-amber-500 text-amber-600">
+                                        <Badge variant="outline" className="border-amber-500 text-amber-600 bg-amber-50">
                                             Recomendado
                                         </Badge>
                                     )}
@@ -108,7 +109,7 @@ export default async function BusinessProfilePage({ params }: { params: { id: st
 
                                 <div className="flex flex-wrap gap-3 pt-4">
                                     {entry.phone && (
-                                        <Button asChild className="gap-2 font-bold shadow-lg shadow-green-100 bg-[#25D366] hover:bg-[#128C7E]">
+                                        <Button asChild className="gap-2 font-bold shadow-lg shadow-green-100 bg-[#25D366] hover:bg-[#128C7E] text-white">
                                             <a href={`https://wa.me/${entry.phone.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer">
                                                 <WhatsAppIcon className="h-5 w-5" /> Contactar por WhatsApp
                                             </a>
@@ -117,7 +118,7 @@ export default async function BusinessProfilePage({ params }: { params: { id: st
                                     {entry.website && (
                                         <Button asChild variant="outline" className="gap-2 font-bold">
                                             <a href={entry.website} target="_blank" rel="noopener noreferrer">
-                                                <Globe className="h-5 w-5" /> Sitio Web
+                                                <Globe className="h-5 w-5 text-primary" /> Sitio Web
                                             </a>
                                         </Button>
                                     )}
@@ -197,7 +198,7 @@ export default async function BusinessProfilePage({ params }: { params: { id: st
                                 </div>
                             </div>
                             
-                            <Button asChild size="lg" className="w-full rounded-[2rem] h-16 text-lg font-black group">
+                            <Button asChild size="lg" className="w-full rounded-[2rem] h-16 text-lg font-black group text-white">
                                 <Link href={`/catalog/${entry.businessId}`}>
                                     Ver Catálogo de Productos <ArrowRight className="ml-2 group-hover:translate-x-2 transition-transform" />
                                 </Link>

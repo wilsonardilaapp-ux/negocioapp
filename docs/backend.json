@@ -376,6 +376,14 @@
           "type": "number",
           "description": "Total price for the ordered quantity (quantity * unitPrice)."
         },
+        "unitPrice": {
+          "type": "number",
+          "description": "Price of a single unit of the product."
+        },
+        "subtotal": {
+          "type": "number",
+          "description": "Total price for the ordered quantity (quantity * unitPrice)."
+        },
         "paymentMethod": {
           "type": "string",
           "description": "Payment method chosen by the customer."
@@ -422,12 +430,14 @@
         "tags": { "type": "array", "items": { "type": "string" } },
         "isVerified": { "type": "boolean" },
         "featured": { "type": "boolean" },
+        "publicProfile": { "type": "boolean", "description": "Mandatory flag for public visibility." },
         "rating": { "type": "number" },
         "reviewCount": { "type": "number" },
         "listingDate": { "type": "string", "format": "date-time" },
-        "status": { "type": "string", "enum": ["published", "hidden", "pending"] }
+        "status": { "type": "string", "enum": ["published", "hidden", "pending"] },
+        "internalNotes": { "type": "string", "description": "Private administrative notes." }
       },
-      "required": ["id", "businessId", "name", "category", "status"]
+      "required": ["id", "businessId", "name", "category", "status", "publicProfile"]
     }
   },
   "auth": {
@@ -458,7 +468,7 @@
         "definition": {
           "entityName": "BusinessDirectoryEntry",
           "schema": { "$ref": "#/backend/entities/BusinessDirectoryEntry" },
-          "description": "Stores entries for the public business directory."
+          "description": "Stores entries for the public business directory. Visible only if status='published' and publicProfile=true."
         }
       },
       {

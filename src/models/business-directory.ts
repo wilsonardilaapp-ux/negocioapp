@@ -21,6 +21,12 @@ export interface BusinessDirectoryEntry {
     updatedAt: string; // ISO String
     status: 'published' | 'hidden' | 'pending';
     
+    /** 
+     * @description Flag obligatorio para visibilidad pública.
+     * Si es false, el negocio no aparecerá en el directorio ni será accesible por URL pública.
+     */
+    publicProfile: boolean; 
+
     // Public profile fields
     address?: string;
     phone?: string;
@@ -31,6 +37,11 @@ export interface BusinessDirectoryEntry {
         facebook?: string;
         whatsapp?: string;
     };
+
+    /**
+     * @description Notas internas del administrador (SENSIBLE - No mostrar en UI pública)
+     */
+    internalNotes?: string;
 }
 
 export const DIRECTORY_CATEGORIES: DirectoryCategory[] = [

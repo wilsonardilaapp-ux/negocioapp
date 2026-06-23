@@ -67,6 +67,21 @@ service cloud.firestore {
 
     // --- REGLAS POR COLECCIÓN ---
 
+    // Directorio de Negocios
+    match /businessDirectory/{entryId} {
+      // Solo lectura pública si está publicado Y marcado como perfil público
+      allow read, list: if (resource.data.status == 'published' && resource.data.publicProfile == true) 
+                        || isSuperAdmin() 
+                        || isOwner(resource.data.businessId);
+      
+      // Escritura permitida a dueños y superadmins
+      allow create: if isSuperAdmin() || isOwner(request.resource.data.businessId);
+      allow update: if isSuperAdmin() || isOwner(resource.data.businessId);
+      
+      // Eliminación exclusiva de Super Admin
+      allow delete: if isSuperAdmin();
+    }
+
     // Planes Híbridos (Zentry)
     match /hybrid_plans/{planId} {
       allow read, list: if true;

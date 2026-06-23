@@ -17,6 +17,7 @@ async function getDirectoryEntries() {
         const db = await getAdminFirestore();
         const snapshot = await db.collection('businessDirectory')
             .where('status', '==', 'published')
+            .where('publicProfile', '==', true) // Filtro de seguridad obligatorio
             .orderBy('featured', 'desc')
             .orderBy('rating', 'desc')
             .limit(24)
@@ -58,7 +59,7 @@ export default async function DirectoryPage() {
                                     className="border-none shadow-none h-12 pl-10 focus-visible:ring-0 text-lg"
                                 />
                             </div>
-                            <Button size="lg" className="px-8 font-bold rounded-xl">
+                            <Button size="lg" className="px-8 font-bold rounded-xl text-white">
                                 Buscar
                             </Button>
                         </div>
