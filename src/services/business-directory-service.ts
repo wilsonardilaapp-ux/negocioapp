@@ -1,8 +1,8 @@
-
 'use client';
 
 /**
  * @fileOverview Firestore service for the Business Directory module.
+ * Updated to use 'businesses' collection as the single source of truth.
  */
 
 import { 
@@ -11,12 +11,10 @@ import {
   query, 
   where, 
   getDocs, 
-  addDoc, 
   updateDoc, 
   doc, 
   type Firestore
 } from 'firebase/firestore';
-import type { BusinessDirectoryEntry } from '@/models/business-directory';
 
 class BusinessDirectoryService {
   private getDb(): Firestore {
@@ -24,36 +22,42 @@ class BusinessDirectoryService {
   }
 
   /**
-   * Retrieves a directory entry for a specific business.
+   * Retrieves a directory entry for a specific business from the main 'businesses' collection.
+   * Only returns the entry if the business status is 'active'.
    */
-  async getEntryByBusiness(businessId: string): Promise<BusinessDirectoryEntry | null> {
+  async getEntryByBusiness(businessId: string): Promise<any | null> {
     const db = this.getDb();
-    const q = query(collection(db, 'businessDirectory'), where('businessId', '==', businessId));
+    // Querying the 'businesses' collection directly as per requirement
+    const q = query(
+      collection(db, 'businesses'), 
+      where('id', '==', businessId),
+      where('status', '==', 'active')
+    );
+    
     const snapshot = await getDocs(q);
     if (snapshot.empty) return null;
-    return { id: snapshot.docs[0].id, ...snapshot.docs[0].data() } as BusinessDirectoryEntry;
+    
+    return { id: snapshot.docs[0].id, ...snapshot.docs[0].data() };
   }
 
   /**
    * Creates a new directory entry.
+   * @deprecated Creation is now handled via the main business registration process.
    */
-  async createEntry(data: Omit<BusinessDirectoryEntry, 'id' | 'listingDate' | 'updatedAt'>): Promise<string> {
-    const db = this.getDb();
-    const now = new Date().toISOString();
-    const docRef = await addDoc(collection(db, 'businessDirectory'), {
-      ...data,
-      listingDate: now,
-      updatedAt: now,
-    });
-    return docRef.id;
+  async createEntry(_data: any): Promise<string> {
+    // This method is no longer needed as businesses are created in the main collection.
+    // We return an empty string to maintain signature compatibility if called.
+    console.warn("createEntry is deprecated. Businesses are now managed in the 'businesses' collection.");
+    return "";
   }
 
   /**
-   * Updates an existing directory entry.
+   * Updates a business entry directly in the 'businesses' collection.
    */
-  async updateEntry(id: string, updates: Partial<BusinessDirectoryEntry>): Promise<void> {
+  async updateEntry(id: string, updates: Partial<any>): Promise<void> {
     const db = this.getDb();
-    const ref = doc(db, 'businessDirectory', id);
+    // Updating the document in the 'businesses' collection
+    const ref = doc(db, 'businesses', id);
     await updateDoc(ref, {
       ...updates,
       updatedAt: new Date().toISOString(),
