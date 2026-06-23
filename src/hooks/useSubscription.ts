@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useMemo, useState, useEffect, useCallback } from 'react';
@@ -167,9 +168,15 @@ export function useSubscription() {
         else if (m.status === 'inactive') activeModuleIds.delete(m.id);
     });
 
+    const PREMIUM_PLAN_IDS = new Set(['pro', 'enterprise', 'estandar']);
     const planName = details?.name || currentPlanId;
     const normalizedName = planName.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-    if (normalizedName.includes('estandar') || normalizedName.includes('pro') || normalizedName.includes('enterprise')) {
+
+    // Verificación robusta por ID con fallback por nombre para máxima seguridad
+    const hasPremiumId = details?.id && PREMIUM_PLAN_IDS.has(details.id.toLowerCase());
+    const hasPremiumName = normalizedName.includes('estandar') || normalizedName.includes('pro') || normalizedName.includes('enterprise');
+
+    if (hasPremiumId || hasPremiumName) {
         activeModuleIds.add('catalogo');
         activeModuleIds.add('blog');
         activeModuleIds.add('chatbot-integrado-con-whatsapp-para-soporte-y-ventas');
