@@ -3,6 +3,10 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useMemo } from 'react';
+import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
+import { collection } from 'firebase/firestore';
+import type { Module } from '@/models/module';
 import {
   LayoutDashboard,
   Users,
@@ -28,11 +32,11 @@ import {
 
 import { SidebarMenu, SidebarMenuItem, SidebarMenuButton } from "@/components/ui/sidebar";
 
-const navItems = [
+const navItemsList = [
   { href: "/superadmin", icon: LayoutDashboard, label: "Dashboard" },
   { href: "/superadmin/usuarios", icon: Users, label: "Usuarios" },
   { href: "/superadmin/negocios", icon: Building, label: "Negocios" },
-  { href: "/superadmin/business-directory", icon: Search, label: "Directorio" },
+  { href: "/superadmin/business-directory", icon: Search, label: "Directorio", moduleId: 'business-directory' },
   { href: "/superadmin/subscriptions", icon: CreditCard, label: "Suscripciones" },
   { href: "/superadmin/revenue", icon: TrendingUp, label: "Ingresos" },
   { href: "/superadmin/plans", icon: Package, label: "Planes" },
@@ -55,6 +59,22 @@ const navItems = [
 
 export function SuperAdminNav() {
   const pathname = usePathname();
+  const firestore = useFirestore();
+
+  const modulesQuery = useMemoFirebase(
+    () => (!firestore ? null : collection(firestore, 'modules')),
+    [firestore]
+  );
+  const { data: modules } = useCollection<Module>(modulesQuery);
+
+  const navItems = useMemo(() => {
+    return navItemsList.filter(item => {
+      if (!item.moduleId) return true;
+      const module = modules?.find(m => m.id === item.moduleId);
+      // El ítem solo es visible si el módulo está marcado como 'active'
+      return module?.status === 'active';
+    });
+  }, [modules]);
 
   return (
     <SidebarMenu>
