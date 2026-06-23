@@ -1,9 +1,9 @@
 
 'use client';
 
-import { useState, useEffect, useRef, useTransition } from 'react';
-import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, doc, deleteDoc } from 'firebase/firestore';
+import { useState, useEffect, useRef, useMemo, useTransition } from 'react';
+import { useCollection, useFirestore, useMemoFirebase, updateDocumentNonBlocking } from '@/firebase';
+import { collection, doc } from 'firebase/firestore';
 import {
   Card,
   CardHeader,
@@ -18,7 +18,6 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import {
   AlertDialog,
@@ -362,6 +361,13 @@ export default function IntegrationsPage() {
             if (!exists) {
                 console.log(`Integration "${reqInt.name}" missing, creating...`);
                 createIntegration({ name: reqInt.name, description: '' });
+            } else {
+                // Auto-healing: Ensure name matches current requirement (especially for AI providers list)
+                const currentInt = integrations.find(i => i.id === reqInt.id);
+                if (currentInt && currentInt.name !== reqInt.name) {
+                    console.log(`Updating name for ${reqInt.id} to match latest providers list...`);
+                    updateDocumentNonBlocking(doc(firestore, 'integrations', reqInt.id), { name: reqInt.name });
+                }
             }
         });
     };
@@ -477,8 +483,11 @@ export default function IntegrationsPage() {
         {(integrations ?? []).map((integration) => {
           const correspondingModule = modules?.find(m => m.id === integration.id);
           const isModuleActive = !!correspondingModule && correspondingModule.status === 'active';
-          const isControlDisabled = isSaving || isUpdatingStatus || isDeleting || !isModuleActive;
-          const tooltipMessage = !isModuleActive ? 'Activa el módulo correspondiente en la página de "Módulos" para habilitar esta integración.' : '';
+          
+          // DIRECT FIX: We allow the Super Admin to edit and toggle even if the module is inactive
+          // but we show a warning icon if the module isn't active.
+          const isControlDisabled = isSaving || isUpdatingStatus || isDeleting;
+          const tooltipMessage = !isModuleActive ? 'Módulo inactivo: Los clientes no verán esta funcionalidad hasta que actives el módulo en la página correspondiente.' : '';
 
           const icon =
             integration.id === 'cloudinary'
@@ -533,25 +542,19 @@ export default function IntegrationsPage() {
               <CardContent className="space-y-4">
                 <div className="flex items-center justify-between border p-4 rounded-md">
                   <div className="space-y-1">
-                    <p className="text-sm font-medium">Estado del Servicio</p>
+                    <div className="flex items-center gap-2">
+                        <p className="text-sm font-medium">Estado del Servicio</p>
+                        {!isModuleActive && <TooltipProvider><Tooltip><TooltipTrigger><AlertTriangle className="h-4 w-4 text-yellow-500" /></TooltipTrigger><TooltipContent><p>{tooltipMessage}</p></TooltipContent></Tooltip></TooltipProvider>}
+                    </div>
                     <p className="text-xs text-muted-foreground">
                       {isActive ? 'Operativo' : 'Desactivado'}
                     </p>
                   </div>
-                   <TooltipProvider>
-                      <Tooltip>
-                          <TooltipTrigger asChild>
-                              <div>
-                                  <Switch
-                                      checked={isActive}
-                                      onCheckedChange={(c) => handleStatusChange(integration, c)}
-                                      disabled={isControlDisabled}
-                                  />
-                              </div>
-                          </TooltipTrigger>
-                          {tooltipMessage && <TooltipContent><p>{tooltipMessage}</p></TooltipContent>}
-                      </Tooltip>
-                  </TooltipProvider>
+                   <Switch
+                        checked={isActive}
+                        onCheckedChange={(c) => handleStatusChange(integration, c)}
+                        disabled={isControlDisabled}
+                    />
                 </div>
                 <div className="flex items-center justify-between border p-4 rounded-md">
                   <div className="space-y-1">
@@ -565,18 +568,9 @@ export default function IntegrationsPage() {
                 </div>
               </CardContent>
               <CardFooter className="grid grid-cols-2 gap-2">
-                 <TooltipProvider>
-                      <Tooltip>
-                          <TooltipTrigger asChild>
-                              <div className="w-full">
-                                  <Button className="w-full" onClick={() => setEditingIntegration(integration)} disabled={isControlDisabled}>
-                                      <Plug className="mr-2 h-4 w-4" /> Editar Config.
-                                  </Button>
-                              </div>
-                          </TooltipTrigger>
-                           {tooltipMessage && <TooltipContent><p>{tooltipMessage}</p></TooltipContent>}
-                      </Tooltip>
-                  </TooltipProvider>
+                  <Button className="w-full" onClick={() => setEditingIntegration(integration)} disabled={isControlDisabled}>
+                      <Plug className="mr-2 h-4 w-4" /> Editar Config.
+                  </Button>
                   <AlertDialog>
                         <AlertDialogTrigger asChild>
                             <Button variant="destructive" className="w-full" disabled={isControlDisabled}>
@@ -640,3 +634,7 @@ export default function IntegrationsPage() {
     </div>
   );
 }
+
+const AlertTriangle = ({ className }: { className?: string }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+);
