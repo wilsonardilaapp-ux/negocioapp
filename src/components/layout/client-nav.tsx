@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useMemo } from 'react';
 import { useSubscription } from "@/hooks/useSubscription";
+import { useUser } from "@/firebase";
 import {
   LayoutDashboard,
   FileText,
@@ -35,6 +36,7 @@ const allNavItems = [
   { href: "/dashboard/catalogo", icon: ShoppingCart, label: "Catálogo", moduleId: 'catalogo' },
   { href: "/dashboard/share", icon: Share2, label: "Compartir Menú", moduleId: 'catalogo' },
   { href: "/dashboard/blog", icon: FileText, label: "Blog", moduleId: 'blog' },
+  { href: "/dashboard/chatbot", icon: MessageCircleIcon, label: "Asistente IA", moduleId: 'chatbot-integrado-con-whatsapp-para-soporte-y-ventas'},
   { href: "/dashboard/promotions", icon: Tag, label: "Promociones", moduleId: 'promotions' },
   { href: "/dashboard/cupones", icon: Ticket, label: "Cupones", moduleId: 'promotions' },
   { href: "/dashboard/messages", icon: Bell, label: "Notificaciones" },
@@ -51,13 +53,13 @@ const allNavItems = [
   { href: "/dashboard/backups", icon: HardDrive, label: "Backups" },
   { href: "/dashboard/subscription", icon: CreditCard, label: "Suscripción" },
   { href: "/dashboard/perfil", icon: UserCircle, label: "Perfil" },
-  { href: "/dashboard/chatbot", icon: MessageCircleIcon, label: "Asistente IA", moduleId: 'chatbot-integrado-con-whatsapp-para-soporte-y-ventas'},
   { href: "/dashboard/suggestions", icon: Lightbulb, label: "Sugerencias", moduleId: 'motor-de-sugerencias-inteligentes' },
   { href: "/dashboard/analytics", icon: BarChart, label: "Métricas", moduleId: 'google-analytics' },
 ];
 
 export function ClientNav() {
   const pathname = usePathname();
+  const { profile } = useUser();
   const { setOpenMobile } = useSidebar();
   const { isModuleAuthorized, isLoading: isSubLoading } = useSubscription();
 
@@ -65,9 +67,11 @@ export function ClientNav() {
   const navItems = useMemo(() => {
     return allNavItems.filter(item => {
       if (!item.moduleId) return true;
+      // El Super Administrador debe ver todas las herramientas disponibles para soporte y auditoría
+      if (profile?.role === 'super_admin') return true;
       return isModuleAuthorized(item.moduleId);
     });
-  }, [isModuleAuthorized]);
+  }, [isModuleAuthorized, profile?.role]);
 
   if (isSubLoading && navItems.length === 0) {
     return (
