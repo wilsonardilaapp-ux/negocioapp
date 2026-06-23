@@ -1,3 +1,4 @@
+
 "use client";
 
 import Link from "next/link";
@@ -21,8 +22,8 @@ import {
   Mail,
   ScanLine,
   Calculator,
+  Bot,
 } from "lucide-react";
-import { MessageCircle as MessageCircleIcon } from "@/components/icons";
 
 import { SidebarMenu, SidebarMenuItem, SidebarMenuButton } from "@/components/ui/sidebar";
 
@@ -37,7 +38,7 @@ const navItems = [
   { href: "/superadmin/hybrid-billing", icon: Calculator, label: "Facturación Híbrida" },
   { href: "/superadmin/payment-methods", icon: CreditCard, label: "Pasarelas de Pago" },
   { href: "/superadmin/blog", icon: FileText, label: "Blog" },
-  { href: "/superadmin/integraciones", icon: MessageCircleIcon, label: "Chatbot IA" },
+  { href: "/superadmin/integraciones", icon: Bot, label: "Chatbot IA" },
   { href: "/superadmin/notifications", icon: Bell, label: "Notificaciones" },
   { href: "/superadmin/contacto", icon: Mail, label: "Bandeja de Entrada" },
   { href: "/superadmin/landing-public", icon: FileText, label: "Editor de Landing" },

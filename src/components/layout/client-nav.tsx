@@ -1,3 +1,4 @@
+
 "use client";
 
 import Link from "next/link";
@@ -25,8 +26,8 @@ import {
   ScanLine,
   Tag,
   Ticket,
+  Bot,
 } from "lucide-react";
-import { MessageCircle as MessageCircleIcon } from "@/components/icons";
 
 import { SidebarMenu, SidebarMenuItem, SidebarMenuButton, useSidebar } from "@/components/ui/sidebar";
 
@@ -36,7 +37,7 @@ const allNavItems = [
   { href: "/dashboard/catalogo", icon: ShoppingCart, label: "Catálogo", moduleId: 'catalogo' },
   { href: "/dashboard/share", icon: Share2, label: "Compartir Menú", moduleId: 'catalogo' },
   { href: "/dashboard/blog", icon: FileText, label: "Blog", moduleId: 'blog' },
-  { href: "/dashboard/chatbot", icon: MessageCircleIcon, label: "Asistente IA", moduleId: 'chatbot-integrado-con-whatsapp-para-soporte-y-ventas'},
+  { href: "/dashboard/chatbot", icon: Bot, label: "Asistente IA", moduleId: 'chatbot-integrado-con-whatsapp-para-soporte-y-ventas'},
   { href: "/dashboard/promotions", icon: Tag, label: "Promociones", moduleId: 'promotions' },
   { href: "/dashboard/cupones", icon: Ticket, label: "Cupones", moduleId: 'promotions' },
   { href: "/dashboard/messages", icon: Bell, label: "Notificaciones" },
@@ -63,11 +64,9 @@ export function ClientNav() {
   const { setOpenMobile } = useSidebar();
   const { isModuleAuthorized, isLoading: isSubLoading } = useSubscription();
 
-  // Filtrar los elementos del menú según los módulos autorizados por el hook central
   const navItems = useMemo(() => {
     return allNavItems.filter(item => {
       if (!item.moduleId) return true;
-      // El Super Administrador debe ver todas las herramientas disponibles para soporte y auditoría
       if (profile?.role === 'super_admin') return true;
       return isModuleAuthorized(item.moduleId);
     });
