@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useMemo, useState, useEffect, useCallback } from 'react';
@@ -157,16 +158,12 @@ export function useSubscription() {
         suggestions: baseLimits.suggestions === -1 ? -1 : (baseLimits.suggestions + (extras.suggestions || 0)),
     };
 
-    const planType = (details?.name || currentPlanId).toLowerCase();
     const activeModuleIds = new Set<string>();
     
+    // 1. Módulos incluidos por defecto en la definición del plan (Firestore)
     details?.includedModuleKeys?.forEach(key => activeModuleIds.add(key));
 
-    dbModules?.forEach(m => {
-        if (m.status === 'active') activeModuleIds.add(m.id);
-        else if (m.status === 'inactive') activeModuleIds.delete(m.id);
-    });
-
+    // 2. Módulos premium "forzados" por ID o nombre (Red de seguridad robusta)
     const PREMIUM_PLAN_IDS = new Set([
       'AoKkP9RLp517Nl11aNxt', // Plan Estándar
       'KmDDgHJW2H2e8I69Owud', // Plan Profesional
@@ -174,7 +171,6 @@ export function useSubscription() {
     const planName = details?.name || currentPlanId;
     const normalizedName = planName.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
-    // Verificación robusta por ID con fallback por nombre para máxima seguridad
     const hasPremiumId = details?.id && PREMIUM_PLAN_IDS.has(details.id);
     const hasPremiumName = normalizedName.includes('estandar') || normalizedName.includes('pro') || normalizedName.includes('enterprise');
 
@@ -183,6 +179,20 @@ export function useSubscription() {
         activeModuleIds.add('blog');
         activeModuleIds.add('chatbot-integrado-con-whatsapp-para-soporte-y-ventas');
     }
+
+    // 3. SOBRESCRITURA FINAL: Estado de módulos específicos del negocio (base de datos)
+    // CRÍTICO: Este paso debe ir al final para que las desactivaciones manuales en 
+    // "Gestionar Negocio" tengan prioridad absoluta sobre los valores por defecto del plan.
+    dbModules?.forEach(m => {
+        if (m.status === 'active') {
+            activeModuleIds.add(m.id);
+        } else if (m.status === 'inactive') {
+            // Si el admin lo desactivó manualmente, lo borramos de la lista de activos
+            activeModuleIds.delete(m.id);
+        }
+    });
+
+    const planType = (details?.name || currentPlanId).toLowerCase();
 
     return {
       plan: details?.name || currentPlanId,
