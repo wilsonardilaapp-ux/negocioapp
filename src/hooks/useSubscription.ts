@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useMemo, useState, useEffect, useCallback } from 'react';
@@ -173,6 +172,7 @@ export function useSubscription() {
     if (normalizedName.includes('estandar') || normalizedName.includes('pro') || normalizedName.includes('enterprise')) {
         activeModuleIds.add('catalogo');
         activeModuleIds.add('blog');
+        activeModuleIds.add('chatbot-integrado-con-whatsapp-para-soporte-y-ventas');
     }
 
     return {
