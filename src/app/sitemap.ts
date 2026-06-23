@@ -1,16 +1,12 @@
 
 import { MetadataRoute } from 'next';
 import { getAdminFirestore } from '@/firebase/server-init';
-import { DIRECTORY_CATEGORIES, type BusinessDirectoryEntry } from '@/models/business-directory';
+import { DIRECTORY_CATEGORIES } from '@/models/business-directory';
+import type { Business } from '@/models/business';
 
-/**
- * Genera el sitemap dinámico de la aplicación, incluyendo todas las rutas
- * del directorio de negocios para optimizar el rastreo de Google.
- */
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://zentry.com'; // Ajustar según dominio real
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://zentry.com';
 
-  // 1. Rutas estáticas del directorio
   const staticRoutes: MetadataRoute.Sitemap = [
     {
       url: `${baseUrl}/directorio`,
@@ -20,7 +16,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     },
   ];
 
-  // 2. Rutas de categorías
   const categoryRoutes: MetadataRoute.Sitemap = DIRECTORY_CATEGORIES.map((category) => ({
     url: `${baseUrl}/directorio/${category.toLowerCase()}`,
     lastModified: new Date(),
@@ -28,20 +23,18 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.7,
   }));
 
-  // 3. Rutas dinámicas de negocios
   let businessRoutes: MetadataRoute.Sitemap = [];
   try {
     const db = await getAdminFirestore();
-    const snapshot = await db.collection('businessDirectory')
-      .where('status', '==', 'published')
-      .where('publicProfile', '==', true)
+    const snapshot = await db.collection('businesses')
+      .where('directoryEnabled', '==', true)
+      .where('directoryStatus', '==', 'approved')
       .get();
 
     businessRoutes = snapshot.docs.map((doc) => {
-      const data = doc.data() as BusinessDirectoryEntry;
       return {
         url: `${baseUrl}/negocio/${doc.id}`,
-        lastModified: new Date(data.updatedAt || data.listingDate),
+        lastModified: new Date(),
         changeFrequency: 'monthly',
         priority: 0.6,
       };

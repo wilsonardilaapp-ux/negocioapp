@@ -1,5 +1,6 @@
 
 export type EntityStatus = 'active' | 'inactive' | 'suspended' | 'pending_payment';
+export type DirectoryStatus = 'approved' | 'suspended' | 'hidden';
 
 export type Business = {
     id: string;
@@ -12,8 +13,10 @@ export type Business = {
     avatarUrl?: string;
     bannerUrl?: string;
     faviconUrl?: string;
+    address?: string;
+    website?: string;
     description: string;
-    googleAnalyticsId?: string; // Add the optional GA ID field
+    googleAnalyticsId?: string;
     vatRate?: number;
     deliveryFee?: number;
     packagingFee?: number;
@@ -21,6 +24,18 @@ export type Business = {
     status: EntityStatus;
     imageLimit?: number | null;
     productLimit?: number | null;
-};
-
     
+    // Directorio Fields
+    directoryEnabled?: boolean;
+    directoryStatus?: DirectoryStatus;
+    category?: string;
+    tags?: string[];
+    rating?: number;
+    reviewCount?: number;
+    socialLinks?: {
+        instagram?: string;
+        facebook?: string;
+        whatsapp?: string;
+    };
+    internalNotes?: string;
+};

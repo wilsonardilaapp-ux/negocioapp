@@ -61,63 +61,18 @@ service cloud.firestore {
     }
 
     match /blog_posts/{postId} {
-      // CRÍTICO: Se requiere 'list' para que el dashboard pueda contar los posts y validar límites
       allow read, list: if true;
       allow write: if isSuperAdmin() || isOwner(request.resource.data.businessId || resource.data.businessId);
     }
 
     // --- REGLAS POR COLECCIÓN ---
 
-    // Publicidad del Directorio
-    match /directoryAds/{adId} {
-      // Solo anuncios activos son visibles públicamente
-      allow read, list: if true;
-      allow write: if isSuperAdmin();
-    }
-
-    // Directorio de Negocios
-    match /businessDirectory/{entryId} {
-      // Solo lectura pública si está publicado Y marcado como perfil público
-      allow read, list: if (resource.data.status == 'published' && resource.data.publicProfile == true) 
-                        || isSuperAdmin() 
-                        || isOwner(resource.data.businessId);
-      
-      // Escritura permitida a dueños y superadmins
-      allow create: if isSuperAdmin() || isOwner(request.resource.data.businessId);
-      allow update: if isSuperAdmin() || isOwner(request.resource.data.businessId);
-      
-      // Eliminación exclusiva de Super Admin
-      allow delete: if isSuperAdmin();
-    }
-
-    // Planes Híbridos (Zentry)
-    match /hybrid_plans/{planId} {
-      allow read, list: if true;
-      allow write: if isSuperAdmin();
-    }
-
-    // Planes Estándar
-    match /plans/{planId} {
-      allow read, list: if true;
-      allow write: if isSuperAdmin();
-    }
-
-    // Configuración Global
-    match /globalConfig/{document=**} {
-      allow read, list: if true;
-      allow write: if isSuperAdmin();
-    }
-
-    // Usuarios y Perfiles
-    match /users/{userId} {
-      allow get: if isAuthenticated() && (request.auth.uid == userId || isSuperAdmin());
-      allow list: if isSuperAdmin();
-      allow write: if isSuperAdmin() || (isAuthenticated() && request.auth.uid == userId);
-    }
-
-    // Negocios y sus recursos
+    // Directorio Unificado (en la colección businesses)
     match /businesses/{businessId} {
+      // Lectura pública permitida para el directorio
       allow get, list: if true;
+      
+      // Escritura restringida
       allow write: if isSuperAdmin() || isBusinessMember(businessId);
 
       match /publicData/{docId=**} {
@@ -150,13 +105,33 @@ service cloud.firestore {
       }
     }
 
-    // Mensajes de contacto globales
+    // --- REGLAS OBSOLETAS (MIGRACIÓN) ---
+    match /businessDirectory/{entryId} {
+      allow read, list: if true;
+      allow write: if isSuperAdmin();
+    }
+
+    match /directoryAds/{adId} {
+      allow read, list: if true;
+      allow write: if isSuperAdmin();
+    }
+
+    // Planes y Configuración
+    match /hybrid_plans/{planId} { allow read, list: if true; allow write: if isSuperAdmin(); }
+    match /plans/{planId} { allow read, list: if true; allow write: if isSuperAdmin(); }
+    match /globalConfig/{document=**} { allow read, list: if true; allow write: if isSuperAdmin(); }
+
+    match /users/{userId} {
+      allow get: if isAuthenticated() && (request.auth.uid == userId || isSuperAdmin());
+      allow list: if isSuperAdmin();
+      allow write: if isSuperAdmin() || (isAuthenticated() && request.auth.uid == userId);
+    }
+
     match /contactMessages/{messageId} {
       allow create: if true;
       allow read, write: if isSuperAdmin();
     }
 
-    // --- REGLA POR DEFECTO ---
     match /{document=**} {
       allow read, write: if isSuperAdmin();
     }

@@ -2,7 +2,7 @@
 "use client";
 
 import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
-import { collection, query, orderBy, doc, writeBatch } from "firebase/firestore";
+import { collection, query, orderBy } from "firebase/firestore";
 import {
   Card,
   CardContent,
@@ -12,119 +12,51 @@ import {
 } from "@/components/ui/card";
 import { DataTable } from "./data-table";
 import { columns } from "./columns";
-import type { BusinessDirectoryEntry } from "@/models/business-directory";
 import type { Business } from "@/models/business";
-import { Search, ShieldAlert, Globe, Star, LayoutPanelTop, RefreshCw, Loader2 } from "lucide-react";
+import { Search, ShieldAlert, Globe, Star, LayoutPanelTop } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { useToast } from "@/hooks/use-toast";
 
 export default function BusinessDirectoryAdminPage() {
   const firestore = useFirestore();
-  const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
-  const [isSyncing, setIsSyncing] = useState(false);
 
-  // Consulta de entradas actuales del directorio
-  const directoryQuery = useMemoFirebase(() => {
-    if (!firestore) return null;
-    return query(collection(firestore, "businessDirectory"), orderBy("updatedAt", "desc"));
-  }, [firestore]);
-
-  // Consulta de TODOS los negocios del sistema para sincronización
+  // Ahora consultamos directamente la colección de negocios
   const businessesQuery = useMemoFirebase(() => {
     if (!firestore) return null;
-    return collection(firestore, "businesses");
+    return query(collection(firestore, "businesses"), orderBy("name", "asc"));
   }, [firestore]);
 
-  const { data: entries, isLoading } = useCollection<BusinessDirectoryEntry>(directoryQuery);
-  const { data: allBusinesses } = useCollection<Business>(businessesQuery);
-
-  const handleSync = async () => {
-    if (!firestore || !allBusinesses || !entries) return;
-    setIsSyncing(true);
-    try {
-      const batch = writeBatch(firestore);
-      let newEntriesCount = 0;
-
-      for (const business of allBusinesses) {
-        // Verificar si el negocio ya tiene una entrada en el directorio
-        const exists = entries.some(e => e.businessId === business.id);
-        if (!exists) {
-          const newEntryRef = doc(collection(firestore, "businessDirectory"));
-          const newEntry: BusinessDirectoryEntry = {
-            id: newEntryRef.id,
-            businessId: business.id,
-            name: business.name,
-            description: business.description || "Nuevo negocio registrado en la plataforma.",
-            logoUrl: business.logoURL || null,
-            category: 'Otro',
-            tags: [],
-            isVerified: false,
-            featured: false,
-            rating: 5,
-            reviewCount: 0,
-            listingDate: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-            status: 'pending',
-            publicProfile: false, // Por defecto oculto hasta moderación
-          };
-          batch.set(newEntryRef, newEntry);
-          newEntriesCount++;
-        }
-      }
-
-      if (newEntriesCount > 0) {
-        await batch.commit();
-        toast({ 
-            title: "Sincronización Completada", 
-            description: `Se han añadido ${newEntriesCount} negocios para moderación.` 
-        });
-      } else {
-        toast({ 
-            title: "Directorio al día", 
-            description: "No se encontraron nuevos negocios para sincronizar." 
-        });
-      }
-    } catch (e: any) {
-      toast({ 
-          variant: "destructive", 
-          title: "Error de Sincronización", 
-          description: e.message 
-      });
-    } finally {
-      setIsSyncing(false);
-    }
-  };
+  const { data: businesses, isLoading } = useCollection<Business>(businessesQuery);
 
   const filteredEntries = useMemo(() => {
-    if (!entries) return [];
-    if (!searchTerm) return entries;
+    if (!businesses) return [];
+    if (!searchTerm) return businesses;
     const term = searchTerm.toLowerCase();
-    return entries.filter(e => 
+    return businesses.filter(e => 
       e.name.toLowerCase().includes(term) || 
-      e.category.toLowerCase().includes(term) ||
-      e.businessId.toLowerCase().includes(term)
+      (e.category && e.category.toLowerCase().includes(term)) ||
+      e.id.toLowerCase().includes(term)
     );
-  }, [entries, searchTerm]);
+  }, [businesses, searchTerm]);
 
   const stats = useMemo(() => {
-    if (!entries) return { total: 0, public: 0, verified: 0, featured: 0 };
+    if (!businesses) return { total: 0, public: 0, approved: 0, hidden: 0 };
     return {
-      total: entries.length,
-      public: entries.filter(e => e.publicProfile && e.status === 'published').length,
-      verified: entries.filter(e => e.isVerified).length,
-      featured: entries.filter(e => e.featured).length,
+      total: businesses.length,
+      public: businesses.filter(e => e.directoryEnabled && e.directoryStatus === 'approved').length,
+      approved: businesses.filter(e => e.directoryStatus === 'approved').length,
+      hidden: businesses.filter(e => e.directoryStatus === 'hidden').length,
     };
-  }, [entries]);
+  }, [businesses]);
 
   const kpiData = [
-    { title: "Total Registros", value: stats.total, icon: Search, color: "text-blue-600" },
-    { title: "Públicos", value: stats.public, icon: Globe, color: "text-green-600" },
-    { title: "Verificados", value: stats.verified, icon: ShieldAlert, color: "text-indigo-600" },
-    { title: "Destacados", value: stats.featured, icon: Star, color: "text-amber-600" },
+    { title: "Total Negocios", value: stats.total, icon: Search, color: "text-blue-600" },
+    { title: "Visibles", value: stats.public, icon: Globe, color: "text-green-600" },
+    { title: "Aprobados", value: stats.approved, icon: ShieldAlert, color: "text-indigo-600" },
+    { title: "Ocultos", value: stats.hidden, icon: Star, color: "text-amber-600" },
   ];
 
   return (
@@ -134,19 +66,10 @@ export default function BusinessDirectoryAdminPage() {
           <div>
             <CardTitle className="text-3xl font-black tracking-tight">Moderación del Directorio</CardTitle>
             <CardDescription>
-              Gestiona la visibilidad, verificación y estatus de los negocios en el directorio público de Zentry.
+              Gestiona la visibilidad y el estatus de los negocios directamente desde la base central.
             </CardDescription>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button 
-                variant="outline" 
-                onClick={handleSync} 
-                disabled={isSyncing || isLoading}
-                className="font-bold border-blue-200 text-blue-700 hover:bg-blue-50"
-            >
-                {isSyncing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
-                Sincronizar Negocios
-            </Button>
             <Button asChild variant="outline" className="font-bold border-primary text-primary hover:bg-primary/5">
                 <Link href="/superadmin/business-directory/ads">
                 <LayoutPanelTop className="mr-2 h-4 w-4" />

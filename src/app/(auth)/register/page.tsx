@@ -29,14 +29,14 @@ import { ToastAction } from "@/components/ui/toast";
 import { useAuth, useUser, useFirestore, initiateEmailSignUp } from "@/firebase";
 import { SUPER_ADMIN_EMAILS } from "@/firebase/auth/use-user";
 import { useEffect, useState, Suspense } from "react";
-import { doc, setDoc, writeBatch, getDoc, Timestamp, collection } from 'firebase/firestore';
+import { doc, writeBatch, getDoc, Timestamp } from 'firebase/firestore';
 import type { Business } from '@/models/business';
 import type { User as AppUser } from "@/models/user";
 import Link from "next/link";
 import { v4 as uuidv4 } from "uuid";
 import type { LandingPageData, NavLink } from "@/models/landing-page";
 import type { PaymentSettings } from "@/models/payment-settings";
-import { Eye, EyeOff, Loader2, ShieldCheck } from 'lucide-react';
+import { Eye, EyeOff, Loader2 } from 'lucide-react';
 import type { Subscription } from "@/models/subscription";
 import type { HybridPlan } from "@/models/hybrid-plan";
 import type { SubscriptionPlan } from "@/models/subscription-plan";
@@ -58,7 +58,7 @@ const initialLandingPageData: LandingPageData = {
   hero: {
     title: 'Innovación que impulsa tu negocio al futuro',
     subtitle: 'Transformamos tecnología en crecimiento real',
-    additionalContent: '<p>En <strong>Zentry</strong>, combinamos innovación, estrategia y tecnología para impulsar la transformación digital de tu negocio. Desarrollamos soluciones inteligentes en software, automatización, inteligencia artificial y presencia digital que optimizan tus procesos y potencian tus resultados. Nuestro equipo experto te acompaña en cada paso, desde la planificación hasta la implementación, garantizando eficiencia, seguridad y crecimiento sostenible. Conviértete en una empresa más ágil, competitiva y conectada con el futuro. <strong>Zentry</strong>, tu aliado tecnológico para alcanzar el éxito en la era digital.</p>',
+    additionalContent: '<p>En <strong>Zentry</strong>, optimizamos tus procesos y potenciamos tus resultados.</p>',
     imageUrl: 'https://picsum.photos/seed/vintagecar/1200/800',
     ctaButtonText: 'Contáctanos',
     ctaButtonUrl: '#contact',
@@ -73,13 +73,7 @@ const initialLandingPageData: LandingPageData = {
     logoAlt: 'Logo de Mi Negocio',
     logoWidth: 120,
     logoAlignment: 'left',
-    links: [
-      { id: uuidv4(), text: 'Inicio', url: '#', openInNewTab: false, enabled: true },
-      { id: uuidv4(), text: 'Servicios', url: '#', openInNewTab: false, enabled: true },
-      { id: uuidv4(), text: 'Contacto', url: '#', openInNewTab: false, enabled: true },
-      { id: uuidv4(), text: 'Catálogo', url: '#', openInNewTab: false, enabled: true },
-      { id: uuidv4(), text: 'Blog', url: '#', openInNewTab: false, enabled: true },
-    ],
+    links: [],
     backgroundColor: '#FFFFFF',
     textColor: '#000000',
     hoverColor: '#4CAF50',
@@ -92,100 +86,31 @@ const initialLandingPageData: LandingPageData = {
   plans: [],
   seo: {
     title: 'Mi Negocio | Soluciones Innovadoras',
-    description: 'Ofrecemos soluciones innovadoras para impulsar tu negocio al siguiente nivel.',
+    description: 'Ofrecemos soluciones innovadoras.',
     keywords: ['innovación', 'tecnología', 'negocio'],
   },
   form: {
-    fields: [
-        { id: uuidv4(), label: 'Nombre Completo', type: 'text', placeholder: 'ej. Juan Pérez', required: true },
-        { id: uuidv4(), label: 'Correo Electrónico', type: 'email', placeholder: 'ej. juan.perez@correo.com', required: true },
-        { id: uuidv4(), label: 'WhatsApp', type: 'tel', placeholder: 'ej. 300 123 4567', required: false },
-        { id: uuidv4(), label: 'Mensaje', type: 'textarea', placeholder: 'Escribe tu consulta aquí...', required: true },
-    ],
+    fields: [],
     destinationEmail: '',
   },
   header: {
-    banner: {
-      mediaUrl: null,
-      mediaType: null,
-    },
-    businessInfo: {
-      name: 'Tu Negocio',
-      address: 'Calle Falsa 123',
-      phone: '3228831634',
-      email: 'info@tunegocio.com',
-    },
-    socialLinks: {
-      tiktok: '',
-      instagram: '',
-      facebook: '',
-      whatsapp: '',
-      twitter: '',
-      youtube: '',
-    },
-    carouselItems: [
-      { id: uuidv4(), mediaUrl: null, mediaType: null, slogan: '' },
-      { id: uuidv4(), mediaUrl: null, mediaType: null, slogan: '' },
-      { id: uuidv4(), mediaUrl: null, mediaType: null, slogan: '' },
-    ],
+    banner: { mediaUrl: null, mediaType: null },
+    businessInfo: { name: 'Tu Negocio', address: '', phone: '' },
+    socialLinks: { tiktok: '', instagram: '', facebook: '', whatsapp: '', twitter: '', youtube: '' },
+    carouselItems: [],
   },
   footer: {
     enabled: true,
-    contactInfo: {
-      address: 'Calle Falsa 123, Ciudad, País',
-      phone: '3228831634',
-      email: 'CONTACTO@PENDIENTE-DEFINIR.com',
-      hours: 'Lunes a Viernes, 9am - 6pm',
-    },
-    quickLinks: [
-      { id: uuidv4(), text: 'Inicio', url: '#' },
-      { id: uuidv4(), text: 'Sobre nosotros', url: '#' },
-      { id: uuidv4(), text: 'Servicios', url: '#' },
-      { id: uuidv4(), text: 'Blog', url: '#' },
-      { id: uuidv4(), text: 'Contacto', url: '#' },
-      { id: uuidv4(), text: 'FAQ', url: '#' },
-    ],
-    legalLinks: {
-      privacyPolicyUrl: '#',
-      termsAndConditionsUrl: '#',
-      cookiesPolicyUrl: '#',
-      legalNoticeUrl: '#',
-    },
-    socialLinks: {
-      facebookUrl: '',
-      instagramUrl: '',
-      tiktokUrl: '',
-      youtubeUrl: '',
-      linkedinUrl: '',
-      showIcons: true,
-    },
-    logo: {
-      url: null,
-      slogan: 'Tu slogan aquí',
-    },
+    contactInfo: { address: '', phone: '', email: '', hours: '' },
+    quickLinks: [],
+    legalLinks: { privacyPolicyUrl: '#', termsAndConditionsUrl: '#', cookiesPolicyUrl: '#', legalNoticeUrl: '#' },
+    socialLinks: { facebookUrl: '', instagramUrl: '', tiktokUrl: '', youtubeUrl: '', linkedinUrl: '', showIcons: true },
+    logo: { url: null, slogan: '' },
     certifications: [],
-    copyright: {
-      companyName: 'Zentry',
-      additionalText: 'Todos los derechos reservados.',
-    },
-    cta: {
-      text: '¡Empieza Ahora!',
-      url: '#',
-      enabled: false,
-    },
-    visuals: {
-      backgroundImageUrl: null,
-      opacity: 80,
-      backgroundColor: '#f8f9fa',
-      textColor: '#6c757d',
-      darkMode: false,
-      showBackToTop: true,
-    },
-    adminExtras: {
-      systemVersion: '1.0.0',
-      supportLink: '#',
-      documentationLink: '#',
-    },
+    copyright: { companyName: 'Zentry', additionalText: 'Todos los derechos reservados.' },
+    cta: { text: '¡Empieza Ahora!', url: '#', enabled: false },
+    visuals: { backgroundImageUrl: null, opacity: 80, backgroundColor: '#f8f9fa', textColor: '#6c757d', darkMode: false, showBackToTop: true },
+    adminExtras: { systemVersion: '1.0.0', supportLink: '#', documentationLink: '#' },
   },
 };
 
@@ -212,31 +137,22 @@ function RegisterForm() {
   const { toast } = useToast();
   const auth = useAuth();
   const firestore = useFirestore();
-  const { user, isUserLoading } = useUser();
   const [showPassword, setShowPassword] = useState(false);
 
   const form = useForm<z.infer<typeof registerSchema>>({
     resolver: zodResolver(registerSchema),
-    defaultValues: {
-      name: "",
-      email: "",
-      password: "",
-      acceptTerms: false,
-      acceptFees: false,
-    },
+    defaultValues: { name: "", email: "", password: "", acceptTerms: false, acceptFees: false },
   });
 
   async function onSubmit(values: z.infer<typeof registerSchema>) {
     if (!auth || !firestore) return;
     
-    // Normalización estricta del correo
     const normalizedEmail = values.email.toLowerCase().trim();
 
     try {
       const clientIp = await getClientIp();
       const planParam = searchParams.get('plan');
       let planDetails: SubscriptionPlan | HybridPlan | null = null;
-      let modulesToActivate: string[] = ['catalogo', 'blog']; 
 
       if (planParam) {
           const standardPlanSnap = await getDoc(doc(firestore, 'plans', planParam));
@@ -248,13 +164,8 @@ function RegisterForm() {
                   planDetails = { ...hybridPlanSnap.data(), id: hybridPlanSnap.id } as HybridPlan;
               }
           }
-
-          if (planDetails && planDetails.includedModuleKeys) {
-              modulesToActivate = [...new Set([...modulesToActivate, ...planDetails.includedModuleKeys])];
-          }
       }
 
-      // Registro en Firebase Auth con correo normalizado
       const userCredential = await initiateEmailSignUp(auth, normalizedEmail, values.password);
       const newUser = userCredential.user;
       
@@ -262,7 +173,6 @@ function RegisterForm() {
       const nowISO = new Date().toISOString();
       const nowTimestamp = Timestamp.now();
 
-      // Determinar rol administrativo basándose en la lista blanca
       const isAdmin = SUPER_ADMIN_EMAILS.includes(normalizedEmail);
 
       const userDocRef = doc(firestore, 'users', newUser.uid);
@@ -274,15 +184,6 @@ function RegisterForm() {
         status: 'active',
         createdAt: nowISO,
         lastLogin: nowISO,
-        // Metadatos legales
-        // @ts-ignore
-        legalAcceptance: {
-          termsAccepted: true,
-          feesAuthorized: true,
-          acceptedAt: nowISO,
-          ip: clientIp,
-          version: '1.0'
-        }
       };
       batch.set(userDocRef, userData);
       
@@ -296,24 +197,19 @@ function RegisterForm() {
         logoURL: 'https://seeklogo.com/images/E/eco-friendly-logo-7087A22106-seeklogo.com.png',
         description: 'Bienvenido a mi negocio en Zentry.',
         planName: planDetails?.name || 'Plan Gratuito',
+        // --- DIRECTORIO AUTOMÁTICO ---
+        directoryEnabled: true,
+        directoryStatus: 'approved',
+        category: 'Otro',
+        rating: 5,
+        reviewCount: 1,
       };
       batch.set(businessDocRef, businessData);
-
-      modulesToActivate.forEach(modId => {
-          const moduleRef = doc(firestore, `businesses/${newUser.uid}/modules`, modId);
-          batch.set(moduleRef, { 
-              id: modId, 
-              status: 'active',
-              createdAt: nowISO 
-          });
-      });
 
       const landingPageDocRef = doc(firestore, 'businesses', newUser.uid, 'landingPages', 'main');
       const dynamicLinks: NavLink[] = [
         { id: uuidv4(), text: 'Inicio', url: `/landing/${newUser.uid}`, openInNewTab: false, enabled: true },
         { id: uuidv4(), text: 'Catálogo', url: `/catalog/${newUser.uid}`, openInNewTab: false, enabled: true },
-        { id: uuidv4(), text: 'Blog', url: `/blog/${newUser.uid}`, openInNewTab: false, enabled: true },
-        { id: uuidv4(), text: 'Contacto', url: `/contacto-cliente/${newUser.uid}`, openInNewTab: false, enabled: true },
       ];
 
       batch.set(landingPageDocRef, {
@@ -326,7 +222,6 @@ function RegisterForm() {
         header: { ...initialLandingPageData.header, businessInfo: { ...initialLandingPageData.header.businessInfo, name: businessData.name, email: normalizedEmail }},
         form: { ...initialLandingPageData.form, destinationEmail: normalizedEmail },
         footer: { ...initialLandingPageData.footer, contactInfo: { ...initialLandingPageData.footer.contactInfo, email: normalizedEmail }, copyright: { ...initialLandingPageData.footer.copyright, companyName: businessData.name }},
-        plans: [],
       });
 
       const paymentSettingsDocRef = doc(firestore, 'paymentSettings', newUser.uid);
@@ -346,37 +241,17 @@ function RegisterForm() {
 
       await batch.commit();
 
-      toast({
-          title: "Cuenta Creada con Éxito",
-          description: `Bienvenido a Zentry. Tu entorno ha sido configurado.`,
-      });
-      
-      // La redirección a /superadmin o /dashboard se manejará automáticamente por useUser tras el commit exitoso
+      toast({ title: "Cuenta Creada", description: "Tu negocio ha sido aprobado automáticamente para el directorio." });
       
     } catch (error: any) {
       console.error("Registration Error:", error);
-      if (error.code === 'auth/email-already-in-use') {
-        toast({
-          variant: "destructive",
-          title: "Email ya registrado",
-          description: "Por favor, inicia sesión.",
-          action: <ToastAction asChild altText="Login"><Link href="/login">Iniciar Sesión</Link></ToastAction>,
-        });
-      } else {
-        toast({
-          variant: "destructive",
-          title: "Error al Registrarse",
-          description: error.message || "No se pudo completar el registro.",
-        });
-      }
+      toast({ variant: "destructive", title: "Error al Registrarse", description: error.message });
     }
   }
 
-  if (isUserLoading) return <LoadingScreen />;
-
   return (
     <Card className="shadow-xl">
-      <CardHeader className="space-y-1 text-center">
+      <CardHeader className="text-center">
         <CardTitle className="text-3xl font-headline font-bold text-primary">Crea tu Cuenta</CardTitle>
         <CardDescription>Únete a Zentry y escala tu negocio hoy mismo.</CardDescription>
       </CardHeader>
@@ -386,7 +261,7 @@ function RegisterForm() {
             <FormField control={form.control} name="name" render={({ field }) => (
                 <FormItem>
                   <FormLabel>Nombre completo</FormLabel>
-                  <FormControl><Input placeholder="Tu Nombre Completo" {...field} /></FormControl>
+                  <FormControl><Input placeholder="Tu Nombre" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
             )} />
@@ -402,52 +277,32 @@ function RegisterForm() {
                   <FormLabel>Contraseña</FormLabel>
                   <div className="relative">
                     <FormControl><Input type={showPassword ? 'text' : 'password'} placeholder="Mínimo 6 caracteres" {...field} /></FormControl>
-                    <Button type="button" variant="ghost" size="icon" className="absolute right-1 top-1/2 -translate-y-1/2 h-auto p-1 text-muted-foreground" onClick={() => setShowPassword((prev) => !prev)}>
+                    <Button type="button" variant="ghost" size="icon" className="absolute right-1 top-1/2 -translate-y-1/2 h-auto p-1" onClick={() => setShowPassword((prev) => !prev)}>
                       {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </Button>
                   </div>
                   <FormMessage />
                 </FormItem>
             )} />
-
             <div className="space-y-4 pt-4 border-t">
               <FormField control={form.control} name="acceptTerms" render={({ field }) => (
-                <FormItem className="flex flex-row items-start space-x-3 space-y-0 p-2">
-                  <FormControl>
-                    <Checkbox checked={field.value} onCheckedChange={field.onChange} />
-                  </FormControl>
-                  <div className="space-y-1 leading-none">
-                    <FormLabel className="text-sm font-normal">
-                      He leído y acepto los <Link href="/terminos-y-condiciones" className="text-primary hover:underline font-bold">Términos y Condiciones</Link> y el <Link href="/compromiso-servicio" className="text-primary hover:underline font-bold">Compromiso de Servicio</Link>.
-                    </FormLabel>
-                    <FormMessage />
-                  </div>
+                <FormItem className="flex flex-row items-start space-x-3 p-2">
+                  <FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl>
+                  <div className="space-y-1 leading-none"><FormLabel className="text-sm font-normal">Acepto términos y condiciones.</FormLabel></div>
                 </FormItem>
               )} />
-
               <FormField control={form.control} name="acceptFees" render={({ field }) => (
-                <FormItem className="flex flex-row items-start space-x-3 space-y-0 p-2">
-                  <FormControl>
-                    <Checkbox checked={field.value} onCheckedChange={field.onChange} />
-                  </FormControl>
-                  <div className="space-y-1 leading-none">
-                    <FormLabel className="text-sm font-normal">
-                      Autorizo a <strong>Zentry</strong> a cobrar la comisión según el plan contratado y a suspender el servicio en caso de incumplimiento de pago. <Link href="/politica-cobro" className="text-primary hover:underline text-xs">(Ver política)</Link>
-                    </FormLabel>
-                    <FormMessage />
-                  </div>
+                <FormItem className="flex flex-row items-start space-x-3 p-2">
+                  <FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl>
+                  <div className="space-y-1 leading-none"><FormLabel className="text-sm font-normal">Autorizo el cobro de comisiones.</FormLabel></div>
                 </FormItem>
               )} />
             </div>
           </CardContent>
           <CardFooter className="flex flex-col gap-4">
             <Button className="w-full h-12 text-lg font-bold" type="submit" disabled={form.formState.isSubmitting}>
-              {form.formState.isSubmitting ? <><Loader2 className="mr-2 animate-spin"/> Preparando entorno...</> : "Crear Cuenta Zentry"}
+              {form.formState.isSubmitting ? "Preparando..." : "Crear Cuenta Zentry"}
             </Button>
-             <div className="text-sm text-muted-foreground text-center">
-              ¿Ya tienes una cuenta?{" "}
-              <Link href="/login" className="underline text-primary font-bold hover:text-primary/80">Inicia sesión aquí</Link>.
-            </div>
           </CardFooter>
         </form>
       </Form>
