@@ -20,4 +20,24 @@ export interface BusinessDirectoryEntry {
     listingDate: string; // ISO String
     updatedAt: string; // ISO String
     status: 'published' | 'hidden' | 'pending';
+    
+    // Public profile fields
+    address?: string;
+    phone?: string;
+    email?: string;
+    website?: string;
+    socialLinks?: {
+        instagram?: string;
+        facebook?: string;
+        whatsapp?: string;
+    };
 }
+
+export const DIRECTORY_CATEGORIES: DirectoryCategory[] = [
+    'Salud',
+    'Bienestar',
+    'Belleza',
+    'Deportes',
+    'Nutrición',
+    'Otro'
+];
