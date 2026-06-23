@@ -14,18 +14,29 @@ import type { Metadata } from 'next';
 
 export const dynamic = 'force-dynamic';
 
-async function getEntriesByCategory(category: string) {
+/**
+ * Normaliza un string para comparaciones seguras de URLs (remueve acentos y pasa a minúsculas)
+ */
+function normalizeString(text: string): string {
+    return decodeURIComponent(text)
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "");
+}
+
+async function getEntriesByCategory(categoryParam: string) {
     try {
         const db = await getAdminFirestore();
         
-        // Normalizar categoría para la búsqueda
+        // Buscamos la categoría original comparando versiones normalizadas (sin acentos)
+        const normalizedTarget = normalizeString(categoryParam);
         const normalizedCategory = DIRECTORY_CATEGORIES.find(
-            c => c.toLowerCase() === category.toLowerCase()
+            c => normalizeString(c) === normalizedTarget
         );
 
         if (!normalizedCategory) return null;
 
-        // Consultamos la colección 'businesses' directamente con el filtro de categoría
+        // Consultamos la colección 'businesses' directamente con el nombre exacto guardado
         const snapshot = await db.collection('businesses')
             .where('directoryStatus', '==', 'approved')
             .where('category', '==', normalizedCategory)
@@ -42,8 +53,9 @@ async function getEntriesByCategory(category: string) {
 }
 
 export async function generateMetadata({ params }: { params: { categoria: string } }): Promise<Metadata> {
+    const normalizedTarget = normalizeString(params.categoria);
     const category = DIRECTORY_CATEGORIES.find(
-        c => c.toLowerCase() === params.categoria.toLowerCase()
+        c => normalizeString(c) === normalizedTarget
     );
 
     if (!category) return { title: 'Categoría no encontrada' };

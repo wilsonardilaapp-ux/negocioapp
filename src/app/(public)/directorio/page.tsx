@@ -23,9 +23,6 @@ export const metadata: Metadata = {
 async function getDirectoryBusinesses() {
     try {
         const db = await getAdminFirestore();
-        // Consultamos la colección 'businesses' directamente.
-        // Relajamos un poco el filtro para incluir negocios que tengan status 'approved' 
-        // aunque el flag enabled sea undefined (por migración).
         const snapshot = await db.collection('businesses')
             .where('directoryStatus', '==', 'approved')
             .limit(48)
@@ -44,7 +41,6 @@ async function getDirectoryBusinesses() {
 export default async function DirectoryPage() {
     const allBusinesses = await getDirectoryBusinesses();
     
-    // Filtrado final en memoria para mayor seguridad y flexibilidad con datos antiguos
     const businesses = allBusinesses.filter(b => b.directoryEnabled !== false);
 
     return (
@@ -89,7 +85,7 @@ export default async function DirectoryPage() {
                                     {DIRECTORY_CATEGORIES.map(category => (
                                         <Link 
                                             key={category} 
-                                            href={`/directorio/${category.toLowerCase()}`}
+                                            href={`/directorio/${encodeURIComponent(category.toLowerCase())}`}
                                             className="block px-3 py-2 rounded-lg text-sm text-gray-600 hover:bg-primary/5 hover:text-primary transition-colors"
                                         >
                                             {category}
