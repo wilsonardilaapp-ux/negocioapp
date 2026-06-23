@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { ChevronLeft } from 'lucide-react';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import type { Metadata } from 'next';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,7 +26,7 @@ async function getEntriesByCategory(category: string) {
 
         const snapshot = await db.collection('businessDirectory')
             .where('status', '==', 'published')
-            .where('publicProfile', '==', true) // Filtro de seguridad obligatorio
+            .where('publicProfile', '==', true)
             .where('category', '==', normalizedCategory)
             .orderBy('featured', 'desc')
             .get();
@@ -38,6 +39,19 @@ async function getEntriesByCategory(category: string) {
         console.error("Error fetching category entries:", error);
         return null;
     }
+}
+
+export async function generateMetadata({ params }: { params: { categoria: string } }): Promise<Metadata> {
+    const category = DIRECTORY_CATEGORIES.find(
+        c => c.toLowerCase() === params.categoria.toLowerCase()
+    );
+
+    if (!category) return { title: 'Categoría no encontrada' };
+
+    return {
+        title: `Negocios de ${category} | Zentry`,
+        description: `Encuentra los mejores negocios y servicios en la categoría de ${category.toLowerCase()}. Perfiles profesionales y verificados.`,
+    };
 }
 
 export default async function CategoryPage({ params }: { params: { categoria: string } }) {

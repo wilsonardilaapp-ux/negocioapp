@@ -21,6 +21,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { notFound } from 'next/navigation';
 import type { BusinessDirectoryEntry } from '@/models/business-directory';
+import type { Metadata } from 'next';
 
 export const dynamic = 'force-dynamic';
 
@@ -45,6 +46,22 @@ async function getEntry(id: string) {
     }
 }
 
+export async function generateMetadata({ params }: { params: { id: string } }): Promise<Metadata> {
+    const entry = await getEntry(params.id);
+    if (!entry) return { title: 'Negocio no encontrado' };
+
+    return {
+        title: `${entry.name} | Directorio Zentry`,
+        description: entry.description.substring(0, 160),
+        openGraph: {
+            title: entry.name,
+            description: entry.description.substring(0, 160),
+            images: entry.logoUrl ? [{ url: entry.logoUrl }] : [],
+            type: 'profile',
+        },
+    };
+}
+
 export default async function BusinessProfilePage({ params }: { params: { id: string } }) {
     const entry = await getEntry(params.id);
 
@@ -52,8 +69,32 @@ export default async function BusinessProfilePage({ params }: { params: { id: st
         notFound();
     }
 
+    // Datos estructurados para Google (SEO Local)
+    const jsonLd = {
+        '@context': 'https://schema.org',
+        '@type': 'LocalBusiness',
+        name: entry.name,
+        description: entry.description,
+        image: entry.logoUrl,
+        address: {
+            '@type': 'PostalAddress',
+            streetAddress: entry.address || '',
+        },
+        telephone: entry.phone || '',
+        url: entry.website || '',
+        aggregateRating: {
+            '@type': 'AggregateRating',
+            ratingValue: entry.rating || 5,
+            reviewCount: entry.reviewCount || 1,
+        }
+    };
+
     return (
         <div className="min-h-screen bg-gray-50/30 flex flex-col">
+            <script
+                type="application/ld+json"
+                dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+            />
             <Header businessId={entry.businessId} navigation={null} />
             
             <main className="flex-grow">

@@ -9,15 +9,26 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Search, Filter, LayoutGrid } from 'lucide-react';
 import Link from 'next/link';
+import type { Metadata } from 'next';
 
 export const dynamic = 'force-dynamic';
+
+export const metadata: Metadata = {
+    title: 'Directorio de Negocios | Zentry',
+    description: 'Explora el directorio de negocios líderes en salud, bienestar y servicios. Encuentra profesionales verificados cerca de ti.',
+    openGraph: {
+        title: 'Directorio de Negocios | Zentry',
+        description: 'Conecta con los mejores negocios de salud y bienestar.',
+        type: 'website',
+    },
+};
 
 async function getDirectoryEntries() {
     try {
         const db = await getAdminFirestore();
         const snapshot = await db.collection('businessDirectory')
             .where('status', '==', 'published')
-            .where('publicProfile', '==', true) // Filtro de seguridad obligatorio
+            .where('publicProfile', '==', true)
             .orderBy('featured', 'desc')
             .orderBy('rating', 'desc')
             .limit(24)
