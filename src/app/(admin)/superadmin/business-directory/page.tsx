@@ -32,6 +32,7 @@ export default function BusinessDirectoryAdminPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const { toast } = useToast();
 
+  // Resolución dinámica de la URL del directorio
   const directoryUrl = typeof window !== 'undefined' ? `${window.location.origin}/directorio` : '';
 
   const businessesQuery = useMemoFirebase(() => {
@@ -82,7 +83,7 @@ export default function BusinessDirectoryAdminPage() {
       <Card className="border-none shadow-none bg-transparent">
         <CardHeader className="px-0 pt-0 flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <CardTitle className="text-3xl font-black tracking-tight">Moderación del Directorio</CardTitle>
+            <CardTitle className="text-3xl font-black tracking-tight text-gray-900">Moderación del Directorio</CardTitle>
             <CardDescription>
               Gestiona la visibilidad y el estatus de los negocios directamente desde la base central.
             </CardDescription>
@@ -112,7 +113,7 @@ export default function BusinessDirectoryAdminPage() {
         ))}
       </div>
 
-      <Card>
+      <Card className="shadow-sm">
         <CardHeader className="pb-3">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <CardTitle className="text-lg">Listado de Negocios</CardTitle>
@@ -136,16 +137,16 @@ export default function BusinessDirectoryAdminPage() {
         </CardContent>
       </Card>
 
-      {/* NUEVA SESIÓN: COMPARTIR DIRECTORIO */}
-      <Card className="border-primary/20 bg-primary/5 shadow-lg overflow-hidden">
+      {/* SECCIÓN: COMPARTIR DIRECTORIO */}
+      <Card className="border-primary/20 bg-primary/5 shadow-lg overflow-hidden border-2">
         <CardHeader>
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-primary text-white rounded-xl">
+            <div className="p-2 bg-primary text-white rounded-xl shadow-md">
               <Share2 className="h-5 w-5" />
             </div>
             <div>
               <CardTitle className="text-xl font-black text-gray-900">Compartir Directorio Zentry</CardTitle>
-              <CardDescription>Atrae más tráfico y genera más pedidos compartiendo el enlace global.</CardDescription>
+              <CardDescription className="text-gray-600">Aumenta el tráfico de la plataforma difundiendo el directorio en tus redes sociales.</CardDescription>
             </div>
           </div>
         </CardHeader>
@@ -156,57 +157,57 @@ export default function BusinessDirectoryAdminPage() {
                 <Input 
                   value={directoryUrl} 
                   readOnly 
-                  className="bg-white font-mono text-sm h-12 pr-12 focus-visible:ring-primary border-primary/20"
+                  className="bg-white font-mono text-sm h-12 pr-12 focus-visible:ring-primary border-primary/20 shadow-inner"
                 />
                 <Button 
                   size="icon" 
                   variant="ghost" 
-                  className="absolute right-1 top-1 h-10 w-10 hover:bg-primary/10"
+                  className="absolute right-1 top-1 h-10 w-10 hover:bg-primary/10 text-primary transition-colors"
                   onClick={handleCopyLink}
                 >
-                  <Copy className="h-4 w-4 text-primary" />
+                  <Copy className="h-4 w-4" />
                 </Button>
               </div>
             </div>
             <div className="flex flex-wrap justify-center gap-2">
               {/* FACEBOOK */}
-              <Button asChild variant="outline" className="bg-[#1877F2] text-white hover:bg-[#1877F2]/90 border-none h-12 px-6 shadow-sm">
+              <Button asChild variant="outline" className="bg-[#1877F2] text-white hover:bg-[#1877F2]/90 border-none h-12 px-6 shadow-md transition-transform hover:scale-105">
                 <a href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(directoryUrl)}`} target="_blank" rel="noopener noreferrer">
                   <FacebookIcon className="h-5 w-5 mr-2" /> Facebook
                 </a>
               </Button>
 
-              {/* INSTAGRAM (Redirect) */}
-              <Button asChild variant="outline" className="bg-gradient-to-br from-[#833ab4] via-[#fd1d1d] to-[#fcb045] text-white hover:opacity-90 border-none h-12 px-6 shadow-sm">
+              {/* INSTAGRAM */}
+              <Button asChild variant="outline" className="bg-gradient-to-br from-[#833ab4] via-[#fd1d1d] to-[#fcb045] text-white hover:opacity-95 border-none h-12 px-6 shadow-md transition-transform hover:scale-105">
                 <a href="https://www.instagram.com/" target="_blank" rel="noopener noreferrer">
                   <InstagramIcon className="h-5 w-5 mr-2" /> Instagram
                 </a>
               </Button>
 
               {/* TWITTER / X */}
-              <Button asChild variant="outline" className="bg-black text-white hover:bg-black/90 border-none h-12 px-6 shadow-sm">
-                <a href={`https://twitter.com/intent/tweet?url=${encodeURIComponent(directoryUrl)}&text=${encodeURIComponent('¡Descubre los mejores negocios en el Directorio Zentry!')}`} target="_blank" rel="noopener noreferrer">
+              <Button asChild variant="outline" className="bg-black text-white hover:bg-black/90 border-none h-12 px-6 shadow-md transition-transform hover:scale-105">
+                <a href={`https://twitter.com/intent/tweet?url=${encodeURIComponent(directoryUrl)}&text=${encodeURIComponent('🚀 ¡Explora los mejores negocios en el Directorio Zentry! Encuentra servicios verificados y profesionales en un solo lugar.')}`} target="_blank" rel="noopener noreferrer">
                   <XIcon className="h-4 w-4 mr-2" /> Twitter/X
                 </a>
               </Button>
 
               {/* TIKTOK */}
-              <Button asChild variant="outline" className="bg-black text-white hover:bg-black/90 border-none h-12 px-6 shadow-sm">
+              <Button asChild variant="outline" className="bg-black text-white hover:bg-black/90 border-none h-12 px-6 shadow-md transition-transform hover:scale-105">
                 <a href="https://www.tiktok.com/" target="_blank" rel="noopener noreferrer">
                   <TikTokIcon className="h-5 w-5 mr-2" /> TikTok
                 </a>
               </Button>
 
               {/* WHATSAPP */}
-              <Button asChild variant="outline" className="bg-[#25D366] text-white hover:bg-[#25D366]/90 border-none h-12 px-6 shadow-sm">
+              <Button asChild variant="outline" className="bg-[#25D366] text-white hover:bg-[#25D366]/90 border-none h-12 px-6 shadow-md transition-transform hover:scale-105">
                 <a href={`https://api.whatsapp.com/send?text=${encodeURIComponent(`🚀 ¡Mira el nuevo Directorio de Negocios Zentry! Encuentra todo lo que necesitas aquí: ${directoryUrl}`)}`} target="_blank" rel="noopener noreferrer">
                   <WhatsAppIcon className="h-5 w-5 mr-2" /> WhatsApp
                 </a>
               </Button>
 
               {/* PINTEREST */}
-              <Button asChild variant="outline" className="bg-[#E60023] text-white hover:bg-[#E60023]/90 border-none h-12 px-6 shadow-sm">
-                <a href={`https://pinterest.com/pin/create/button/?url=${encodeURIComponent(directoryUrl)}&description=${encodeURIComponent('Directorio Zentry - Negocios Líderes')}`} target="_blank" rel="noopener noreferrer">
+              <Button asChild variant="outline" className="bg-[#E60023] text-white hover:bg-[#E60023]/90 border-none h-12 px-6 shadow-md transition-transform hover:scale-105">
+                <a href={`https://pinterest.com/pin/create/button/?url=${encodeURIComponent(directoryUrl)}&description=${encodeURIComponent('Directorio Zentry - Negocios y Servicios Verificados')}`} target="_blank" rel="noopener noreferrer">
                   <PinterestIcon className="h-5 w-5 mr-2" /> Pinterest
                 </a>
               </Button>
@@ -232,6 +233,6 @@ function PinterestIcon(props: any) {
   );
 }
 
-function cn(...classes: string[]) {
+function cn(...classes: any[]) {
   return classes.filter(Boolean).join(" ");
 }
