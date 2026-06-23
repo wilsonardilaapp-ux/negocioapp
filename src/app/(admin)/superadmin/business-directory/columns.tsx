@@ -2,7 +2,7 @@
 "use client";
 
 import { ColumnDef } from "@tanstack/react-table";
-import { MoreHorizontal, ShieldCheck, Star, ExternalLink, MessageSquareText, Eye } from "lucide-react";
+import { MoreHorizontal, ShieldCheck, Star, ExternalLink, MessageSquareText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
@@ -31,6 +31,7 @@ import { useFirestore, updateDocumentNonBlocking } from "@/firebase";
 import { doc } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import Link from "next/link";
+import { cn } from "@/lib/utils";
 
 interface ActionCellProps {
   entry: BusinessDirectoryEntry;
@@ -75,10 +76,12 @@ const ActionCell = ({ entry }: ActionCellProps) => {
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={() => handleUpdate({ isVerified: !entry.isVerified })}>
-            <ShieldCheck className="mr-2 h-4 w-4" /> {entry.isVerified ? "Quitar Verificación" : "Verificar Negocio"}
+            <ShieldCheck className={cn("mr-2 h-4 w-4", entry.isVerified ? "text-blue-500" : "")} /> 
+            {entry.isVerified ? "Quitar Verificación" : "Verificar Negocio"}
           </DropdownMenuItem>
           <DropdownMenuItem onClick={() => handleUpdate({ featured: !entry.featured })}>
-            <Star className="mr-2 h-4 w-4" /> {entry.featured ? "Quitar de Destacados" : "Destacar Negocio"}
+            <Star className={cn("mr-2 h-4 w-4", entry.featured ? "text-amber-500 fill-amber-500" : "")} /> 
+            {entry.featured ? "Quitar de Destacados" : "Destacar Negocio"}
           </DropdownMenuItem>
           <DropdownMenuItem onClick={() => setIsNotesOpen(true)}>
             <MessageSquareText className="mr-2 h-4 w-4" /> Notas Internas
@@ -94,7 +97,7 @@ const ActionCell = ({ entry }: ActionCellProps) => {
               Estas notas son privadas y solo visibles para el Super Admin. Úsalas para seguimiento de validación.
             </DialogDescription>
           </DialogHeader>
-          <div className="py-4">
+          <div className="py-4 space-y-2">
             <Label htmlFor="notes">Contenido de la nota</Label>
             <Textarea
               id="notes"
@@ -121,7 +124,7 @@ export const columns: ColumnDef<BusinessDirectoryEntry>[] = [
     cell: ({ row }) => (
       <div className="flex flex-col">
         <span className="font-bold">{row.original.name}</span>
-        <span className="text-[10px] text-muted-foreground uppercase">{row.original.category}</span>
+        <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-tight">{row.original.category}</span>
       </div>
     ),
   },
@@ -140,13 +143,16 @@ export const columns: ColumnDef<BusinessDirectoryEntry>[] = [
 
       return (
         <Select value={status} onValueChange={handleStatusChange}>
-          <SelectTrigger className="w-[130px] h-8 text-xs font-medium">
+          <SelectTrigger className={cn(
+            "w-[130px] h-8 text-[10px] font-black uppercase tracking-wider",
+            status === 'published' ? "border-green-200 text-green-700 bg-green-50" : "border-muted text-muted-foreground"
+          )}>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="published">Publicado</SelectItem>
-            <SelectItem value="pending">Pendiente</SelectItem>
-            <SelectItem value="hidden">Oculto</SelectItem>
+            <SelectItem value="published" className="text-[10px] font-bold">Publicado</SelectItem>
+            <SelectItem value="pending" className="text-[10px] font-bold">Pendiente</SelectItem>
+            <SelectItem value="hidden" className="text-[10px] font-bold">Oculto</SelectItem>
           </SelectContent>
         </Select>
       );
@@ -167,8 +173,17 @@ export const columns: ColumnDef<BusinessDirectoryEntry>[] = [
 
       return (
         <div className="flex items-center gap-2">
-          <Switch checked={active} onCheckedChange={handleChange} />
-          <span className="text-[10px] font-bold uppercase">{active ? "ON" : "OFF"}</span>
+          <Switch 
+            checked={active} 
+            onCheckedChange={handleChange} 
+            className="data-[state=checked]:bg-green-500"
+          />
+          <span className={cn(
+            "text-[10px] font-black uppercase tracking-widest",
+            active ? "text-green-600" : "text-muted-foreground"
+          )}>
+            {active ? "ON" : "OFF"}
+          </span>
         </div>
       );
     },
@@ -178,8 +193,8 @@ export const columns: ColumnDef<BusinessDirectoryEntry>[] = [
     header: "Atributos",
     cell: ({ row }) => (
       <div className="flex gap-1">
-        {row.original.isVerified && <Badge className="bg-blue-500 text-[10px] py-0 h-4">Verificado</Badge>}
-        {row.original.featured && <Badge className="bg-amber-500 text-[10px] py-0 h-4">Destacado</Badge>}
+        {row.original.isVerified && <Badge className="bg-blue-500 text-[9px] font-black uppercase py-0 h-4 border-none">Verificado</Badge>}
+        {row.original.featured && <Badge className="bg-amber-500 text-[9px] font-black uppercase py-0 h-4 border-none">Destacado</Badge>}
       </div>
     ),
   },
@@ -187,10 +202,10 @@ export const columns: ColumnDef<BusinessDirectoryEntry>[] = [
     accessorKey: "rating",
     header: "Rating",
     cell: ({ row }) => (
-      <div className="flex items-center gap-1 text-xs">
+      <div className="flex items-center gap-1 text-xs font-bold">
         <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
         <span>{row.original.rating.toFixed(1)}</span>
-        <span className="text-muted-foreground">({row.original.reviewCount})</span>
+        <span className="text-[10px] text-muted-foreground font-normal">({row.original.reviewCount})</span>
       </div>
     ),
   },

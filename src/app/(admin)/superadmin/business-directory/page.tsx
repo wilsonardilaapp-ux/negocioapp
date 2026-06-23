@@ -13,9 +13,11 @@ import {
 import { DataTable } from "./data-table";
 import { columns } from "./columns";
 import type { BusinessDirectoryEntry } from "@/models/business-directory";
-import { Search, ShieldAlert, Globe, Star } from "lucide-react";
+import { Search, ShieldAlert, Globe, Star, LayoutPanelTop } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import Link from "next/link";
 
 export default function BusinessDirectoryAdminPage() {
   const firestore = useFirestore();
@@ -59,11 +61,19 @@ export default function BusinessDirectoryAdminPage() {
   return (
     <div className="flex flex-col gap-6 animate-in fade-in duration-500">
       <Card className="border-none shadow-none bg-transparent">
-        <CardHeader className="px-0 pt-0">
-          <CardTitle className="text-3xl font-black tracking-tight">Moderación del Directorio</CardTitle>
-          <CardDescription>
-            Gestiona la visibilidad, verificación y estatus de los negocios en el directorio público de Zentry.
-          </CardDescription>
+        <CardHeader className="px-0 pt-0 flex flex-row items-center justify-between">
+          <div>
+            <CardTitle className="text-3xl font-black tracking-tight">Moderación del Directorio</CardTitle>
+            <CardDescription>
+              Gestiona la visibilidad, verificación y estatus de los negocios en el directorio público de Zentry.
+            </CardDescription>
+          </div>
+          <Button asChild variant="outline" className="font-bold border-primary text-primary hover:bg-primary/5">
+            <Link href="/superadmin/business-directory/ads">
+              <LayoutPanelTop className="mr-2 h-4 w-4" />
+              Gestionar Publicidad (Ads)
+            </Link>
+          </Button>
         </CardHeader>
       </Card>
 
