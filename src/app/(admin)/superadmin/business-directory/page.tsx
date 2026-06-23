@@ -26,6 +26,7 @@ import {
   WhatsAppIcon, 
   XIcon 
 } from "@/components/icons";
+import { cn } from "@/lib/utils";
 
 export default function BusinessDirectoryAdminPage() {
   const firestore = useFirestore();
@@ -57,9 +58,9 @@ export default function BusinessDirectoryAdminPage() {
     if (!businesses) return { total: 0, public: 0, approved: 0, hidden: 0 };
     return {
       total: businesses.length,
-      public: businesses.filter(e => e.directoryEnabled && e.directoryStatus === 'approved').length,
+      public: businesses.filter(e => e.directoryEnabled === true).length,
       approved: businesses.filter(e => e.directoryStatus === 'approved').length,
-      hidden: businesses.filter(e => e.directoryStatus === 'hidden').length,
+      hidden: businesses.filter(e => e.directoryStatus === 'hidden' || e.directoryStatus === 'suspended').length,
     };
   }, [businesses]);
 
@@ -231,8 +232,4 @@ function PinterestIcon(props: any) {
       <path d="M12.017 0C5.396 0 .029 5.367.029 11.987c0 5.079 3.158 9.417 7.618 11.162-.105-.949-.199-2.403.041-3.439.219-1.038 1.411-5.966 1.411-5.966s-.359-.72-.359-1.781c0-1.668.967-2.914 2.171-2.914 1.023 0 1.518.769 1.518 1.69 0 1.029-.655 2.568-.994 3.995-.283 1.194.305 2.169 1.482 2.169 1.778 0 3.144-1.875 3.144-4.579 0-2.393-1.72-4.068-4.176-4.068-2.847 0-4.518 2.135-4.518 4.341 0 .859.331 1.781.745 2.281a.238.213 0 01.063.226c-.031.129-.101.516-.131.642-.031.123-.105.151-.231.094-1.002-.465-1.632-1.921-1.632-3.098 0-3.447 2.503-6.613 7.222-6.613 3.793 0 6.74 2.704 6.74 6.315 0 3.766-2.373 6.797-5.665 6.797-1.106 0-2.146-.574-2.502-1.258 0 0-.547 2.083-.68 2.591-.247.946-.913 2.133-1.358 2.853a12.022 12.022 0 003.671.575c6.62 0 11.988-5.367 11.988-11.987.001-6.62-5.368-11.987-11.988-11.987z" />
     </svg>
   );
-}
-
-function cn(...classes: any[]) {
-  return classes.filter(Boolean).join(" ");
 }
