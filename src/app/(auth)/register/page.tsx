@@ -22,6 +22,7 @@ import {
   FormLabel,
   FormMessage,
 } from "../../../components/ui/form";
+import { Checkbox } from "../../../components/ui/checkbox";
 import { useToast } from "../../../hooks/use-toast";
 import { ToastAction } from "../../../components/ui/toast";
 import { useAuth, useUser, useFirestore, initiateEmailSignUp } from "../../../firebase";
@@ -33,23 +34,29 @@ import Link from "next/link";
 import { v4 as uuidv4 } from "uuid";
 import type { LandingPageData, NavLink } from "../../../models/landing-page";
 import type { PaymentSettings } from "../../../models/payment-settings";
-import { Eye, EyeOff, Loader2 } from 'lucide-react';
+import { Eye, EyeOff, Loader2, ShieldCheck } from 'lucide-react';
 import type { Subscription } from "../../../models/subscription";
-import { STRIPE_PRICE_IDS } from "../../../lib/stripe";
 import type { HybridPlan } from "../../../models/hybrid-plan";
 import type { SubscriptionPlan } from "../../../models/subscription-plan";
+import { getClientIp } from "@/actions/get-client-ip";
 
 const registerSchema = z.object({
   name: z.string().min(1, { message: "Por favor, introduce tu nombre." }),
   email: z.string().email({ message: "Por favor, introduce un correo electrónico válido." }),
   password: z.string().min(6, { message: "La contraseña debe tener al menos 6 caracteres." }),
+  acceptTerms: z.boolean().refine(val => val === true, {
+    message: "Debes aceptar los términos y el compromiso de servicio.",
+  }),
+  acceptFees: z.boolean().refine(val => val === true, {
+    message: "Debes autorizar el cobro de comisiones.",
+  }),
 });
 
 const initialLandingPageData: LandingPageData = {
   hero: {
     title: 'Innovación que impulsa tu negocio al futuro',
     subtitle: 'Transformamos tecnología en crecimiento real',
-    additionalContent: '<p>En <strong>PS-USER</strong>, combinamos innovación, estrategia y tecnología para impulsar la transformación digital de tu negocio. Desarrollamos soluciones inteligentes en software, automatización, inteligencia artificial y presencia digital que optimizan tus procesos y potencian tus resultados. Nuestro equipo experto te acompaña en cada paso, desde la planificación hasta la implementación, garantizando eficiencia, seguridad y crecimiento sostenible. Conviértete en una empresa más ágil, competitiva y conectada con el futuro. <strong>PS-USER</strong>, tu aliado tecnológico para alcanzar el éxito en la era digital.</p>',
+    additionalContent: '<p>En <strong>Zentry</strong>, combinamos innovación, estrategia y tecnología para impulsar la transformación digital de tu negocio. Desarrollamos soluciones inteligentes en software, automatización, inteligencia artificial y presencia digital que optimizan tus procesos y potencian tus resultados. Nuestro equipo experto te acompaña en cada paso, desde la planificación hasta la implementación, garantizando eficiencia, seguridad y crecimiento sostenible. Conviértete en una empresa más ágil, competitiva y conectada con el futuro. <strong>Zentry</strong>, tu aliado tecnológico para alcanzar el éxito en la era digital.</p>',
     imageUrl: 'https://picsum.photos/seed/vintagecar/1200/800',
     ctaButtonText: 'Contáctanos',
     ctaButtonUrl: '#contact',
@@ -125,7 +132,7 @@ const initialLandingPageData: LandingPageData = {
     contactInfo: {
       address: 'Calle Falsa 123, Ciudad, País',
       phone: '3228831634',
-      email: 'allseosoporte@gmail.com',
+      email: 'CONTACTO@PENDIENTE-DEFINIR.com',
       hours: 'Lunes a Viernes, 9am - 6pm',
     },
     quickLinks: [
@@ -212,6 +219,8 @@ function RegisterForm() {
       name: "",
       email: "",
       password: "",
+      acceptTerms: false,
+      acceptFees: false,
     },
   });
 
@@ -219,10 +228,10 @@ function RegisterForm() {
     if (!auth || !firestore) return;
     
     try {
-      // 1. Obtener información del plan seleccionado ANTES de empezar el batch
+      const clientIp = await getClientIp();
       const planParam = searchParams.get('plan');
       let planDetails: SubscriptionPlan | HybridPlan | null = null;
-      let modulesToActivate: string[] = ['catalogo', 'blog']; // Módulos base siempre activos
+      let modulesToActivate: string[] = ['catalogo', 'blog']; 
 
       if (planParam) {
           const standardPlanSnap = await getDoc(doc(firestore, 'plans', planParam));
@@ -236,12 +245,10 @@ function RegisterForm() {
           }
 
           if (planDetails && planDetails.includedModuleKeys) {
-              // Unificamos módulos base con los del plan
               modulesToActivate = [...new Set([...modulesToActivate, ...planDetails.includedModuleKeys])];
           }
       }
 
-      // 2. Iniciar registro de usuario
       const userCredential = await initiateEmailSignUp(auth, values.email, values.password);
       const newUser = userCredential.user;
       
@@ -249,7 +256,6 @@ function RegisterForm() {
       const nowISO = new Date().toISOString();
       const nowTimestamp = Timestamp.now();
 
-      // Perfil de Usuario
       const userDocRef = doc(firestore, 'users', newUser.uid);
       const userData: AppUser = {
         id: newUser.uid,
@@ -259,10 +265,17 @@ function RegisterForm() {
         status: 'active',
         createdAt: nowISO,
         lastLogin: nowISO,
+        // @ts-ignore - Agregando metadatos legales requeridos
+        legalAcceptance: {
+          termsAccepted: true,
+          feesAuthorized: true,
+          acceptedAt: nowISO,
+          ip: clientIp,
+          version: '1.0'
+        }
       };
       batch.set(userDocRef, userData);
       
-      // Documento de Negocio
       const businessDocRef = doc(firestore, 'businesses', newUser.uid);
       const businessData: Business = {
         id: newUser.uid,
@@ -271,12 +284,11 @@ function RegisterForm() {
         ownerEmail: values.email,
         status: 'active',
         logoURL: 'https://seeklogo.com/images/E/eco-friendly-logo-7087A22106-seeklogo.com.png',
-        description: 'Bienvenido a mi negocio en Negocio V03.',
+        description: 'Bienvenido a mi negocio en Zentry.',
         planName: planDetails?.name || 'Plan Gratuito',
       };
       batch.set(businessDocRef, businessData);
 
-      // Inicializar Módulos dinámicamente
       modulesToActivate.forEach(modId => {
           const moduleRef = doc(firestore, `businesses/${newUser.uid}/modules`, modId);
           batch.set(moduleRef, { 
@@ -286,7 +298,6 @@ function RegisterForm() {
           });
       });
 
-      // Configuración de Landing Page
       const landingPageDocRef = doc(firestore, 'businesses', newUser.uid, 'landingPages', 'main');
       const dynamicLinks: NavLink[] = [
         { id: uuidv4(), text: 'Inicio', url: `/landing/${newUser.uid}`, openInNewTab: false, enabled: true },
@@ -308,11 +319,9 @@ function RegisterForm() {
         plans: [],
       });
 
-      // Configuración de Pagos
       const paymentSettingsDocRef = doc(firestore, 'paymentSettings', newUser.uid);
       batch.set(paymentSettingsDocRef, { id: newUser.uid, userId: newUser.uid, ...initialPaymentSettings });
       
-      // Documento de Suscripción
       const subscriptionDocRef = doc(firestore, `businesses/${newUser.uid}/subscription`, 'current');
       const subscriptionData: Subscription = {
         plan: planParam || 'free',
@@ -325,10 +334,8 @@ function RegisterForm() {
       };
       batch.set(subscriptionDocRef, subscriptionData);
 
-      // 3. Ejecutar Batch
       await batch.commit();
 
-      // 4. Manejar redirección a pasarela si aplica
       if (planParam && planParam !== 'free' && planDetails && 'stripePriceId' in planDetails) {
         const stripePriceId = (planDetails as SubscriptionPlan).stripePriceId;
         if (stripePriceId && !stripePriceId.includes('placeholder')) {
@@ -353,7 +360,6 @@ function RegisterForm() {
       router.push('/dashboard');
       
     } catch (error: any) {
-      console.error("Error during registration:", error);
       if (error.code === 'auth/email-already-in-use') {
         toast({
           variant: "destructive",
@@ -374,10 +380,10 @@ function RegisterForm() {
   if (isUserLoading) return <LoadingScreen />;
 
   return (
-    <Card>
+    <Card className="shadow-xl">
       <CardHeader className="space-y-1 text-center">
-        <CardTitle className="text-2xl font-headline">Crear una Cuenta</CardTitle>
-        <CardDescription>Ingresa tus datos para crear el perfil de tu negocio.</CardDescription>
+        <CardTitle className="text-3xl font-headline font-bold text-primary">Crea tu Cuenta</CardTitle>
+        <CardDescription>Únete a Zentry y escala tu negocio hoy mismo.</CardDescription>
       </CardHeader>
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)}>
@@ -408,14 +414,44 @@ function RegisterForm() {
                   <FormMessage />
                 </FormItem>
             )} />
+
+            <div className="space-y-4 pt-4 border-t">
+              <FormField control={form.control} name="acceptTerms" render={({ field }) => (
+                <FormItem className="flex flex-row items-start space-x-3 space-y-0 p-2">
+                  <FormControl>
+                    <Checkbox checked={field.value} onCheckedChange={field.onChange} />
+                  </FormControl>
+                  <div className="space-y-1 leading-none">
+                    <FormLabel className="text-sm font-normal">
+                      He leído y acepto los <Link href="/terminos-y-condiciones" className="text-primary hover:underline font-bold">Términos y Condiciones</Link> y el <Link href="/compromiso-servicio" className="text-primary hover:underline font-bold">Compromiso de Servicio</Link>.
+                    </FormLabel>
+                    <FormMessage />
+                  </div>
+                </FormItem>
+              )} />
+
+              <FormField control={form.control} name="acceptFees" render={({ field }) => (
+                <FormItem className="flex flex-row items-start space-x-3 space-y-0 p-2">
+                  <FormControl>
+                    <Checkbox checked={field.value} onCheckedChange={field.onChange} />
+                  </FormControl>
+                  <div className="space-y-1 leading-none">
+                    <FormLabel className="text-sm font-normal">
+                      Autorizo a <strong>Zentry</strong> a cobrar la comisión según el plan contratado y a suspender el servicio en caso de incumplimiento de pago. <Link href="/politica-cobro" className="text-primary hover:underline text-xs">(Ver política)</Link>
+                    </FormLabel>
+                    <FormMessage />
+                  </div>
+                </FormItem>
+              )} />
+            </div>
           </CardContent>
           <CardFooter className="flex flex-col gap-4">
-            <Button className="w-full" type="submit" disabled={form.formState.isSubmitting}>
-              {form.formState.isSubmitting ? "Preparando tu entorno..." : "Crear Cuenta"}
+            <Button className="w-full h-12 text-lg font-bold" type="submit" disabled={form.formState.isSubmitting}>
+              {form.formState.isSubmitting ? <><Loader2 className="mr-2 animate-spin"/> Preparando entorno...</> : "Crear Cuenta Zentry"}
             </Button>
              <div className="text-sm text-muted-foreground text-center">
               ¿Ya tienes una cuenta?{" "}
-              <Link href="/login" className="underline text-primary hover:text-primary/80">Inicia sesión aquí</Link>.
+              <Link href="/login" className="underline text-primary font-bold hover:text-primary/80">Inicia sesión aquí</Link>.
             </div>
           </CardFooter>
         </form>

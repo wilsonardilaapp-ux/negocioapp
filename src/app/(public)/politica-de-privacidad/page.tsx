@@ -81,7 +81,7 @@ export default async function PrivacyPolicyPage() {
                         <p>Nos reservamos el derecho de actualizar esta política de privacidad en cualquier momento. Te notificaremos sobre cualquier cambio material publicando la nueva política en esta página y, si es apropiado, a través de una notificación por correo electrónico.</p>
 
                         <h2>11. Información de Contacto</h2>
-                        <p>Si tienes alguna pregunta o inquietud sobre esta Política de Privacidad o nuestras prácticas de datos, por favor, no dudes en contactarnos en nuestro correo de soporte: [tu-email-de-soporte@zentry.com].</p>
+                        <p>Si tienes alguna pregunta o inquietud sobre esta Política de Privacidad o nuestras prácticas de datos, por favor, no dudes en contactarnos en nuestro correo de soporte: CONTACTO@PENDIENTE-DEFINIR.com.</p>
 
                         <p className="text-sm text-muted-foreground pt-4">Última actualización: 24 de julio de 2024</p>
                     </CardContent>

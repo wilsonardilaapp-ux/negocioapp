@@ -52,7 +52,7 @@ const fallbackData: LandingPageData = {
         { id: 'form-field-3', label: 'WhatsApp', type: 'tel', placeholder: 'ej. 3228831634', required: false },
         { id: 'form-field-4', label: 'Mensaje', type: 'textarea', placeholder: 'Escribe tu consulta aquí...', required: true },
     ],
-    destinationEmail: 'allseosoporte@gmail.com',
+    destinationEmail: 'CONTACTO@PENDIENTE-DEFINIR.com',
   },
   header: {
     banner: {
@@ -63,7 +63,7 @@ const fallbackData: LandingPageData = {
       name: 'Zentry Platform',
       address: 'Soporte Global Online',
       phone: '3228831634',
-      email: 'allseosoporte@gmail.com',
+      email: 'CONTACTO@PENDIENTE-DEFINIR.com',
     },
     socialLinks: {
       tiktok: '',
@@ -84,7 +84,7 @@ const fallbackData: LandingPageData = {
     contactInfo: {
       address: 'Central de Operaciones Zentry',
       phone: '3228831634',
-      email: 'allseosoporte@gmail.com',
+      email: 'CONTACTO@PENDIENTE-DEFINIR.com',
       hours: 'Lunes a Viernes, 9am - 6pm',
     },
     quickLinks: [

@@ -82,7 +82,7 @@ export default function ContactoPage() {
             }
 
             const landingSnap = await getDoc(doc(firestore, "businesses", mainBusinessId, "landingPages", "main"));
-            const navigation = landingSnap.exists() ? (landingSnap.data() as LandingPageData).navigation : null;
+            const navigation = landingSnap.exists ? (landingSnap.data() as LandingPageData).navigation : null;
             
             setHeaderData({ businessId: mainBusinessId, navigation });
         } catch (error) {
@@ -142,7 +142,7 @@ export default function ContactoPage() {
   };
 
   const contactInfo = [
-    { icon: Mail, text: "soporte@zentry.com", href: "mailto:soporte@zentry.com" },
+    { icon: Mail, text: "CONTACTO@PENDIENTE-DEFINIR.com", href: "mailto:CONTACTO@PENDIENTE-DEFINIR.com" },
     { icon: WhatsAppIcon, text: "3228831634", href: "https://api.whatsapp.com/send?phone=3228831634" },
     { icon: Instagram, text: "@ZentryApp", href: "#" },
     { icon: Facebook, text: "ZentryApp", href: "#" },

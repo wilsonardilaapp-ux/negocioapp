@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useMemo, useEffect, useState, useRef } from 'react';
@@ -90,7 +89,7 @@ export default function SettingsPage() {
       <Card>
         <CardHeader>
           <CardTitle>Configuración Global</CardTitle>
-          <CardDescription>Ajusta la configuración general de la plataforma Negocio V03.</CardDescription>
+          <CardDescription>Ajusta la configuración general de la plataforma Zentry.</CardDescription>
         </CardHeader>
       </Card>
       

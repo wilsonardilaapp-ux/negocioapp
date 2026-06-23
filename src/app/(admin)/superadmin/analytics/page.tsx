@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
@@ -169,7 +168,7 @@ export default function AnalyticsPage() {
             <CardHeader>
                 <CardTitle>Métricas y Analíticas</CardTitle>
                 <CardDescription>
-                Visualiza los indicadores clave de rendimiento (KPIs) de la plataforma Negocio V03.
+                Visualiza los indicadores clave de rendimiento (KPIs) de la plataforma Zentry.
                 </CardDescription>
             </CardHeader>
         </Card>

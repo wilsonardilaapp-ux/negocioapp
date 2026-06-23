@@ -205,7 +205,6 @@ export default function ClientProfilePage() {
             <h1 className="text-2xl font-bold">{business?.name}</h1>
             <p className="text-muted-foreground">{user?.email}</p>
             <div className="flex items-center justify-center md:justify-start gap-2 mt-2">
-              {/* CORRECCIÓN: Mostramos el nombre amigable del plan en lugar del ID técnico */}
               <Badge variant={plan === 'free' ? 'secondary' : 'default'} className="capitalize">
                 {planDetails?.name || plan || 'Plan Gratuito'}
               </Badge>
@@ -348,7 +347,7 @@ export default function ClientProfilePage() {
             </CardHeader>
             <CardContent>
               <p className="text-sm text-muted-foreground">
-                Esta acción es irreversible. Se eliminarán todos los datos de tu negocio, incluyendo productos, páginas y configuraciones.
+                Esta acción es irreversible. Se eliminarán todos los datos de tu negocio en Zentry, incluyendo productos, páginas y configuraciones.
               </p>
             </CardContent>
             <CardFooter>
