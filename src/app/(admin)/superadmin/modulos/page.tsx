@@ -23,7 +23,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from "@/hooks/use-toast";
-import { PlusCircle, Trash2, Box, FileText, Edit, Loader2, Tag } from 'lucide-react';
+import { PlusCircle, Trash2, Box, Edit, Loader2 } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -31,7 +31,6 @@ import {
   DialogTitle,
   DialogDescription,
   DialogFooter,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import {
   AlertDialog,
@@ -64,6 +63,7 @@ const DEFAULT_MODULES: { name: string; description: string; limit: number; idOve
     { name: 'Google Analytics', description: 'Integración con Google Analytics', limit: -1, idOverride: 'google-analytics' },
     { name: 'Cloudinary', description: 'Almacenamiento de medios en la nube', limit: -1, idOverride: 'cloudinary' },
     { name: 'Pistola Escáner', description: 'Gestión de dispositivos de escaneo de códigos de barras.', limit: -1, idOverride: 'pistola-escaner' },
+    { name: 'Directorio de Negocios', description: 'Módulo para listar el negocio en el directorio público de la plataforma.', limit: -1, idOverride: 'business-directory' },
 ];
 
 const slugify = (text: string) => 
@@ -88,7 +88,6 @@ export default function ModulesPage() {
   
   const { data: modules, isLoading } = useCollection<Module>(modulesQuery);
 
-  // Self-healing useEffect
   useEffect(() => {
       if (isLoading || !firestore || !modules) return;
       
