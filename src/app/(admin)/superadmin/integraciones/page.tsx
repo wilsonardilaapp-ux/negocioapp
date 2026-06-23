@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useRef, useMemo, useTransition } from 'react';
@@ -14,6 +13,7 @@ import {
 } from '@/components/ui/card';
 import {
   Dialog,
+  DialogTrigger,
   DialogContent,
   DialogHeader,
   DialogTitle,
