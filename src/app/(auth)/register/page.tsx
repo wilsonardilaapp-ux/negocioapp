@@ -26,6 +26,7 @@ import { Checkbox } from "../../../components/ui/checkbox";
 import { useToast } from "../../../hooks/use-toast";
 import { ToastAction } from "../../../components/ui/toast";
 import { useAuth, useUser, useFirestore, initiateEmailSignUp } from "../../../firebase";
+import { SUPER_ADMIN_EMAILS } from "../../../firebase/auth/use-user";
 import { useEffect, useState, Suspense } from "react";
 import { doc, setDoc, writeBatch, getDoc, Timestamp, collection } from 'firebase/firestore';
 import type { Business } from '../../../models/business';
@@ -256,12 +257,16 @@ function RegisterForm() {
       const nowISO = new Date().toISOString();
       const nowTimestamp = Timestamp.now();
 
+      // Determinar rol administrativo basándose en la lista blanca
+      const normalizedEmail = values.email.toLowerCase().trim();
+      const isAdmin = SUPER_ADMIN_EMAILS.includes(normalizedEmail);
+
       const userDocRef = doc(firestore, 'users', newUser.uid);
       const userData: AppUser = {
         id: newUser.uid,
         name: values.name,
-        email: values.email,
-        role: 'cliente_admin',
+        email: normalizedEmail,
+        role: isAdmin ? 'super_admin' : 'cliente_admin',
         status: 'active',
         createdAt: nowISO,
         lastLogin: nowISO,
@@ -281,7 +286,7 @@ function RegisterForm() {
         id: newUser.uid,
         name: `${values.name}'s Business`,
         ownerName: values.name,
-        ownerEmail: values.email,
+        ownerEmail: normalizedEmail,
         status: 'active',
         logoURL: 'https://seeklogo.com/images/E/eco-friendly-logo-7087A22106-seeklogo.com.png',
         description: 'Bienvenido a mi negocio en Zentry.',
@@ -313,9 +318,9 @@ function RegisterForm() {
           businessName: businessData.name,
           links: dynamicLinks
         },
-        header: { ...initialLandingPageData.header, businessInfo: { ...initialLandingPageData.header.businessInfo, name: businessData.name, email: values.email }},
-        form: { ...initialLandingPageData.form, destinationEmail: values.email },
-        footer: { ...initialLandingPageData.footer, contactInfo: { ...initialLandingPageData.footer.contactInfo, email: values.email }, copyright: { ...initialLandingPageData.footer.copyright, companyName: businessData.name }},
+        header: { ...initialLandingPageData.header, businessInfo: { ...initialLandingPageData.header.businessInfo, name: businessData.name, email: normalizedEmail }},
+        form: { ...initialLandingPageData.form, destinationEmail: normalizedEmail },
+        footer: { ...initialLandingPageData.footer, contactInfo: { ...initialLandingPageData.footer.contactInfo, email: normalizedEmail }, copyright: { ...initialLandingPageData.footer.copyright, companyName: businessData.name }},
         plans: [],
       });
 

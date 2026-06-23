@@ -9,7 +9,7 @@ import { updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import type { User as UserProfile } from '@/models/user';
 
 // --- LISTA BLANCA ESTRICTA DE SUPER ADMINISTRADORES ---
-const SUPER_ADMIN_EMAILS = [
+export const SUPER_ADMIN_EMAILS = [
   'allseosoporte@gmail.com',
   'admin@zentry.com',
   'admin@ecosalud.com',
@@ -54,7 +54,7 @@ export function useUser() {
 
     setProfileLoading(true);
     const userDocRef = doc(firestore, 'users', authState.user.uid);
-    const userEmail = authState.user.email || '';
+    const userEmail = authState.user.email?.toLowerCase().trim() || '';
 
     const unsubscribe = onSnapshot(userDocRef, async (docSnap) => {
         if (docSnap.exists()) {
