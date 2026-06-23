@@ -82,7 +82,7 @@ export default function ContactoPage() {
             }
 
             const landingSnap = await getDoc(doc(firestore, "businesses", mainBusinessId, "landingPages", "main"));
-            const navigation = landingSnap.exists ? (landingSnap.data() as LandingPageData).navigation : null;
+            const navigation = landingSnap.exists() ? (landingSnap.data() as LandingPageData).navigation : null;
             
             setHeaderData({ businessId: mainBusinessId, navigation });
         } catch (error) {
