@@ -167,10 +167,12 @@ export function useSubscription() {
         else if (m.status === 'inactive') activeModuleIds.delete(m.id);
     });
 
+    // --- ACTIVACIÓN ROBUSTA POR ID Y FALLBACK DE TEXTO ---
     const PREMIUM_PLAN_IDS = new Set([
       'AoKkP9RLp517Nl11aNxt', // Plan Estándar
       'KmDDgHJW2H2e8I69Owud', // Plan Profesional
     ]);
+    
     const planName = details?.name || currentPlanId;
     const normalizedName = planName.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
