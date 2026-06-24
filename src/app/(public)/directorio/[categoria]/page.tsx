@@ -14,16 +14,19 @@ import type { Metadata } from 'next';
 export const dynamic = 'force-dynamic';
 
 /**
- * Normaliza un string para comparaciones seguras de URLs (remueve acentos y pasa a minúsculas)
+ * Normaliza un string para comparaciones seguras de URLs.
+ * Elimina acentos y TODO lo que no sea letra o número para máxima compatibilidad.
  */
 function normalizeString(text: string): string {
+    if (!text) return "";
     return decodeURIComponent(text)
         .toLowerCase()
         .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "");
+        .replace(/[\u0300-\u036f]/g, "") // Quitar acentos
+        .replace(/[^a-z0-9]/g, "");    // Quitar TODO lo demás (espacios, emojis, guiones)
 }
 
-async function getEntriesByCategory(categoryParam: string) {
+async function getEntriesByCategory(categoryParam: string, subcategoryParam?: string) {
     try {
         const db = await getAdminFirestore();
         
@@ -50,11 +53,17 @@ async function getEntriesByCategory(categoryParam: string) {
         const subcategories = typeof originalCategoryObj === 'string' ? [] : (originalCategoryObj.subcategories || []);
 
         // 3. Consultar negocios aprobados en esa categoría respetando los flags de visibilidad
-        const snapshot = await db.collection('businesses')
+        let queryRef: any = db.collection('businesses')
             .where('status', '==', 'active')
             .where('directoryEnabled', '==', true)
-            .where('category', '==', originalCategoryName)
-            .get();
+            .where('category', '==', originalCategoryName);
+
+        // Si hay una subcategoría seleccionada, filtramos por ella
+        if (subcategoryParam) {
+            queryRef = queryRef.where('subcategory', '==', decodeURIComponent(subcategoryParam));
+        }
+
+        const snapshot = await queryRef.get();
 
         return {
             category: originalCategoryName,
@@ -67,18 +76,19 @@ async function getEntriesByCategory(categoryParam: string) {
     }
 }
 
-export async function generateMetadata({ params }: { params: { categoria: string } }): Promise<Metadata> {
-    const data = await getEntriesByCategory(params.categoria);
+export async function generateMetadata({ params, searchParams }: { params: { categoria: string }, searchParams: { sub?: string } }): Promise<Metadata> {
+    const data = await getEntriesByCategory(params.categoria, searchParams.sub);
     if (!data) return { title: 'Categoría no encontrada' };
 
+    const titleSuffix = searchParams.sub ? ` - ${searchParams.sub}` : '';
     return {
-        title: `Negocios de ${data.category} | Zentry`,
+        title: `Negocios de ${data.category}${titleSuffix} | Zentry`,
         description: `Encuentra los mejores negocios y servicios en la categoría de ${data.category.toLowerCase()}. Perfiles profesionales y verificados.`,
     };
 }
 
-export default async function CategoryPage({ params }: { params: { categoria: string } }) {
-    const data = await getEntriesByCategory(params.categoria);
+export default async function CategoryPage({ params, searchParams }: { params: { categoria: string }, searchParams: { sub?: string } }) {
+    const data = await getEntriesByCategory(params.categoria, searchParams.sub);
 
     if (!data) {
         notFound();
@@ -99,6 +109,11 @@ export default async function CategoryPage({ params }: { params: { categoria: st
                         <h1 className="text-4xl font-black text-gray-900 tracking-tight">
                             Negocios de {data.category}
                         </h1>
+                        {searchParams.sub && (
+                            <Badge variant="secondary" className="text-sm font-bold bg-primary/10 text-primary border-primary/20">
+                                Subcategoría: {searchParams.sub}
+                            </Badge>
+                        )}
                         <p className="text-gray-500">
                             Explora los mejores perfiles en el sector de {data.category.toLowerCase()}.
                         </p>
@@ -111,14 +126,26 @@ export default async function CategoryPage({ params }: { params: { categoria: st
                         <aside className="lg:w-64 space-y-8">
                             <div className="bg-white p-6 rounded-2xl border shadow-sm">
                                 <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
-                                    <Filter className="h-4 w-4 text-primary" /> Subcategorías
+                                    <Filter className="h-4 w-4 text-primary" /> Filtrar Subcategoría
                                 </h3>
                                 <div className="space-y-1">
+                                    <Link 
+                                        href={`/directorio/${params.categoria}`}
+                                        className={cn(
+                                            "block px-3 py-2 rounded-lg text-sm transition-colors",
+                                            !searchParams.sub ? "bg-primary text-white font-bold" : "text-gray-600 hover:bg-primary/5 hover:text-primary"
+                                        )}
+                                    >
+                                        Todas
+                                    </Link>
                                     {data.subcategories.map(sub => (
                                         <Link 
                                             key={sub} 
                                             href={`/directorio/${params.categoria}?sub=${encodeURIComponent(sub)}`}
-                                            className="block px-3 py-2 rounded-lg text-sm text-gray-600 hover:bg-primary/5 hover:text-primary transition-colors"
+                                            className={cn(
+                                                "block px-3 py-2 rounded-lg text-sm transition-colors",
+                                                searchParams.sub === sub ? "bg-primary text-white font-bold" : "text-gray-600 hover:bg-primary/5 hover:text-primary"
+                                            )}
                                         >
                                             {sub}
                                         </Link>
@@ -133,9 +160,11 @@ export default async function CategoryPage({ params }: { params: { categoria: st
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
                                 <LayoutGrid className="h-5 w-5 text-primary" />
-                                <h2 className="text-xl font-bold text-gray-900">Resultados</h2>
+                                <h2 className="text-xl font-bold text-gray-900">
+                                    {searchParams.sub ? `Resultados para ${searchParams.sub}` : 'Resultados'}
+                                </h2>
                             </div>
-                            <span className="text-sm text-gray-500">
+                            <span className="text-sm text-gray-500 font-medium">
                                 {data.items.length} resultados encontrados
                             </span>
                         </div>
@@ -148,9 +177,9 @@ export default async function CategoryPage({ params }: { params: { categoria: st
                             </div>
                         ) : (
                             <div className="text-center py-32 bg-white rounded-3xl border border-dashed border-gray-200">
-                                <p className="text-gray-400 font-bold text-lg">Aún no hay negocios publicados en esta categoría.</p>
-                                <Link href="/directorio">
-                                    <Button variant="link" className="mt-2 text-primary">Ver todas las categorías</Button>
+                                <p className="text-gray-400 font-bold text-lg">No se encontraron negocios para esta selección.</p>
+                                <Link href={`/directorio/${params.categoria}`}>
+                                    <Button variant="link" className="mt-2 text-primary">Ver todos los negocios de {data.category}</Button>
                                 </Link>
                             </div>
                         )}
@@ -162,3 +191,20 @@ export default async function CategoryPage({ params }: { params: { categoria: st
         </div>
     );
 }
+
+// Función auxiliar para combinar clases
+function cn(...classes: any[]) {
+    return classes.filter(Boolean).join(" ");
+}
+
+const Badge = ({ children, variant, className }: any) => {
+    const variants: any = {
+        secondary: "bg-secondary text-secondary-foreground",
+        outline: "border border-input bg-background"
+    };
+    return (
+        <span className={cn("inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold transition-colors", variants[variant], className)}>
+            {children}
+        </span>
+    );
+};
