@@ -58,9 +58,15 @@ export default function ProductCard({ product, children }: ProductCardProps) {
             <CardContent className="p-4 flex-grow">
                 <CardTitle className="h-[2.8rem] text-base font-semibold leading-snug overflow-hidden [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical] mb-1">{product.name}</CardTitle>
                 <div className="flex items-center gap-1 text-sm text-muted-foreground mb-2">
-                    <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
-                    <span>{product.rating.toFixed(1)}</span>
-                    <span className="text-xs">({product.ratingCount} valoraciones)</span>
+                    {product.ratingCount > 0 ? (
+                        <>
+                            <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
+                            <span className="font-medium text-foreground">{product.rating.toFixed(1)}</span>
+                            <span className="text-xs">({product.ratingCount})</span>
+                        </>
+                    ) : (
+                        <span className="text-xs italic">Sin valoraciones</span>
+                    )}
                 </div>
                 <p className="text-2xl font-bold text-primary">{formatCurrency(product.price)}</p>
             </CardContent>

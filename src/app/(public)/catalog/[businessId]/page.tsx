@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
@@ -130,9 +131,15 @@ const PublicProductCard = ({ product, onOpenModal, activePromotions }: { product
             <CardContent className="p-4 flex-grow">
                 <CardTitle className="text-sm font-bold h-10 overflow-hidden text-gray-900 group-hover:text-primary transition-colors leading-tight mb-2">{product.name}</CardTitle>
                  <div className="flex items-center gap-1 text-[11px] text-muted-foreground mb-3">
-                    <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
-                    <span className="font-semibold text-gray-700">{product.rating.toFixed(1)}</span>
-                    <span>({product.ratingCount})</span>
+                    {product.ratingCount > 0 ? (
+                        <>
+                            <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
+                            <span className="font-semibold text-gray-700">{product.rating.toFixed(1)}</span>
+                            <span>({product.ratingCount})</span>
+                        </>
+                    ) : (
+                        <span className="italic">Sin valoraciones</span>
+                    )}
                 </div>
                 <div className="flex items-center justify-between mt-auto">
                     <p className="text-base font-black text-primary">{formatCurrency(product.price)}</p>
@@ -244,7 +251,17 @@ const ProductViewModal = ({ product, isOpen, onOpenChange, businessId, onAddToCa
                                          <DialogTitle className="text-xl sm:text-2xl font-bold leading-tight">{product.name}</DialogTitle>
                                          <p className="text-2xl font-bold text-primary">{formatCurrency(product.price)}</p>
                                     </DialogHeader>
-                                    <div className="flex items-center gap-1 text-sm text-muted-foreground"><Star className="w-4 h-4 fill-yellow-400 text-yellow-400"/><span>{product.rating.toFixed(1)}</span></div>
+                                    <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                                        {product.ratingCount > 0 ? (
+                                            <>
+                                                <Star className="w-4 h-4 fill-yellow-400 text-yellow-400"/>
+                                                <span className="font-bold text-foreground">{product.rating.toFixed(1)}</span>
+                                                <span>({product.ratingCount})</span>
+                                            </>
+                                        ) : (
+                                            <span className="italic">Sin valoraciones</span>
+                                        )}
+                                    </div>
                                     <div className="prose prose-sm max-w-none text-muted-foreground" dangerouslySetInnerHTML={{ __html: product.description }} />
                                     <div className="flex flex-col gap-2 pt-3 border-t">
                                         <span className="text-sm font-semibold">Califica este producto:</span>
