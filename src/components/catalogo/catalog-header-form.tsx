@@ -11,6 +11,7 @@ import type { LandingHeaderConfigData, CarouselItem } from '../../models/landing
 import { Loader2, UploadCloud, RotateCcw, Save, Trash2, Pencil, Image as ImageIcon } from "lucide-react";
 import { TikTokIcon, WhatsAppIcon, XIcon, FacebookIcon, InstagramIcon, YoutubeIcon } from '../icons';
 import { uploadMedia } from '../../ai/flows/upload-media-flow';
+import { cn } from "@/lib/utils";
 
 interface CatalogHeaderFormProps {
   data: LandingHeaderConfigData;
