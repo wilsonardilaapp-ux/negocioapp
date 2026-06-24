@@ -52,6 +52,21 @@
         "updatedAt": { "type": "string", "format": "date-time" }
       },
       "required": ["id", "businessId", "userId", "rating", "comment", "status", "createdAt", "updatedAt"]
+    },
+    "ProductAlert": {
+      "title": "ProductAlert",
+      "type": "object",
+      "description": "Represents an alert for a product with low rating.",
+      "properties": {
+        "id": { "type": "string" },
+        "productId": { "type": "string" },
+        "productName": { "type": "string" },
+        "rating": { "type": "number" },
+        "ratingCount": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending", "reviewed", "resolved"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      }
     }
   },
   "auth": {
@@ -81,6 +96,14 @@
           "entityName": "DirectoryRating",
           "schema": { "$ref": "#/backend/entities/DirectoryRating" },
           "description": "Stores user ratings for businesses."
+        }
+      },
+      {
+        "path": "/businesses/{businessId}/productAlerts/{alertId}",
+        "definition": {
+          "entityName": "ProductAlert",
+          "schema": { "$ref": "#/backend/entities/ProductAlert" },
+          "description": "Stores low rating alerts for business products."
         }
       }
     ]

@@ -1,23 +1,133 @@
 
 'use client';
 
-import { useMemo } from 'react';
-import { useCollection, useFirestore, useUser, useMemoFirebase } from '@/firebase';
-import { collection } from 'firebase/firestore';
+import { useMemo, useEffect, useState } from 'react';
+import { useCollection, useFirestore, useUser, useMemoFirebase, updateDocumentNonBlocking, addDocumentNonBlocking } from '@/firebase';
+import { collection, doc, writeBatch, query, orderBy, where } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Star, TrendingUp, TrendingDown, Package, CheckCircle, HelpCircle, Loader2, BarChart } from 'lucide-react';
+import { 
+    Star, 
+    TrendingUp, 
+    TrendingDown, 
+    Package, 
+    CheckCircleCircle, 
+    HelpCircle, 
+    Loader2, 
+    BarChart, 
+    AlertTriangle,
+    CheckCircle2,
+    Clock,
+    Check
+} from 'lucide-react';
 import type { Product } from '@/models/product';
+import type { ProductAlert, AlertStatus } from '@/models/product-alert';
+import type { AdminNotification } from '@/models/notification';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { useToast } from '@/hooks/use-toast';
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
+import { cn } from '@/lib/utils';
+
+const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('es-CO', {
+        style: 'currency',
+        currency: 'COP',
+        minimumFractionDigits: 0,
+    }).format(value);
+};
 
 export default function ProductStatsPage() {
     const { user } = useUser();
     const firestore = useFirestore();
+    const { toast } = useToast();
+    const [isSyncing, setIsSyncing] = useState(false);
 
+    // --- DATOS: PRODUCTOS ---
     const productsQuery = useMemoFirebase(() => 
         user ? collection(firestore, 'businesses', user.uid, 'products') : null, 
     [firestore, user]);
-    
-    const { data: products, isLoading } = useCollection<Product>(productsQuery);
+    const { data: products, isLoading: isProductsLoading } = useCollection<Product>(productsQuery);
 
+    // --- DATOS: ALERTAS ---
+    const alertsQuery = useMemoFirebase(() => 
+        user ? query(collection(firestore, 'businesses', user.uid, 'productAlerts'), orderBy('updatedAt', 'desc')) : null,
+    [firestore, user]);
+    const { data: alerts, isLoading: isAlertsLoading } = useCollection<ProductAlert>(alertsQuery);
+
+    // --- LÓGICA: DETECCIÓN Y SINCRONIZACIÓN DE ALERTAS ---
+    useEffect(() => {
+        if (!products || !user || !firestore || isSyncing) return;
+
+        const syncAlerts = async () => {
+            setIsSyncing(true);
+            const batch = writeBatch(firestore);
+            let hasChanges = false;
+            const now = new Date().toISOString();
+
+            for (const product of products) {
+                const existingAlert = alerts?.find(a => a.productId === product.id);
+                const meetsAlertCriteria = product.ratingCount >= 3 && product.rating < 3.0;
+
+                // Caso 1: Nuevo problema detectado
+                if (meetsAlertCriteria && (!existingAlert || existingAlert.status === 'resolved')) {
+                    const alertId = existingAlert?.id || doc(collection(firestore, 'placeholder')).id;
+                    const alertRef = doc(firestore, `businesses/${user.uid}/productAlerts`, alertId);
+                    
+                    const newAlert: Omit<ProductAlert, 'id'> = {
+                        businessId: user.uid,
+                        productId: product.id,
+                        productName: product.name,
+                        rating: product.rating,
+                        ratingCount: product.ratingCount,
+                        status: 'pending',
+                        createdAt: existingAlert?.createdAt || now,
+                        updatedAt: now,
+                    };
+                    
+                    batch.set(alertRef, newAlert);
+
+                    // Generar notificación en la campana
+                    const notificationRef = doc(collection(firestore, `businesses/${user.uid}/notifications`));
+                    const notification: Omit<AdminNotification, 'id'> = {
+                        fromSuperAdmin: true, // Sistema
+                        subject: '⚠️ Producto con baja valoración',
+                        body: `<p>Tu producto <strong>"${product.name}"</strong> tiene una valoración promedio de <strong>${product.rating.toFixed(1)} estrellas</strong> basada en ${product.ratingCount} opiniones.</p><p>Te recomendamos revisar la calidad o descripción del mismo.</p>`,
+                        read: false,
+                        createdAt: now,
+                        type: 'alert',
+                    };
+                    batch.set(notificationRef, notification);
+                    hasChanges = true;
+                }
+                
+                // Caso 2: El producto se recuperó (subió a >= 3.0)
+                if (!meetsAlertCriteria && existingAlert && existingAlert.status !== 'resolved') {
+                    const alertRef = doc(firestore, `businesses/${user.uid}/productAlerts`, existingAlert.id);
+                    batch.update(alertRef, { 
+                        status: 'resolved',
+                        updatedAt: now,
+                        rating: product.rating,
+                        ratingCount: product.ratingCount
+                    });
+                    hasChanges = true;
+                }
+            }
+
+            if (hasChanges) {
+                try {
+                    await batch.commit();
+                } catch (e) {
+                    console.error("Error syncing alerts:", e);
+                }
+            }
+            setIsSyncing(false);
+        };
+
+        syncAlerts();
+    }, [products, alerts, user, firestore]);
+
+    // --- LÓGICA: ESTADÍSTICAS ---
     const stats = useMemo(() => {
         if (!products) return null;
 
@@ -48,7 +158,21 @@ export default function ProductStatsPage() {
         };
     }, [products]);
 
-    if (isLoading) {
+    const handleMarkAsReviewed = async (alertId: string) => {
+        if (!user || !firestore) return;
+        try {
+            const alertRef = doc(firestore, `businesses/${user.uid}/productAlerts`, alertId);
+            await updateDocumentNonBlocking(alertRef, { 
+                status: 'reviewed',
+                updatedAt: new Date().toISOString()
+            });
+            toast({ title: "Alerta actualizada", description: "El producto ha sido marcado como revisado." });
+        } catch (e) {
+            toast({ variant: 'destructive', title: "Error", description: "No se pudo actualizar la alerta." });
+        }
+    };
+
+    if (isProductsLoading || isAlertsLoading) {
         return <div className="flex justify-center items-center h-64"><Loader2 className="animate-spin text-primary" /></div>;
     }
 
@@ -67,10 +191,12 @@ export default function ProductStatsPage() {
 
     const kpis = [
         { title: "Total productos", value: stats.total, icon: Package },
-        { title: "Productos valorados", value: stats.ratedCount, icon: CheckCircle },
+        { title: "Productos valorados", value: stats.ratedCount, icon: CheckCircleCircle },
         { title: "Sin valoraciones", value: stats.unratedCount, icon: HelpCircle },
         { title: "Promedio catálogo", value: stats.avgRating.toFixed(1), icon: Star },
     ];
+
+    const activeAlerts = alerts?.filter(a => a.status !== 'resolved') || [];
 
     return (
         <div className="space-y-6">
@@ -97,6 +223,51 @@ export default function ProductStatsPage() {
                     </Card>
                 ))}
             </div>
+
+            {/* --- SECCIÓN: PRODUCTOS QUE REQUIEREN ATENCIÓN (NUEVO) --- */}
+            {activeAlerts.length > 0 && (
+                <Card className="border-orange-200 bg-orange-50/20">
+                    <CardHeader>
+                        <CardTitle className="text-orange-700 flex items-center gap-2">
+                            <AlertTriangle className="h-5 w-5" />
+                            Productos que requieren atención
+                        </CardTitle>
+                        <CardDescription>Productos con una valoración menor a 3.0 basada en 3 o más opiniones.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="space-y-3">
+                            {activeAlerts.map(alert => (
+                                <div key={alert.id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 bg-white border border-orange-100 rounded-xl gap-4">
+                                    <div className="space-y-1">
+                                        <p className="font-bold text-gray-900">{alert.productName}</p>
+                                        <div className="flex items-center gap-4 text-xs">
+                                            <div className="flex items-center gap-1 text-orange-600">
+                                                <Star className="h-3 w-3 fill-orange-600" />
+                                                <span className="font-black">{alert.rating.toFixed(1)}</span>
+                                                <span className="opacity-70">({alert.ratingCount} votos)</span>
+                                            </div>
+                                            <div className="flex items-center gap-1 text-muted-foreground">
+                                                <Clock className="h-3 w-3" />
+                                                <span>Última actualización: {format(new Date(alert.updatedAt), 'dd/MM/yyyy', { locale: es })}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-3 w-full sm:w-auto">
+                                        <Badge variant={alert.status === 'reviewed' ? 'secondary' : 'destructive'} className="capitalize">
+                                            {alert.status === 'reviewed' ? 'Revisado' : 'Requiere revisión'}
+                                        </Badge>
+                                        {alert.status === 'pending' && (
+                                            <Button size="sm" variant="outline" className="border-orange-200 text-orange-700 hover:bg-orange-50" onClick={() => handleMarkAsReviewed(alert.id)}>
+                                                <Check className="h-4 w-4 mr-1" /> Marcar revisado
+                                            </Button>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Mejor Valorados */}
