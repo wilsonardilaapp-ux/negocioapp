@@ -28,6 +28,7 @@ import {
   Calculator,
   Bot,
   Search,
+  Star,
 } from "lucide-react";
 
 import { SidebarMenu, SidebarMenuItem, SidebarMenuButton } from "@/components/ui/sidebar";
@@ -37,6 +38,7 @@ const navItemsList = [
   { href: "/superadmin/usuarios", icon: Users, label: "Usuarios" },
   { href: "/superadmin/negocios", icon: Building, label: "Negocios" },
   { href: "/superadmin/business-directory", icon: Search, label: "Directorio", moduleId: 'business-directory' },
+  { href: "/superadmin/valoraciones", icon: Star, label: "Valoraciones" },
   { href: "/superadmin/subscriptions", icon: CreditCard, label: "Suscripciones" },
   { href: "/superadmin/revenue", icon: TrendingUp, label: "Ingresos" },
   { href: "/superadmin/plans", icon: Package, label: "Planes" },
@@ -71,7 +73,6 @@ export function SuperAdminNav() {
     return navItemsList.filter(item => {
       if (!item.moduleId) return true;
       const module = modules?.find(m => m.id === item.moduleId);
-      // El ítem solo es visible si el módulo está marcado como 'active'
       return module?.status === 'active';
     });
   }, [modules]);
