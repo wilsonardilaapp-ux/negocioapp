@@ -1,7 +1,7 @@
 "use client";
 
 import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
-import { collection, query, orderBy, doc, updateDoc, arrayUnion } from "firebase/firestore";
+import { collection, query, orderBy, doc, setDoc, arrayUnion } from "firebase/firestore";
 import {
   Card,
   CardContent,
@@ -41,7 +41,7 @@ export default function BusinessDirectoryAdminPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const { toast } = useToast();
 
-  // Estados para la nueva funcionalidad de categorías
+  // Estados para la funcionalidad de categorías
   const [isCreateCategoryOpen, setIsCreateCategoryOpen] = useState(false);
   const [newCategory, setNewCategory] = useState("");
   const [isSavingCategory, setIsSavingCategory] = useState(false);
@@ -90,9 +90,12 @@ export default function BusinessDirectoryAdminPage() {
     setIsSavingCategory(true);
     try {
       const configRef = doc(firestore, "globalConfig", "directoryCategories");
-      await updateDoc(configRef, {
+      
+      // Corregido: Usamos setDoc con merge para asegurar que el documento se cree si no existe.
+      await setDoc(configRef, {
         categories: arrayUnion(newCategory.trim())
-      });
+      }, { merge: true });
+
       toast({ 
         title: "Categoría creada", 
         description: `Se ha añadido "${newCategory}" a la lista oficial.` 
@@ -104,7 +107,7 @@ export default function BusinessDirectoryAdminPage() {
       toast({ 
         variant: "destructive", 
         title: "Error", 
-        description: "No se pudo guardar la nueva categoría." 
+        description: error.message || "No se pudo guardar la nueva categoría." 
       });
     } finally {
       setIsSavingCategory(false);
@@ -135,7 +138,6 @@ export default function BusinessDirectoryAdminPage() {
                 Gestionar Publicidad (Ads)
                 </Link>
             </Button>
-            {/* BOTÓN CREAR CATEGORÍA */}
             <Button onClick={() => setIsCreateCategoryOpen(true)} variant="outline" className="font-bold border-primary text-primary hover:bg-primary/5">
                 <FolderPlus className="mr-2 h-4 w-4" />
                 Crear Categoría
@@ -182,7 +184,6 @@ export default function BusinessDirectoryAdminPage() {
         </CardContent>
       </Card>
 
-      {/* SECCIÓN: COMPARTIR DIRECTORIO */}
       <Card className="border-primary/20 bg-primary/5 shadow-lg overflow-hidden border-2">
         <CardHeader>
           <div className="flex items-center gap-3">
@@ -244,12 +245,6 @@ export default function BusinessDirectoryAdminPage() {
                   <WhatsAppIcon className="h-5 w-5 mr-2" /> WhatsApp
                 </a>
               </Button>
-
-              <Button asChild variant="outline" className="bg-[#E60023] text-white hover:bg-[#E60023]/90 border-none h-12 px-6 shadow-md transition-transform hover:scale-105">
-                <a href={`https://pinterest.com/pin/create/button/?url=${encodeURIComponent(directoryUrl)}&description=${encodeURIComponent('Directorio Zentry - Negocios y Servicios Verificados')}`} target="_blank" rel="noopener noreferrer">
-                  <PinterestIcon className="h-5 w-5 mr-2" /> Pinterest
-                </a>
-              </Button>
             </div>
           </div>
         </CardContent>
@@ -288,19 +283,5 @@ export default function BusinessDirectoryAdminPage() {
         </DialogContent>
       </Dialog>
     </div>
-  );
-}
-
-function PinterestIcon(props: any) {
-  return (
-    <svg 
-      viewBox="0 0 24 24" 
-      fill="currentColor" 
-      height="1em" 
-      width="1em" 
-      {...props}
-    >
-      <path d="M12.017 0C5.396 0 .029 5.367.029 11.987c0 5.079 3.158 9.417 7.618 11.162-.105-.949-.199-2.403.041-3.439.219-1.038 1.411-5.966 1.411-5.966s-.359-.72-.359-1.781c0-1.668.967-2.914 2.171-2.914 1.023 0 1.518.769 1.518 1.69 0 1.029-.655 2.568-.994 3.995-.283 1.194.305 2.169 1.482 2.169 1.778 0 3.144-1.875 3.144-4.579 0-2.393-1.72-4.068-4.176-4.068-2.847 0-4.518 2.135-4.518 4.341 0 .859.331 1.781.745 2.281a.238.213 0 01.063.226c-.031.129-.101.516-.131.642-.031.123-.105.151-.231.094-1.002-.465-1.632-1.921-1.632-3.098 0-3.447 2.503-6.613 7.222-6.613 3.793 0 6.74 2.704 6.74 6.315 0 3.766-2.373 6.797-5.665 6.797-1.106 0-2.146-.574-2.502-1.258 0 0-.547 2.083-.68 2.591-.247.946-.913 2.133-1.358 2.853a12.022 12.022 0 003.671.575c6.62 0 11.988-5.367 11.988-11.987.001-6.62-5.368-11.987-11.988-11.987z" />
-    </svg>
   );
 }
