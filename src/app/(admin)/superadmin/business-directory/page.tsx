@@ -1,6 +1,6 @@
 "use client";
 
-import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
+import { useCollection, useDoc, useFirestore, useMemoFirebase } from "@/firebase";
 import { collection, query, orderBy, doc, setDoc, arrayUnion } from "firebase/firestore";
 import {
   Card,
@@ -12,7 +12,7 @@ import {
 import { DataTable } from "./data-table";
 import { columns } from "./columns";
 import type { Business } from "@/models/business";
-import { Search, ShieldAlert, Globe, Star, LayoutPanelTop, Share2, Copy, FolderPlus, Loader2 } from "lucide-react";
+import { Search, ShieldAlert, Globe, Star, LayoutPanelTop, Share2, Copy, FolderPlus, Loader2, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -35,6 +35,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 
 export default function BusinessDirectoryAdminPage() {
   const firestore = useFirestore();
@@ -44,6 +45,8 @@ export default function BusinessDirectoryAdminPage() {
   // Estados para la funcionalidad de categorías
   const [isCreateCategoryOpen, setIsCreateCategoryOpen] = useState(false);
   const [newCategory, setNewCategory] = useState("");
+  const [newSubcategory, setNewSubcategory] = useState("");
+  const [subcategories, setSubcategories] = useState<string[]>([]);
   const [isSavingCategory, setIsSavingCategory] = useState(false);
 
   // Resolución dinámica de la URL del directorio
@@ -85,22 +88,40 @@ export default function BusinessDirectoryAdminPage() {
     });
   };
 
+  const addSubcategory = () => {
+    if (newSubcategory.trim()) {
+      setSubcategories(prev => [...prev, newSubcategory.trim()]);
+      setNewSubcategory("");
+    }
+  };
+
+  const removeSubcategory = (index: number) => {
+    setSubcategories(prev => prev.filter((_, i) => i !== index));
+  };
+
   const handleCreateCategory = async () => {
     if (!newCategory.trim() || !firestore) return;
     setIsSavingCategory(true);
     try {
       const configRef = doc(firestore, "globalConfig", "directoryCategories");
       
-      // Corregido: Usamos setDoc con merge para asegurar que el documento se cree si no existe.
+      const categoryObject = {
+        name: newCategory.trim(),
+        subcategories: subcategories.filter(s => s.trim() !== "")
+      };
+
+      // Garantizamos que el documento se cree si no existe o se actualice si existe
       await setDoc(configRef, {
-        categories: arrayUnion(newCategory.trim())
+        categories: arrayUnion(categoryObject)
       }, { merge: true });
 
       toast({ 
         title: "Categoría creada", 
-        description: `Se ha añadido "${newCategory}" a la lista oficial.` 
+        description: `Se ha añadido "${newCategory}" con sus subcategorías.` 
       });
       setNewCategory("");
+      setSubcategories([]);
+      setNewSubcategory("");
       setIsCreateCategoryOpen(false);
     } catch (error: any) {
       console.error("Error al crear categoría:", error);
@@ -252,23 +273,60 @@ export default function BusinessDirectoryAdminPage() {
 
       {/* DIALOGO CREAR CATEGORÍA */}
       <Dialog open={isCreateCategoryOpen} onOpenChange={setIsCreateCategoryOpen}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
             <DialogTitle>Crear Nueva Categoría</DialogTitle>
             <DialogDescription>
-              Escribe el nombre de la categoría para añadirla al sistema del directorio.
+              Escribe el nombre de la categoría (con emoji) y añade sus subcategorías correspondientes.
             </DialogDescription>
           </DialogHeader>
-          <div className="py-4 space-y-4">
+          <div className="py-4 space-y-6">
             <div className="space-y-2">
               <Label htmlFor="category-name">Nombre de la Categoría</Label>
               <Input 
                 id="category-name"
-                placeholder="Ej. Spa, Veterinaria, Consultoría..." 
+                placeholder="Ej. 🏥 Salud y Medicina" 
                 value={newCategory}
                 onChange={(e) => setNewCategory(e.target.value)}
                 disabled={isSavingCategory}
               />
+            </div>
+
+            <div className="space-y-4">
+              <Label>Subcategorías</Label>
+              <div className="flex gap-2">
+                <Input 
+                  placeholder="Ej. Clínicas" 
+                  value={newSubcategory}
+                  onChange={(e) => setNewSubcategory(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        addSubcategory();
+                    }
+                  }}
+                  disabled={isSavingCategory}
+                />
+                <Button type="button" variant="outline" onClick={addSubcategory} disabled={isSavingCategory || !newSubcategory.trim()}>
+                   Agregar
+                </Button>
+              </div>
+
+              {subcategories.length > 0 && (
+                <div className="flex flex-wrap gap-2 p-3 bg-muted/30 rounded-lg border">
+                  {subcategories.map((sub, index) => (
+                    <Badge key={index} variant="secondary" className="gap-1 pl-2 pr-1 h-7">
+                      {sub}
+                      <button 
+                        onClick={() => removeSubcategory(index)}
+                        className="rounded-full hover:bg-muted p-0.5"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </Badge>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
           <DialogFooter>
@@ -277,7 +335,7 @@ export default function BusinessDirectoryAdminPage() {
             </Button>
             <Button onClick={handleCreateCategory} disabled={isSavingCategory || !newCategory.trim()}>
               {isSavingCategory && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Añadir Categoría
+              Añadir Categoría Completa
             </Button>
           </DialogFooter>
         </DialogContent>
