@@ -22,7 +22,7 @@ export const metadata: Metadata = {
 
 /**
  * Obtiene las categorías configuradas dinámicamente en Firestore.
- * Usa DIRECTORY_CATEGORIES como fallback si no existe configuración.
+ * Mapea los objetos de categoría para obtener solo los nombres como strings.
  */
 async function getCategories(): Promise<string[]> {
     try {
@@ -32,7 +32,10 @@ async function getCategories(): Promise<string[]> {
         if (configSnap.exists) {
             const data = configSnap.data();
             if (data && Array.isArray(data.categories) && data.categories.length > 0) {
-                return data.categories as string[];
+                // Extraer el nombre independientemente de si es un string o un objeto {name, subcategories}
+                return data.categories.map((cat: any) => 
+                    typeof cat === 'string' ? cat : cat.name
+                ).filter(Boolean);
             }
         }
     } catch (error) {
@@ -61,7 +64,6 @@ async function getDirectoryBusinesses() {
 }
 
 export default async function DirectoryPage() {
-    // Carga paralela de negocios y categorías dinámicas
     const [businesses, dynamicCategories] = await Promise.all([
         getDirectoryBusinesses(),
         getCategories()
