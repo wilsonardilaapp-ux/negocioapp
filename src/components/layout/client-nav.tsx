@@ -27,6 +27,7 @@ import {
   Tag,
   Ticket,
   Bot,
+  Star,
 } from "lucide-react";
 
 import { SidebarMenu, SidebarMenuItem, SidebarMenuButton, useSidebar } from "@/components/ui/sidebar";
@@ -37,6 +38,7 @@ const allNavItems = [
   { href: "/dashboard/catalogo", icon: ShoppingCart, label: "Catálogo", moduleId: 'catalogo' },
   { href: "/dashboard/share", icon: Share2, label: "Compartir Menú", moduleId: 'catalogo' },
   { href: "/dashboard/blog", icon: FileText, label: "Blog", moduleId: 'blog' },
+  { href: "/dashboard/valoraciones-directorio", icon: Star, label: "Valoraciones del Directorio" },
   { href: "/dashboard/chatbot", icon: Bot, label: "Asistente IA", moduleId: 'chatbot-integrado-con-whatsapp-para-soporte-y-ventas'},
   { href: "/dashboard/messages", icon: Bell, label: "Notificaciones" },
   { href: "/dashboard/mensajes-clientes", icon: Mail, label: "Mensajes de Clientes" },
@@ -67,7 +69,6 @@ export function ClientNav() {
   const navItems = useMemo(() => {
     return allNavItems.filter(item => {
       if (!item.moduleId) return true;
-      // El Super Admin siempre ve todas las pestañas para poder configurar
       if (profile?.role === 'super_admin') return true;
       return isModuleAuthorized(item.moduleId);
     });
