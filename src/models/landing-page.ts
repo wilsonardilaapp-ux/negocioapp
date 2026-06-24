@@ -123,6 +123,10 @@ export type LandingHeaderConfigData = {
         name: string;
         address: string;
         phone: string;
+        phone2?: string;
+        phone3?: string;
+        phone4?: string;
+        phone5?: string;
         email?: string;
         logoURL?: string; // Add logoURL here
         deliveryFee?: number;

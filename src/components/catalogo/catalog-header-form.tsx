@@ -27,6 +27,10 @@ const initialHeaderConfig: LandingHeaderConfigData = {
       name: 'Mi Negocio',
       address: 'Dirección de ejemplo',
       phone: '3001234567',
+      phone2: '',
+      phone3: '',
+      phone4: '',
+      phone5: '',
       email: 'info@tunegocio.com',
       deliveryFee: 0,
       vatRate: 19,
@@ -258,6 +262,22 @@ export default function CatalogHeaderForm({ data, setData }: CatalogHeaderFormPr
                 <div>
                     <Label htmlFor="business-vat-rate">IVA (%)</Label>
                     <Input id="business-vat-rate" type="number" value={localData.businessInfo.vatRate ?? ''} onChange={e => handleInputChange('businessInfo', 'vatRate', Number(e.target.value))} placeholder="Ej: 19" />
+                </div>
+                <div>
+                    <Label htmlFor="business-phone2">Teléfono / WhatsApp 2</Label>
+                    <Input id="business-phone2" value={localData.businessInfo.phone2 || ''} onChange={e => handleInputChange('businessInfo', 'phone2', e.target.value)} />
+                </div>
+                <div>
+                    <Label htmlFor="business-phone3">Teléfono / WhatsApp 3</Label>
+                    <Input id="business-phone3" value={localData.businessInfo.phone3 || ''} onChange={e => handleInputChange('businessInfo', 'phone3', e.target.value)} />
+                </div>
+                <div>
+                    <Label htmlFor="business-phone4">Teléfono / WhatsApp 4</Label>
+                    <Input id="business-phone4" value={localData.businessInfo.phone4 || ''} onChange={e => handleInputChange('businessInfo', 'phone4', e.target.value)} />
+                </div>
+                <div>
+                    <Label htmlFor="business-phone5">Teléfono / WhatsApp 5</Label>
+                    <Input id="business-phone5" value={localData.businessInfo.phone5 || ''} onChange={e => handleInputChange('businessInfo', 'phone5', e.target.value)} />
                 </div>
                 <div className="md:col-span-2 space-y-2">
                     <div className="flex justify-between items-center">
