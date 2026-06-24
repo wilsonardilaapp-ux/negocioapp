@@ -16,23 +16,21 @@ import FaviconInjector from '@/components/layout/FaviconInjector';
 export const dynamic = 'force-dynamic';
 
 /**
- * Normalización agresiva y definitiva:
- * 1. Decodifica URL.
- * 2. Pasa a minúsculas.
- * 3. Quita acentos (NFD).
- * 4. Elimina TODO lo que no sea letra o número (emojis, espacios, guiones, puntos).
+ * Normalización agresiva para asegurar que los Slugs coincidan 
+ * sin importar emojis o caracteres especiales.
  */
-function normalizeString(text: string | null | undefined): string {
+function normalizeString(text: any): string {
     if (!text) return "";
+    const str = Array.isArray(text) ? text[0] : String(text);
     try {
-        const decoded = decodeURIComponent(text);
+        const decoded = decodeURIComponent(str);
         return decoded
             .toLowerCase()
             .normalize("NFD")
             .replace(/[\u0300-\u036f]/g, "") 
             .replace(/[^a-z0-9]/g, "");    
     } catch (e) {
-        return String(text)
+        return str
             .toLowerCase()
             .normalize("NFD")
             .replace(/[\u0300-\u036f]/g, "")
@@ -63,15 +61,13 @@ async function getEntriesByCategory(categoryParam: string, subcategoryParam?: st
         });
 
         if (!categoryMatch) {
-            console.error(`[Directory] No se encontró categoría maestra para el slug: ${categoryParam}`);
             return null;
         }
 
         const categoryName = typeof categoryMatch === 'string' ? categoryMatch : categoryMatch.name;
         const subcategories = typeof categoryMatch === 'string' ? [] : (categoryMatch.subcategories || []);
 
-        // 3. Obtener todos los negocios activos habilitados en el directorio
-        // Filtramos en memoria para evitar colisiones por índices o falta de normalización en queries de Firestore
+        // 3. Obtener negocios activos
         const snapshot = await db.collection('businesses')
             .where('status', '==', 'active')
             .where('directoryEnabled', '==', true)
@@ -81,15 +77,13 @@ async function getEntriesByCategory(categoryParam: string, subcategoryParam?: st
 
         const normalizedSubcategoryParam = subcategoryParam ? normalizeString(subcategoryParam) : null;
 
-        // 4. Filtrado Lógico Robusto
+        // 4. Filtrado en memoria
         const filteredItems = allBusinesses.filter(item => {
-            // Comparación de Categoría
             const itemCategoryNormalized = normalizeString(item.category);
             const categoryMatches = itemCategoryNormalized === normalizedTargetSlug;
 
             if (!categoryMatches) return false;
 
-            // Comparación de Subcategoría (si aplica)
             if (normalizedSubcategoryParam) {
                 const itemSubcategoryNormalized = normalizeString((item as any).subcategory);
                 return itemSubcategoryNormalized === normalizedSubcategoryParam;
@@ -120,19 +114,22 @@ async function getGlobalFavicon() {
 }
 
 export async function generateMetadata({ params, searchParams }: { params: { categoria: string }, searchParams: { sub?: string } }): Promise<Metadata> {
-    const data = await getEntriesByCategory(params.categoria, searchParams.sub);
+    const data = await getEntriesByCategory(params.categoria, searchParams?.sub);
     if (!data) return { title: 'Categoría no encontrada' };
 
-    const titleSuffix = searchParams.sub ? ` - ${searchParams.sub}` : '';
+    const titleSuffix = searchParams?.sub ? ` - ${searchParams.sub}` : '';
     return {
-        title: `Negocios de ${data.category}${titleSuffix} | Zentry`,
+        title: `${data.category}${titleSuffix} | Directorio Zentry`,
         description: `Explora negocios verificados en ${data.category}.`,
     };
 }
 
-export default async function CategoryPage({ params, searchParams }: { params: { categoria: string }, searchParams: { sub?: string } }) {
+export default async function CategoryPage({ params, searchParams }: { params: { categoria: string }, searchParams?: { sub?: string } }) {
+    // Asegurar que searchParams no sea null
+    const safeSearchParams = searchParams || {};
+    
     const [data, faviconUrl] = await Promise.all([
-        getEntriesByCategory(params.categoria, searchParams.sub),
+        getEntriesByCategory(params.categoria, safeSearchParams.sub),
         getGlobalFavicon()
     ]);
 
@@ -140,7 +137,7 @@ export default async function CategoryPage({ params, searchParams }: { params: {
         notFound();
     }
 
-    const pageTitle = searchParams.sub ? `Negocios de ${data.category} - ${searchParams.sub} | Zentry` : `Negocios de ${data.category} | Zentry`;
+    const pageTitle = safeSearchParams.sub ? `${data.category} - ${safeSearchParams.sub} | Zentry` : `${data.category} | Zentry`;
 
     return (
         <div className="min-h-screen bg-gray-50/30 flex flex-col">
@@ -176,13 +173,13 @@ export default async function CategoryPage({ params, searchParams }: { params: {
                                     href={`/directorio/${params.categoria}`}
                                     className={cn(
                                         "block px-3 py-2 rounded-lg text-sm transition-colors",
-                                        !searchParams.sub ? "bg-primary text-white font-bold" : "text-gray-600 hover:bg-primary/5 hover:text-primary"
+                                        !safeSearchParams.sub ? "bg-primary text-white font-bold" : "text-gray-600 hover:bg-primary/5 hover:text-primary"
                                     )}
                                 >
                                     Todas
                                 </Link>
                                 {data.subcategories.map(sub => {
-                                    const isSelected = normalizeString(searchParams.sub) === normalizeString(sub);
+                                    const isSelected = normalizeString(safeSearchParams.sub) === normalizeString(sub);
                                     return (
                                         <Link 
                                             key={sub} 
@@ -206,7 +203,7 @@ export default async function CategoryPage({ params, searchParams }: { params: {
                             <div className="flex items-center gap-2">
                                 <LayoutGrid className="h-5 w-5 text-primary" />
                                 <h2 className="text-xl font-bold text-gray-900">
-                                    {searchParams.sub ? `Resultados para ${searchParams.sub}` : 'Todos los resultados'}
+                                    {safeSearchParams.sub ? `Resultados para ${safeSearchParams.sub}` : 'Todos los resultados'}
                                 </h2>
                             </div>
                             <span className="text-sm text-gray-500 font-medium">
