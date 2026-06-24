@@ -18,7 +18,7 @@ import {
     Twitter,
     MessageSquareQuote
 } from 'lucide-react';
-import { WhatsAppIcon, TikTokIcon, XIcon, InstagramIcon, FacebookIcon } from '@/components/icons';
+import { WhatsAppIcon, TikTokIcon, XIcon, FacebookIcon, InstagramIcon } from '@/components/icons';
 import Link from 'next/link';
 import Image from 'next/image';
 import { notFound } from 'next/navigation';
@@ -90,11 +90,15 @@ async function getPublishedRatings(businessId: string) {
         const snapshot = await db.collection('directoryRatings')
             .where('businessId', '==', businessId)
             .where('status', '==', 'published')
-            .orderBy('createdAt', 'desc')
-            .limit(10)
+            .limit(20)
             .get();
 
-        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as DirectoryRating));
+        if (snapshot.empty) return [];
+
+        const ratings = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as DirectoryRating));
+        
+        // Ordenar manualmente en el servidor para evitar requerir índices compuestos en Firestore
+        return ratings.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     } catch (error) {
         console.error("Error fetching ratings:", error);
         return [];
@@ -281,7 +285,7 @@ export default async function BusinessProfilePage({ params }: { params: { id: st
                             </div>
                             
                             <Button asChild size="lg" className="w-full rounded-[2rem] h-16 text-lg font-black group text-white bg-primary">
-                                <Link href={`/catalog/${entry.id}`} target="_blank">
+                                <Link href={`/catalog/${entry.id}`} target="_blank" rel="noopener noreferrer">
                                     Ver Catálogo de Productos <ArrowRight className="ml-2 group-hover:translate-x-2 transition-transform" />
                                 </Link>
                             </Button>
