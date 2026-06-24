@@ -61,8 +61,21 @@ service cloud.firestore {
     }
 
     match /blog_posts/{postId} {
+      // CRÍTICO: Se requiere 'list' para que el dashboard pueda contar los posts y validar límites
       allow read, list: if true;
       allow write: if isSuperAdmin() || isOwner(request.resource.data.businessId || resource.data.businessId);
+    }
+
+    // --- VALORACIONES DEL DIRECTORIO ---
+    match /directoryRatings/{ratingId} {
+      // Cualquier usuario puede ver valoraciones publicadas
+      allow read, list: if resource.data.status == 'published' || isSuperAdmin() || isOwner(resource.data.businessId);
+      // Usuarios autenticados pueden crear valoraciones
+      allow create: if isAuthenticated();
+      // Solo el superadmin o el dueño del negocio pueden actualizar (para respuestas)
+      allow update: if isSuperAdmin() || isOwner(resource.data.businessId);
+      // Solo el superadmin puede eliminar
+      allow delete: if isSuperAdmin();
     }
 
     // --- REGLAS POR COLECCIÓN ---
@@ -132,6 +145,7 @@ service cloud.firestore {
       allow read, write: if isSuperAdmin();
     }
 
+    // --- REGLA POR DEFECTO ---
     match /{document=**} {
       allow read, write: if isSuperAdmin();
     }

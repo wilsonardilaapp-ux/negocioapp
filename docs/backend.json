@@ -1,4 +1,3 @@
-
 {
   "entities": {
     "User": {
@@ -33,6 +32,26 @@
         "clicks": { "type": "number" },
         "createdAt": { "type": "string", "format": "date-time" }
       }
+    },
+    "DirectoryRating": {
+      "title": "DirectoryRating",
+      "type": "object",
+      "description": "Represents a user rating for a business in the directory.",
+      "properties": {
+        "id": { "type": "string" },
+        "businessId": { "type": "string" },
+        "businessName": { "type": "string" },
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "rating": { "type": "number", "minimum": 1, "maximum": 5 },
+        "comment": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "published", "hidden", "rejected", "reported"] },
+        "adminResponse": { "type": "string" },
+        "businessResponse": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "businessId", "userId", "rating", "comment", "status", "createdAt", "updatedAt"]
     }
   },
   "auth": {
@@ -54,6 +73,14 @@
           "entityName": "DirectoryAd",
           "schema": { "$ref": "#/backend/entities/DirectoryAd" },
           "description": "Stores advertisements for the directory."
+        }
+      },
+      {
+        "path": "/directoryRatings/{ratingId}",
+        "definition": {
+          "entityName": "DirectoryRating",
+          "schema": { "$ref": "#/backend/entities/DirectoryRating" },
+          "description": "Stores user ratings for businesses."
         }
       }
     ]
