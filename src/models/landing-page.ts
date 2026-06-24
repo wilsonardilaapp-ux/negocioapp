@@ -127,6 +127,7 @@ export type LandingHeaderConfigData = {
         logoURL?: string; // Add logoURL here
         deliveryFee?: number;
         vatRate?: number;
+        shortDescription?: string;
     };
     socialLinks: {
         tiktok: string;

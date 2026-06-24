@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { getAdminFirestore } from '@/firebase/server-init';
 import Header from '@/components/layout/header';
@@ -35,6 +34,7 @@ type BusinessWithSocial = Business & {
     socialWhatsapp?: string;
     socialTwitter?: string;
     socialYoutube?: string;
+    shortDescription?: string;
 };
 
 async function getBusinessEntry(id: string) {
@@ -59,22 +59,24 @@ async function getBusinessEntry(id: string) {
         if (catalogSnap.exists) {
             const catalog = catalogSnap.data();
             const socialLinks = catalog?.headerConfig?.socialLinks;
+            const businessInfo = catalog?.headerConfig?.businessInfo;
             
             if (socialLinks) {
                 // Función para limpiar URLs y convertirlas en undefined si están vacías
-                const cleanUrl = (url: any) => {
-                    if (typeof url !== 'string') return undefined;
-                    const trimmed = url.trim();
+                const cleanValue = (val: any) => {
+                    if (typeof val !== 'string') return undefined;
+                    const trimmed = val.trim();
                     return trimmed.length > 0 ? trimmed : undefined;
                 };
 
                 socialData = {
-                    socialInstagram: cleanUrl(socialLinks.instagram),
-                    socialFacebook: cleanUrl(socialLinks.facebook),
-                    socialTiktok: cleanUrl(socialLinks.tiktok),
-                    socialTwitter: cleanUrl(socialLinks.twitter),
-                    socialYoutube: cleanUrl(socialLinks.youtube),
-                    socialWhatsapp: cleanUrl(socialLinks.whatsapp),
+                    socialInstagram: cleanValue(socialLinks.instagram),
+                    socialFacebook: cleanValue(socialLinks.facebook),
+                    socialTiktok: cleanValue(socialLinks.tiktok),
+                    socialTwitter: cleanValue(socialLinks.twitter),
+                    socialYoutube: cleanValue(socialLinks.youtube),
+                    socialWhatsapp: cleanValue(socialLinks.whatsapp),
+                    shortDescription: cleanValue(businessInfo?.shortDescription)
                 };
             }
         }
@@ -127,13 +129,20 @@ export default async function BusinessProfilePage({ params }: { params: { id: st
                             </div>
                             
                             <div className="space-y-4 flex-1">
-                                <div className="flex flex-wrap items-center gap-3">
-                                    <h1 className="text-3xl md:text-5xl font-black text-gray-900 tracking-tight">
-                                        {entry.name}
-                                    </h1>
-                                    <Badge className="bg-blue-500 text-white gap-1 py-1 border-none shadow-sm">
-                                        <CheckCircle2 className="h-3 w-3" /> Verificado
-                                    </Badge>
+                                <div className="space-y-1">
+                                    <div className="flex flex-wrap items-center gap-3">
+                                        <h1 className="text-3xl md:text-5xl font-black text-gray-900 tracking-tight">
+                                            {entry.name}
+                                        </h1>
+                                        <Badge className="bg-blue-500 text-white gap-1 py-1 border-none shadow-sm">
+                                            <CheckCircle2 className="h-3 w-3" /> Verificado
+                                        </Badge>
+                                    </div>
+                                    {entry.shortDescription && (
+                                        <p className="text-lg md:text-xl text-gray-600 font-medium">
+                                            {entry.shortDescription}
+                                        </p>
+                                    )}
                                 </div>
                                 
                                 <div className="flex flex-wrap items-center gap-6 text-gray-600">

@@ -689,6 +689,11 @@ const CatalogHeader = ({ config, cartItemCount, onCartClick }: { config: any, ca
                     <div className="flex flex-col md:flex-row items-center gap-4">
                         <div className="text-center md:text-left">
                             <h1 className="text-xl font-bold text-foreground">{config.businessInfo.name}</h1>
+                            {config.businessInfo.shortDescription && (
+                                <p className="text-xs text-muted-foreground font-medium mb-1 line-clamp-1">
+                                    {config.businessInfo.shortDescription}
+                                </p>
+                            )}
                             <p className="text-sm text-muted-foreground">{config.businessInfo.address}</p>
                         </div>
                         <div className="flex items-center gap-2">

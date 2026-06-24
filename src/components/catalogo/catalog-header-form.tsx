@@ -29,6 +29,7 @@ const initialHeaderConfig: LandingHeaderConfigData = {
       email: 'info@tunegocio.com',
       deliveryFee: 0,
       vatRate: 19,
+      shortDescription: '',
     },
     socialLinks: {
       tiktok: '',
@@ -256,6 +257,24 @@ export default function CatalogHeaderForm({ data, setData }: CatalogHeaderFormPr
                 <div>
                     <Label htmlFor="business-vat-rate">IVA (%)</Label>
                     <Input id="business-vat-rate" type="number" value={localData.businessInfo.vatRate ?? ''} onChange={e => handleInputChange('businessInfo', 'vatRate', Number(e.target.value))} placeholder="Ej: 19" />
+                </div>
+                <div className="md:col-span-2 space-y-2">
+                    <div className="flex justify-between items-center">
+                        <Label htmlFor="business-short-desc">Descripción Corta</Label>
+                        <span className={cn(
+                            "text-[10px] font-bold",
+                            (localData.businessInfo.shortDescription?.length || 0) > 150 ? "text-destructive" : "text-muted-foreground"
+                        )}>
+                            {localData.businessInfo.shortDescription?.length || 0} / 150
+                        </span>
+                    </div>
+                    <Input 
+                        id="business-short-desc" 
+                        value={localData.businessInfo.shortDescription || ''} 
+                        onChange={e => handleInputChange('businessInfo', 'shortDescription', e.target.value)} 
+                        placeholder="Una frase breve que describe tu negocio (aparecerá debajo del nombre)"
+                        maxLength={150}
+                    />
                 </div>
             </div>
         </div>
