@@ -2,25 +2,24 @@
 'use client';
 
 import { useMemo, useEffect, useState } from 'react';
-import { useCollection, useFirestore, useUser, useMemoFirebase, updateDocumentNonBlocking, addDocumentNonBlocking } from '@/firebase';
-import { collection, doc, writeBatch, query, orderBy, where } from 'firebase/firestore';
+import { useCollection, useFirestore, useUser, useMemoFirebase, updateDocumentNonBlocking } from '@/firebase';
+import { collection, doc, writeBatch, query, orderBy } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { 
     Star, 
     TrendingUp, 
     TrendingDown, 
     Package, 
-    CheckCircleCircle, 
-    HelpCircle, 
+    CheckCircle, 
+    CircleHelp, 
     Loader2, 
     BarChart, 
-    AlertTriangle,
-    CheckCircle2,
+    TriangleAlert,
     Clock,
     Check
 } from 'lucide-react';
 import type { Product } from '@/models/product';
-import type { ProductAlert, AlertStatus } from '@/models/product-alert';
+import type { ProductAlert } from '@/models/product-alert';
 import type { AdminNotification } from '@/models/notification';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -28,14 +27,6 @@ import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
-
-const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('es-CO', {
-        style: 'currency',
-        currency: 'COP',
-        minimumFractionDigits: 0,
-    }).format(value);
-};
 
 export default function ProductStatsPage() {
     const { user } = useUser();
@@ -125,7 +116,7 @@ export default function ProductStatsPage() {
         };
 
         syncAlerts();
-    }, [products, alerts, user, firestore]);
+    }, [products, alerts, user, firestore, isSyncing]);
 
     // --- LÓGICA: ESTADÍSTICAS ---
     const stats = useMemo(() => {
@@ -191,8 +182,8 @@ export default function ProductStatsPage() {
 
     const kpis = [
         { title: "Total productos", value: stats.total, icon: Package },
-        { title: "Productos valorados", value: stats.ratedCount, icon: CheckCircleCircle },
-        { title: "Sin valoraciones", value: stats.unratedCount, icon: HelpCircle },
+        { title: "Productos valorados", value: stats.ratedCount, icon: CheckCircle },
+        { title: "Sin valoraciones", value: stats.unratedCount, icon: CircleHelp },
         { title: "Promedio catálogo", value: stats.avgRating.toFixed(1), icon: Star },
     ];
 
@@ -215,7 +206,7 @@ export default function ProductStatsPage() {
                     <Card key={kpi.title}>
                         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                             <CardTitle className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{kpi.title}</CardTitle>
-                            <kpi.icon className="h-4 w-4 text-primary" />
+                            <kpi.icon className={cn("h-4 w-4 text-primary")} />
                         </CardHeader>
                         <CardContent>
                             <div className="text-2xl font-black">{kpi.value}</div>
@@ -224,12 +215,12 @@ export default function ProductStatsPage() {
                 ))}
             </div>
 
-            {/* --- SECCIÓN: PRODUCTOS QUE REQUIEREN ATENCIÓN (NUEVO) --- */}
+            {/* --- SECCIÓN: PRODUCTOS QUE REQUIEREN ATENCIÓN --- */}
             {activeAlerts.length > 0 && (
                 <Card className="border-orange-200 bg-orange-50/20">
                     <CardHeader>
                         <CardTitle className="text-orange-700 flex items-center gap-2">
-                            <AlertTriangle className="h-5 w-5" />
+                            <TriangleAlert className="h-5 w-5" />
                             Productos que requieren atención
                         </CardTitle>
                         <CardDescription>Productos con una valoración menor a 3.0 basada en 3 o más opiniones.</CardDescription>
@@ -320,7 +311,7 @@ export default function ProductStatsPage() {
                 <Card className="border-gray-200">
                     <CardHeader className="bg-gray-50 border-b border-gray-200">
                         <CardTitle className="text-base flex items-center gap-2 text-gray-700 font-bold">
-                            <HelpCircle className="h-5 w-5" /> Sin valoraciones
+                            <CircleHelp className="h-5 w-5" /> Sin valoraciones
                         </CardTitle>
                         <CardDescription>Anima a tus clientes a calificar estos ítems.</CardDescription>
                     </CardHeader>
