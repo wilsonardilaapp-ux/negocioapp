@@ -35,6 +35,7 @@ import type { Module } from '@/models/module';
 import { doc } from 'firebase/firestore';
 import { useSubscription } from '@/hooks/useSubscription';
 import { LimitBanner } from '@/components/dashboard/LimitBanner';
+import { cn } from "@/lib/utils";
 
 export default function PromotionsPage() {
   const { user } = useUser();
@@ -141,7 +142,7 @@ export default function PromotionsPage() {
         </CardHeader>
         <CardContent>
             <div className="flex items-center gap-2 rounded-lg border bg-secondary/50 p-3 text-sm">
-                <Info className="h-5 w-5 text-muted-foreground" />
+                <Input className="h-5 w-5 text-muted-foreground" />
                 <p className="text-muted-foreground">
                     Límite de promociones: <span className="font-bold">{promotionsCount} / {limits.promotions === -1 ? '∞' : limits.promotions}</span>.
                 </p>

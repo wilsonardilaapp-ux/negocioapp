@@ -8,6 +8,7 @@ import type { DirectoryAd, AdFormat, AdPosition } from '@/models/directory-ad';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { ExternalLink } from 'lucide-react';
+import { Badge } from "@/components/ui/badge";
 
 interface DirectoryAdSlotProps {
     position: AdPosition;

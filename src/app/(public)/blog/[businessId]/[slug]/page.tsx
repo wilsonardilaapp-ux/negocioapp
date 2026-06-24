@@ -1,4 +1,3 @@
-
 import { notFound } from "next/navigation";
 import { getAdminFirestore } from "@/firebase/server-init";
 import { Timestamp } from "firebase-admin/firestore";
@@ -8,6 +7,7 @@ import { ChevronLeft, ChevronRight, Calendar, User } from "lucide-react";
 import Header from "@/components/layout/header";
 import Footer from "@/components/layout/footer";
 import type { LandingPageData } from "@/models/landing-page";
+import { cn } from "@/lib/utils";
 
 export const dynamic = 'force-dynamic';
 
@@ -207,7 +207,7 @@ export default async function BlogPostPage({ params }: Props) {
           
           <div className="flex flex-col md:flex-row justify-between items-center gap-4">
             {prevPost ? (
-              <Link href={`/blog/${businessId}/${prevPost.slug}`} className="w-full md:w-auto">
+              <Link href={`/blog/${businessId}/${prevPost.slug}`} className={cn("w-full md:w-auto")}>
                 <Button variant="outline" className="w-full justify-start h-auto py-3 px-4 border-gray-300 hover:border-primary hover:text-primary group">
                   <ChevronLeft className="mr-2 h-4 w-4 group-hover:-translate-x-1 transition-transform" />
                   <div className="text-left">
@@ -219,7 +219,7 @@ export default async function BlogPostPage({ params }: Props) {
             ) : <div className="flex-1"></div>}
 
             {nextPost ? (
-              <Link href={`/blog/${businessId}/${nextPost.slug}`} className="w-full md:w-auto">
+              <Link href={`/blog/${businessId}/${nextPost.slug}`} className={cn("w-full md:w-auto")}>
                 <Button variant="outline" className="w-full justify-end h-auto py-3 px-4 border-gray-300 hover:border-primary hover:text-primary group">
                   <div className="text-right">
                     <span className="block text-xs text-gray-500">Siguiente</span>

@@ -20,6 +20,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { HybridPlanSchema } from '@/models/hybrid-plan';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError, type SecurityRuleContext } from '@/firebase/errors';
+import { cn } from "@/lib/utils";
 
 // DND Kit Imports
 import {
