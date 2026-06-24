@@ -4,7 +4,6 @@ import { getAdminFirestore } from '@/firebase/server-init';
 import Header from '@/components/layout/header';
 import Footer from '@/components/layout/footer';
 import BusinessCard from '@/components/directory/BusinessCard';
-import { DIRECTORY_CATEGORIES } from '@/models/business-directory';
 import type { Business } from '@/models/business';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft } from 'lucide-react';
@@ -28,22 +27,35 @@ async function getEntriesByCategory(categoryParam: string) {
     try {
         const db = await getAdminFirestore();
         
-        // Buscamos la categoría original comparando versiones normalizadas (sin acentos)
+        // 1. Obtener las categorías dinámicas de Firestore
+        const configSnap = await db.collection('globalConfig').doc('directoryCategories').get();
+        let dynamicCategories: string[] = [];
+
+        if (configSnap.exists) {
+            const data = configSnap.data();
+            if (data && Array.isArray(data.categories)) {
+                dynamicCategories = data.categories.map((cat: any) => 
+                    typeof cat === 'string' ? cat : cat.name
+                );
+            }
+        }
+
+        // 2. Buscar la categoría original comparando versiones normalizadas
         const normalizedTarget = normalizeString(categoryParam);
-        const normalizedCategory = DIRECTORY_CATEGORIES.find(
+        const originalCategory = dynamicCategories.find(
             c => normalizeString(c) === normalizedTarget
         );
 
-        if (!normalizedCategory) return null;
+        if (!originalCategory) return null;
 
-        // Consultamos la colección 'businesses' directamente con el nombre exacto guardado
+        // 3. Consultar negocios aprobados en esa categoría
         const snapshot = await db.collection('businesses')
             .where('directoryStatus', '==', 'approved')
-            .where('category', '==', normalizedCategory)
+            .where('category', '==', originalCategory)
             .get();
 
         return {
-            category: normalizedCategory,
+            category: originalCategory,
             items: snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Business[]
         };
     } catch (error) {
@@ -53,16 +65,12 @@ async function getEntriesByCategory(categoryParam: string) {
 }
 
 export async function generateMetadata({ params }: { params: { categoria: string } }): Promise<Metadata> {
-    const normalizedTarget = normalizeString(params.categoria);
-    const category = DIRECTORY_CATEGORIES.find(
-        c => normalizeString(c) === normalizedTarget
-    );
-
-    if (!category) return { title: 'Categoría no encontrada' };
+    const data = await getEntriesByCategory(params.categoria);
+    if (!data) return { title: 'Categoría no encontrada' };
 
     return {
-        title: `Negocios de ${category} | Zentry`,
-        description: `Encuentra los mejores negocios y servicios en la categoría de ${category.toLowerCase()}. Perfiles profesionales y verificados.`,
+        title: `Negocios de ${data.category} | Zentry`,
+        description: `Encuentra los mejores negocios y servicios en la categoría de ${data.category.toLowerCase()}. Perfiles profesionales y verificados.`,
     };
 }
 
