@@ -6,10 +6,25 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/com
 import { BusinessRatingsStats } from '@/components/directory/ratings/BusinessRatingsStats';
 import { BusinessRatingsList } from '@/components/directory/ratings/BusinessRatingsList';
 import { useBusinessRatings } from '@/hooks/useBusinessRatings';
+import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
+import { doc } from 'firebase/firestore';
 import { Loader2, Star } from 'lucide-react';
+import type { Business } from '@/models/business';
 
 export default function BusinessRatingsPage() {
-  const { ratings, isLoading, error } = useBusinessRatings();
+  const { user } = useUser();
+  const firestore = useFirestore();
+  const { ratings, isLoading: isRatingsLoading } = useBusinessRatings();
+
+  // Cargamos el documento del negocio para obtener la calificación real consolidada
+  const businessDocRef = useMemoFirebase(() => 
+    user ? doc(firestore, 'businesses', user.uid) : null,
+    [user, firestore]
+  );
+  
+  const { data: business, isLoading: isBusinessLoading } = useDoc<Business>(businessDocRef);
+
+  const isLoading = isRatingsLoading || isBusinessLoading;
 
   if (isLoading) {
     return (
@@ -37,7 +52,12 @@ export default function BusinessRatingsPage() {
         </CardHeader>
       </Card>
 
-      <BusinessRatingsStats ratings={ratings} />
+      <BusinessRatingsStats 
+        ratings={ratings} 
+        businessRating={business?.rating}
+        businessReviewCount={business?.reviewCount}
+        businessDistribution={business?.ratingDistribution}
+      />
 
       <Card>
         <CardHeader>

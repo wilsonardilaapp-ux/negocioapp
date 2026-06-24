@@ -9,10 +9,35 @@ import type { DirectoryRating } from '@/models/directory-rating';
 
 interface BusinessRatingsStatsProps {
   ratings: DirectoryRating[];
+  businessRating?: number;
+  businessReviewCount?: number;
+  businessDistribution?: Record<string, number>;
 }
 
-export function BusinessRatingsStats({ ratings }: BusinessRatingsStatsProps) {
+export function BusinessRatingsStats({ 
+    ratings, 
+    businessRating, 
+    businessReviewCount, 
+    businessDistribution 
+}: BusinessRatingsStatsProps) {
   const stats = useMemo(() => {
+    // Si tenemos datos del documento del negocio (Source of Truth), los usamos prioritariamente
+    if (businessRating !== undefined) {
+      const distribution = [0, 0, 0, 0, 0];
+      if (businessDistribution) {
+          // Mapeamos el objeto Record<string, number> al array de distribución para el Progress
+          for(let i = 1; i <= 5; i++) {
+              distribution[i-1] = businessDistribution[i.toString()] || 0;
+          }
+      }
+      return { 
+          average: businessRating, 
+          total: businessReviewCount || 0, 
+          distribution: distribution.reverse() // [5, 4, 3, 2, 1] estrellas
+      };
+    }
+
+    // Fallback: cálculo client-side si el documento del negocio no tiene los campos
     if (ratings.length === 0) return { average: 0, total: 0, distribution: [0, 0, 0, 0, 0] };
 
     const total = ratings.length;
@@ -26,7 +51,7 @@ export function BusinessRatingsStats({ ratings }: BusinessRatingsStatsProps) {
     });
 
     return { average, total, distribution: distribution.reverse() };
-  }, [ratings]);
+  }, [ratings, businessRating, businessReviewCount, businessDistribution]);
 
   return (
     <div className="grid gap-4 md:grid-cols-3">
