@@ -20,6 +20,27 @@ export const metadata: Metadata = {
     description: 'Explora el directorio de negocios líderes. Encuentra profesionales verificados cerca de ti.',
 };
 
+/**
+ * Obtiene las categorías configuradas dinámicamente en Firestore.
+ * Usa DIRECTORY_CATEGORIES como fallback si no existe configuración.
+ */
+async function getCategories(): Promise<string[]> {
+    try {
+        const db = await getAdminFirestore();
+        const configSnap = await db.collection('globalConfig').doc('directoryCategories').get();
+        
+        if (configSnap.exists) {
+            const data = configSnap.data();
+            if (data && Array.isArray(data.categories) && data.categories.length > 0) {
+                return data.categories as string[];
+            }
+        }
+    } catch (error) {
+        console.error("Error fetching dynamic categories:", error);
+    }
+    return DIRECTORY_CATEGORIES;
+}
+
 async function getDirectoryBusinesses() {
     try {
         const db = await getAdminFirestore();
@@ -40,7 +61,11 @@ async function getDirectoryBusinesses() {
 }
 
 export default async function DirectoryPage() {
-    const businesses = await getDirectoryBusinesses();
+    // Carga paralela de negocios y categorías dinámicas
+    const [businesses, dynamicCategories] = await Promise.all([
+        getDirectoryBusinesses(),
+        getCategories()
+    ]);
 
     return (
         <div className="min-h-screen bg-gray-50/30 flex flex-col">
@@ -81,7 +106,7 @@ export default async function DirectoryPage() {
                                     <Filter className="h-4 w-4" /> Categorías
                                 </h3>
                                 <div className="space-y-1">
-                                    {DIRECTORY_CATEGORIES.map(category => (
+                                    {dynamicCategories.map(category => (
                                         <Link 
                                             key={category} 
                                             href={`/directorio/${encodeURIComponent(category.toLowerCase())}`}
