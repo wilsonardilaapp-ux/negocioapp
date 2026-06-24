@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { getAdminFirestore } from '@/firebase/server-init';
 import Header from '@/components/layout/header';
@@ -16,7 +15,8 @@ import {
     Facebook,
     ArrowRight,
     Youtube,
-    Twitter
+    Twitter,
+    MessageSquareQuote
 } from 'lucide-react';
 import { WhatsAppIcon, TikTokIcon, XIcon } from '@/components/icons';
 import Link from 'next/link';
@@ -25,10 +25,13 @@ import { notFound } from 'next/navigation';
 import type { Business } from '@/models/business';
 import type { Metadata } from 'next';
 import FaviconInjector from '@/components/layout/FaviconInjector';
+import { BusinessRatingForm } from '@/components/directory/BusinessRatingForm';
+import type { DirectoryRating } from '@/models/directory-rating';
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
 
 export const dynamic = 'force-dynamic';
 
-// Definimos un tipo extendido localmente para incluir las propiedades de redes sociales directas
 type BusinessWithSocial = Business & {
     socialTiktok?: string;
     socialInstagram?: string;
@@ -37,25 +40,18 @@ type BusinessWithSocial = Business & {
     socialTwitter?: string;
     socialYoutube?: string;
     shortDescription?: string;
-    subcategory?: string; // Campo añadido
+    subcategory?: string;
 };
 
 async function getBusinessEntry(id: string) {
     try {
         const db = await getAdminFirestore();
-        // 1. Consultamos el documento raíz para datos básicos y estatus
         const businessDoc = await db.collection('businesses').doc(id).get();
-        
         if (!businessDoc.exists) return null;
         
         const data = businessDoc.data() as BusinessWithSocial;
-        
-        // El único campo obligatorio para visualización es que el negocio esté activo
-        if (data.status !== 'active') {
-            return null;
-        }
+        if (data.status !== 'active') return null;
 
-        // 2. Obtener datos adicionales desde la subcolección denormalizada (Donde vive la configuración real)
         const catalogSnap = await db.collection("businesses").doc(id).collection("publicData").doc("catalog").get();
         let additionalData: Partial<BusinessWithSocial> = {};
         
@@ -65,13 +61,7 @@ async function getBusinessEntry(id: string) {
             const businessInfo = catalog?.headerConfig?.businessInfo;
             
             if (socialLinks) {
-                // Función para limpiar URLs y convertirlas en undefined si están vacías
-                const cleanValue = (val: any) => {
-                    if (typeof val !== 'string') return undefined;
-                    const trimmed = val.trim();
-                    return trimmed.length > 0 ? trimmed : undefined;
-                };
-
+                const cleanValue = (val: any) => (typeof val === 'string' && val.trim().length > 0) ? val.trim() : undefined;
                 additionalData = {
                     socialInstagram: cleanValue(socialLinks.instagram),
                     socialFacebook: cleanValue(socialLinks.facebook),
@@ -80,22 +70,33 @@ async function getBusinessEntry(id: string) {
                     socialYoutube: cleanValue(socialLinks.youtube),
                     socialWhatsapp: cleanValue(socialLinks.whatsapp),
                     shortDescription: cleanValue(businessInfo?.shortDescription),
-                    // Sincronizar categoría y subcategoría desde businessInfo si no están en el raíz
                     category: data.category || cleanValue(businessInfo?.category),
                     subcategory: data.subcategory || cleanValue(businessInfo?.subcategory)
                 };
             }
         }
         
-        // 3. Fusionar datos (la subcolección sobreescribe o complementa al raíz)
-        return { 
-            id: businessDoc.id, 
-            ...data,
-            ...additionalData 
-        };
+        return { id: businessDoc.id, ...data, ...additionalData };
     } catch (error) {
         console.error("Error fetching entry:", error);
         return null;
+    }
+}
+
+async function getPublishedRatings(businessId: string) {
+    try {
+        const db = await getAdminFirestore();
+        const snapshot = await db.collection('directoryRatings')
+            .where('businessId', '==', businessId)
+            .where('status', '==', 'published')
+            .orderBy('createdAt', 'desc')
+            .limit(10)
+            .get();
+
+        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as DirectoryRating));
+    } catch (error) {
+        console.error("Error fetching ratings:", error);
+        return [];
     }
 }
 
@@ -112,7 +113,6 @@ async function getGlobalFavicon() {
 export async function generateMetadata({ params }: { params: { id: string } }): Promise<Metadata> {
     const entry = await getBusinessEntry(params.id);
     if (!entry) return { title: 'Negocio no encontrado' };
-
     return {
         title: `${entry.name} | Directorio Zentry`,
         description: entry.description?.substring(0, 160),
@@ -120,21 +120,19 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
 }
 
 export default async function BusinessProfilePage({ params }: { params: { id: string } }) {
-    const [entry, globalFavicon] = await Promise.all([
+    const [entry, ratings, globalFavicon] = await Promise.all([
         getBusinessEntry(params.id),
+        getPublishedRatings(params.id),
         getGlobalFavicon()
     ]);
 
-    if (!entry) {
-        notFound();
-    }
+    if (!entry) notFound();
 
     const faviconUrl = globalFavicon || entry.faviconUrl || entry.logoURL || null;
-    const pageTitle = `${entry.name} | Directorio Zentry`;
 
     return (
         <div className="min-h-screen bg-gray-50/30 flex flex-col">
-            <FaviconInjector faviconUrl={faviconUrl} title={pageTitle} />
+            <FaviconInjector faviconUrl={faviconUrl} title={`${entry.name} | Directorio Zentry`} />
             <Header businessId={entry.id} navigation={null} />
             
             <main className="flex-grow">
@@ -154,17 +152,15 @@ export default async function BusinessProfilePage({ params }: { params: { id: st
                             <div className="space-y-4 flex-1">
                                 <div className="space-y-1">
                                     <div className="flex flex-wrap items-center gap-3">
-                                        <h1 className="text-3xl md:text-5xl font-black text-gray-900 tracking-tight">
-                                            {entry.name}
-                                        </h1>
-                                        <Badge className="bg-blue-500 text-white gap-1 py-1 border-none shadow-sm">
-                                            <CheckCircle2 className="h-3 w-3" /> Verificado
-                                        </Badge>
+                                        <h1 className="text-3xl md:text-5xl font-black text-gray-900 tracking-tight">{entry.name}</h1>
+                                        {(entry.directoryStatus === 'approved') && (
+                                            <Badge className="bg-blue-500 text-white gap-1 py-1 border-none shadow-sm">
+                                                <CheckCircle2 className="h-3 w-3" /> Verificado
+                                            </Badge>
+                                        )}
                                     </div>
                                     {entry.shortDescription && (
-                                        <p className="text-lg md:text-xl text-gray-600 font-medium">
-                                            {entry.shortDescription}
-                                        </p>
+                                        <p className="text-lg md:text-xl text-gray-600 font-medium">{entry.shortDescription}</p>
                                     )}
                                 </div>
                                 
@@ -175,14 +171,8 @@ export default async function BusinessProfilePage({ params }: { params: { id: st
                                         <span>({entry.reviewCount || 0} reseñas)</span>
                                     </div>
                                     <div className="flex flex-wrap items-center gap-2">
-                                        <Badge variant="secondary" className="font-bold">
-                                            {entry.category || 'Servicios'}
-                                        </Badge>
-                                        {entry.subcategory && (
-                                            <Badge variant="outline" className="font-bold border-muted">
-                                                {entry.subcategory}
-                                            </Badge>
-                                        )}
+                                        <Badge variant="secondary" className="font-bold">{entry.category || 'Servicios'}</Badge>
+                                        {entry.subcategory && <Badge variant="outline" className="font-bold border-muted">{entry.subcategory}</Badge>}
                                     </div>
                                     {entry.address && (
                                         <div className="flex items-center gap-1.5">
@@ -196,17 +186,15 @@ export default async function BusinessProfilePage({ params }: { params: { id: st
                                     {entry.phone && (
                                         <Button asChild className="gap-2 font-bold shadow-lg shadow-green-100 bg-[#25D366] hover:bg-[#128C7E] text-white border-none">
                                             <a href={`https://wa.me/${entry.phone.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer">
-                                                <WhatsAppIcon className="h-5 w-5" /> Contactar por WhatsApp
+                                                <WhatsAppIcon className="h-5 w-5" /> WhatsApp
                                             </a>
                                         </Button>
                                     )}
-                                    {entry.website && (
-                                        <Button asChild variant="outline" className="gap-2 font-bold">
-                                            <a href={entry.website} target="_blank" rel="noopener noreferrer">
-                                                <Globe className="h-5 w-5 text-primary" /> Sitio Web
-                                            </a>
-                                        </Button>
-                                    )}
+                                    <Button asChild variant="outline" className="gap-2 font-bold">
+                                        <a href="#ratings-section">
+                                            <Star className="h-5 w-5 text-primary" /> Calificar Negocio
+                                        </a>
+                                    </Button>
                                 </div>
                             </div>
                         </div>
@@ -218,103 +206,81 @@ export default async function BusinessProfilePage({ params }: { params: { id: st
                         <div className="lg:col-span-2 space-y-12">
                             <section className="space-y-4">
                                 <h2 className="text-2xl font-black text-gray-900">Sobre nosotros</h2>
-                                <div className="prose prose-lg max-w-none text-gray-600 leading-relaxed">
-                                    {entry.description}
-                                </div>
+                                <div className="prose prose-lg max-w-none text-gray-600 leading-relaxed">{entry.description}</div>
                             </section>
 
-                            {entry.tags && entry.tags.length > 0 && (
-                                <section className="space-y-4">
-                                    <h2 className="text-2xl font-black text-gray-900">Especialidades</h2>
-                                    <div className="flex flex-wrap gap-2">
-                                        {entry.tags.map(tag => (
-                                            <Badge key={tag} variant="outline" className="px-4 py-2 text-sm bg-white">
-                                                {tag}
-                                            </Badge>
-                                        ))}
+                            <section id="ratings-section" className="space-y-8 border-t pt-12">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 bg-primary/10 rounded-lg">
+                                        <MessageSquareQuote className="h-6 w-6 text-primary" />
                                     </div>
-                                </section>
-                            )}
+                                    <h2 className="text-2xl font-black text-gray-900">Opiniones de clientes</h2>
+                                </div>
+
+                                <BusinessRatingForm businessId={entry.id} businessName={entry.name} />
+
+                                <div className="space-y-6">
+                                    {ratings.length > 0 ? (
+                                        ratings.map((rating) => (
+                                            <div key={rating.id} className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm space-y-4">
+                                                <div className="flex justify-between items-start">
+                                                    <div className="space-y-1">
+                                                        <p className="font-bold text-gray-900">{rating.userName}</p>
+                                                        <div className="flex items-center gap-1">
+                                                            {[...Array(5)].map((_, i) => (
+                                                                <Star key={i} className={cn("h-3 w-3", i < rating.rating ? "text-yellow-400 fill-yellow-400" : "text-gray-200")} />
+                                                            ))}
+                                                            <span className="text-[10px] text-muted-foreground ml-2">
+                                                                {format(new Date(rating.createdAt), 'dd MMMM, yyyy', { locale: es })}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <p className="text-gray-600 text-sm italic">"{rating.comment}"</p>
+                                                {(rating.adminResponse || rating.businessResponse) && (
+                                                    <div className="bg-gray-50 p-4 rounded-xl space-y-2">
+                                                        {rating.businessResponse && (
+                                                            <div>
+                                                                <p className="text-[10px] font-bold text-primary uppercase">Respuesta del Negocio</p>
+                                                                <p className="text-xs text-gray-600">{rating.businessResponse}</p>
+                                                            </div>
+                                                        )}
+                                                        {rating.adminResponse && (
+                                                            <div>
+                                                                <p className="text-[10px] font-bold text-blue-600 uppercase">Nota de Moderación</p>
+                                                                <p className="text-xs text-gray-600">{rating.adminResponse}</p>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ))
+                                    ) : (
+                                        <div className="text-center py-10 bg-white rounded-2xl border border-dashed text-muted-foreground">
+                                            Aún no hay opiniones publicadas. ¡Sé el primero en calificar!
+                                        </div>
+                                    )}
+                                </div>
+                            </section>
                         </div>
 
                         <aside className="space-y-6">
                             <div className="bg-white p-8 rounded-[2rem] border shadow-sm space-y-6">
-                                <h3 className="font-bold text-xl">Información de contacto</h3>
-                                <div className="space-y-4">
-                                    {entry.phone && (
-                                        <div className="flex items-center gap-3 text-gray-600">
-                                            <div className="h-10 w-10 rounded-xl bg-gray-50 flex items-center justify-center shrink-0">
-                                                <Phone className="h-5 w-5" />
-                                            </div>
-                                            <div>
-                                                <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Teléfono</p>
-                                                <span className="block font-medium">{entry.phone}</span>
-                                            </div>
-                                        </div>
-                                    )}
-                                    {entry.address && (
-                                        <div className="flex items-center gap-3 text-gray-600">
-                                            <div className="h-10 w-10 rounded-xl bg-gray-50 flex items-center justify-center shrink-0">
-                                                <MapPin className="h-5 w-5" />
-                                            </div>
-                                            <div>
-                                                <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Dirección</p>
-                                                <span className="block font-medium">{entry.address}</span>
-                                            </div>
-                                        </div>
-                                    )}
-                                    {(entry.contactEmail || entry.ownerEmail) && (
-                                        <div className="flex items-center gap-3 text-gray-600">
-                                            <div className="h-10 w-10 rounded-xl bg-gray-50 flex items-center justify-center shrink-0">
-                                                <Mail className="h-5 w-5" />
-                                            </div>
-                                            <div className="truncate">
-                                                <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Email</p>
-                                                <span className="truncate block font-medium">{entry.contactEmail || entry.ownerEmail}</span>
-                                            </div>
-                                        </div>
-                                    )}
+                                <h3 className="font-bold text-xl">Contacto</h3>
+                                <div className="space-y-4 text-sm">
+                                    {entry.phone && <div className="flex items-center gap-3"><Phone className="h-4 w-4 text-primary"/><span>{entry.phone}</span></div>}
+                                    {entry.address && <div className="flex items-center gap-3"><MapPin className="h-4 w-4 text-primary"/><span>{entry.address}</span></div>}
+                                    {entry.ownerEmail && <div className="flex items-center gap-3"><Mail className="h-4 w-4 text-primary"/><span>{entry.ownerEmail}</span></div>}
                                 </div>
-
-                                <div className="pt-6 border-t space-y-4">
-                                    <h4 className="font-bold text-sm uppercase tracking-widest text-gray-400">Redes sociales</h4>
-                                    <div className="flex flex-wrap gap-4">
-                                        {entry.socialInstagram && (
-                                            <a href={entry.socialInstagram} target="_blank" rel="noopener noreferrer" className="h-12 w-12 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white hover:scale-110 transition-transform">
-                                                <Instagram className="h-6 w-6" />
-                                            </a>
-                                        )}
-                                        {entry.socialFacebook && (
-                                            <a href={entry.socialFacebook} target="_blank" rel="noopener noreferrer" className="h-12 w-12 rounded-full bg-[#1877F2] flex items-center justify-center text-white hover:scale-110 transition-transform">
-                                                <Facebook className="h-6 w-6" />
-                                            </a>
-                                        )}
-                                        {entry.socialTiktok && (
-                                            <a href={entry.socialTiktok} target="_blank" rel="noopener noreferrer" className="h-12 w-12 rounded-full bg-black flex items-center justify-center text-white hover:scale-110 transition-transform">
-                                                <TikTokIcon className="h-6 w-6" />
-                                            </a>
-                                        )}
-                                        {(entry.socialWhatsapp || entry.phone) && (
-                                            <a href={`https://wa.me/${(entry.socialWhatsapp || entry.phone || '').replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer" className="h-12 w-12 rounded-full bg-[#25D366] flex items-center justify-center text-white hover:scale-110 transition-transform">
-                                                <WhatsAppIcon className="h-6 w-6" />
-                                            </a>
-                                        )}
-                                        {entry.socialTwitter && (
-                                            <a href={entry.socialTwitter} target="_blank" rel="noopener noreferrer" className="h-12 w-12 rounded-full bg-black flex items-center justify-center text-white hover:scale-110 transition-transform">
-                                                <Twitter className="h-5 w-5" />
-                                            </a>
-                                        )}
-                                        {entry.socialYoutube && (
-                                            <a href={entry.socialYoutube} target="_blank" rel="noopener noreferrer" className="h-12 w-12 rounded-full bg-[#FF0000] flex items-center justify-center text-white hover:scale-110 transition-transform">
-                                                <Youtube className="h-6 w-6" />
-                                            </a>
-                                        )}
-                                    </div>
+                                <div className="pt-6 border-t flex flex-wrap gap-4">
+                                    {entry.socialInstagram && <a href={entry.socialInstagram} target="_blank" rel="noopener noreferrer"><InstagramIcon /></a>}
+                                    {entry.socialFacebook && <a href={entry.socialFacebook} target="_blank" rel="noopener noreferrer"><FacebookIcon /></a>}
+                                    {entry.socialTiktok && <a href={entry.socialTiktok} target="_blank" rel="noopener noreferrer"><TikTokIcon /></a>}
                                 </div>
                             </div>
                             
-                            <Button asChild size="lg" className="w-full rounded-[2rem] h-16 text-lg font-black group text-white bg-primary" variant="default">
-                                <Link href={`/catalog/${entry.id}`} target="_blank" rel="noopener noreferrer">
+                            <Button asChild size="lg" className="w-full rounded-[2rem] h-16 text-lg font-black group text-white bg-primary">
+                                <Link href={`/catalog/${entry.id}`} target="_blank">
                                     Ver Catálogo de Productos <ArrowRight className="ml-2 group-hover:translate-x-2 transition-transform" />
                                 </Link>
                             </Button>

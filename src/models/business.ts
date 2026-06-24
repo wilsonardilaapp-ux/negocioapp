@@ -1,4 +1,3 @@
-
 export type EntityStatus = 'active' | 'inactive' | 'suspended' | 'pending_payment';
 export type DirectoryStatus = 'approved' | 'suspended' | 'hidden';
 
@@ -32,10 +31,12 @@ export type Business = {
     tags?: string[];
     rating?: number;
     reviewCount?: number;
+    ratingDistribution?: Record<string, number>; // Distribución de 1 a 5 estrellas
     socialLinks?: {
         instagram?: string;
         facebook?: string;
         whatsapp?: string;
     };
     internalNotes?: string;
+    limitesExtra?: Record<string, number>;
 };

@@ -1,5 +1,4 @@
-
-"use client";
+'use client';
 
 import { useCollection, useFirestore, useMemoFirebase, updateDocumentNonBlocking } from "@/firebase";
 import { collection, query, orderBy, doc } from "firebase/firestore";
@@ -9,6 +8,7 @@ import { columns } from "./columns";
 import { useToast } from "@/hooks/use-toast";
 import type { DirectoryRating, RatingStatus } from "@/models/directory-rating";
 import { Star } from "lucide-react";
+import { updateBusinessAggregates } from "@/actions/directory-ratings";
 
 export default function GlobalRatingsModerationPage() {
   const firestore = useFirestore();
@@ -29,6 +29,15 @@ export default function GlobalRatingsModerationPage() {
         status,
         updatedAt: new Date().toISOString()
       });
+
+      // Si se aprueba, actualizamos los indicadores globales del negocio afectado
+      if (status === 'published') {
+        const rating = ratings?.find(r => r.id === id);
+        if (rating?.businessId) {
+            await updateBusinessAggregates(rating.businessId);
+        }
+      }
+
       toast({
         title: "Estado actualizado",
         description: `La valoración ha sido marcada como ${status}.`,
