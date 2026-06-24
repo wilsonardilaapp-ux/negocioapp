@@ -1,8 +1,9 @@
+
 'use server';
 
 import { getAdminFirestore } from '@/firebase/server-init';
 import type { DirectoryRating, RatingStatus } from '@/models/directory-rating';
-import type { Business } from '@/models/business';
+import type { AdminNotification } from '@/models/notification';
 import { revalidatePath } from 'next/cache';
 
 /**
@@ -48,6 +49,7 @@ export async function updateBusinessAggregates(businessId: string) {
 
         revalidatePath(`/negocio/${businessId}`);
         revalidatePath('/directorio');
+        revalidatePath('/dashboard/valoraciones-directorio');
     } catch (error) {
         console.error('Error actualizando agregados de negocio:', error);
         throw error;
@@ -55,7 +57,7 @@ export async function updateBusinessAggregates(businessId: string) {
 }
 
 /**
- * Registra una nueva valoración con reglas automáticas de publicación.
+ * Registra una nueva valoración con reglas automáticas de publicación y notifica al negocio.
  */
 export async function submitBusinessRating(data: {
     businessId: string;
@@ -80,6 +82,18 @@ export async function submitBusinessRating(data: {
 
     try {
         const docRef = await db.collection('directoryRatings').add(newRating);
+
+        // --- GENERAR NOTIFICACIÓN PARA EL ADMINISTRADOR DEL NEGOCIO ---
+        const notificationRef = db.collection(`businesses/${data.businessId}/notifications`).doc();
+        const notificationData: Omit<AdminNotification, 'id'> = {
+            fromSuperAdmin: true,
+            subject: '⭐ Nueva valoración en el directorio',
+            body: `<p>Has recibido una nueva calificación de <strong>${data.rating} estrellas</strong> de <strong>${data.userName}</strong>.</p><p>Comentario: <em>"${data.comment}"</em></p><p>Estado: ${status === 'published' ? 'Publicada automáticamente.' : 'Pendiente de moderación por el Super Admin.'}</p>`,
+            read: false,
+            createdAt: now,
+            type: 'general',
+        };
+        await notificationRef.set(notificationData);
 
         // Si se publicó automáticamente, actualizamos los indicadores del negocio
         if (status === 'published') {
