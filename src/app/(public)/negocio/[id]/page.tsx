@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { getAdminFirestore } from '@/firebase/server-init';
 import Header from '@/components/layout/header';
@@ -295,7 +296,7 @@ export default async function BusinessProfilePage({ params }: { params: { id: st
                             </div>
                             
                             <Button asChild size="lg" className="w-full rounded-[2rem] h-16 text-lg font-black group text-white bg-primary">
-                                <Link href={`/catalog/${entry.id}`}>
+                                <Link href={`/catalog/${entry.id}`} target="_blank" rel="noopener noreferrer">
                                     Ver Catálogo de Productos <ArrowRight className="ml-2 group-hover:translate-x-2 transition-transform" />
                                 </Link>
                             </Button>
