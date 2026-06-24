@@ -15,8 +15,11 @@ import { cn } from "@/lib/utils";
 export const dynamic = 'force-dynamic';
 
 /**
- * Normaliza un string para comparaciones robustas.
- * Maneja decodificación de URL, quita acentos, emojis y caracteres especiales.
+ * Normalización agresiva y definitiva:
+ * 1. Decodifica URL.
+ * 2. Pasa a minúsculas.
+ * 3. Quita acentos (NFD).
+ * 4. Elimina TODO lo que no sea letra o número (emojis, espacios, guiones, puntos).
  */
 function normalizeString(text: string | null | undefined): string {
     if (!text) return "";
@@ -25,8 +28,8 @@ function normalizeString(text: string | null | undefined): string {
         return decoded
             .toLowerCase()
             .normalize("NFD")
-            .replace(/[\u0300-\u036f]/g, "") // Quitar acentos
-            .replace(/[^a-z0-9]/g, "");    // Quitar TODO lo demás (espacios, emojis, guiones)
+            .replace(/[\u0300-\u036f]/g, "") 
+            .replace(/[^a-z0-9]/g, "");    
     } catch (e) {
         return String(text)
             .toLowerCase()
@@ -40,7 +43,7 @@ async function getEntriesByCategory(categoryParam: string, subcategoryParam?: st
     try {
         const db = await getAdminFirestore();
         
-        // 1. Obtener las categorías dinámicas de la configuración global
+        // 1. Obtener la configuración maestra de categorías
         const configSnap = await db.collection('globalConfig').doc('directoryCategories').get();
         let dynamicCategories: any[] = [];
 
@@ -51,18 +54,23 @@ async function getEntriesByCategory(categoryParam: string, subcategoryParam?: st
             }
         }
 
-        // 2. Identificar la categoría actual basándose en la normalización del slug de la URL
-        const normalizedTargetCategory = normalizeString(categoryParam);
-        const originalCategoryObj = dynamicCategories.find(
-            c => normalizeString(typeof c === 'string' ? c : c.name) === normalizedTargetCategory
-        );
+        // 2. Identificar la Categoría Maestra comparando Slugs Normalizados
+        const normalizedTargetSlug = normalizeString(categoryParam);
+        const categoryMatch = dynamicCategories.find(c => {
+            const name = typeof c === 'string' ? c : c.name;
+            return normalizeString(name) === normalizedTargetSlug;
+        });
 
-        if (!originalCategoryObj) return null;
+        if (!categoryMatch) {
+            console.error(`[Directory] No se encontró categoría maestra para el slug: ${categoryParam}`);
+            return null;
+        }
 
-        const categoryName = typeof originalCategoryObj === 'string' ? originalCategoryObj : originalCategoryObj.name;
-        const subcategories = typeof originalCategoryObj === 'string' ? [] : (originalCategoryObj.subcategories || []);
+        const categoryName = typeof categoryMatch === 'string' ? categoryMatch : categoryMatch.name;
+        const subcategories = typeof categoryMatch === 'string' ? [] : (categoryMatch.subcategories || []);
 
-        // 3. Obtener negocios aprobados (Filtrado en memoria para máxima robustez ante variaciones de texto)
+        // 3. Obtener todos los negocios activos habilitados en el directorio
+        // Filtramos en memoria para evitar colisiones por índices o falta de normalización en queries de Firestore
         const snapshot = await db.collection('businesses')
             .where('status', '==', 'active')
             .where('directoryEnabled', '==', true)
@@ -70,19 +78,20 @@ async function getEntriesByCategory(categoryParam: string, subcategoryParam?: st
 
         const allBusinesses = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Business));
 
-        const normalizedTargetSubcategory = subcategoryParam ? normalizeString(subcategoryParam) : null;
+        const normalizedSubcategoryParam = subcategoryParam ? normalizeString(subcategoryParam) : null;
 
-        // 4. Filtrar resultados comparando valores normalizados
+        // 4. Filtrado Lógico Robusto
         const filteredItems = allBusinesses.filter(item => {
+            // Comparación de Categoría
             const itemCategoryNormalized = normalizeString(item.category);
-            const categoryMatches = itemCategoryNormalized === normalizedTargetCategory;
+            const categoryMatches = itemCategoryNormalized === normalizedTargetSlug;
 
             if (!categoryMatches) return false;
 
-            // Si hay filtro de subcategoría, normalizar y comparar
-            if (normalizedTargetSubcategory) {
+            // Comparación de Subcategoría (si aplica)
+            if (normalizedSubcategoryParam) {
                 const itemSubcategoryNormalized = normalizeString((item as any).subcategory);
-                return itemSubcategoryNormalized === normalizedTargetSubcategory;
+                return itemSubcategoryNormalized === normalizedSubcategoryParam;
             }
 
             return true;
@@ -106,7 +115,7 @@ export async function generateMetadata({ params, searchParams }: { params: { cat
     const titleSuffix = searchParams.sub ? ` - ${searchParams.sub}` : '';
     return {
         title: `Negocios de ${data.category}${titleSuffix} | Zentry`,
-        description: `Encuentra los mejores negocios y servicios en la categoría de ${data.category.toLowerCase()}. Perfiles profesionales y verificados.`,
+        description: `Explora negocios verificados en ${data.category}.`,
     };
 }
 
@@ -130,10 +139,10 @@ export default async function CategoryPage({ params, searchParams }: { params: {
                     </Link>
                     <div className="space-y-2">
                         <h1 className="text-4xl font-black text-gray-900 tracking-tight">
-                            Negocios de {data.category}
+                            {data.category}
                         </h1>
                         <p className="text-gray-500">
-                            Explora los mejores perfiles en el sector de {data.category.toLowerCase()}.
+                            Explora los mejores perfiles verificados en {data.category.toLowerCase()}.
                         </p>
                     </div>
                 </div>
@@ -143,7 +152,7 @@ export default async function CategoryPage({ params, searchParams }: { params: {
                     <aside className="lg:w-64 space-y-8">
                         <div className="bg-white p-6 rounded-2xl border shadow-sm">
                             <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
-                                <Filter className="h-4 w-4 text-primary" /> Filtrar Subcategoría
+                                <Filter className="h-4 w-4 text-primary" /> Subcategorías
                             </h3>
                             <div className="space-y-1">
                                 <Link 
@@ -174,17 +183,17 @@ export default async function CategoryPage({ params, searchParams }: { params: {
                         </div>
                     </aside>
 
-                    {/* Listado de Negocios */}
+                    {/* Resultados */}
                     <div className="flex-1 space-y-8">
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
                                 <LayoutGrid className="h-5 w-5 text-primary" />
                                 <h2 className="text-xl font-bold text-gray-900">
-                                    {searchParams.sub ? `Resultados para ${searchParams.sub}` : 'Resultados'}
+                                    {searchParams.sub ? `Resultados para ${searchParams.sub}` : 'Todos los resultados'}
                                 </h2>
                             </div>
                             <span className="text-sm text-gray-500 font-medium">
-                                {data.items.length} resultados encontrados
+                                {data.items.length} negocios encontrados
                             </span>
                         </div>
 
@@ -196,7 +205,7 @@ export default async function CategoryPage({ params, searchParams }: { params: {
                             </div>
                         ) : (
                             <div className="text-center py-32 bg-white rounded-3xl border border-dashed border-gray-200">
-                                <p className="text-gray-400 font-bold text-lg">No se encontraron negocios en esta selección.</p>
+                                <p className="text-gray-400 font-bold text-lg">No hay negocios registrados para esta selección.</p>
                                 <Link href={`/directorio/${params.categoria}`}>
                                     <Button variant="link" className="mt-2 text-primary">Ver todos los negocios de {data.category}</Button>
                                 </Link>
@@ -210,15 +219,3 @@ export default async function CategoryPage({ params, searchParams }: { params: {
         </div>
     );
 }
-
-const Badge = ({ children, variant, className }: any) => {
-    const variants: any = {
-        secondary: "bg-secondary text-secondary-foreground",
-        outline: "border border-input bg-background"
-    };
-    return (
-        <span className={cn("inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold transition-colors", variants[variant], className)}>
-            {children}
-        </span>
-    );
-};
