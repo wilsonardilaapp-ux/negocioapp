@@ -18,7 +18,7 @@ import {
     Twitter,
     MessageSquareQuote
 } from 'lucide-react';
-import { WhatsAppIcon, TikTokIcon, XIcon } from '@/components/icons';
+import { WhatsAppIcon, TikTokIcon, XIcon, InstagramIcon, FacebookIcon } from '@/components/icons';
 import Link from 'next/link';
 import Image from 'next/image';
 import { notFound } from 'next/navigation';
@@ -29,6 +29,7 @@ import { BusinessRatingForm } from '@/components/directory/BusinessRatingForm';
 import type { DirectoryRating } from '@/models/directory-rating';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { cn } from "@/lib/utils";
 
 export const dynamic = 'force-dynamic';
 
