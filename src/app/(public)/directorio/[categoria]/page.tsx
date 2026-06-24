@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { getAdminFirestore } from '@/firebase/server-init';
+import { getAdminFirestore } from "@/firebase/server-init";
 import Header from '@/components/layout/header';
 import Footer from '@/components/layout/footer';
 import BusinessCard from '@/components/directory/BusinessCard';
@@ -10,27 +10,37 @@ import { ChevronLeft, Filter, LayoutGrid } from 'lucide-react';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
+import { cn } from "@/lib/utils";
 
 export const dynamic = 'force-dynamic';
 
 /**
- * Normaliza un string para comparaciones seguras de URLs.
- * Elimina acentos y TODO lo que no sea letra o número para máxima compatibilidad.
+ * Normaliza un string para comparaciones robustas.
+ * Maneja decodificación de URL, quita acentos, emojis y caracteres especiales.
  */
-function normalizeString(text: string): string {
+function normalizeString(text: string | null | undefined): string {
     if (!text) return "";
-    return decodeURIComponent(text)
-        .toLowerCase()
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "") // Quitar acentos
-        .replace(/[^a-z0-9]/g, "");    // Quitar TODO lo demás (espacios, emojis, guiones)
+    try {
+        const decoded = decodeURIComponent(text);
+        return decoded
+            .toLowerCase()
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "") // Quitar acentos
+            .replace(/[^a-z0-9]/g, "");    // Quitar TODO lo demás (espacios, emojis, guiones)
+    } catch (e) {
+        return String(text)
+            .toLowerCase()
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .replace(/[^a-z0-9]/g, "");
+    }
 }
 
 async function getEntriesByCategory(categoryParam: string, subcategoryParam?: string) {
     try {
         const db = await getAdminFirestore();
         
-        // 1. Obtener las categorías dinámicas de Firestore
+        // 1. Obtener las categorías dinámicas de la configuración global
         const configSnap = await db.collection('globalConfig').doc('directoryCategories').get();
         let dynamicCategories: any[] = [];
 
@@ -41,34 +51,47 @@ async function getEntriesByCategory(categoryParam: string, subcategoryParam?: st
             }
         }
 
-        // 2. Buscar el objeto de categoría original comparando versiones normalizadas
-        const normalizedTarget = normalizeString(categoryParam);
+        // 2. Identificar la categoría actual basándose en la normalización del slug de la URL
+        const normalizedTargetCategory = normalizeString(categoryParam);
         const originalCategoryObj = dynamicCategories.find(
-            c => normalizeString(typeof c === 'string' ? c : c.name) === normalizedTarget
+            c => normalizeString(typeof c === 'string' ? c : c.name) === normalizedTargetCategory
         );
 
         if (!originalCategoryObj) return null;
 
-        const originalCategoryName = typeof originalCategoryObj === 'string' ? originalCategoryObj : originalCategoryObj.name;
+        const categoryName = typeof originalCategoryObj === 'string' ? originalCategoryObj : originalCategoryObj.name;
         const subcategories = typeof originalCategoryObj === 'string' ? [] : (originalCategoryObj.subcategories || []);
 
-        // 3. Consultar negocios aprobados en esa categoría respetando los flags de visibilidad
-        let queryRef: any = db.collection('businesses')
+        // 3. Obtener negocios aprobados (Filtrado en memoria para máxima robustez ante variaciones de texto)
+        const snapshot = await db.collection('businesses')
             .where('status', '==', 'active')
             .where('directoryEnabled', '==', true)
-            .where('category', '==', originalCategoryName);
+            .get();
 
-        // Si hay una subcategoría seleccionada, filtramos por ella
-        if (subcategoryParam) {
-            queryRef = queryRef.where('subcategory', '==', decodeURIComponent(subcategoryParam));
-        }
+        const allBusinesses = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Business));
 
-        const snapshot = await queryRef.get();
+        const normalizedTargetSubcategory = subcategoryParam ? normalizeString(subcategoryParam) : null;
+
+        // 4. Filtrar resultados comparando valores normalizados
+        const filteredItems = allBusinesses.filter(item => {
+            const itemCategoryNormalized = normalizeString(item.category);
+            const categoryMatches = itemCategoryNormalized === normalizedTargetCategory;
+
+            if (!categoryMatches) return false;
+
+            // Si hay filtro de subcategoría, normalizar y comparar
+            if (normalizedTargetSubcategory) {
+                const itemSubcategoryNormalized = normalizeString((item as any).subcategory);
+                return itemSubcategoryNormalized === normalizedTargetSubcategory;
+            }
+
+            return true;
+        });
 
         return {
-            category: originalCategoryName,
+            category: categoryName,
             subcategories: subcategories as string[],
-            items: snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Business[]
+            items: filteredItems
         };
     } catch (error) {
         console.error("Error fetching category entries:", error);
@@ -109,11 +132,6 @@ export default async function CategoryPage({ params, searchParams }: { params: {
                         <h1 className="text-4xl font-black text-gray-900 tracking-tight">
                             Negocios de {data.category}
                         </h1>
-                        {searchParams.sub && (
-                            <Badge variant="secondary" className="text-sm font-bold bg-primary/10 text-primary border-primary/20">
-                                Subcategoría: {searchParams.sub}
-                            </Badge>
-                        )}
                         <p className="text-gray-500">
                             Explora los mejores perfiles en el sector de {data.category.toLowerCase()}.
                         </p>
@@ -122,38 +140,39 @@ export default async function CategoryPage({ params, searchParams }: { params: {
 
                 <div className="flex flex-col lg:flex-row gap-8">
                     {/* Sidebar de Subcategorías */}
-                    {data.subcategories.length > 0 && (
-                        <aside className="lg:w-64 space-y-8">
-                            <div className="bg-white p-6 rounded-2xl border shadow-sm">
-                                <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
-                                    <Filter className="h-4 w-4 text-primary" /> Filtrar Subcategoría
-                                </h3>
-                                <div className="space-y-1">
-                                    <Link 
-                                        href={`/directorio/${params.categoria}`}
-                                        className={cn(
-                                            "block px-3 py-2 rounded-lg text-sm transition-colors",
-                                            !searchParams.sub ? "bg-primary text-white font-bold" : "text-gray-600 hover:bg-primary/5 hover:text-primary"
-                                        )}
-                                    >
-                                        Todas
-                                    </Link>
-                                    {data.subcategories.map(sub => (
+                    <aside className="lg:w-64 space-y-8">
+                        <div className="bg-white p-6 rounded-2xl border shadow-sm">
+                            <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
+                                <Filter className="h-4 w-4 text-primary" /> Filtrar Subcategoría
+                            </h3>
+                            <div className="space-y-1">
+                                <Link 
+                                    href={`/directorio/${params.categoria}`}
+                                    className={cn(
+                                        "block px-3 py-2 rounded-lg text-sm transition-colors",
+                                        !searchParams.sub ? "bg-primary text-white font-bold" : "text-gray-600 hover:bg-primary/5 hover:text-primary"
+                                    )}
+                                >
+                                    Todas
+                                </Link>
+                                {data.subcategories.map(sub => {
+                                    const isSelected = normalizeString(searchParams.sub) === normalizeString(sub);
+                                    return (
                                         <Link 
                                             key={sub} 
                                             href={`/directorio/${params.categoria}?sub=${encodeURIComponent(sub)}`}
                                             className={cn(
                                                 "block px-3 py-2 rounded-lg text-sm transition-colors",
-                                                searchParams.sub === sub ? "bg-primary text-white font-bold" : "text-gray-600 hover:bg-primary/5 hover:text-primary"
+                                                isSelected ? "bg-primary text-white font-bold" : "text-gray-600 hover:bg-primary/5 hover:text-primary"
                                             )}
                                         >
                                             {sub}
                                         </Link>
-                                    ))}
-                                </div>
+                                    );
+                                })}
                             </div>
-                        </aside>
-                    )}
+                        </div>
+                    </aside>
 
                     {/* Listado de Negocios */}
                     <div className="flex-1 space-y-8">
@@ -177,7 +196,7 @@ export default async function CategoryPage({ params, searchParams }: { params: {
                             </div>
                         ) : (
                             <div className="text-center py-32 bg-white rounded-3xl border border-dashed border-gray-200">
-                                <p className="text-gray-400 font-bold text-lg">No se encontraron negocios para esta selección.</p>
+                                <p className="text-gray-400 font-bold text-lg">No se encontraron negocios en esta selección.</p>
                                 <Link href={`/directorio/${params.categoria}`}>
                                     <Button variant="link" className="mt-2 text-primary">Ver todos los negocios de {data.category}</Button>
                                 </Link>
@@ -190,11 +209,6 @@ export default async function CategoryPage({ params, searchParams }: { params: {
             <Footer />
         </div>
     );
-}
-
-// Función auxiliar para combinar clases
-function cn(...classes: any[]) {
-    return classes.filter(Boolean).join(" ");
 }
 
 const Badge = ({ children, variant, className }: any) => {
