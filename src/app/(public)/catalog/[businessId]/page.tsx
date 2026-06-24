@@ -31,7 +31,7 @@ import { Star, Loader2, PackageSearch, Tag, ShoppingCart, Image as ImageIcon, Ch
 import { cn } from '@/lib/utils';
 import type { Product } from '@/models/product';
 import type { LandingHeaderConfigData, LandingPageData } from '@/models/landing-page';
-import { WhatsAppIcon } from '@/components/icons';
+import { WhatsAppIcon, FacebookIcon, InstagramIcon, TikTokIcon, YoutubeIcon, XIcon } from '@/components/icons';
 import { useParams } from 'next/navigation';
 import { rateProduct } from '@/ai/flows/rate-product-flow';
 import { useToast } from '@/hooks/use-toast';
@@ -622,6 +622,60 @@ export default function CatalogPage() {
 
 const CatalogHeader = ({ config, cartItemCount, onCartClick }: { config: any, cartItemCount: number, onCartClick: () => void }) => {
     if (!config) return null;
+
+    const socialLinks = config.socialLinks || {};
+    
+    const renderSocialIcons = () => {
+        const networks = ['instagram', 'facebook', 'tiktok', 'twitter', 'youtube', 'whatsapp'];
+        return (
+            <div className="flex items-center gap-2">
+                {networks.map(network => {
+                    let url = (socialLinks[network] || '').trim();
+                    // Fallback for whatsapp if not defined but phone is
+                    if (network === 'whatsapp' && !url) {
+                        url = (config.businessInfo?.phone || '').trim();
+                    }
+                    
+                    if (!url) return null;
+
+                    const iconClass = "h-8 w-8 rounded-full flex items-center justify-center text-white hover:scale-110 transition-all shadow-sm";
+
+                    if (network === 'instagram') return (
+                        <a key={network} href={url} target="_blank" rel="noopener noreferrer" className={cn(iconClass, "bg-gradient-to-br from-purple-500 to-pink-500")}>
+                            <InstagramIcon className="h-4 w-4" />
+                        </a>
+                    );
+                    if (network === 'facebook') return (
+                        <a key={network} href={url} target="_blank" rel="noopener noreferrer" className={cn(iconClass, "bg-[#1877F2]")}>
+                            <FacebookIcon className="h-4 w-4" />
+                        </a>
+                    );
+                    if (network === 'tiktok') return (
+                        <a key={network} href={url} target="_blank" rel="noopener noreferrer" className={cn(iconClass, "bg-black")}>
+                            <TikTokIcon className="h-4 w-4" />
+                        </a>
+                    );
+                    if (network === 'whatsapp') return (
+                        <a key={network} href={`https://wa.me/${url.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer" className={cn(iconClass, "bg-[#25D366]")}>
+                            <WhatsAppIcon className="h-4 w-4" />
+                        </a>
+                    );
+                    if (network === 'twitter') return (
+                        <a key={network} href={url} target="_blank" rel="noopener noreferrer" className={cn(iconClass, "bg-black")}>
+                            <XIcon className="h-4 w-4" />
+                        </a>
+                    );
+                    if (network === 'youtube') return (
+                        <a key={network} href={url} target="_blank" rel="noopener noreferrer" className={cn(iconClass, "bg-[#FF0000]")}>
+                            <YoutubeIcon className="h-4 w-4" />
+                        </a>
+                    );
+                    return null;
+                })}
+            </div>
+        );
+    };
+
     const cleanPhone = String(config.businessInfo.phone || '').replace(/\D/g, '');
     return (
         <div className="w-full">
@@ -631,11 +685,26 @@ const CatalogHeader = ({ config, cartItemCount, onCartClick }: { config: any, ca
                 </div>
             )}
             <div className="bg-card shadow-md p-4 sticky top-16 z-40 border-b">
-                <div className="container mx-auto flex justify-between items-center">
-                    <div><h1 className="text-xl font-bold text-foreground">{config.businessInfo.name}</h1><p className="text-sm text-muted-foreground">{config.businessInfo.address}</p></div>
+                <div className="container mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
+                    <div className="flex flex-col md:flex-row items-center gap-4">
+                        <div className="text-center md:text-left">
+                            <h1 className="text-xl font-bold text-foreground">{config.businessInfo.name}</h1>
+                            <p className="text-sm text-muted-foreground">{config.businessInfo.address}</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            {renderSocialIcons()}
+                        </div>
+                    </div>
                     <div className="flex items-center gap-3">
-                        <Button asChild size="sm" variant="outline" className="hidden sm:flex"><a href={`https://api.whatsapp.com/send?phone=${cleanPhone}`} target="_blank"><WhatsAppIcon className="mr-2" /> Contactar</a></Button>
-                        <button onClick={onCartClick} className="relative p-2 hover:bg-muted rounded-full transition-colors text-foreground"><ShoppingCart /><Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0">{cartItemCount}</Badge></button>
+                        <Button asChild size="sm" variant="outline" className="hidden sm:flex">
+                            <a href={`https://api.whatsapp.com/send?phone=${cleanPhone}`} target="_blank">
+                                <WhatsAppIcon className="mr-2" /> Contactar
+                            </a>
+                        </Button>
+                        <button onClick={onCartClick} className="relative p-2 hover:bg-muted rounded-full transition-colors text-foreground">
+                            <ShoppingCart />
+                            <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0">{cartItemCount}</Badge>
+                        </button>
                     </div>
                 </div>
             </div>
