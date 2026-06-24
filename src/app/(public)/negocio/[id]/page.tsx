@@ -15,7 +15,8 @@ import {
     Instagram, 
     Facebook,
     ArrowRight,
-    Youtube
+    Youtube,
+    Twitter
 } from 'lucide-react';
 import { WhatsAppIcon, TikTokIcon, XIcon } from '@/components/icons';
 import Link from 'next/link';
@@ -26,6 +27,16 @@ import type { Metadata } from 'next';
 
 export const dynamic = 'force-dynamic';
 
+// Definimos un tipo extendido localmente para incluir las propiedades de redes sociales directas
+type BusinessWithSocial = Business & {
+    socialTiktok?: string;
+    socialInstagram?: string;
+    socialFacebook?: string;
+    socialWhatsapp?: string;
+    socialTwitter?: string;
+    socialYoutube?: string;
+};
+
 async function getBusinessEntry(id: string) {
     try {
         const db = await getAdminFirestore();
@@ -34,7 +45,7 @@ async function getBusinessEntry(id: string) {
         
         if (!doc.exists) return null;
         
-        const data = doc.data() as Business;
+        const data = doc.data() as BusinessWithSocial;
         
         // El único campo obligatorio para visualización es que el negocio esté activo
         if (data.status !== 'active') {
@@ -196,43 +207,41 @@ export default async function BusinessProfilePage({ params }: { params: { id: st
                                     )}
                                 </div>
 
-                                {entry.socialLinks && (
-                                    <div className="pt-6 border-t space-y-4">
-                                        <h4 className="font-bold text-sm uppercase tracking-widest text-gray-400">Redes sociales</h4>
-                                        <div className="flex flex-wrap gap-4">
-                                            {entry.socialLinks.instagram && (
-                                                <a href={entry.socialLinks.instagram} target="_blank" rel="noopener noreferrer" className="h-12 w-12 rounded-2xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white hover:scale-110 transition-transform">
-                                                    <Instagram className="h-6 w-6" />
-                                                </a>
-                                            )}
-                                            {entry.socialLinks.facebook && (
-                                                <a href={entry.socialLinks.facebook} target="_blank" rel="noopener noreferrer" className="h-12 w-12 rounded-2xl bg-[#1877F2] flex items-center justify-center text-white hover:scale-110 transition-transform">
-                                                    <Facebook className="h-6 w-6" />
-                                                </a>
-                                            )}
-                                            {entry.socialLinks.tiktok && (
-                                                <a href={entry.socialLinks.tiktok} target="_blank" rel="noopener noreferrer" className="h-12 w-12 rounded-2xl bg-black flex items-center justify-center text-white hover:scale-110 transition-transform">
-                                                    <TikTokIcon className="h-6 w-6" />
-                                                </a>
-                                            )}
-                                            {(entry.socialLinks.whatsapp || entry.phone) && (
-                                                <a href={`https://wa.me/${(entry.socialLinks.whatsapp || entry.phone || '').replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer" className="h-12 w-12 rounded-2xl bg-[#25D366] flex items-center justify-center text-white hover:scale-110 transition-transform">
-                                                    <WhatsAppIcon className="h-6 w-6" />
-                                                </a>
-                                            )}
-                                            {entry.socialLinks.twitter && (
-                                                <a href={entry.socialLinks.twitter} target="_blank" rel="noopener noreferrer" className="h-12 w-12 rounded-2xl bg-black flex items-center justify-center text-white hover:scale-110 transition-transform">
-                                                    <XIcon className="h-5 w-5" />
-                                                </a>
-                                            )}
-                                            {entry.socialLinks.youtube && (
-                                                <a href={entry.socialLinks.youtube} target="_blank" rel="noopener noreferrer" className="h-12 w-12 rounded-2xl bg-[#FF0000] flex items-center justify-center text-white hover:scale-110 transition-transform">
-                                                    <Youtube className="h-6 w-6" />
-                                                </a>
-                                            )}
-                                        </div>
+                                <div className="pt-6 border-t space-y-4">
+                                    <h4 className="font-bold text-sm uppercase tracking-widest text-gray-400">Redes sociales</h4>
+                                    <div className="flex flex-wrap gap-4">
+                                        {entry.socialInstagram && (
+                                            <a href={entry.socialInstagram} target="_blank" rel="noopener noreferrer" className="h-12 w-12 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white hover:scale-110 transition-transform">
+                                                <Instagram className="h-6 w-6" />
+                                            </a>
+                                        )}
+                                        {entry.socialFacebook && (
+                                            <a href={entry.socialFacebook} target="_blank" rel="noopener noreferrer" className="h-12 w-12 rounded-full bg-[#1877F2] flex items-center justify-center text-white hover:scale-110 transition-transform">
+                                                <Facebook className="h-6 w-6" />
+                                            </a>
+                                        )}
+                                        {entry.socialTiktok && (
+                                            <a href={entry.socialTiktok} target="_blank" rel="noopener noreferrer" className="h-12 w-12 rounded-full bg-black flex items-center justify-center text-white hover:scale-110 transition-transform">
+                                                <TikTokIcon className="h-6 w-6" />
+                                            </a>
+                                        )}
+                                        {(entry.socialWhatsapp || entry.phone) && (
+                                            <a href={`https://wa.me/${(entry.socialWhatsapp || entry.phone || '').replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer" className="h-12 w-12 rounded-full bg-[#25D366] flex items-center justify-center text-white hover:scale-110 transition-transform">
+                                                <WhatsAppIcon className="h-6 w-6" />
+                                            </a>
+                                        )}
+                                        {entry.socialTwitter && (
+                                            <a href={entry.socialTwitter} target="_blank" rel="noopener noreferrer" className="h-12 w-12 rounded-full bg-black flex items-center justify-center text-white hover:scale-110 transition-transform">
+                                                <Twitter className="h-5 w-5" />
+                                            </a>
+                                        )}
+                                        {entry.socialYoutube && (
+                                            <a href={entry.socialYoutube} target="_blank" rel="noopener noreferrer" className="h-12 w-12 rounded-full bg-[#FF0000] flex items-center justify-center text-white hover:scale-110 transition-transform">
+                                                <Youtube className="h-6 w-6" />
+                                            </a>
+                                        )}
                                     </div>
-                                )}
+                                </div>
                             </div>
                             
                             <Button asChild size="lg" className="w-full rounded-[2rem] h-16 text-lg font-black group text-white bg-primary">
