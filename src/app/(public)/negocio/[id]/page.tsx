@@ -40,19 +40,51 @@ type BusinessWithSocial = Business & {
 async function getBusinessEntry(id: string) {
     try {
         const db = await getAdminFirestore();
-        // Consultamos directamente por el ID del documento de Firestore
-        const doc = await db.collection('businesses').doc(id).get();
+        // 1. Consultamos el documento raíz para datos básicos y estatus
+        const businessDoc = await db.collection('businesses').doc(id).get();
         
-        if (!doc.exists) return null;
+        if (!businessDoc.exists) return null;
         
-        const data = doc.data() as BusinessWithSocial;
+        const data = businessDoc.data() as BusinessWithSocial;
         
         // El único campo obligatorio para visualización es que el negocio esté activo
         if (data.status !== 'active') {
             return null;
         }
+
+        // 2. Obtener redes sociales desde la subcolección denormalizada (Donde vive la configuración real)
+        const catalogSnap = await db.collection("businesses").doc(id).collection("publicData").doc("catalog").get();
+        let socialData: Partial<BusinessWithSocial> = {};
         
-        return { id: doc.id, ...data };
+        if (catalogSnap.exists) {
+            const catalog = catalogSnap.data();
+            const socialLinks = catalog?.headerConfig?.socialLinks;
+            
+            if (socialLinks) {
+                // Función para limpiar URLs y convertirlas en undefined si están vacías
+                const cleanUrl = (url: any) => {
+                    if (typeof url !== 'string') return undefined;
+                    const trimmed = url.trim();
+                    return trimmed.length > 0 ? trimmed : undefined;
+                };
+
+                socialData = {
+                    socialInstagram: cleanUrl(socialLinks.instagram),
+                    socialFacebook: cleanUrl(socialLinks.facebook),
+                    socialTiktok: cleanUrl(socialLinks.tiktok),
+                    socialTwitter: cleanUrl(socialLinks.twitter),
+                    socialYoutube: cleanUrl(socialLinks.youtube),
+                    socialWhatsapp: cleanUrl(socialLinks.whatsapp),
+                };
+            }
+        }
+        
+        // 3. Fusionar datos (la subcolección sobreescribe o complementa al raíz)
+        return { 
+            id: businessDoc.id, 
+            ...data,
+            ...socialData 
+        };
     } catch (error) {
         console.error("Error fetching entry:", error);
         return null;
