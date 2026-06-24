@@ -355,7 +355,7 @@ export default function BusinessDirectoryAdminPage() {
             </DialogDescription>
           </DialogHeader>
 
-          <ScrollArea className="flex-1 px-6">
+          <div className="flex-1 px-6 overflow-y-auto">
             <div className="space-y-10 py-4">
                 {/* SECCIÓN 1: CREAR NUEVA */}
                 <section className="space-y-6">
@@ -411,76 +411,78 @@ export default function BusinessDirectoryAdminPage() {
                 </section>
 
                 {/* SECCIÓN 2: EXISTENTES */}
-                <section className="space-y-6">
-                    <div className="flex items-center gap-2 border-b pb-2">
-                        <Tags className="h-5 w-5 text-primary" />
-                        <h3 className="font-bold text-lg">Categorías Existentes</h3>
-                    </div>
+                <ScrollArea className="h-[400px] pr-4">
+                    <section className="space-y-6">
+                        <div className="flex items-center gap-2 border-b pb-2">
+                            <Tags className="h-5 w-5 text-primary" />
+                            <h3 className="font-bold text-lg">Categorías Existentes</h3>
+                        </div>
 
-                    <div className="space-y-4">
-                        {existingCategories.length > 0 ? existingCategories.map((cat, idx) => {
-                            const state = editStates[idx];
-                            if (!state) return null;
+                        <div className="space-y-4">
+                            {existingCategories.length > 0 ? existingCategories.map((cat, idx) => {
+                                const state = editStates[idx];
+                                if (!state) return null;
 
-                            return (
-                                <Card key={idx} className="border-2 shadow-sm overflow-hidden">
-                                    <CardContent className="p-4 space-y-4 bg-white">
-                                        <div className="flex items-center justify-between gap-4">
-                                            <div className="flex-1">
-                                                <Label className="text-[10px] font-bold uppercase text-muted-foreground">Nombre</Label>
-                                                <Input 
-                                                    value={state.name} 
-                                                    onChange={(e) => updateLocalEdit(idx, "name", e.target.value)}
-                                                    className="font-bold"
-                                                />
+                                return (
+                                    <Card key={idx} className="border-2 shadow-sm overflow-hidden">
+                                        <CardContent className="p-4 space-y-4 bg-white">
+                                            <div className="flex items-center justify-between gap-4">
+                                                <div className="flex-1">
+                                                    <Label className="text-[10px] font-bold uppercase text-muted-foreground">Nombre</Label>
+                                                    <Input 
+                                                        value={state.name} 
+                                                        onChange={(e) => updateLocalEdit(idx, "name", e.target.value)}
+                                                        className="font-bold"
+                                                    />
+                                                </div>
+                                                <div className="flex gap-1 pt-4">
+                                                    <Button size="sm" onClick={() => handleSaveEdit(idx, cat)} disabled={isProcessing}>
+                                                        {isProcessing ? <Loader2 className="h-3 w-3 animate-spin" /> : "Guardar"}
+                                                    </Button>
+                                                    <Button size="sm" variant="destructive" onClick={() => handleDeleteCategory(cat)} disabled={isProcessing}>
+                                                        <Trash2 className="h-4 w-4" />
+                                                    </Button>
+                                                </div>
                                             </div>
-                                            <div className="flex gap-1 pt-4">
-                                                <Button size="sm" onClick={() => handleSaveEdit(idx, cat)} disabled={isProcessing}>
-                                                    {isProcessing ? <Loader2 className="h-3 w-3 animate-spin" /> : "Guardar"}
-                                                </Button>
-                                                <Button size="sm" variant="destructive" onClick={() => handleDeleteCategory(cat)} disabled={isProcessing}>
-                                                    <Trash2 className="h-4 w-4" />
-                                                </Button>
-                                            </div>
-                                        </div>
 
-                                        <div className="space-y-2">
-                                            <Label className="text-[10px] font-bold uppercase text-muted-foreground">Subcategorías</Label>
-                                            <div className="flex flex-wrap gap-2 mb-2">
-                                                {state.subcategories.map((sub, sIdx) => (
-                                                    <Badge key={sIdx} variant="outline" className="gap-1 pl-2 pr-1 h-6 text-[11px] bg-muted/20">
-                                                        {sub}
-                                                        <button onClick={() => removeSubFromExisting(idx, sub)} className="rounded-full hover:bg-muted p-0.5">
-                                                            <X className="h-2.5 w-2.5" />
-                                                        </button>
-                                                    </Badge>
-                                                ))}
+                                            <div className="space-y-2">
+                                                <Label className="text-[10px] font-bold uppercase text-muted-foreground">Subcategorías</Label>
+                                                <div className="flex flex-wrap gap-2 mb-2">
+                                                    {state.subcategories.map((sub, sIdx) => (
+                                                        <Badge key={sIdx} variant="outline" className="gap-1 pl-2 pr-1 h-6 text-[11px] bg-muted/20">
+                                                            {sub}
+                                                            <button onClick={() => removeSubFromExisting(idx, sub)} className="rounded-full hover:bg-muted p-0.5">
+                                                                <X className="h-2.5 w-2.5" />
+                                                            </button>
+                                                        </Badge>
+                                                    ))}
+                                                </div>
+                                                <div className="flex gap-2">
+                                                    <Input 
+                                                        placeholder="Nueva sub..." 
+                                                        className="h-8 text-xs" 
+                                                        value={state.tempSub}
+                                                        onChange={(e) => updateLocalEdit(idx, "tempSub", e.target.value)}
+                                                        onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addSubToExisting(idx))}
+                                                    />
+                                                    <Button size="sm" variant="outline" className="h-8" onClick={() => addSubToExisting(idx)}>
+                                                        +
+                                                    </Button>
+                                                </div>
                                             </div>
-                                            <div className="flex gap-2">
-                                                <Input 
-                                                    placeholder="Nueva sub..." 
-                                                    className="h-8 text-xs" 
-                                                    value={state.tempSub}
-                                                    onChange={(e) => updateLocalEdit(idx, "tempSub", e.target.value)}
-                                                    onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addSubToExisting(idx))}
-                                                />
-                                                <Button size="sm" variant="outline" className="h-8" onClick={() => addSubToExisting(idx)}>
-                                                    +
-                                                </Button>
-                                            </div>
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                            );
-                        }) : (
-                            <div className="text-center py-10 bg-muted/20 rounded-xl border border-dashed">
-                                <p className="text-muted-foreground text-sm">No hay categorías configuradas.</p>
-                            </div>
-                        )}
-                    </div>
-                </section>
+                                        </CardContent>
+                                    </Card>
+                                );
+                            }) : (
+                                <div className="text-center py-10 bg-muted/20 rounded-xl border border-dashed">
+                                    <p className="text-muted-foreground text-sm">No hay categorías configuradas.</p>
+                                </div>
+                            )}
+                        </div>
+                    </section>
+                </ScrollArea>
             </div>
-          </ScrollArea>
+          </div>
 
           <DialogFooter className="p-6 bg-muted/20 border-t">
             <Button variant="ghost" onClick={() => setIsManageCategoriesOpen(false)}>Cerrar Panel</Button>
