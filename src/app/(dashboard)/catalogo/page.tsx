@@ -196,9 +196,10 @@ export default function CatalogoPage() {
             const headerConfigDocRef = doc(firestore, 'businesses', user.uid, 'landingConfig', 'header');
             await setDocumentNonBlocking(headerConfigDocRef, config, { merge: true });
 
-            // 2. Guardar en el documento raíz del negocio (Sincronización para perfil público)
+            // 2. Sincronización CRÍTICA con la RAÍZ del negocio para el Directorio y Filtros
             const businessRef = doc(firestore, 'businesses', user.uid);
             await setDocumentNonBlocking(businessRef, { 
+                name: config.businessInfo.name, // Sincroniza el nombre real para el Directorio
                 category: config.businessInfo.category || null,
                 subcategory: config.businessInfo.subcategory || null
             }, { merge: true });
