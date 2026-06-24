@@ -24,6 +24,7 @@ import Image from 'next/image';
 import { notFound } from 'next/navigation';
 import type { Business } from '@/models/business';
 import type { Metadata } from 'next';
+import FaviconInjector from '@/components/layout/FaviconInjector';
 
 export const dynamic = 'force-dynamic';
 
@@ -98,6 +99,16 @@ async function getBusinessEntry(id: string) {
     }
 }
 
+async function getGlobalFavicon() {
+    try {
+        const db = await getAdminFirestore();
+        const snap = await db.collection("globalConfig").doc("system").get();
+        return snap.exists ? snap.data()?.faviconUrl : null;
+    } catch {
+        return null;
+    }
+}
+
 export async function generateMetadata({ params }: { params: { id: string } }): Promise<Metadata> {
     const entry = await getBusinessEntry(params.id);
     if (!entry) return { title: 'Negocio no encontrado' };
@@ -109,14 +120,21 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
 }
 
 export default async function BusinessProfilePage({ params }: { params: { id: string } }) {
-    const entry = await getBusinessEntry(params.id);
+    const [entry, globalFavicon] = await Promise.all([
+        getBusinessEntry(params.id),
+        getGlobalFavicon()
+    ]);
 
     if (!entry) {
         notFound();
     }
 
+    const faviconUrl = globalFavicon || entry.faviconUrl || entry.logoURL || null;
+    const pageTitle = `${entry.name} | Directorio Zentry`;
+
     return (
         <div className="min-h-screen bg-gray-50/30 flex flex-col">
+            <FaviconInjector faviconUrl={faviconUrl} title={pageTitle} />
             <Header businessId={entry.id} navigation={null} />
             
             <main className="flex-grow">
@@ -295,7 +313,7 @@ export default async function BusinessProfilePage({ params }: { params: { id: st
                                 </div>
                             </div>
                             
-                            <Button asChild size="lg" className="w-full rounded-[2rem] h-16 text-lg font-black group text-white bg-primary">
+                            <Button asChild size="lg" className="w-full rounded-[2rem] h-16 text-lg font-black group text-white bg-primary" variant="default">
                                 <Link href={`/catalog/${entry.id}`} target="_blank" rel="noopener noreferrer">
                                     Ver Catálogo de Productos <ArrowRight className="ml-2 group-hover:translate-x-2 transition-transform" />
                                 </Link>

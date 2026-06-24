@@ -11,6 +11,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import { cn } from "@/lib/utils";
+import FaviconInjector from '@/components/layout/FaviconInjector';
 
 export const dynamic = 'force-dynamic';
 
@@ -108,6 +109,16 @@ async function getEntriesByCategory(categoryParam: string, subcategoryParam?: st
     }
 }
 
+async function getGlobalFavicon() {
+    try {
+        const db = await getAdminFirestore();
+        const snap = await db.collection("globalConfig").doc("system").get();
+        return snap.exists ? snap.data()?.faviconUrl : null;
+    } catch {
+        return null;
+    }
+}
+
 export async function generateMetadata({ params, searchParams }: { params: { categoria: string }, searchParams: { sub?: string } }): Promise<Metadata> {
     const data = await getEntriesByCategory(params.categoria, searchParams.sub);
     if (!data) return { title: 'Categoría no encontrada' };
@@ -120,14 +131,20 @@ export async function generateMetadata({ params, searchParams }: { params: { cat
 }
 
 export default async function CategoryPage({ params, searchParams }: { params: { categoria: string }, searchParams: { sub?: string } }) {
-    const data = await getEntriesByCategory(params.categoria, searchParams.sub);
+    const [data, faviconUrl] = await Promise.all([
+        getEntriesByCategory(params.categoria, searchParams.sub),
+        getGlobalFavicon()
+    ]);
 
     if (!data) {
         notFound();
     }
 
+    const pageTitle = searchParams.sub ? `Negocios de ${data.category} - ${searchParams.sub} | Zentry` : `Negocios de ${data.category} | Zentry`;
+
     return (
         <div className="min-h-screen bg-gray-50/30 flex flex-col">
+            <FaviconInjector faviconUrl={faviconUrl} title={pageTitle} />
             <Header businessId={null} navigation={null} />
             
             <main className="flex-grow container mx-auto px-4 py-12">

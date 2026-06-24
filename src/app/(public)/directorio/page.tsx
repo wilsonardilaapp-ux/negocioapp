@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Search, Filter, LayoutGrid } from 'lucide-react';
 import Link from 'next/link';
 import type { Metadata } from 'next';
+import FaviconInjector from '@/components/layout/FaviconInjector';
 
 export const dynamic = 'force-dynamic';
 
@@ -63,14 +64,26 @@ async function getDirectoryBusinesses() {
     }
 }
 
+async function getGlobalFavicon() {
+    try {
+        const db = await getAdminFirestore();
+        const snap = await db.collection("globalConfig").doc("system").get();
+        return snap.exists ? snap.data()?.faviconUrl : null;
+    } catch {
+        return null;
+    }
+}
+
 export default async function DirectoryPage() {
-    const [businesses, dynamicCategories] = await Promise.all([
+    const [businesses, dynamicCategories, faviconUrl] = await Promise.all([
         getDirectoryBusinesses(),
-        getCategories()
+        getCategories(),
+        getGlobalFavicon()
     ]);
 
     return (
         <div className="min-h-screen bg-gray-50/30 flex flex-col">
+            <FaviconInjector faviconUrl={faviconUrl} title="Directorio de Negocios | Zentry" />
             <Header businessId={null} navigation={null} />
             
             <main className="flex-grow">
