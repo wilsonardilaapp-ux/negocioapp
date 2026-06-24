@@ -1,4 +1,3 @@
-
 "use client";
 
 import { ColumnDef } from "@tanstack/react-table";
@@ -173,6 +172,15 @@ export const columns: ColumnDef<Business>[] = [
           {row.original.category || 'Sin Categoría'}
         </span>
       </div>
+    ),
+  },
+  {
+    accessorKey: "category",
+    header: "Categoría",
+    cell: ({ row }) => (
+      <span className="text-xs text-muted-foreground font-medium">
+        {row.original.category || 'Sin Categoría'}
+      </span>
     ),
   },
   {
