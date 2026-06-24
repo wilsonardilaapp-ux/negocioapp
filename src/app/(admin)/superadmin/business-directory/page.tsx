@@ -1,8 +1,7 @@
-
 "use client";
 
 import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
-import { collection, query, orderBy } from "firebase/firestore";
+import { collection, query, orderBy, doc, updateDoc, arrayUnion } from "firebase/firestore";
 import {
   Card,
   CardContent,
@@ -13,7 +12,7 @@ import {
 import { DataTable } from "./data-table";
 import { columns } from "./columns";
 import type { Business } from "@/models/business";
-import { Search, ShieldAlert, Globe, Star, LayoutPanelTop, Share2, Copy } from "lucide-react";
+import { Search, ShieldAlert, Globe, Star, LayoutPanelTop, Share2, Copy, FolderPlus, Loader2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -27,11 +26,25 @@ import {
   XIcon 
 } from "@/components/icons";
 import { cn } from "@/lib/utils";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 
 export default function BusinessDirectoryAdminPage() {
   const firestore = useFirestore();
   const [searchTerm, setSearchTerm] = useState("");
   const { toast } = useToast();
+
+  // Estados para la nueva funcionalidad de categorías
+  const [isCreateCategoryOpen, setIsCreateCategoryOpen] = useState(false);
+  const [newCategory, setNewCategory] = useState("");
+  const [isSavingCategory, setIsSavingCategory] = useState(false);
 
   // Resolución dinámica de la URL del directorio
   const directoryUrl = typeof window !== 'undefined' ? `${window.location.origin}/directorio` : '';
@@ -72,6 +85,32 @@ export default function BusinessDirectoryAdminPage() {
     });
   };
 
+  const handleCreateCategory = async () => {
+    if (!newCategory.trim() || !firestore) return;
+    setIsSavingCategory(true);
+    try {
+      const configRef = doc(firestore, "globalConfig", "directoryCategories");
+      await updateDoc(configRef, {
+        categories: arrayUnion(newCategory.trim())
+      });
+      toast({ 
+        title: "Categoría creada", 
+        description: `Se ha añadido "${newCategory}" a la lista oficial.` 
+      });
+      setNewCategory("");
+      setIsCreateCategoryOpen(false);
+    } catch (error: any) {
+      console.error("Error al crear categoría:", error);
+      toast({ 
+        variant: "destructive", 
+        title: "Error", 
+        description: "No se pudo guardar la nueva categoría." 
+      });
+    } finally {
+      setIsSavingCategory(false);
+    }
+  };
+
   const kpiData = [
     { title: "Total Negocios", value: stats.total, icon: Search, color: "text-blue-600" },
     { title: "Visibles", value: stats.public, icon: Globe, color: "text-green-600" },
@@ -95,6 +134,11 @@ export default function BusinessDirectoryAdminPage() {
                 <LayoutPanelTop className="mr-2 h-4 w-4" />
                 Gestionar Publicidad (Ads)
                 </Link>
+            </Button>
+            {/* BOTÓN CREAR CATEGORÍA */}
+            <Button onClick={() => setIsCreateCategoryOpen(true)} variant="outline" className="font-bold border-primary text-primary hover:bg-primary/5">
+                <FolderPlus className="mr-2 h-4 w-4" />
+                Crear Categoría
             </Button>
           </div>
         </CardHeader>
@@ -171,42 +215,36 @@ export default function BusinessDirectoryAdminPage() {
               </div>
             </div>
             <div className="flex flex-wrap justify-center gap-2">
-              {/* FACEBOOK */}
               <Button asChild variant="outline" className="bg-[#1877F2] text-white hover:bg-[#1877F2]/90 border-none h-12 px-6 shadow-md transition-transform hover:scale-105">
                 <a href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(directoryUrl)}`} target="_blank" rel="noopener noreferrer">
                   <FacebookIcon className="h-5 w-5 mr-2" /> Facebook
                 </a>
               </Button>
 
-              {/* INSTAGRAM */}
               <Button asChild variant="outline" className="bg-gradient-to-br from-[#833ab4] via-[#fd1d1d] to-[#fcb045] text-white hover:opacity-95 border-none h-12 px-6 shadow-md transition-transform hover:scale-105">
                 <a href="https://www.instagram.com/" target="_blank" rel="noopener noreferrer">
                   <InstagramIcon className="h-5 w-5 mr-2" /> Instagram
                 </a>
               </Button>
 
-              {/* TWITTER / X */}
               <Button asChild variant="outline" className="bg-black text-white hover:bg-black/90 border-none h-12 px-6 shadow-md transition-transform hover:scale-105">
                 <a href={`https://twitter.com/intent/tweet?url=${encodeURIComponent(directoryUrl)}&text=${encodeURIComponent('🚀 ¡Explora los mejores negocios en el Directorio Zentry! Encuentra servicios verificados y profesionales en un solo lugar.')}`} target="_blank" rel="noopener noreferrer">
                   <XIcon className="h-4 w-4 mr-2" /> Twitter/X
                 </a>
               </Button>
 
-              {/* TIKTOK */}
               <Button asChild variant="outline" className="bg-black text-white hover:bg-black/90 border-none h-12 px-6 shadow-md transition-transform hover:scale-105">
                 <a href="https://www.tiktok.com/" target="_blank" rel="noopener noreferrer">
                   <TikTokIcon className="h-5 w-5 mr-2" /> TikTok
                 </a>
               </Button>
 
-              {/* WHATSAPP */}
               <Button asChild variant="outline" className="bg-[#25D366] text-white hover:bg-[#25D366]/90 border-none h-12 px-6 shadow-md transition-transform hover:scale-105">
                 <a href={`https://api.whatsapp.com/send?text=${encodeURIComponent(`🚀 ¡Mira el nuevo Directorio de Negocios Zentry! Encuentra todo lo que necesitas aquí: ${directoryUrl}`)}`} target="_blank" rel="noopener noreferrer">
                   <WhatsAppIcon className="h-5 w-5 mr-2" /> WhatsApp
                 </a>
               </Button>
 
-              {/* PINTEREST */}
               <Button asChild variant="outline" className="bg-[#E60023] text-white hover:bg-[#E60023]/90 border-none h-12 px-6 shadow-md transition-transform hover:scale-105">
                 <a href={`https://pinterest.com/pin/create/button/?url=${encodeURIComponent(directoryUrl)}&description=${encodeURIComponent('Directorio Zentry - Negocios y Servicios Verificados')}`} target="_blank" rel="noopener noreferrer">
                   <PinterestIcon className="h-5 w-5 mr-2" /> Pinterest
@@ -216,6 +254,39 @@ export default function BusinessDirectoryAdminPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* DIALOGO CREAR CATEGORÍA */}
+      <Dialog open={isCreateCategoryOpen} onOpenChange={setIsCreateCategoryOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Crear Nueva Categoría</DialogTitle>
+            <DialogDescription>
+              Escribe el nombre de la categoría para añadirla al sistema del directorio.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="category-name">Nombre de la Categoría</Label>
+              <Input 
+                id="category-name"
+                placeholder="Ej. Spa, Veterinaria, Consultoría..." 
+                value={newCategory}
+                onChange={(e) => setNewCategory(e.target.value)}
+                disabled={isSavingCategory}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setIsCreateCategoryOpen(false)} disabled={isSavingCategory}>
+              Cancelar
+            </Button>
+            <Button onClick={handleCreateCategory} disabled={isSavingCategory || !newCategory.trim()}>
+              {isSavingCategory && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Añadir Categoría
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
