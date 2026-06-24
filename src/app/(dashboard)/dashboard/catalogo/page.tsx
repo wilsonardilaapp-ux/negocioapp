@@ -1,16 +1,16 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { Button } from '../../../../components/ui/button';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../../../../components/ui/card';
+import { Button } from '../../../components/ui/button';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../../../components/ui/card';
 import { PlusCircle, ShoppingBag, Edit, Trash2, Printer, FileDown, Info, Frown, Loader2 } from 'lucide-react';
-import type { Product } from '../../../../models/product';
-import ProductForm from '../../../../components/catalogo/product-form';
-import CatalogHeaderForm from '../../../../components/catalogo/catalog-header-form';
-import CatalogQRGenerator from '../../../../components/catalogo/catalog-qr-generator';
-import ShareCatalog from '../../../../components/catalogo/share-catalog';
-import ProductCard from '../../../../components/catalogo/product-card';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from '../../../../components/ui/dialog';
+import type { Product } from '../../../models/product';
+import ProductForm from '../../../components/catalogo/product-form';
+import CatalogHeaderForm from '../../../components/catalogo/catalog-header-form';
+import CatalogQRGenerator from '../../../components/catalogo/catalog-qr-generator';
+import ShareCatalog from '../../../components/catalogo/share-catalog';
+import ProductCard from '../../../components/catalogo/product-card';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from '../../../components/ui/dialog';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -20,15 +20,16 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "../../../../components/ui/alert-dialog";
-import type { LandingHeaderConfigData } from '../../../../models/landing-page';
+} from "../../../components/ui/alert-dialog";
+import type { LandingHeaderConfigData } from '../../../models/landing-page';
 import { v4 as uuidv4 } from 'uuid';
-import { useUser, useFirestore, setDocumentNonBlocking, deleteDocumentNonBlocking, useCollection, useMemoFirebase } from '../../../../firebase';
-import { doc, getDoc, collection } from 'firebase/firestore'; // SE AÑADE collection AQUÍ
-import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '../../../../components/ui/tooltip';
-import { useToast } from '../../../../hooks/use-toast';
-import { useSubscription } from '../../../../hooks/useSubscription';
-import { LimitBanner } from '../../../../components/dashboard/LimitBanner';
+import { useUser, useFirestore, setDocumentNonBlocking, deleteDocumentNonBlocking, useCollection, useMemoFirebase } from '../../../firebase';
+import { doc, getDoc, collection } from 'firebase/firestore'; 
+import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '../../../components/ui/tooltip';
+import { useToast } from '../../../hooks/use-toast';
+import { useSubscription } from '../../../hooks/useSubscription';
+import { LimitBanner } from '../../../components/dashboard/LimitBanner';
+import type { Business } from '../../../models/business';
 
 const initialHeaderConfig: LandingHeaderConfigData = {
     banner: {
@@ -42,6 +43,8 @@ const initialHeaderConfig: LandingHeaderConfigData = {
       email: 'info@tunegocio.com',
       deliveryFee: 0,
       vatRate: 19,
+      category: '',
+      subcategory: '',
     },
     socialLinks: {
       tiktok: '',
@@ -78,7 +81,6 @@ export default function CatalogoPage() {
         isLoading: isSubscriptionLoading 
     } = useSubscription();
 
-    // Verificación de autorización basada en el plan (Zentry Standard / Híbrido incluido)
     const isAuthorized = useMemo(() => isModuleAuthorized('catalogo'), [isModuleAuthorized]);
 
     const productsQuery = useMemoFirebase(() => 
@@ -93,28 +95,36 @@ export default function CatalogoPage() {
         const fetchConfig = async () => {
             if (!isMounted) return;
             
-            // Si el hook central dice que no está autorizado, dejamos de cargar
             if (!isAuthorized) {
                 setInitialLoading(false);
                 return;
             }
 
             try {
+                const businessRef = doc(firestore, 'businesses', user.uid);
+                const businessSnap = await getDoc(businessRef);
+                const businessRootData = businessSnap.exists() ? businessSnap.data() as Business : null;
+
                 const headerConfigRef = doc(firestore, 'businesses', user.uid, 'landingConfig', 'header');
                 const headerConfigSnap = await getDoc(headerConfigRef);
                 
-                if (isMounted && headerConfigSnap.exists()) {
-                    const savedConf = headerConfigSnap.data() as LandingHeaderConfigData;
+                if (isMounted) {
+                    const savedConf = headerConfigSnap.exists() ? headerConfigSnap.data() as LandingHeaderConfigData : null;
                     const carouselItems = (savedConf?.carouselItems && Array.isArray(savedConf.carouselItems) && savedConf.carouselItems.length > 0)
                         ? savedConf.carouselItems.map(item => item?.id ? item : { ...item, id: uuidv4() })
                         : initialHeaderConfig.carouselItems;
 
                     setHeaderConfig({
                         ...initialHeaderConfig,
-                        ...savedConf,
-                        banner: { ...initialHeaderConfig.banner, ...savedConf.banner },
-                        businessInfo: { ...initialHeaderConfig.businessInfo, ...savedConf.businessInfo },
-                        socialLinks: { ...initialHeaderConfig.socialLinks, ...savedConf.socialLinks },
+                        ...(savedConf || {}),
+                        banner: { ...initialHeaderConfig.banner, ...(savedConf?.banner || {}) },
+                        businessInfo: { 
+                            ...initialHeaderConfig.businessInfo, 
+                            ...(savedConf?.businessInfo || {}),
+                            category: savedConf?.businessInfo?.category || businessRootData?.category || '',
+                            subcategory: savedConf?.businessInfo?.subcategory || (businessRootData as any)?.subcategory || '',
+                        },
+                        socialLinks: { ...initialHeaderConfig.socialLinks, ...(savedConf?.socialLinks || {}) },
                         carouselItems,
                     });
                 }
@@ -178,12 +188,37 @@ export default function CatalogoPage() {
         setEditingProduct(null);
     };
     
-    const handleSaveHeader = (config: LandingHeaderConfigData) => {
+    const handleSaveHeader = async (config: LandingHeaderConfigData) => {
         if (!firestore || !user) return;
-        const headerConfigDocRef = doc(firestore, 'businesses', user.uid, 'landingConfig', 'header');
-        setDocumentNonBlocking(headerConfigDocRef, config, { merge: true });
-        setHeaderConfig(config);
-        updatePublicCatalog(products || [], config);
+        
+        try {
+            // 1. Guardar en la configuración del catálogo (subcolección)
+            const headerConfigDocRef = doc(firestore, 'businesses', user.uid, 'landingConfig', 'header');
+            await setDocumentNonBlocking(headerConfigDocRef, config, { merge: true });
+
+            // 2. Guardar en el documento raíz del negocio (Sincronización para perfil público)
+            const businessRef = doc(firestore, 'businesses', user.uid);
+            await setDocumentNonBlocking(businessRef, { 
+                category: config.businessInfo.category || null,
+                subcategory: config.businessInfo.subcategory || null
+            }, { merge: true });
+
+            // 3. Actualizar estado local y datos denormalizados
+            setHeaderConfig(config);
+            updatePublicCatalog(products || [], config);
+            
+            toast({ 
+                title: "Configuración guardada", 
+                description: "Los datos del negocio se han actualizado correctamente." 
+            });
+        } catch (error: any) {
+            console.error("Error saving header config:", error);
+            toast({ 
+                variant: "destructive", 
+                title: "Error al guardar", 
+                description: "No se pudo sincronizar la información del negocio." 
+            });
+        }
     };
 
     const handleEdit = (product: Product) => {

@@ -24,7 +24,7 @@ import {
 import type { LandingHeaderConfigData } from '../../../models/landing-page';
 import { v4 as uuidv4 } from 'uuid';
 import { useUser, useFirestore, setDocumentNonBlocking, deleteDocumentNonBlocking, useCollection, useMemoFirebase } from '../../../firebase';
-import { doc, getDoc, collection, updateDoc } from 'firebase/firestore'; 
+import { doc, getDoc, collection } from 'firebase/firestore'; 
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '../../../components/ui/tooltip';
 import { useToast } from '../../../hooks/use-toast';
 import { useSubscription } from '../../../hooks/useSubscription';
@@ -121,7 +121,6 @@ export default function CatalogoPage() {
                         businessInfo: { 
                             ...initialHeaderConfig.businessInfo, 
                             ...(savedConf?.businessInfo || {}),
-                            // Sincronizar con el raíz si el subcollection no tiene los datos de categoría
                             category: savedConf?.businessInfo?.category || businessRootData?.category || '',
                             subcategory: savedConf?.businessInfo?.subcategory || (businessRootData as any)?.subcategory || '',
                         },
@@ -208,10 +207,17 @@ export default function CatalogoPage() {
             setHeaderConfig(config);
             updatePublicCatalog(products || [], config);
             
-            toast({ title: "Configuración guardada", description: "Los datos del negocio se han actualizado correctamente." });
+            toast({ 
+                title: "Configuración guardada", 
+                description: "Los datos del negocio se han actualizado correctamente." 
+            });
         } catch (error: any) {
             console.error("Error saving header config:", error);
-            toast({ variant: "destructive", title: "Error al guardar", description: "No se pudo sincronizar la información del negocio." });
+            toast({ 
+                variant: "destructive", 
+                title: "Error al guardar", 
+                description: "No se pudo sincronizar la información del negocio." 
+            });
         }
     };
 

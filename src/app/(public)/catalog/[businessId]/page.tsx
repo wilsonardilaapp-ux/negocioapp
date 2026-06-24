@@ -628,7 +628,7 @@ const CatalogHeader = ({ config, cartItemCount, onCartClick }: { config: any, ca
     const renderSocialIcons = () => {
         const networks = ['instagram', 'facebook', 'tiktok', 'twitter', 'youtube', 'whatsapp'];
         return (
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
                 {networks.map(network => {
                     let url = (socialLinks[network] || '').trim();
                     // Fallback for whatsapp if not defined but phone is
@@ -677,6 +677,15 @@ const CatalogHeader = ({ config, cartItemCount, onCartClick }: { config: any, ca
     };
 
     const cleanPhone = String(config.businessInfo.phone || '').replace(/\D/g, '');
+    
+    // Extraer teléfonos adicionales
+    const additionalPhones = [
+        config.businessInfo.phone2,
+        config.businessInfo.phone3,
+        config.businessInfo.phone4,
+        config.businessInfo.phone5
+    ].filter(Boolean);
+
     return (
         <div className="w-full">
             {config.banner.mediaUrl && (
@@ -706,9 +715,17 @@ const CatalogHeader = ({ config, cartItemCount, onCartClick }: { config: any, ca
                                     {config.businessInfo.shortDescription}
                                 </p>
                             )}
-                            <div className="flex items-center justify-center md:justify-start gap-1.5 text-sm text-muted-foreground">
-                                <MapPin className="h-3.5 w-3.5" />
-                                <span>{config.businessInfo.address}</span>
+                            <div className="flex flex-col gap-1 mt-2">
+                                <div className="flex items-center justify-center md:justify-start gap-1.5 text-sm text-muted-foreground">
+                                    <MapPin className="h-3.5 w-3.5" />
+                                    <span>{config.businessInfo.address}</span>
+                                </div>
+                                {additionalPhones.map((phone, idx) => (
+                                    <div key={idx} className="flex items-center justify-center md:justify-start gap-1.5 text-sm text-muted-foreground">
+                                        <WhatsAppIcon className="h-3.5 w-3.5 text-[#25D366]" />
+                                        <span>{phone}</span>
+                                    </div>
+                                ))}
                             </div>
                         </div>
                         <div className="flex items-center gap-2">
