@@ -27,7 +27,7 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
-import { Star, Loader2, PackageSearch, Tag, ShoppingCart, Image as ImageIcon, ChevronLeft, ChevronRight, Search, SortDesc } from 'lucide-react';
+import { Star, Loader2, PackageSearch, Tag, ShoppingCart, Image as ImageIcon, ChevronLeft, ChevronRight, Search, SortDesc, MapPin } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Product } from '@/models/product';
 import type { LandingHeaderConfigData, LandingPageData } from '@/models/landing-page';
@@ -689,12 +689,27 @@ const CatalogHeader = ({ config, cartItemCount, onCartClick }: { config: any, ca
                     <div className="flex flex-col md:flex-row items-center gap-4">
                         <div className="text-center md:text-left">
                             <h1 className="text-xl font-bold text-foreground">{config.businessInfo.name}</h1>
+                            {config.businessInfo.category && (
+                                <div className="flex items-center justify-center md:justify-start gap-2 mb-1">
+                                    <Badge variant="secondary" className="text-[10px] font-bold uppercase tracking-wider">
+                                        {config.businessInfo.category}
+                                    </Badge>
+                                    {config.businessInfo.subcategory && (
+                                        <Badge variant="outline" className="text-[10px] font-bold uppercase tracking-wider">
+                                            {config.businessInfo.subcategory}
+                                        </Badge>
+                                    )}
+                                </div>
+                            )}
                             {config.businessInfo.shortDescription && (
                                 <p className="text-xs text-muted-foreground font-medium mb-1 line-clamp-1">
                                     {config.businessInfo.shortDescription}
                                 </p>
                             )}
-                            <p className="text-sm text-muted-foreground">{config.businessInfo.address}</p>
+                            <div className="flex items-center justify-center md:justify-start gap-1.5 text-sm text-muted-foreground">
+                                <MapPin className="h-3.5 w-3.5" />
+                                <span>{config.businessInfo.address}</span>
+                            </div>
                         </div>
                         <div className="flex items-center gap-2">
                             {renderSocialIcons()}

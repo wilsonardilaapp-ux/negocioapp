@@ -35,6 +35,7 @@ type BusinessWithSocial = Business & {
     socialTwitter?: string;
     socialYoutube?: string;
     shortDescription?: string;
+    subcategory?: string; // Campo añadido
 };
 
 async function getBusinessEntry(id: string) {
@@ -52,9 +53,9 @@ async function getBusinessEntry(id: string) {
             return null;
         }
 
-        // 2. Obtener redes sociales desde la subcolección denormalizada (Donde vive la configuración real)
+        // 2. Obtener datos adicionales desde la subcolección denormalizada (Donde vive la configuración real)
         const catalogSnap = await db.collection("businesses").doc(id).collection("publicData").doc("catalog").get();
-        let socialData: Partial<BusinessWithSocial> = {};
+        let additionalData: Partial<BusinessWithSocial> = {};
         
         if (catalogSnap.exists) {
             const catalog = catalogSnap.data();
@@ -69,14 +70,17 @@ async function getBusinessEntry(id: string) {
                     return trimmed.length > 0 ? trimmed : undefined;
                 };
 
-                socialData = {
+                additionalData = {
                     socialInstagram: cleanValue(socialLinks.instagram),
                     socialFacebook: cleanValue(socialLinks.facebook),
                     socialTiktok: cleanValue(socialLinks.tiktok),
                     socialTwitter: cleanValue(socialLinks.twitter),
                     socialYoutube: cleanValue(socialLinks.youtube),
                     socialWhatsapp: cleanValue(socialLinks.whatsapp),
-                    shortDescription: cleanValue(businessInfo?.shortDescription)
+                    shortDescription: cleanValue(businessInfo?.shortDescription),
+                    // Sincronizar categoría y subcategoría desde businessInfo si no están en el raíz
+                    category: data.category || cleanValue(businessInfo?.category),
+                    subcategory: data.subcategory || cleanValue(businessInfo?.subcategory)
                 };
             }
         }
@@ -85,7 +89,7 @@ async function getBusinessEntry(id: string) {
         return { 
             id: businessDoc.id, 
             ...data,
-            ...socialData 
+            ...additionalData 
         };
     } catch (error) {
         console.error("Error fetching entry:", error);
@@ -151,10 +155,15 @@ export default async function BusinessProfilePage({ params }: { params: { id: st
                                         <span className="font-bold text-gray-900">{(entry.rating || 5).toFixed(1)}</span>
                                         <span>({entry.reviewCount || 0} reseñas)</span>
                                     </div>
-                                    <div className="flex items-center gap-1.5">
+                                    <div className="flex flex-wrap items-center gap-2">
                                         <Badge variant="secondary" className="font-bold">
                                             {entry.category || 'Servicios'}
                                         </Badge>
+                                        {entry.subcategory && (
+                                            <Badge variant="outline" className="font-bold border-muted">
+                                                {entry.subcategory}
+                                            </Badge>
+                                        )}
                                     </div>
                                     {entry.address && (
                                         <div className="flex items-center gap-1.5">

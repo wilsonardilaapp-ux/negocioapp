@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, useMemo } from 'react';
 import Image from 'next/image';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "../ui/card";
 import { Input } from "../ui/input";
@@ -12,48 +12,30 @@ import { Loader2, UploadCloud, RotateCcw, Save, Trash2, Pencil, Image as ImageIc
 import { TikTokIcon, WhatsAppIcon, XIcon, FacebookIcon, InstagramIcon, YoutubeIcon } from '../icons';
 import { uploadMedia } from '../../ai/flows/upload-media-flow';
 import { cn } from "@/lib/utils";
+import { useFirestore, useDoc, useMemoFirebase } from '../../firebase';
+import { doc } from 'firebase/firestore';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface CatalogHeaderFormProps {
   data: LandingHeaderConfigData;
   setData: (data: LandingHeaderConfigData) => void;
 }
 
-const initialHeaderConfig: LandingHeaderConfigData = {
-    banner: {
-      mediaUrl: null,
-      mediaType: null,
-    },
-    businessInfo: {
-      name: 'Mi Negocio',
-      address: 'Dirección de ejemplo',
-      phone: '3001234567',
-      phone2: '',
-      phone3: '',
-      phone4: '',
-      phone5: '',
-      email: 'info@tunegocio.com',
-      deliveryFee: 0,
-      vatRate: 19,
-      shortDescription: '',
-    },
-    socialLinks: {
-      tiktok: '',
-      instagram: '',
-      facebook: '',
-      whatsapp: '',
-      twitter: '',
-      youtube: '',
-    },
-    carouselItems: [
-      { id: '1', mediaUrl: null, mediaType: null, slogan: '' },
-      { id: '2', mediaUrl: null, mediaType: null, slogan: '' },
-      { id: '3', mediaUrl: null, mediaType: null, slogan: '' },
-    ],
-};
-
 export default function CatalogHeaderForm({ data, setData }: CatalogHeaderFormProps) {
   const { toast } = useToast();
+  const firestore = useFirestore();
   const [localData, setLocalData] = useState<LandingHeaderConfigData>(data);
+
+  // --- OBTENCIÓN DE CATEGORÍAS DEL DIRECTORIO ---
+  const categoriesRef = useMemoFirebase(() => doc(firestore, 'globalConfig', 'directoryCategories'), [firestore]);
+  const { data: catConfig } = useDoc<any>(categoriesRef);
+  const categoriesList = useMemo(() => (catConfig?.categories || []) as { name: string, subcategories: string[] }[], [catConfig]);
 
   useEffect(() => {
     setLocalData(data);
@@ -69,6 +51,17 @@ export default function CatalogHeaderForm({ data, setData }: CatalogHeaderFormPr
     }));
   };
   
+  const handleCategoryChange = (value: string) => {
+    setLocalData(prev => ({
+        ...prev,
+        businessInfo: {
+            ...prev.businessInfo,
+            category: value,
+            subcategory: '' // Reiniciar subcategoría al cambiar categoría
+        }
+    }));
+  };
+
   const handleSocialLinkChange = (network: keyof LandingHeaderConfigData['socialLinks'], value: string) => {
     setLocalData(prevData => {
         const updatedSocialLinks = { ...prevData.socialLinks, [network]: value };
@@ -92,74 +85,6 @@ export default function CatalogHeaderForm({ data, setData }: CatalogHeaderFormPr
   
   const handleSave = () => {
     setData(localData);
-    toast({ title: "Guardando Cambios...", description: "Tu configuración está siendo guardada." });
-  };
-  
-  const MediaUploader = ({
-    mediaUrl,
-    mediaType,
-    onUpload,
-    onRemove,
-    aspectRatio = 'aspect-[3/1]',
-    uploadTrigger,
-    dimensions,
-    description,
-    isAvatar = false,
-  }: {
-    mediaUrl: string | null;
-    mediaType: 'image' | 'video' | null;
-    onUpload: (file: File) => void;
-    onRemove?: () => void;
-    aspectRatio?: string;
-    uploadTrigger?: React.ReactNode;
-    dimensions?: string;
-    description?: string;
-    isAvatar?: boolean;
-  }) => {
-    const [isUploading, setIsUploading] = useState(false);
-    const fileInputRef = useRef<HTMLInputElement>(null);
-
-    const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-      const file = event.target.files?.[0];
-      if (!file) return;
-
-      setIsUploading(true);
-      await onUpload(file);
-      setIsUploading(false);
-    };
-
-    return (
-      <div className="space-y-2">
-        <div className={`relative w-full border-2 border-dashed rounded-lg flex items-center justify-center text-center p-4 group ${aspectRatio} ${isAvatar ? 'rounded-full' : ''}`}>
-          {isUploading ? (
-            <div className="flex flex-col items-center">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-              <p className="mt-2 text-sm text-muted-foreground">Procesando...</p>
-            </div>
-          ) : mediaUrl ? (
-            <>
-              {mediaType === 'image' && <Image src={mediaUrl} alt="Banner" layout="fill" sizes="100%" className={isAvatar ? 'object-cover rounded-full' : 'object-cover rounded-md'} />}
-              {mediaType === 'video' && <video src={mediaUrl} controls className="w-full h-full rounded-md" />}
-              { onRemove && (
-                 <div className={`absolute top-2 right-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity ${isAvatar ? 'justify-center items-center inset-0 bg-black/30 rounded-full' : ''}`}>
-                    <Button variant="outline" size="icon" onClick={() => fileInputRef.current?.click()}><Pencil className="h-4 w-4" /></Button>
-                    <Button variant="destructive" size="icon" onClick={onRemove}><Trash2 className="h-4 w-4" /></Button>
-                </div>
-              )}
-            </>
-          ) : (
-            <div className="cursor-pointer" onClick={() => fileInputRef.current?.click()}>
-              { isAvatar ? <ImageIcon className="h-8 w-8 mx-auto text-muted-foreground" /> : <UploadCloud className="h-8 w-8 mx-auto text-muted-foreground" /> }
-              <p className="mt-2 font-semibold">Haz clic para subir {isAvatar ? 'un logo' : 'una imagen o video'}</p>
-              {dimensions && <p className="text-lg font-bold text-muted-foreground mt-2">{dimensions}</p>}
-              {description && <p className="text-xs text-muted-foreground">{description}</p>}
-            </div>
-          )}
-        </div>
-        <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept="image/*,video/*" />
-        {React.isValidElement(uploadTrigger) && uploadTrigger.type !== React.Fragment && React.cloneElement(uploadTrigger as React.ReactElement, { onClick: () => fileInputRef.current?.click() })}
-      </div>
-    );
   };
   
   const handleFileUpload = async (file: File, callback: (mediaUrl: string, mediaType: 'image' | 'video') => void) => {
@@ -206,6 +131,13 @@ export default function CatalogHeaderForm({ data, setData }: CatalogHeaderFormPr
   };
   
   const safeCarouselItems = Array.isArray(localData.carouselItems) ? localData.carouselItems : [];
+
+  // Lógica de filtrado de subcategorías
+  const selectedCategoryName = localData.businessInfo.category;
+  const subcategoriesList = useMemo(() => {
+    const catObj = categoriesList.find(c => c.name === selectedCategoryName);
+    return catObj?.subcategories || [];
+  }, [selectedCategoryName, categoriesList]);
 
   return (
     <Card>
@@ -279,6 +211,40 @@ export default function CatalogHeaderForm({ data, setData }: CatalogHeaderFormPr
                     <Label htmlFor="business-phone5">Teléfono / WhatsApp 5</Label>
                     <Input id="business-phone5" value={localData.businessInfo.phone5 || ''} onChange={e => handleInputChange('businessInfo', 'phone5', e.target.value)} />
                 </div>
+
+                {/* --- NUEVOS CAMPOS: CATEGORÍA Y SUBCATEGORÍA --- */}
+                <div>
+                    <Label>Categoría del Negocio</Label>
+                    <Select value={localData.businessInfo.category || ''} onValueChange={handleCategoryChange}>
+                        <SelectTrigger className="w-full">
+                            <SelectValue placeholder="Seleccionar categoría" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="none">Ninguna</SelectItem>
+                            {categoriesList.map(cat => (
+                                <SelectItem key={cat.name} value={cat.name}>{cat.name}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </div>
+                <div>
+                    <Label>Subcategoría</Label>
+                    <Select 
+                        value={localData.businessInfo.subcategory || ''} 
+                        onValueChange={(val) => handleInputChange('businessInfo', 'subcategory', val)}
+                        disabled={subcategoriesList.length === 0}
+                    >
+                        <SelectTrigger className="w-full">
+                            <SelectValue placeholder={subcategoriesList.length === 0 ? "Sin subcategorías" : "Seleccionar subcategoría"} />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {subcategoriesList.map(sub => (
+                                <SelectItem key={sub} value={sub}>{sub}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </div>
+
                 <div className="md:col-span-2 space-y-2">
                     <div className="flex justify-between items-center">
                         <Label htmlFor="business-short-desc">Descripción Corta</Label>
@@ -322,31 +288,28 @@ export default function CatalogHeaderForm({ data, setData }: CatalogHeaderFormPr
             <Label className="text-lg font-semibold">Carrusel Promocional</Label>
             <p className="text-sm text-muted-foreground">Sube aquí las imágenes o videos que se mostrarán en el carrusel principal de tu landing page (máximo 3).</p>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {(safeCarouselItems || []).map((item, index) => {
-                    const replaceInputRef = useRef<HTMLInputElement>(null);
-                    return (
-                        <Card key={item.id} className="flex flex-col">
-                            <CardHeader>
-                                <CardTitle className="text-base">Elemento {index + 1}</CardTitle>
-                            </CardHeader>
-                            <CardContent className="space-y-4 flex-grow">
-                                <MediaUploader
-                                    mediaUrl={item.mediaUrl}
-                                    mediaType={item.mediaType}
-                                    onUpload={(file) => handleCarouselUpload(item.id, file)}
-                                    onRemove={() => removeCarouselItemMedia(item.id)}
-                                    aspectRatio="aspect-video"
-                                    dimensions="1280x720px (16:9)"
-                                    description="Carrusel"
-                                />
-                                <div>
-                                    <Label htmlFor={`slogan-${item.id}`}>Texto sobreimpreso</Label>
-                                    <Input id={`slogan-${item.id}`} value={item.slogan || ''} onChange={e => handleCarouselItemChange(item.id, 'slogan', e.target.value)} />
-                                </div>
-                            </CardContent>
-                        </Card>
-                    )
-                })}
+                {(safeCarouselItems || []).map((item, index) => (
+                    <Card key={item.id} className="flex flex-col">
+                        <CardHeader>
+                            <CardTitle className="text-base">Elemento {index + 1}</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4 flex-grow">
+                            <MediaUploader
+                                mediaUrl={item.mediaUrl}
+                                mediaType={item.mediaType}
+                                onUpload={(file) => handleCarouselUpload(item.id, file)}
+                                onRemove={() => removeCarouselItemMedia(item.id)}
+                                aspectRatio="aspect-video"
+                                dimensions="1280x720px (16:9)"
+                                description="Carrusel"
+                            />
+                            <div>
+                                <Label htmlFor={`slogan-${item.id}`}>Texto sobreimpreso</Label>
+                                <Input id={`slogan-${item.id}`} value={item.slogan || ''} onChange={e => handleCarouselItemChange(item.id, 'slogan', e.target.value)} />
+                            </div>
+                        </CardContent>
+                    </Card>
+                ))}
             </div>
         </div>
 
@@ -354,3 +317,67 @@ export default function CatalogHeaderForm({ data, setData }: CatalogHeaderFormPr
     </Card>
   );
 }
+
+const MediaUploader = ({
+    mediaUrl,
+    mediaType,
+    onUpload,
+    onRemove,
+    aspectRatio = 'aspect-[3/1]',
+    dimensions,
+    description,
+    isAvatar = false,
+  }: {
+    mediaUrl: string | null;
+    mediaType: 'image' | 'video' | null;
+    onUpload: (file: File) => void;
+    onRemove?: () => void;
+    aspectRatio?: string;
+    dimensions?: string;
+    description?: string;
+    isAvatar?: boolean;
+  }) => {
+    const [isUploading, setIsUploading] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      if (!file) return;
+
+      setIsUploading(true);
+      await onUpload(file);
+      setIsUploading(false);
+    };
+
+    return (
+      <div className="space-y-2">
+        <div className={`relative w-full border-2 border-dashed rounded-lg flex items-center justify-center text-center p-4 group ${aspectRatio} ${isAvatar ? 'rounded-full' : ''}`}>
+          {isUploading ? (
+            <div className="flex flex-col items-center">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              <p className="mt-2 text-sm text-muted-foreground">Procesando...</p>
+            </div>
+          ) : mediaUrl ? (
+            <>
+              {mediaType === 'image' && <Image src={mediaUrl} alt="Banner" fill sizes="100%" className={isAvatar ? 'object-cover rounded-full' : 'object-cover rounded-md'} />}
+              {mediaType === 'video' && <video src={mediaUrl} controls className="w-full h-full rounded-md" />}
+              { onRemove && (
+                 <div className={`absolute top-2 right-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity ${isAvatar ? 'justify-center items-center inset-0 bg-black/30 rounded-full' : ''}`}>
+                    <Button variant="outline" size="icon" onClick={() => fileInputRef.current?.click()}><Pencil className="h-4 w-4" /></Button>
+                    <Button variant="destructive" size="icon" onClick={onRemove}><Trash2 className="h-4 w-4" /></Button>
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="cursor-pointer" onClick={() => fileInputRef.current?.click()}>
+              { isAvatar ? <ImageIcon className="h-8 w-8 mx-auto text-muted-foreground" /> : <UploadCloud className="h-8 w-8 mx-auto text-muted-foreground" /> }
+              <p className="mt-2 font-semibold">Haz clic para subir {isAvatar ? 'un logo' : 'una imagen o video'}</p>
+              {dimensions && <p className="text-lg font-bold text-muted-foreground mt-2">{dimensions}</p>}
+              {description && <p className="text-xs text-muted-foreground">{description}</p>}
+            </div>
+          )}
+        </div>
+        <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept="image/*,video/*" />
+      </div>
+    );
+  };

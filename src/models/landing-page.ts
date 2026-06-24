@@ -132,6 +132,8 @@ export type LandingHeaderConfigData = {
         deliveryFee?: number;
         vatRate?: number;
         shortDescription?: string;
+        category?: string;
+        subcategory?: string;
     };
     socialLinks: {
         tiktok: string;
