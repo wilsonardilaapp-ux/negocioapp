@@ -77,7 +77,7 @@ async function getBusinessEntry(id: string) {
             }
         }
         
-        return { id: businessDoc.id, ...data, ...additionalData };
+        return { ...data, ...additionalData, id: businessDoc.id };
     } catch (error) {
         console.error("Error fetching entry:", error);
         return null;
@@ -97,7 +97,6 @@ async function getPublishedRatings(businessId: string) {
 
         const ratings = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as DirectoryRating));
         
-        // Ordenar manualmente en el servidor para evitar requerir índices compuestos en Firestore
         return ratings.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     } catch (error) {
         console.error("Error fetching ratings:", error);

@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useCollection, useDoc, useFirestore, useMemoFirebase } from "@/firebase";
@@ -607,5 +606,3 @@ export default function BusinessDirectoryAdminPage() {
     </div>
   );
 }
-
-import { useReactTable } from "@tanstack/react-table";

@@ -5,6 +5,7 @@ import {
   flexRender,
   getCoreRowModel,
   getPaginationRowModel,
+  useReactTable,
 } from "@tanstack/react-table";
 
 import {
@@ -134,5 +135,3 @@ export function DataTable<TData, TValue>({
     </div>
   );
 }
-
-import { useReactTable } from "@tanstack/react-table";

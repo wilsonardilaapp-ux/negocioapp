@@ -1,7 +1,6 @@
-
-
 "use client"
 
+import * as React from "react"
 import {
   ColumnDef,
   flexRender,
@@ -20,7 +19,7 @@ import {
 import { Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
-interface DataTableProps<TData, TValue> {
+interface DataTableProps<TData extends {id: string}, TValue> {
   columns: ColumnDef<TData, TValue>[]
   data: TData[]
   isLoading?: boolean

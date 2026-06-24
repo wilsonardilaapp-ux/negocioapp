@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 import { 
     PlusCircle, 
     Trash2, 
@@ -255,7 +256,7 @@ export default function DirectoryAdsPage() {
                             </CardContent>
                             <CardFooter className="p-4 pt-0 flex gap-2">
                                 <div className="flex items-center gap-2 mr-auto">
-                                    <Switch checked={ad.active} onCheckedChange={() => handleStatusToggle(ad)} />
+                                    <Switch checked={ad.active} onCheckedChange={() => handleToggleActive(ad)} />
                                 </div>
                                 <Button variant="ghost" size="icon" className="text-destructive hover:bg-destructive/10" onClick={() => handleDeleteAd(ad.id)}>
                                     <Trash2 className="h-4 w-4" />
@@ -274,16 +275,4 @@ export default function DirectoryAdsPage() {
             </div>
         </div>
     );
-
-    function cn(...classes: any[]) {
-        return classes.filter(Boolean).join(" ");
-    }
-
-    function handleStatusToggle(ad: DirectoryAd) {
-        if (!firestore) return;
-        updateDocumentNonBlocking(doc(firestore, 'directoryAds', ad.id), { 
-            active: !ad.active,
-            updatedAt: new Date().toISOString()
-        });
-    }
 }
