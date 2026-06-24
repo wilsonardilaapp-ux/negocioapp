@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useCollection, useDoc, useFirestore, useMemoFirebase } from "@/firebase";
@@ -12,7 +13,7 @@ import {
 import { DataTable } from "./data-table";
 import { columns } from "./columns";
 import type { Business } from "@/models/business";
-import { Search, ShieldAlert, Globe, Star, LayoutPanelTop, Share2, Copy, Tags, Loader2, X, Plus, Trash2 } from "lucide-react";
+import { Search, ShieldAlert, Globe, Star, LayoutPanelTop, Share2, Copy, Tags, Loader2, X, Plus, Trash2, GripVertical } from "lucide-react";
 import { useMemo, useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -37,6 +38,113 @@ import {
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+
+// DND Kit Imports
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  useSortable,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+
+// Componente para ítem de categoría arrastrable
+function SortableCategoryItem({ 
+  id, 
+  idx, 
+  cat, 
+  state, 
+  isProcessing, 
+  updateLocalEdit, 
+  handleSaveEdit, 
+  handleDeleteCategory, 
+  removeSubFromExisting, 
+  addSubToExisting 
+}: any) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isDragging ? 50 : 'auto',
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style}>
+      <Card className="border-2 shadow-sm overflow-hidden mb-4 bg-white">
+        <CardContent className="p-4 space-y-4">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3 flex-1">
+                <div {...attributes} {...listeners} className="cursor-grab p-1 hover:bg-muted rounded text-muted-foreground transition-colors">
+                    <GripVertical className="h-5 w-5" />
+                </div>
+                <div className="flex-1">
+                    <Label className="text-[10px] font-bold uppercase text-muted-foreground">Nombre</Label>
+                    <Input 
+                        value={state.name} 
+                        onChange={(e) => updateLocalEdit(idx, "name", e.target.value)}
+                        className="font-bold"
+                    />
+                </div>
+            </div>
+            <div className="flex gap-1 pt-4">
+                <Button size="sm" onClick={() => handleSaveEdit(idx, cat)} disabled={isProcessing}>
+                    {isProcessing ? <Loader2 className="h-3 w-3 animate-spin" /> : "Guardar"}
+                </Button>
+                <Button size="sm" variant="destructive" onClick={() => handleDeleteCategory(cat)} disabled={isProcessing}>
+                    <Trash2 className="h-4 w-4" />
+                </Button>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-[10px] font-bold uppercase text-muted-foreground">Subcategorías</Label>
+            <div className="flex flex-wrap gap-2 mb-2">
+                {state.subcategories.map((sub: string, sIdx: number) => (
+                    <Badge key={sIdx} variant="outline" className="gap-1 pl-2 pr-1 h-6 text-[11px] bg-muted/20">
+                        {sub}
+                        <button onClick={() => removeSubFromExisting(idx, sub)} className="rounded-full hover:bg-muted p-0.5">
+                            <X className="h-2.5 w-2.5" />
+                        </button>
+                    </Badge>
+                ))}
+            </div>
+            <div className="flex gap-2">
+                <Input 
+                    placeholder="Nueva sub..." 
+                    className="h-8 text-xs" 
+                    value={state.tempSub}
+                    onChange={(e) => updateLocalEdit(idx, "tempSub", e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addSubToExisting(idx))}
+                />
+                <Button size="sm" variant="outline" className="h-8" onClick={() => addSubToExisting(idx)}>
+                    +
+                </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
 
 export default function BusinessDirectoryAdminPage() {
   const firestore = useFirestore();
@@ -72,6 +180,14 @@ export default function BusinessDirectoryAdminPage() {
       setEditStates(initialEditStates);
     }
   }, [isManageCategoriesOpen, existingCategories]);
+
+  // Sensores para DND
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
 
   // --- LÓGICA DE DIRECTORIO ---
   const directoryUrl = typeof window !== 'undefined' ? `${window.location.origin}/directorio` : '';
@@ -177,6 +293,27 @@ export default function BusinessDirectoryAdminPage() {
       toast({ variant: "destructive", title: "Error", description: error.message });
     } finally {
       setIsProcessing(false);
+    }
+  };
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (active.id !== over?.id && firestore && existingCategories) {
+      const oldIndex = existingCategories.findIndex((_, i) => `cat-${i}` === active.id);
+      const newIndex = existingCategories.findIndex((_, i) => `cat-${i}` === over?.id);
+      
+      const newOrder = arrayMove(existingCategories, oldIndex, newIndex);
+      
+      setIsProcessing(true);
+      try {
+        const configRef = doc(firestore, "globalConfig", "directoryCategories");
+        await setDoc(configRef, { categories: newOrder }, { merge: true });
+        toast({ title: "Orden actualizado" });
+      } catch (error: any) {
+        toast({ variant: "destructive", title: "Error", description: error.message });
+      } finally {
+        setIsProcessing(false);
+      }
     }
   };
 
@@ -410,77 +547,55 @@ export default function BusinessDirectoryAdminPage() {
                     </Button>
                 </section>
 
-                {/* SECCIÓN 2: EXISTENTES */}
-                <ScrollArea className="h-[400px] pr-4">
-                    <section className="space-y-6">
-                        <div className="flex items-center gap-2 border-b pb-2">
-                            <Tags className="h-5 w-5 text-primary" />
-                            <h3 className="font-bold text-lg">Categorías Existentes</h3>
-                        </div>
+                {/* SECCIÓN 2: EXISTENTES (Con Drag & Drop) */}
+                <section className="space-y-6">
+                    <div className="flex items-center gap-2 border-b pb-2">
+                        <Tags className="h-5 w-5 text-primary" />
+                        <h3 className="font-bold text-lg">Categorías Existentes (Arrastra para reordenar)</h3>
+                    </div>
 
+                    <ScrollArea className="h-[400px] pr-4">
                         <div className="space-y-4">
-                            {existingCategories.length > 0 ? existingCategories.map((cat, idx) => {
-                                const state = editStates[idx];
-                                if (!state) return null;
+                            {existingCategories.length > 0 ? (
+                                <DndContext
+                                    sensors={sensors}
+                                    collisionDetection={closestCenter}
+                                    onDragEnd={handleDragEnd}
+                                >
+                                    <SortableContext
+                                        items={existingCategories.map((_, i) => `cat-${i}`)}
+                                        strategy={verticalListSortingStrategy}
+                                    >
+                                        {existingCategories.map((cat, idx) => {
+                                            const state = editStates[idx];
+                                            if (!state) return null;
 
-                                return (
-                                    <Card key={idx} className="border-2 shadow-sm overflow-hidden">
-                                        <CardContent className="p-4 space-y-4 bg-white">
-                                            <div className="flex items-center justify-between gap-4">
-                                                <div className="flex-1">
-                                                    <Label className="text-[10px] font-bold uppercase text-muted-foreground">Nombre</Label>
-                                                    <Input 
-                                                        value={state.name} 
-                                                        onChange={(e) => updateLocalEdit(idx, "name", e.target.value)}
-                                                        className="font-bold"
-                                                    />
-                                                </div>
-                                                <div className="flex gap-1 pt-4">
-                                                    <Button size="sm" onClick={() => handleSaveEdit(idx, cat)} disabled={isProcessing}>
-                                                        {isProcessing ? <Loader2 className="h-3 w-3 animate-spin" /> : "Guardar"}
-                                                    </Button>
-                                                    <Button size="sm" variant="destructive" onClick={() => handleDeleteCategory(cat)} disabled={isProcessing}>
-                                                        <Trash2 className="h-4 w-4" />
-                                                    </Button>
-                                                </div>
-                                            </div>
-
-                                            <div className="space-y-2">
-                                                <Label className="text-[10px] font-bold uppercase text-muted-foreground">Subcategorías</Label>
-                                                <div className="flex flex-wrap gap-2 mb-2">
-                                                    {state.subcategories.map((sub, sIdx) => (
-                                                        <Badge key={sIdx} variant="outline" className="gap-1 pl-2 pr-1 h-6 text-[11px] bg-muted/20">
-                                                            {sub}
-                                                            <button onClick={() => removeSubFromExisting(idx, sub)} className="rounded-full hover:bg-muted p-0.5">
-                                                                <X className="h-2.5 w-2.5" />
-                                                            </button>
-                                                        </Badge>
-                                                    ))}
-                                                </div>
-                                                <div className="flex gap-2">
-                                                    <Input 
-                                                        placeholder="Nueva sub..." 
-                                                        className="h-8 text-xs" 
-                                                        value={state.tempSub}
-                                                        onChange={(e) => updateLocalEdit(idx, "tempSub", e.target.value)}
-                                                        onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addSubToExisting(idx))}
-                                                    />
-                                                    <Button size="sm" variant="outline" className="h-8" onClick={() => addSubToExisting(idx)}>
-                                                        +
-                                                    </Button>
-                                                </div>
-                                            </div>
-                                        </CardContent>
-                                    </Card>
-                                );
-                            }) : (
+                                            return (
+                                                <SortableCategoryItem
+                                                    key={`cat-${idx}`}
+                                                    id={`cat-${idx}`}
+                                                    idx={idx}
+                                                    cat={cat}
+                                                    state={state}
+                                                    isProcessing={isProcessing}
+                                                    updateLocalEdit={updateLocalEdit}
+                                                    handleSaveEdit={handleSaveEdit}
+                                                    handleDeleteCategory={handleDeleteCategory}
+                                                    removeSubFromExisting={removeSubFromExisting}
+                                                    addSubToExisting={addSubToExisting}
+                                                />
+                                            );
+                                        })}
+                                    </SortableContext>
+                                </DndContext>
+                            ) : (
                                 <div className="text-center py-10 bg-muted/20 rounded-xl border border-dashed">
                                     <p className="text-muted-foreground text-sm">No hay categorías configuradas.</p>
                                 </div>
                             )}
                         </div>
-                    </section>
-                </ScrollArea>
+                    </ScrollArea>
+                </section>
             </div>
           </div>
 
