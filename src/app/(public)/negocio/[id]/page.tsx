@@ -14,9 +14,10 @@ import {
     CheckCircle2, 
     Instagram, 
     Facebook,
-    ArrowRight
+    ArrowRight,
+    Youtube
 } from 'lucide-react';
-import { WhatsAppIcon } from '@/components/icons';
+import { WhatsAppIcon, TikTokIcon, XIcon } from '@/components/icons';
 import Link from 'next/link';
 import Image from 'next/image';
 import { notFound } from 'next/navigation';
@@ -160,14 +161,36 @@ export default async function BusinessProfilePage({ params }: { params: { id: st
                             <div className="bg-white p-8 rounded-[2rem] border shadow-sm space-y-6">
                                 <h3 className="font-bold text-xl">Información de contacto</h3>
                                 <div className="space-y-4">
-                                    {entry.ownerEmail && (
+                                    {entry.phone && (
+                                        <div className="flex items-center gap-3 text-gray-600">
+                                            <div className="h-10 w-10 rounded-xl bg-gray-50 flex items-center justify-center shrink-0">
+                                                <Phone className="h-5 w-5" />
+                                            </div>
+                                            <div>
+                                                <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Teléfono</p>
+                                                <span className="block font-medium">{entry.phone}</span>
+                                            </div>
+                                        </div>
+                                    )}
+                                    {entry.address && (
+                                        <div className="flex items-center gap-3 text-gray-600">
+                                            <div className="h-10 w-10 rounded-xl bg-gray-50 flex items-center justify-center shrink-0">
+                                                <MapPin className="h-5 w-5" />
+                                            </div>
+                                            <div>
+                                                <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Dirección</p>
+                                                <span className="block font-medium">{entry.address}</span>
+                                            </div>
+                                        </div>
+                                    )}
+                                    {(entry.contactEmail || entry.ownerEmail) && (
                                         <div className="flex items-center gap-3 text-gray-600">
                                             <div className="h-10 w-10 rounded-xl bg-gray-50 flex items-center justify-center shrink-0">
                                                 <Mail className="h-5 w-5" />
                                             </div>
                                             <div className="truncate">
                                                 <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Email</p>
-                                                <span className="truncate block">{entry.ownerEmail}</span>
+                                                <span className="truncate block font-medium">{entry.contactEmail || entry.ownerEmail}</span>
                                             </div>
                                         </div>
                                     )}
@@ -176,15 +199,35 @@ export default async function BusinessProfilePage({ params }: { params: { id: st
                                 {entry.socialLinks && (
                                     <div className="pt-6 border-t space-y-4">
                                         <h4 className="font-bold text-sm uppercase tracking-widest text-gray-400">Redes sociales</h4>
-                                        <div className="flex gap-4">
+                                        <div className="flex flex-wrap gap-4">
                                             {entry.socialLinks.instagram && (
-                                                <a href={entry.socialLinks.instagram} className="h-12 w-12 rounded-2xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white hover:scale-110 transition-transform">
+                                                <a href={entry.socialLinks.instagram} target="_blank" rel="noopener noreferrer" className="h-12 w-12 rounded-2xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white hover:scale-110 transition-transform">
                                                     <Instagram className="h-6 w-6" />
                                                 </a>
                                             )}
                                             {entry.socialLinks.facebook && (
-                                                <a href={entry.socialLinks.facebook} className="h-12 w-12 rounded-2xl bg-[#1877F2] flex items-center justify-center text-white hover:scale-110 transition-transform">
+                                                <a href={entry.socialLinks.facebook} target="_blank" rel="noopener noreferrer" className="h-12 w-12 rounded-2xl bg-[#1877F2] flex items-center justify-center text-white hover:scale-110 transition-transform">
                                                     <Facebook className="h-6 w-6" />
+                                                </a>
+                                            )}
+                                            {entry.socialLinks.tiktok && (
+                                                <a href={entry.socialLinks.tiktok} target="_blank" rel="noopener noreferrer" className="h-12 w-12 rounded-2xl bg-black flex items-center justify-center text-white hover:scale-110 transition-transform">
+                                                    <TikTokIcon className="h-6 w-6" />
+                                                </a>
+                                            )}
+                                            {(entry.socialLinks.whatsapp || entry.phone) && (
+                                                <a href={`https://wa.me/${(entry.socialLinks.whatsapp || entry.phone || '').replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer" className="h-12 w-12 rounded-2xl bg-[#25D366] flex items-center justify-center text-white hover:scale-110 transition-transform">
+                                                    <WhatsAppIcon className="h-6 w-6" />
+                                                </a>
+                                            )}
+                                            {entry.socialLinks.twitter && (
+                                                <a href={entry.socialLinks.twitter} target="_blank" rel="noopener noreferrer" className="h-12 w-12 rounded-2xl bg-black flex items-center justify-center text-white hover:scale-110 transition-transform">
+                                                    <XIcon className="h-5 w-5" />
+                                                </a>
+                                            )}
+                                            {entry.socialLinks.youtube && (
+                                                <a href={entry.socialLinks.youtube} target="_blank" rel="noopener noreferrer" className="h-12 w-12 rounded-2xl bg-[#FF0000] flex items-center justify-center text-white hover:scale-110 transition-transform">
+                                                    <Youtube className="h-6 w-6" />
                                                 </a>
                                             )}
                                         </div>
