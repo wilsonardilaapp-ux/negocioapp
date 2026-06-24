@@ -2,7 +2,7 @@
 "use client";
 
 import { ColumnDef } from "@tanstack/react-table";
-import { MoreHorizontal, ExternalLink, MessageSquareText, ShieldCheck, Ban, EyeOff, Eye } from "lucide-react";
+import { MoreHorizontal, ExternalLink, MessageSquareText, ShieldCheck, Ban, EyeOff, Eye, Tag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
@@ -32,6 +32,7 @@ import { doc } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
+import { DIRECTORY_CATEGORIES } from "@/models/business-directory";
 
 interface ActionCellProps {
   business: Business;
@@ -39,7 +40,9 @@ interface ActionCellProps {
 
 const ActionCell = ({ business }: ActionCellProps) => {
   const [isNotesOpen, setIsNotesOpen] = useState(false);
+  const [isCategoryOpen, setIsCategoryOpen] = useState(false);
   const [notes, setNotes] = useState(business.internalNotes || "");
+  const [selectedCategory, setSelectedCategory] = useState(business.category || "");
   const firestore = useFirestore();
   const { toast } = useToast();
 
@@ -57,6 +60,11 @@ const ActionCell = ({ business }: ActionCellProps) => {
   const saveNotes = async () => {
     await handleUpdate({ internalNotes: notes });
     setIsNotesOpen(false);
+  };
+
+  const saveCategory = async () => {
+    await handleUpdate({ category: selectedCategory });
+    setIsCategoryOpen(false);
   };
 
   return (
@@ -85,12 +93,47 @@ const ActionCell = ({ business }: ActionCellProps) => {
             <EyeOff className="mr-2 h-4 w-4 text-muted-foreground" /> Ocultar de Listas
           </DropdownMenuItem>
           <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={() => setIsCategoryOpen(true)}>
+            <Tag className="mr-2 h-4 w-4" /> Cambiar Categoría
+          </DropdownMenuItem>
           <DropdownMenuItem onClick={() => setIsNotesOpen(true)}>
             <MessageSquareText className="mr-2 h-4 w-4" /> Notas Internas
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
 
+      {/* Modal de Categoría */}
+      <Dialog open={isCategoryOpen} onOpenChange={setIsCategoryOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Cambiar Categoría</DialogTitle>
+            <DialogDescription>
+              Selecciona la categoría más apropiada para {business.name}.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4 space-y-2">
+            <Label htmlFor="category">Nueva Categoría</Label>
+            <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+              <SelectTrigger>
+                <SelectValue placeholder="Seleccione una categoría" />
+              </SelectTrigger>
+              <SelectContent>
+                {DIRECTORY_CATEGORIES.map((cat) => (
+                  <SelectItem key={cat} value={cat}>
+                    {cat}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setIsCategoryOpen(false)}>Cancelar</Button>
+            <Button onClick={saveCategory}>Actualizar Categoría</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de Notas */}
       <Dialog open={isNotesOpen} onOpenChange={setIsNotesOpen}>
         <DialogContent>
           <DialogHeader>
