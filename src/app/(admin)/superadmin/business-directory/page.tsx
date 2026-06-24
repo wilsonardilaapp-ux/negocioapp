@@ -1,7 +1,7 @@
 "use client";
 
 import { useCollection, useDoc, useFirestore, useMemoFirebase } from "@/firebase";
-import { collection, query, orderBy, doc, setDoc, arrayUnion } from "firebase/firestore";
+import { collection, query, orderBy, doc, setDoc, arrayUnion, arrayRemove, updateDoc } from "firebase/firestore";
 import {
   Card,
   CardContent,
@@ -12,8 +12,8 @@ import {
 import { DataTable } from "./data-table";
 import { columns } from "./columns";
 import type { Business } from "@/models/business";
-import { Search, ShieldAlert, Globe, Star, LayoutPanelTop, Share2, Copy, FolderPlus, Loader2, X } from "lucide-react";
-import { useMemo, useState } from "react";
+import { Search, ShieldAlert, Globe, Star, LayoutPanelTop, Share2, Copy, Tags, Loader2, X, Plus, Trash2 } from "lucide-react";
+import { useMemo, useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
@@ -36,20 +36,44 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 export default function BusinessDirectoryAdminPage() {
   const firestore = useFirestore();
   const [searchTerm, setSearchTerm] = useState("");
   const { toast } = useToast();
 
-  // Estados para la funcionalidad de categorías
-  const [isCreateCategoryOpen, setIsCreateCategoryOpen] = useState(false);
-  const [newCategory, setNewCategory] = useState("");
-  const [newSubcategory, setNewSubcategory] = useState("");
-  const [subcategories, setSubcategories] = useState<string[]>([]);
-  const [isSavingCategory, setIsSavingCategory] = useState(false);
+  // --- ESTADOS GESTIÓN DE CATEGORÍAS ---
+  const [isManageCategoriesOpen, setIsManageCategoriesOpen] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const [tempSubcategory, setTempSubcategory] = useState("");
+  const [newCategorySubcategories, setNewCategorySubcategories] = useState<string[]>([]);
+  const [isProcessing, setIsProcessing] = useState(false);
 
-  // Resolución dinámica de la URL del directorio
+  // Estado local para edición de categorías existentes (por índice)
+  const [editStates, setEditStates] = useState<Record<number, { name: string, subcategories: string[], tempSub: string }>>({});
+
+  // Suscripción a la configuración global de categorías
+  const categoriesConfigRef = useMemoFirebase(() => !firestore ? null : doc(firestore, "globalConfig", "directoryCategories"), [firestore]);
+  const { data: catConfig } = useDoc<any>(categoriesConfigRef);
+  const existingCategories = (catConfig?.categories || []) as any[];
+
+  // Inicializar estados de edición cuando se abre el modal o cambia la data
+  useEffect(() => {
+    if (isManageCategoriesOpen && existingCategories.length > 0) {
+      const initialEditStates: any = {};
+      existingCategories.forEach((cat, idx) => {
+        initialEditStates[idx] = { 
+            name: cat.name, 
+            subcategories: [...(cat.subcategories || [])],
+            tempSub: "" 
+        };
+      });
+      setEditStates(initialEditStates);
+    }
+  }, [isManageCategoriesOpen, existingCategories]);
+
+  // --- LÓGICA DE DIRECTORIO ---
   const directoryUrl = typeof window !== 'undefined' ? `${window.location.origin}/directorio` : '';
 
   const businessesQuery = useMemoFirebase(() => {
@@ -80,59 +104,109 @@ export default function BusinessDirectoryAdminPage() {
     };
   }, [businesses]);
 
+  // --- HANDLERS CATEGORÍAS ---
+
+  const addSubToNew = () => {
+    if (tempSubcategory.trim()) {
+        setNewCategorySubcategories(prev => [...prev, tempSubcategory.trim()]);
+        setTempSubcategory("");
+    }
+  };
+
+  const removeSubFromNew = (val: string) => {
+    setNewCategorySubcategories(prev => prev.filter(s => s !== val));
+  };
+
+  const handleCreateCategory = async () => {
+    if (!newCategoryName.trim() || !firestore) return;
+    setIsProcessing(true);
+    try {
+      const configRef = doc(firestore, "globalConfig", "directoryCategories");
+      const categoryObject = {
+        name: newCategoryName.trim(),
+        subcategories: newCategorySubcategories
+      };
+
+      await setDoc(configRef, {
+        categories: arrayUnion(categoryObject)
+      }, { merge: true });
+
+      toast({ title: "Categoría creada" });
+      setNewCategoryName("");
+      setNewCategorySubcategories([]);
+    } catch (error: any) {
+      toast({ variant: "destructive", title: "Error", description: error.message });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleDeleteCategory = async (cat: any) => {
+    if (!firestore) return;
+    setIsProcessing(true);
+    try {
+      const configRef = doc(firestore, "globalConfig", "directoryCategories");
+      await updateDoc(configRef, {
+        categories: arrayRemove(cat)
+      });
+      toast({ title: "Categoría eliminada" });
+    } catch (error: any) {
+      toast({ variant: "destructive", title: "Error", description: error.message });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleSaveEdit = async (idx: number, originalCat: any) => {
+    if (!firestore || !editStates[idx]) return;
+    setIsProcessing(true);
+    try {
+      const configRef = doc(firestore, "globalConfig", "directoryCategories");
+      const updatedCat = {
+        name: editStates[idx].name,
+        subcategories: editStates[idx].subcategories
+      };
+
+      // Firestore no permite actualizar un item de array directamente por índice.
+      // Removemos el original e insertamos el nuevo.
+      await updateDoc(configRef, { categories: arrayRemove(originalCat) });
+      await updateDoc(configRef, { categories: arrayUnion(updatedCat) });
+
+      toast({ title: "Cambios guardados" });
+    } catch (error: any) {
+      toast({ variant: "destructive", title: "Error", description: error.message });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const updateLocalEdit = (idx: number, field: string, value: any) => {
+    setEditStates(prev => ({
+        ...prev,
+        [idx]: { ...prev[idx], [field]: value }
+    }));
+  };
+
+  const addSubToExisting = (idx: number) => {
+    const val = editStates[idx]?.tempSub?.trim();
+    if (val) {
+        const currentSubs = editStates[idx].subcategories;
+        updateLocalEdit(idx, "subcategories", [...currentSubs, val]);
+        updateLocalEdit(idx, "tempSub", "");
+    }
+  };
+
+  const removeSubFromExisting = (idx: number, val: string) => {
+    const currentSubs = editStates[idx].subcategories;
+    updateLocalEdit(idx, "subcategories", currentSubs.filter(s => s !== val));
+  };
+
   const handleCopyLink = () => {
     navigator.clipboard.writeText(directoryUrl);
     toast({
       title: "Enlace copiado",
       description: "La URL del directorio está lista para compartir.",
     });
-  };
-
-  const addSubcategory = () => {
-    if (newSubcategory.trim()) {
-      setSubcategories(prev => [...prev, newSubcategory.trim()]);
-      setNewSubcategory("");
-    }
-  };
-
-  const removeSubcategory = (index: number) => {
-    setSubcategories(prev => prev.filter((_, i) => i !== index));
-  };
-
-  const handleCreateCategory = async () => {
-    if (!newCategory.trim() || !firestore) return;
-    setIsSavingCategory(true);
-    try {
-      const configRef = doc(firestore, "globalConfig", "directoryCategories");
-      
-      const categoryObject = {
-        name: newCategory.trim(),
-        subcategories: subcategories.filter(s => s.trim() !== "")
-      };
-
-      // Garantizamos que el documento se cree si no existe o se actualice si existe
-      await setDoc(configRef, {
-        categories: arrayUnion(categoryObject)
-      }, { merge: true });
-
-      toast({ 
-        title: "Categoría creada", 
-        description: `Se ha añadido "${newCategory}" con sus subcategorías.` 
-      });
-      setNewCategory("");
-      setSubcategories([]);
-      setNewSubcategory("");
-      setIsCreateCategoryOpen(false);
-    } catch (error: any) {
-      console.error("Error al crear categoría:", error);
-      toast({ 
-        variant: "destructive", 
-        title: "Error", 
-        description: error.message || "No se pudo guardar la nueva categoría." 
-      });
-    } finally {
-      setIsSavingCategory(false);
-    }
   };
 
   const kpiData = [
@@ -159,9 +233,9 @@ export default function BusinessDirectoryAdminPage() {
                 Gestionar Publicidad (Ads)
                 </Link>
             </Button>
-            <Button onClick={() => setIsCreateCategoryOpen(true)} variant="outline" className="font-bold border-primary text-primary hover:bg-primary/5">
-                <FolderPlus className="mr-2 h-4 w-4" />
-                Crear Categoría
+            <Button onClick={() => setIsManageCategoriesOpen(true)} variant="outline" className="font-bold border-primary text-primary hover:bg-primary/5">
+                <Tags className="mr-2 h-4 w-4" />
+                Gestionar Categorías
             </Button>
           </div>
         </CardHeader>
@@ -271,75 +345,150 @@ export default function BusinessDirectoryAdminPage() {
         </CardContent>
       </Card>
 
-      {/* DIALOGO CREAR CATEGORÍA */}
-      <Dialog open={isCreateCategoryOpen} onOpenChange={setIsCreateCategoryOpen}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
-            <DialogTitle>Crear Nueva Categoría</DialogTitle>
+      {/* DIÁLOGO GESTIÓN DE CATEGORÍAS (TODO EN UNO) */}
+      <Dialog open={isManageCategoriesOpen} onOpenChange={setIsManageCategoriesOpen}>
+        <DialogContent className="sm:max-w-[700px] max-h-[90vh] flex flex-col p-0 overflow-hidden">
+          <DialogHeader className="p-6 pb-2">
+            <DialogTitle className="text-2xl font-black">Gestionar Categorías</DialogTitle>
             <DialogDescription>
-              Escribe el nombre de la categoría (con emoji) y añade sus subcategorías correspondientes.
+                Crea nuevas categorías o administra las existentes y sus subcategorías.
             </DialogDescription>
           </DialogHeader>
-          <div className="py-4 space-y-6">
-            <div className="space-y-2">
-              <Label htmlFor="category-name">Nombre de la Categoría</Label>
-              <Input 
-                id="category-name"
-                placeholder="Ej. 🏥 Salud y Medicina" 
-                value={newCategory}
-                onChange={(e) => setNewCategory(e.target.value)}
-                disabled={isSavingCategory}
-              />
-            </div>
 
-            <div className="space-y-4">
-              <Label>Subcategorías</Label>
-              <div className="flex gap-2">
-                <Input 
-                  placeholder="Ej. Clínicas" 
-                  value={newSubcategory}
-                  onChange={(e) => setNewSubcategory(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                        e.preventDefault();
-                        addSubcategory();
-                    }
-                  }}
-                  disabled={isSavingCategory}
-                />
-                <Button type="button" variant="outline" onClick={addSubcategory} disabled={isSavingCategory || !newSubcategory.trim()}>
-                   Agregar
-                </Button>
-              </div>
+          <ScrollArea className="flex-1 px-6">
+            <div className="space-y-10 py-4">
+                {/* SECCIÓN 1: CREAR NUEVA */}
+                <section className="space-y-6">
+                    <div className="flex items-center gap-2 border-b pb-2">
+                        <Plus className="h-5 w-5 text-primary" />
+                        <h3 className="font-bold text-lg">Nueva Categoría</h3>
+                    </div>
 
-              {subcategories.length > 0 && (
-                <div className="flex flex-wrap gap-2 p-3 bg-muted/30 rounded-lg border">
-                  {subcategories.map((sub, index) => (
-                    <Badge key={index} variant="secondary" className="gap-1 pl-2 pr-1 h-7">
-                      {sub}
-                      <button 
-                        onClick={() => removeSubcategory(index)}
-                        className="rounded-full hover:bg-muted p-0.5"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </Badge>
-                  ))}
-                </div>
-              )}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+                        <div className="space-y-2">
+                            <Label>Nombre con Emoji</Label>
+                            <Input 
+                                placeholder="Ej. 🏥 Salud y Medicina" 
+                                value={newCategoryName}
+                                onChange={(e) => setNewCategoryName(e.target.value)}
+                                disabled={isProcessing}
+                            />
+                        </div>
+
+                        <div className="space-y-4">
+                            <Label>Subcategorías</Label>
+                            <div className="flex gap-2">
+                                <Input 
+                                    placeholder="Ej. Clínicas" 
+                                    value={tempSubcategory}
+                                    onChange={(e) => setTempSubcategory(e.target.value)}
+                                    onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addSubToNew())}
+                                    disabled={isProcessing}
+                                />
+                                <Button type="button" variant="outline" onClick={addSubToNew} disabled={isProcessing || !tempSubcategory.trim()}>
+                                    Añadir
+                                </Button>
+                            </div>
+
+                            {newCategorySubcategories.length > 0 && (
+                                <div className="flex flex-wrap gap-2 p-3 bg-muted/30 rounded-lg border">
+                                    {newCategorySubcategories.map((sub, index) => (
+                                        <Badge key={index} variant="secondary" className="gap-1 pl-2 pr-1 h-7">
+                                            {sub}
+                                            <button onClick={() => removeSubFromNew(sub)} className="rounded-full hover:bg-muted p-0.5">
+                                                <X className="h-3 w-3" />
+                                            </button>
+                                        </Badge>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                    <Button onClick={handleCreateCategory} disabled={isProcessing || !newCategoryName.trim()} className="w-full">
+                        {isProcessing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        Crear Categoría Completa
+                    </Button>
+                </section>
+
+                {/* SECCIÓN 2: EXISTENTES */}
+                <section className="space-y-6">
+                    <div className="flex items-center gap-2 border-b pb-2">
+                        <Tags className="h-5 w-5 text-primary" />
+                        <h3 className="font-bold text-lg">Categorías Existentes</h3>
+                    </div>
+
+                    <div className="space-y-4">
+                        {existingCategories.length > 0 ? existingCategories.map((cat, idx) => {
+                            const state = editStates[idx];
+                            if (!state) return null;
+
+                            return (
+                                <Card key={idx} className="border-2 shadow-sm overflow-hidden">
+                                    <CardContent className="p-4 space-y-4 bg-white">
+                                        <div className="flex items-center justify-between gap-4">
+                                            <div className="flex-1">
+                                                <Label className="text-[10px] font-bold uppercase text-muted-foreground">Nombre</Label>
+                                                <Input 
+                                                    value={state.name} 
+                                                    onChange={(e) => updateLocalEdit(idx, "name", e.target.value)}
+                                                    className="font-bold"
+                                                />
+                                            </div>
+                                            <div className="flex gap-1 pt-4">
+                                                <Button size="sm" onClick={() => handleSaveEdit(idx, cat)} disabled={isProcessing}>
+                                                    {isProcessing ? <Loader2 className="h-3 w-3 animate-spin" /> : "Guardar"}
+                                                </Button>
+                                                <Button size="sm" variant="destructive" onClick={() => handleDeleteCategory(cat)} disabled={isProcessing}>
+                                                    <Trash2 className="h-4 w-4" />
+                                                </Button>
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <Label className="text-[10px] font-bold uppercase text-muted-foreground">Subcategorías</Label>
+                                            <div className="flex flex-wrap gap-2 mb-2">
+                                                {state.subcategories.map((sub, sIdx) => (
+                                                    <Badge key={sIdx} variant="outline" className="gap-1 pl-2 pr-1 h-6 text-[11px] bg-muted/20">
+                                                        {sub}
+                                                        <button onClick={() => removeSubFromExisting(idx, sub)} className="rounded-full hover:bg-muted p-0.5">
+                                                            <X className="h-2.5 w-2.5" />
+                                                        </button>
+                                                    </Badge>
+                                                ))}
+                                            </div>
+                                            <div className="flex gap-2">
+                                                <Input 
+                                                    placeholder="Nueva sub..." 
+                                                    className="h-8 text-xs" 
+                                                    value={state.tempSub}
+                                                    onChange={(e) => updateLocalEdit(idx, "tempSub", e.target.value)}
+                                                    onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addSubToExisting(idx))}
+                                                />
+                                                <Button size="sm" variant="outline" className="h-8" onClick={() => addSubToExisting(idx)}>
+                                                    +
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            );
+                        }) : (
+                            <div className="text-center py-10 bg-muted/20 rounded-xl border border-dashed">
+                                <p className="text-muted-foreground text-sm">No hay categorías configuradas.</p>
+                            </div>
+                        )}
+                    </div>
+                </section>
             </div>
-          </div>
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setIsCreateCategoryOpen(false)} disabled={isSavingCategory}>
-              Cancelar
-            </Button>
-            <Button onClick={handleCreateCategory} disabled={isSavingCategory || !newCategory.trim()}>
-              {isSavingCategory && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Añadir Categoría Completa
-            </Button>
+          </ScrollArea>
+
+          <DialogFooter className="p-6 bg-muted/20 border-t">
+            <Button variant="ghost" onClick={() => setIsManageCategoriesOpen(false)}>Cerrar Panel</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
   );
 }
+
+import { useReactTable } from "@tanstack/react-table";
