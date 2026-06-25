@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { getAdminFirestore } from '@/firebase/server-init';
 import Header from '@/components/layout/header';
@@ -7,12 +6,12 @@ import BusinessCard from '@/components/directory/BusinessCard';
 import DirectoryAdSlot from '@/components/directory/DirectoryAdSlot';
 import { DIRECTORY_CATEGORIES } from '@/models/business-directory';
 import type { Business } from '@/models/business';
-import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Search, Filter, LayoutGrid } from 'lucide-react';
+import { Filter, LayoutGrid } from 'lucide-react';
 import Link from 'next/link';
 import type { Metadata } from 'next';
 import FaviconInjector from '@/components/layout/FaviconInjector';
+import SearchBar from './SearchBar';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,7 +22,6 @@ export const metadata: Metadata = {
 
 /**
  * Obtiene las categorías configuradas dinámicamente en Firestore.
- * Mapea los objetos de categoría para obtener solo los nombres como strings.
  */
 async function getCategories(): Promise<string[]> {
     try {
@@ -33,7 +31,6 @@ async function getCategories(): Promise<string[]> {
         if (configSnap.exists) {
             const data = configSnap.data();
             if (data && Array.isArray(data.categories) && data.categories.length > 0) {
-                // Extraer el nombre independientemente de si es un string o un objeto {name, subcategories}
                 return data.categories.map((cat: any) => 
                     typeof cat === 'string' ? cat : cat.name
                 ).filter(Boolean);
@@ -51,7 +48,7 @@ async function getDirectoryBusinesses() {
         const snapshot = await db.collection('businesses')
             .where('status', '==', 'active')
             .where('directoryEnabled', '==', true)
-            .limit(48)
+            .limit(100)
             .get();
 
         return snapshot.docs.map(doc => ({
@@ -74,12 +71,26 @@ async function getGlobalFavicon() {
     }
 }
 
-export default async function DirectoryPage() {
-    const [businesses, dynamicCategories, faviconUrl] = await Promise.all([
+export default async function DirectoryPage({ 
+  searchParams 
+}: { 
+  searchParams: { q?: string } 
+}) {
+    const query = searchParams.q?.toLowerCase().trim() || '';
+
+    const [allBusinesses, dynamicCategories, faviconUrl] = await Promise.all([
         getDirectoryBusinesses(),
         getCategories(),
         getGlobalFavicon()
     ]);
+
+    // Filtrado de negocios por nombre o categoría
+    const filteredBusinesses = query 
+        ? allBusinesses.filter(b => 
+            b.name.toLowerCase().includes(query) || 
+            (b.category && b.category.toLowerCase().includes(query))
+          )
+        : allBusinesses;
 
     return (
         <div className="min-h-screen bg-gray-50/30 flex flex-col">
@@ -96,18 +107,7 @@ export default async function DirectoryPage() {
                             Conecta con los mejores negocios y servicios locales en una sola plataforma.
                         </p>
                         
-                        <div className="max-w-2xl mx-auto flex gap-2 p-2 bg-white rounded-2xl shadow-xl border border-gray-100">
-                            <div className="relative flex-1">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-                                <Input 
-                                    placeholder="¿Qué estás buscando? (ej. Salud, Yoga...)" 
-                                    className="border-none shadow-none h-12 pl-10 focus-visible:ring-0 text-lg"
-                                />
-                            </div>
-                            <Button size="lg" className="px-8 font-bold rounded-xl text-white bg-primary">
-                                Buscar
-                            </Button>
-                        </div>
+                        <SearchBar />
                     </div>
                 </section>
 
@@ -140,16 +140,18 @@ export default async function DirectoryPage() {
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
                                     <LayoutGrid className="h-5 w-5 text-primary" />
-                                    <h2 className="text-xl font-bold text-gray-900">Explorar Negocios</h2>
+                                    <h2 className="text-xl font-bold text-gray-900">
+                                        {query ? `Resultados para "${query}"` : 'Explorar Negocios'}
+                                    </h2>
                                 </div>
                                 <span className="text-sm text-gray-500">
-                                    {businesses.length} resultados encontrados
+                                    {filteredBusinesses.length} resultados encontrados
                                 </span>
                             </div>
 
-                            {businesses.length > 0 ? (
+                            {filteredBusinesses.length > 0 ? (
                                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                                    {businesses.map((business, index) => (
+                                    {filteredBusinesses.map((business, index) => (
                                         <React.Fragment key={business.id}>
                                             <BusinessCard entry={business} />
                                             {index === 5 && (
@@ -162,7 +164,12 @@ export default async function DirectoryPage() {
                                 </div>
                             ) : (
                                 <div className="text-center py-20 bg-white rounded-3xl border border-dashed">
-                                    <p className="text-gray-400 font-medium">Aún no hay negocios publicados en esta sección.</p>
+                                    <p className="text-gray-400 font-medium">No se encontraron negocios que coincidan con tu búsqueda.</p>
+                                    {query && (
+                                      <Button variant="link" asChild className="mt-2 text-primary font-bold">
+                                        <Link href="/directorio">Ver todos los negocios</Link>
+                                      </Button>
+                                    )}
                                 </div>
                             )}
                         </div>
