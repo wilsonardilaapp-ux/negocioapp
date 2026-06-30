@@ -1,8 +1,7 @@
-
 'use client';
 
 import { useState, useMemo } from 'react';
-import { useUser, useFirestore, useDoc, useCollection, useMemoFirebase } from '@/firebase';
+import { useUser, useFirestore, useCollection, useDoc, useMemoFirebase } from '@/firebase';
 import { collection, query, where, orderBy, doc } from 'firebase/firestore';
 import { 
   Card, 
@@ -81,7 +80,8 @@ export default function ReferidosPage() {
 
   const referralLink = useMemo(() => {
     if (typeof window === 'undefined' || !business?.referralCode) return '';
-    return `${window.location.origin}/register?ref=${business.referralCode}`;
+    // Cambio quirúrgico: Redirigir a /pricing para mostrar planes primero
+    return `${window.location.origin}/pricing?ref=${business.referralCode}`;
   }, [business?.referralCode]);
 
   const stats = useMemo(() => {
@@ -95,7 +95,6 @@ export default function ReferidosPage() {
 
   const totalEarnedCapacity = useMemo(() => {
     if (!capacityLogs) return 0;
-    // Filtrado en el cliente para evitar necesidad de índices complejos y operador startsWith inexistente
     return capacityLogs
       .filter(log => log.reason && log.reason.indexOf('referido_confirmado') === 0)
       .reduce((sum, log) => sum + (log.amount || 0), 0);
@@ -175,7 +174,6 @@ export default function ReferidosPage() {
           <CardContent>
             <div className="text-2xl font-black">{loadingReferrals ? "..." : stats.pending}</div>
           </CardContent>
-        </Card>
         <Card className="bg-primary text-primary-foreground">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-xs font-bold uppercase tracking-widest opacity-80">Capacidad Ganada</CardTitle>

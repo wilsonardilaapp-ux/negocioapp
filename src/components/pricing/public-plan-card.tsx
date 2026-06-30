@@ -1,7 +1,8 @@
-
 'use client';
 
+import React, { Suspense } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -17,7 +18,15 @@ const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
 };
 
-export default function PublicPlanCard({ plan }: PublicPlanCardProps) {
+function PublicPlanCardInner({ plan }: PublicPlanCardProps) {
+    const searchParams = useSearchParams();
+    const refCode = searchParams.get('ref');
+
+    // Cambio quirúrgico: Preservar el código ref al redirigir al registro
+    const href = refCode 
+        ? `/register?plan=${plan.id}&ref=${refCode}` 
+        : `/register?plan=${plan.id}`;
+
     return (
         <Card className={cn(
             "flex flex-col h-full transition-all",
@@ -46,11 +55,19 @@ export default function PublicPlanCard({ plan }: PublicPlanCardProps) {
             </CardContent>
             <CardFooter>
                 <Button asChild className="w-full">
-                    <Link href={`/register?plan=${plan.id}`}>
+                    <Link href={href}>
                         Seleccionar Plan <ArrowRight className="ml-2 h-4 w-4" />
                     </Link>
                 </Button>
             </CardFooter>
         </Card>
+    );
+}
+
+export default function PublicPlanCard(props: PublicPlanCardProps) {
+    return (
+        <Suspense fallback={<Card className="h-[400px] animate-pulse bg-muted" />}>
+            <PublicPlanCardInner {...props} />
+        </Suspense>
     );
 }

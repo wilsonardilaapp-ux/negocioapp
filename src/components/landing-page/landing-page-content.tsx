@@ -116,26 +116,18 @@ const getPlanButtonConfig = (plan: SubscriptionPlan | HybridPlan, hotmartLinks: 
     const hotmartLink = hotmartLinks.find((h) => h.planId === plan.id);
     const isHybrid = 'commissionType' in plan;
     const price = isHybrid ? (plan as HybridPlan).basePrice : (plan as SubscriptionPlan).price;
-  
-    if (price === 0) {
-      return {
-        label: 'Empezar Gratis',
-        variant: 'free',
-        onClick: () => {
-          const url = hotmartLink?.hotmartUrl || `/register?plan=${plan.id}`;
-          window.open(url, '_self');
-        },
-      };
-    }
-  
-    return {
-      label: 'Suscribirse',
-      variant: (plan as any).isMostPopular ? 'popular' : 'paid',
-      onClick: async () => {
+
+    const handleRedirect = async () => {
         if (hotmartLink?.hotmartUrl) {
           window.open(hotmartLink.hotmartUrl, '_blank');
           return;
         }
+
+        // Cambio quirúrgico: Capturar ref de la URL actual y propagarlo
+        const refCode = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('ref') : null;
+        const baseRegisterUrl = `/register?plan=${plan.id}`;
+        const finalUrl = refCode ? `${baseRegisterUrl}&ref=${refCode}` : baseRegisterUrl;
+
         if (!isHybrid && (plan as SubscriptionPlan).stripePriceId && !(plan as SubscriptionPlan).stripePriceId.includes('placeholder') && user) {
           try {
             const res = await fetch('/api/stripe/create-checkout-session', {
@@ -157,9 +149,22 @@ const getPlanButtonConfig = (plan: SubscriptionPlan | HybridPlan, hotmartLinks: 
             console.error("Stripe error:", e);
           }
         }
-        // Redirección por defecto para planes híbridos o cuando Stripe falla/no está configurado
-        window.location.href = `/register?plan=${plan.id}`;
-      },
+        
+        window.location.href = finalUrl;
+    };
+  
+    if (price === 0) {
+      return {
+        label: 'Empezar Gratis',
+        variant: 'free',
+        onClick: handleRedirect,
+      };
+    }
+  
+    return {
+      label: 'Suscribirse',
+      variant: (plan as any).isMostPopular ? 'popular' : 'paid',
+      onClick: handleRedirect,
     };
 };
 
