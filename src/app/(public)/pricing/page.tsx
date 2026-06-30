@@ -6,6 +6,8 @@ import PublicPlanCard from "@/components/pricing/public-plan-card";
 import Header from "@/components/layout/header";
 import Footer from "@/components/layout/footer";
 
+export const dynamic = 'force-dynamic';
+
 async function getPlans(): Promise<SubscriptionPlan[]> {
     try {
         const db = await getAdminFirestore();
@@ -15,7 +17,6 @@ async function getPlans(): Promise<SubscriptionPlan[]> {
             return [];
         }
         
-        // Filtramos en memoria para asegurar que solo se muestren los activos en la página de precios
         return snapshot.docs
           .map(doc => ({ ...doc.data(), id: doc.id } as SubscriptionPlan))
           .filter(plan => plan.isActive === true);
@@ -50,13 +51,13 @@ export default async function PricingPage() {
     const { businessId, navigation } = await getHeaderData();
 
     return (
-        <div className="w-full bg-background">
+        <div className="w-full bg-background min-h-screen flex flex-col">
             <Header businessId={businessId} navigation={navigation} />
-            <main className="container mx-auto px-4 py-16 md:py-24">
+            <main className="container mx-auto px-4 py-16 md:py-24 flex-1">
                 <div className="text-center max-w-3xl mx-auto mb-12">
-                    <h1 className="text-4xl md:text-5xl font-bold tracking-tight">Planes para cada necesidad</h1>
+                    <h1 className="text-4xl md:text-5xl font-black tracking-tight text-gray-900">Planes para cada necesidad</h1>
                     <p className="mt-4 text-lg text-muted-foreground">
-                        Elige el plan que mejor se adapte al crecimiento de tu negocio.
+                        Elige el plan que mejor se adapte al crecimiento de tu negocio. El código de referido se aplicará automáticamente al registrarte.
                     </p>
                 </div>
 
@@ -65,6 +66,12 @@ export default async function PricingPage() {
                         <PublicPlanCard key={plan.id} plan={plan} />
                     ))}
                 </div>
+                
+                {plans.length === 0 && (
+                    <div className="text-center py-20 bg-muted/20 rounded-3xl border border-dashed">
+                        <p className="text-muted-foreground font-medium">Cargando opciones de suscripción...</p>
+                    </div>
+                )}
             </main>
             <Footer />
         </div>
