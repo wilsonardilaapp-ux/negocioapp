@@ -42,5 +42,14 @@ export type Business = {
         whatsapp?: string;
     };
     internalNotes?: string;
-    limitesExtra?: Record<string, number>;
+    limitesExtra?: {
+        products?: number;
+        blogPosts?: number;
+        landingPages?: number;
+        promotions?: number;
+        coupons?: number;
+        orders?: number;
+        suggestions?: number;
+        [key: string]: number | undefined;
+    };
 };

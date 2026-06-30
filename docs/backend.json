@@ -1,4 +1,3 @@
-
 {
   "entities": {
     "User": {
@@ -25,7 +24,13 @@
         "id": { "type": "string" },
         "name": { "type": "string" },
         "referralCode": { "type": "string", "description": "Unique 8-character referral code." },
-        "referredByBusinessId": { "type": ["string", "null"], "description": "ID of the business that referred this one." }
+        "referredByBusinessId": { "type": ["string", "null"], "description": "ID of the business that referred this one." },
+        "limitesExtra": {
+          "type": "object",
+          "properties": {
+            "products": { "type": "number" }
+          }
+        }
       }
     },
     "AffiliateConfig": {
@@ -59,42 +64,18 @@
         "manualNote": { "type": ["string", "null"] }
       }
     },
-    "DirectoryAd": {
-      "title": "DirectoryAd",
+    "ExtraCapacityLog": {
+      "title": "ExtraCapacityLog",
       "type": "object",
-      "description": "Represents an advertisement in the business directory.",
+      "description": "Log of extra capacity granted to businesses.",
       "properties": {
-        "id": { "type": "string" },
-        "title": { "type": "string" },
-        "imageUrl": { "type": "string", "format": "uri" },
-        "linkUrl": { "type": "string", "format": "uri" },
-        "format": { "type": "string", "enum": ["google_display", "meta_feed", "meta_story"] },
-        "position": { "type": "string", "enum": ["top", "mid", "grid", "sidebar"] },
-        "active": { "type": "boolean" },
-        "views": { "type": "number" },
-        "clicks": { "type": "number" },
-        "createdAt": { "type": "string", "format": "date-time" }
-      }
-    },
-    "DirectoryRating": {
-      "title": "DirectoryRating",
-      "type": "object",
-      "description": "Represents a user rating for a business in the directory.",
-      "properties": {
-        "id": { "type": "string" },
         "businessId": { "type": "string" },
         "businessName": { "type": "string" },
-        "userId": { "type": "string" },
-        "userName": { "type": "string" },
-        "rating": { "type": "number", "minimum": 1, "maximum": 5 },
-        "comment": { "type": "string" },
-        "status": { "type": "string", "enum": ["pending", "published", "hidden", "rejected", "reported"] },
-        "adminResponse": { "type": "string" },
-        "businessResponse": { "type": "string" },
-        "createdAt": { "type": "string", "format": "date-time" },
-        "updatedAt": { "type": "string", "format": "date-time" }
-      },
-      "required": ["id", "businessId", "userId", "rating", "comment", "status", "createdAt", "updatedAt"]
+        "amount": { "type": "number" },
+        "reason": { "type": "string" },
+        "origin": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      }
     },
     "ProductAlert": {
       "title": "ProductAlert",
@@ -150,19 +131,11 @@
         }
       },
       {
-        "path": "/directoryAds/{adId}",
+        "path": "/extraCapacityLogs/{logId}",
         "definition": {
-          "entityName": "DirectoryAd",
-          "schema": { "$ref": "#/backend/entities/DirectoryAd" },
-          "description": "Stores advertisements for the directory."
-        }
-      },
-      {
-        "path": "/directoryRatings/{ratingId}",
-        "definition": {
-          "entityName": "DirectoryRating",
-          "schema": { "$ref": "#/backend/entities/DirectoryRating" },
-          "description": "Stores user ratings for businesses."
+          "entityName": "ExtraCapacityLog",
+          "schema": { "$ref": "#/backend/entities/ExtraCapacityLog" },
+          "description": "Audit logs for extra capacity granted."
         }
       },
       {
