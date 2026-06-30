@@ -229,12 +229,12 @@ function RegisterForm() {
       batch.set(businessDocRef, businessData);
 
       // --- LOG DE REFERIDO (FASE 2) ---
-      if (referredByBusinessId) {
+      if (referredByBusinessId && refCode) {
         const referralDocRef = doc(collection(firestore, 'referrals'));
         batch.set(referralDocRef, {
           referentBusinessId: referredByBusinessId,
           referreeBusinessId: newUser.uid,
-          referralCode: refCode?.toUpperCase(),
+          referralCode: refCode.toUpperCase(),
           createdAt: nowTimestamp,
           status: 'pending_payment',
           paidConfirmedAt: null,
