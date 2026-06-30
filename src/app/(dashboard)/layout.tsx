@@ -3,7 +3,7 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useCallback } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -33,14 +33,15 @@ import {
 } from "@/components/ui/card";
 import { Logo } from "@/components/icons";
 import { ClientNav } from "@/components/layout/client-nav";
-import { useAuth, useUser, useFirestore, useDoc, useMemoFirebase, setDocumentNonBlocking } from "@/firebase";
-import { doc } from "firebase/firestore";
+import { useAuth, useUser, useFirestore, useDoc, useMemoFirebase, setDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase";
+import { doc, collection, query, where, getDocs, limit, type Firestore } from "firebase/firestore";
 import type { Business } from "@/models/business";
 import { uploadMedia } from "@/ai/flows/upload-media-flow";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, XCircle } from "lucide-react";
 import { NotificationBell } from "@/components/layout/NotificationBell";
 import FaviconInjector from "@/components/layout/FaviconInjector";
+import { v4 as uuidv4 } from "uuid";
 
 const LoadingScreen = () => (
     <div className="flex justify-center items-center h-screen">
@@ -64,6 +65,34 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   }, [firestore, user]);
 
   const { data: business, isLoading: isBusinessLoading } = useDoc<Business>(businessDocRef);
+
+  const generateUniqueReferralCode = useCallback(async (db: Firestore): Promise<string> => {
+    let code = '';
+    let isUnique = false;
+    while (!isUnique) {
+      code = uuidv4().slice(0, 8).toUpperCase();
+      const q = query(collection(db, 'businesses'), where('referralCode', '==', code), limit(1));
+      const snap = await getDocs(q);
+      if (snap.empty) isUnique = true;
+    }
+    return code;
+  }, []);
+
+  // Lazy generation for existing businesses missing a referral code
+  useEffect(() => {
+    if (business && !business.referralCode && businessDocRef && firestore) {
+      const initReferralCode = async () => {
+        try {
+          const code = await generateUniqueReferralCode(firestore);
+          await updateDocumentNonBlocking(businessDocRef, { referralCode: code });
+          console.log(`[Referral] Generated lazy code for ${business.name}: ${code}`);
+        } catch (error) {
+          console.error("[Referral] Lazy generation failed:", error);
+        }
+      };
+      initReferralCode();
+    }
+  }, [business, businessDocRef, firestore, generateUniqueReferralCode]);
 
   const handleLogout = async () => {
     if (!auth) return;

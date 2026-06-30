@@ -16,6 +16,29 @@
       },
       "required": ["id", "name", "email", "role", "status", "createdAt", "lastLogin"]
     },
+    "Business": {
+      "title": "Business",
+      "type": "object",
+      "description": "Represents a business tenant.",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "referralCode": { "type": "string", "description": "Unique 8-character referral code." },
+        "referredByBusinessId": { "type": ["string", "null"], "description": "ID of the business that referred this one." }
+      }
+    },
+    "AffiliateConfig": {
+      "title": "AffiliateConfig",
+      "type": "object",
+      "description": "Stores global settings for the referral program.",
+      "properties": {
+        "programName": { "type": "string" },
+        "rewardReferent": { "type": "number" },
+        "rewardReferree": { "type": "number" },
+        "maxReferralsPerUser": { "type": ["number", "null"] },
+        "isActive": { "type": "boolean" }
+      }
+    },
     "DirectoryAd": {
       "title": "DirectoryAd",
       "type": "object",
@@ -80,6 +103,22 @@
           "entityName": "User",
           "schema": { "$ref": "#/backend/entities/User" },
           "description": "Stores user profiles."
+        }
+      },
+      {
+        "path": "/businesses/{businessId}",
+        "definition": {
+          "entityName": "Business",
+          "schema": { "$ref": "#/backend/entities/Business" },
+          "description": "Main business document."
+        }
+      },
+      {
+        "path": "/adminConfig/affiliates",
+        "definition": {
+          "entityName": "AffiliateConfig",
+          "schema": { "$ref": "#/backend/entities/AffiliateConfig" },
+          "description": "Global configuration for the affiliate program."
         }
       },
       {

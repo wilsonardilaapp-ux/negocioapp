@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useRouter, useSearchParams } from "next/navigation";
@@ -25,11 +24,10 @@ import {
 } from "@/components/ui/form";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
-import { ToastAction } from "@/components/ui/toast";
 import { useAuth, useUser, useFirestore, initiateEmailSignUp } from "@/firebase";
 import { SUPER_ADMIN_EMAILS } from "@/firebase/auth/use-user";
-import { useEffect, useState, Suspense } from "react";
-import { doc, writeBatch, getDoc, Timestamp } from 'firebase/firestore';
+import { useEffect, useState, Suspense, useCallback } from "react";
+import { doc, writeBatch, getDoc, Timestamp, collection, query, where, getDocs, limit, type Firestore } from 'firebase/firestore';
 import type { Business } from '@/models/business';
 import type { User as AppUser } from "@/models/user";
 import Link from "next/link";
@@ -144,6 +142,18 @@ function RegisterForm() {
     defaultValues: { name: "", email: "", password: "", acceptTerms: false, acceptFees: false },
   });
 
+  const generateUniqueReferralCode = useCallback(async (db: Firestore): Promise<string> => {
+    let code = '';
+    let isUnique = false;
+    while (!isUnique) {
+      code = uuidv4().slice(0, 8).toUpperCase();
+      const q = query(collection(db, 'businesses'), where('referralCode', '==', code), limit(1));
+      const snap = await getDocs(q);
+      if (snap.empty) isUnique = true;
+    }
+    return code;
+  }, []);
+
   async function onSubmit(values: z.infer<typeof registerSchema>) {
     if (!auth || !firestore) return;
     
@@ -152,6 +162,8 @@ function RegisterForm() {
     try {
       const clientIp = await getClientIp();
       const planParam = searchParams.get('plan');
+      const refCode = searchParams.get('ref');
+
       let planDetails: SubscriptionPlan | HybridPlan | null = null;
 
       if (planParam) {
@@ -166,6 +178,16 @@ function RegisterForm() {
           }
       }
 
+      // Logic to find referredByBusinessId if ref code is provided
+      let referredByBusinessId: string | null = null;
+      if (refCode) {
+        const refQuery = query(collection(firestore, 'businesses'), where('referralCode', '==', refCode.toUpperCase()), limit(1));
+        const refSnap = await getDocs(refQuery);
+        if (!refSnap.empty) {
+          referredByBusinessId = refSnap.docs[0].id;
+        }
+      }
+
       const userCredential = await initiateEmailSignUp(auth, normalizedEmail, values.password);
       const newUser = userCredential.user;
       
@@ -174,6 +196,7 @@ function RegisterForm() {
       const nowTimestamp = Timestamp.now();
 
       const isAdmin = SUPER_ADMIN_EMAILS.includes(normalizedEmail);
+      const generatedReferralCode = await generateUniqueReferralCode(firestore);
 
       const userDocRef = doc(firestore, 'users', newUser.uid);
       const userData: AppUser = {
@@ -197,6 +220,9 @@ function RegisterForm() {
         logoURL: 'https://seeklogo.com/images/E/eco-friendly-logo-7087A22106-seeklogo.com.png',
         description: 'Bienvenido a mi negocio en Zentry.',
         planName: planDetails?.name || 'Plan Gratuito',
+        // --- Referral System ---
+        referralCode: generatedReferralCode,
+        referredByBusinessId,
         // --- DIRECTORIO AUTOMÁTICO ---
         directoryEnabled: true,
         directoryStatus: 'approved',

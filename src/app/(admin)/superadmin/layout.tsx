@@ -1,6 +1,6 @@
 'use client';
 
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import Link from "next/link";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -23,7 +23,8 @@ import {
 } from "@/components/ui/sidebar";
 import { Logo } from "@/components/icons";
 import { SuperAdminNav } from "@/components/layout/super-admin-nav";
-import { useAuth, useUser } from "@/firebase";
+import { useAuth, useUser, useFirestore } from "@/firebase";
+import { doc, getDoc, setDoc } from "firebase/firestore";
 import { Loader2 } from "lucide-react";
 
 const LoadingScreen = () => (
@@ -38,6 +39,28 @@ const LoadingScreen = () => (
 export default function SuperAdminLayout({ children }: { children: ReactNode }) {
   const { user, isUserLoading, profile, isProfileLoading } = useUser();
   const auth = useAuth();
+  const firestore = useFirestore();
+
+  // Initialize Affiliate Config if it doesn't exist
+  useEffect(() => {
+    if (!firestore || profile?.role !== 'super_admin') return;
+
+    const initAffiliateConfig = async () => {
+      const configRef = doc(firestore, 'adminConfig', 'affiliates');
+      const snap = await getDoc(configRef);
+      if (!snap.exists()) {
+        await setDoc(configRef, {
+          programName: "Programa Socios",
+          rewardReferent: 5,
+          rewardReferree: 5,
+          maxReferralsPerUser: null,
+          isActive: true
+        });
+        console.log("[Affiliates] Configuración inicial creada.");
+      }
+    };
+    initAffiliateConfig();
+  }, [firestore, profile?.role]);
 
   const handleLogout = async () => {
     if (!auth) return;

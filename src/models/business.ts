@@ -24,6 +24,10 @@ export type Business = {
     imageLimit?: number | null;
     productLimit?: number | null;
     
+    // Referral System
+    referralCode?: string;
+    referredByBusinessId?: string | null;
+
     // Directorio Fields
     directoryEnabled?: boolean;
     directoryStatus?: DirectoryStatus;
