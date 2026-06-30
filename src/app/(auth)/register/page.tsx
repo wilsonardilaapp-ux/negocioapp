@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useRouter, useSearchParams } from "next/navigation";
@@ -137,11 +138,6 @@ function RegisterForm() {
   const firestore = useFirestore();
   const [showPassword, setShowPassword] = useState(false);
 
-  const form = useForm<z.infer<typeof registerSchema>>({
-    resolver: zodResolver(registerSchema),
-    defaultValues: { name: "", email: "", password: "", acceptTerms: false, acceptFees: false },
-  });
-
   const generateUniqueReferralCode = useCallback(async (db: Firestore): Promise<string> => {
     let code = '';
     let isUnique = false;
@@ -231,6 +227,25 @@ function RegisterForm() {
         reviewCount: 1,
       };
       batch.set(businessDocRef, businessData);
+
+      // --- LOG DE REFERIDO (FASE 2) ---
+      if (referredByBusinessId) {
+        const referralDocRef = doc(collection(firestore, 'referrals'));
+        batch.set(referralDocRef, {
+          referentBusinessId: referredByBusinessId,
+          referreeBusinessId: newUser.uid,
+          referralCode: refCode?.toUpperCase(),
+          createdAt: nowTimestamp,
+          status: 'pending_payment',
+          paidConfirmedAt: null,
+          referentRewardGranted: false,
+          referreeRewardGranted: false,
+          paymentRail: null,
+          origin: 'automatico',
+          adminResponsibleId: null,
+          manualNote: null
+        });
+      }
 
       const landingPageDocRef = doc(firestore, 'businesses', newUser.uid, 'landingPages', 'main');
       const dynamicLinks: NavLink[] = [

@@ -1,3 +1,4 @@
+
 {
   "entities": {
     "User": {
@@ -37,6 +38,25 @@
         "rewardReferree": { "type": "number" },
         "maxReferralsPerUser": { "type": ["number", "null"] },
         "isActive": { "type": "boolean" }
+      }
+    },
+    "Referral": {
+      "title": "Referral",
+      "type": "object",
+      "description": "Represents a referral connection between two businesses.",
+      "properties": {
+        "referentBusinessId": { "type": "string" },
+        "referreeBusinessId": { "type": "string" },
+        "referralCode": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "status": { "type": "string", "enum": ["pending_payment", "confirmed", "rejected"] },
+        "paidConfirmedAt": { "type": ["string", "null"], "format": "date-time" },
+        "referentRewardGranted": { "type": "boolean" },
+        "referreeRewardGranted": { "type": "boolean" },
+        "paymentRail": { "type": ["string", "null"] },
+        "origin": { "type": "string" },
+        "adminResponsibleId": { "type": ["string", "null"] },
+        "manualNote": { "type": ["string", "null"] }
       }
     },
     "DirectoryAd": {
@@ -119,6 +139,14 @@
           "entityName": "AffiliateConfig",
           "schema": { "$ref": "#/backend/entities/AffiliateConfig" },
           "description": "Global configuration for the affiliate program."
+        }
+      },
+      {
+        "path": "/referrals/{referralId}",
+        "definition": {
+          "entityName": "Referral",
+          "schema": { "$ref": "#/backend/entities/Referral" },
+          "description": "Logs of referrals and their reward status."
         }
       },
       {
