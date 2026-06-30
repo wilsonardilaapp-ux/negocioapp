@@ -33,7 +33,6 @@ export async function onSubscriptionActivated(businessId: string, statusAfter: s
     }
 
     const referralDoc = referralQuery.docs[0];
-    const referralData = referralDoc.data() as Referral;
 
     // 2. Ejecutar otorgamiento en una transacción atómica
     await db.runTransaction(async (transaction) => {
@@ -41,7 +40,12 @@ export async function onSubscriptionActivated(businessId: string, statusAfter: s
       const freshReferralSnap = await transaction.get(referralDoc.ref);
       const freshReferral = freshReferralSnap.data() as Referral;
 
-      if (freshReferral.status !== 'pending_payment' || freshReferral.referentRewardGranted) {
+      // GUARDIA CRÍTICA: Verificar que no haya sido procesado
+      if (
+        freshReferral.status !== 'pending_payment' || 
+        freshReferral.referentRewardGranted || 
+        freshReferral.referreeRewardGranted
+      ) {
         throw new Error('El referido ya ha sido procesado o no está pendiente.');
       }
 
@@ -94,7 +98,7 @@ export async function onSubscriptionActivated(businessId: string, statusAfter: s
           reason: 'referido_confirmado_referente',
           origin: 'automatico',
           adminId: null,
-          notes: `Recompensa por referir a ${referreeName}`,
+          notes: null,
           createdAt: now as any
         };
         transaction.set(db.collection('extraCapacityLogs').doc(), referentLog);
@@ -112,7 +116,7 @@ export async function onSubscriptionActivated(businessId: string, statusAfter: s
         reason: 'referido_confirmado_referido',
         origin: 'automatico',
         adminId: null,
-        notes: `Recompensa por registrarse con código de ${referentName}`,
+        notes: null,
         createdAt: now as any
       };
       transaction.set(db.collection('extraCapacityLogs').doc(), referreeLog);
