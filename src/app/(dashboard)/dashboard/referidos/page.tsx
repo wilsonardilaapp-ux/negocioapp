@@ -29,7 +29,6 @@ import {
   Users, 
   TrendingUp, 
   Gift, 
-  ExternalLink,
   Share2,
   Clock,
   CheckCircle2
@@ -48,21 +47,18 @@ export default function ReferidosPage() {
   const { toast } = useToast();
   const [copied, setCopied] = useState(false);
 
-  // 1. Obtener datos del negocio actual
   const businessRef = useMemoFirebase(
     () => (user?.uid ? doc(firestore, 'businesses', user.uid) : null),
     [firestore, user?.uid]
   );
   const { data: business, isLoading: loadingBusiness } = useDoc<Business>(businessRef);
 
-  // 2. Obtener configuración de afiliados
   const configRef = useMemoFirebase(
-    () => doc(firestore, 'adminConfig', 'affiliates'),
+    () => (firestore ? doc(firestore, 'adminConfig', 'affiliates') : null),
     [firestore]
   );
   const { data: config } = useDoc<AffiliateConfig>(configRef);
 
-  // 3. Obtener lista de referidos (donde el negocio actual es el referente)
   const referralsQuery = useMemoFirebase(() => {
     if (!firestore || !user?.uid) return null;
     return query(
@@ -73,7 +69,6 @@ export default function ReferidosPage() {
   }, [firestore, user?.uid]);
   const { data: referrals, isLoading: loadingReferrals } = useCollection<Referral>(referralsQuery);
 
-  // 4. Obtener logs de capacidad extra para el conteo de recompensas
   const logsQuery = useMemoFirebase(() => {
     if (!firestore || !user?.uid) return null;
     return query(
@@ -82,8 +77,6 @@ export default function ReferidosPage() {
     );
   }, [firestore, user?.uid]);
   const { data: capacityLogs } = useCollection<ExtraCapacityLog>(logsQuery);
-
-  // --- LÓGICA DE NEGOCIO ---
 
   const referralLink = useMemo(() => {
     if (typeof window === 'undefined' || !business?.referralCode) return '';
@@ -101,7 +94,6 @@ export default function ReferidosPage() {
 
   const totalEarnedCapacity = useMemo(() => {
     if (!capacityLogs) return 0;
-    // Opción A: Filtrado en cliente por reason
     return capacityLogs
       .filter(log => log.reason.startsWith('referido_confirmado'))
       .reduce((sum, log) => sum + log.amount, 0);
@@ -109,12 +101,20 @@ export default function ReferidosPage() {
 
   const handleCopy = () => {
     if (!referralLink) return;
-    navigator.clipboard.writeText(referralLink);
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(referralLink);
+    } else {
+      const el = document.createElement('textarea');
+      el.value = referralLink;
+      el.style.position = 'absolute';
+      el.style.left = '-9999px';
+      document.body.appendChild(el);
+      el.select();
+      document.execCommand('copy');
+      document.body.removeChild(el);
+    }
     setCopied(true);
-    toast({
-      title: "Enlace copiado",
-      description: "¡Ya puedes compartir tu enlace de socio!",
-    });
+    toast({ title: "Enlace copiado", description: "¡Ya puedes compartir tu enlace de socio!" });
     setTimeout(() => setCopied(false), 2000);
   };
 
@@ -146,7 +146,6 @@ export default function ReferidosPage() {
         </div>
       </div>
 
-      {/* KPIs */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -188,7 +187,6 @@ export default function ReferidosPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Generador de Enlace */}
         <Card className="lg:col-span-1 h-fit">
           <CardHeader>
             <CardTitle>Tu Enlace de Socio</CardTitle>
@@ -234,7 +232,6 @@ export default function ReferidosPage() {
           </CardContent>
         </Card>
 
-        {/* Historial */}
         <Card className="lg:col-span-2">
           <CardHeader>
             <CardTitle>Mis Invitaciones</CardTitle>
