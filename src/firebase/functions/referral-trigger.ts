@@ -16,7 +16,7 @@ import type { ExtraCapacityLog } from '../../models/extra-capacity-log';
  * Función que procesa el otorgamiento de recompensas cuando una suscripción pasa a 'active'.
  * Se dispara mediante un trigger onWrite en businesses/{businessId}/subscription/current.
  */
-export async function onSubscriptionActivated(businessId: string, subscriptionData: any) {
+export async function onSubscriptionActivated(businessId: string, subscriptionData: { status: string }) {
   // Solo actuamos si el estado es 'active'
   if (!subscriptionData || subscriptionData.status !== 'active') {
     return null;
@@ -135,7 +135,31 @@ export async function onSubscriptionActivated(businessId: string, subscriptionDa
       };
       transaction.set(db.collection('extraCapacityLogs').doc(), referreeLog);
 
-      // C. Actualización final del documento de referido
+      // D. Notificación al Referente (si aplica)
+      if (grantToReferent) {
+        const referentNotifRef = db.collection(`businesses/${referentId}/notifications`).doc();
+        transaction.set(referentNotifRef, {
+          fromSuperAdmin: true,
+          subject: "🎉 ¡Recompensa recibida por tu referido!",
+          body: `<p>¡Buenas noticias! El negocio que invitaste se ha registrado exitosamente.</p><p>Has ganado <strong>+${config.rewardReferent} productos extra</strong> en tu catálogo como recompensa por participar en el Programa de Socios.</p>`,
+          read: false,
+          createdAt: new Date().toISOString(),
+          type: 'promotion'
+        });
+      }
+
+      // E. Notificación al Referido (siempre se otorga)
+      const referreeNotifRef = db.collection(`businesses/${referreeId}/notifications`).doc();
+      transaction.set(referreeNotifRef, {
+        fromSuperAdmin: true,
+        subject: "🎁 ¡Bienvenido al Programa de Socios!",
+        body: `<p>Te registraste con un código de referido y <strong>ambos ganan</strong>.</p><p>Recibiste <strong>+${config.rewardReferree} productos extra</strong> en tu catálogo como recompensa de bienvenida.</p>`,
+        read: false,
+        createdAt: new Date().toISOString(),
+        type: 'promotion'
+      });
+
+      // F. Actualización final del documento de referido
       transaction.update(referralDoc.ref, {
         status: 'paid_confirmed',
         paidConfirmedAt: now,
