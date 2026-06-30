@@ -66,6 +66,33 @@ service cloud.firestore {
       allow write: if isSuperAdmin() || isOwner(request.resource.data.businessId || resource.data.businessId);
     }
 
+    // --- PROGRAMA DE SOCIOS (REFERIDOS) ---
+
+    match /referrals/{id} {
+      allow list: if isSuperAdmin();
+      allow get: if isAuthenticated() && (
+        isSuperAdmin() ||
+        resource.data.referentBusinessId == request.auth.uid ||
+        resource.data.referreeBusinessId == request.auth.uid
+      );
+      allow create: if isAuthenticated();
+      allow update, delete: if isSuperAdmin();
+    }
+
+    match /extraCapacityLogs/{id} {
+      allow list: if isSuperAdmin();
+      allow get: if isAuthenticated() && (
+        isSuperAdmin() || 
+        resource.data.businessId == request.auth.uid
+      );
+      allow write: if isSuperAdmin();
+    }
+
+    match /adminConfig/affiliates {
+      allow read: if true;
+      allow write: if isSuperAdmin();
+    }
+
     // --- VALORACIONES DEL DIRECTORIO ---
     match /directoryRatings/{ratingId} {
       // Cualquier usuario puede ver valoraciones publicadas
@@ -110,7 +137,7 @@ service cloud.firestore {
 
       match /notifications/{notificationId} {
         allow read, update, delete: if isSuperAdmin() || isBusinessMember(businessId);
-        allow create: if isSuperAdmin() || isBusinessMember(businessId); // Ajuste Fase 2
+        allow create: if isSuperAdmin() || isBusinessMember(businessId);
       }
 
       match /productAlerts/{alertId} {
@@ -120,17 +147,6 @@ service cloud.firestore {
       match /{allSubcollections=**} {
         allow read, write: if isSuperAdmin() || isBusinessMember(businessId);
       }
-    }
-
-    // --- REGLAS OBSOLETAS (MIGRACIÓN) ---
-    match /businessDirectory/{entryId} {
-      allow read, list: if true;
-      allow write: if isSuperAdmin();
-    }
-
-    match /directoryAds/{adId} {
-      allow read, list: if true;
-      allow write: if isSuperAdmin();
     }
 
     // Planes y Configuración
