@@ -80,7 +80,6 @@ export default function ReferidosPage() {
 
   const referralLink = useMemo(() => {
     if (typeof window === 'undefined' || !business?.referralCode) return '';
-    // Cambio quirúrgico: Redirigir a /pricing para mostrar planes primero
     return `${window.location.origin}/pricing?ref=${business.referralCode}`;
   }, [business?.referralCode]);
 
@@ -96,7 +95,7 @@ export default function ReferidosPage() {
   const totalEarnedCapacity = useMemo(() => {
     if (!capacityLogs) return 0;
     return capacityLogs
-      .filter(log => log.reason && log.reason.indexOf('referido_confirmado') === 0)
+      .filter(log => log.reason && log.reason.startsWith('referido_confirmado'))
       .reduce((sum, log) => sum + (log.amount || 0), 0);
   }, [capacityLogs]);
 
@@ -174,6 +173,7 @@ export default function ReferidosPage() {
           <CardContent>
             <div className="text-2xl font-black">{loadingReferrals ? "..." : stats.pending}</div>
           </CardContent>
+        </Card>
         <Card className="bg-primary text-primary-foreground">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-xs font-bold uppercase tracking-widest opacity-80">Capacidad Ganada</CardTitle>
