@@ -2,11 +2,10 @@
 
 import React, { createContext, useContext, ReactNode, useMemo, useState, useEffect } from 'react';
 import { FirebaseApp } from 'firebase/app';
-import { Firestore, enableNetwork } from 'firebase/firestore';
+import { Firestore } from 'firebase/firestore';
 import { Auth } from 'firebase/auth';
 import { FirebaseErrorListener } from '@/components/FirebaseErrorListener';
 
-// Simplified interfaces, user state is handled by useUser hook
 export interface FirebaseContextState {
   areServicesAvailable: boolean;
   isNetworkEnabled: boolean;
@@ -30,20 +29,10 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
   firestore,
   auth,
 }) => {
-  const [isNetworkEnabled, setIsNetworkEnabled] = useState(false);
-  
-  useEffect(() => {
-    if (firestore) {
-      enableNetwork(firestore)
-        .then(() => {
-          console.log("Firestore network connection enabled.");
-          setIsNetworkEnabled(true);
-        })
-        .catch((error) => {
-          console.error("Error enabling Firestore network: ", error);
-        });
-    }
-  }, [firestore]);
+  // La red de Firestore está habilitada por defecto tras la inicialización.
+  // Llamar a enableNetwork de forma explícita puede causar conflictos de estado interno
+  // (Unexpected state) especialmente durante el montaje doble de React Strict Mode.
+  const [isNetworkEnabled] = useState(true);
 
   const contextValue = useMemo((): FirebaseContextState => {
     const servicesAvailable = !!(firebaseApp && firestore && auth);
