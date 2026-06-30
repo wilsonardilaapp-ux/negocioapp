@@ -1,6 +1,6 @@
-
 import { getAdminFirestore } from "@/firebase/server-init";
 import type { SubscriptionPlan } from "@/models/subscription-plan";
+import { DefaultSubscriptionPlans } from "@/models/subscription-plan";
 import type { LandingPageData } from "@/models/landing-page";
 import PublicPlanCard from "@/components/pricing/public-plan-card";
 import Header from "@/components/layout/header";
@@ -13,13 +13,14 @@ async function getPlans(): Promise<SubscriptionPlan[]> {
         const db = await getAdminFirestore();
         const q = db.collection("plans").orderBy("price", "asc");
         const snapshot = await q.get();
+        
         if (snapshot.empty) {
             return [];
         }
         
         return snapshot.docs
           .map(doc => ({ ...doc.data(), id: doc.id } as SubscriptionPlan))
-          .filter(plan => plan.isActive === true);
+          .filter(plan => plan.isActive !== false); // Más flexible: si no existe, es true
     } catch (error) {
         console.error("Error fetching plans:", error);
         return [];
@@ -47,8 +48,13 @@ async function getHeaderData(): Promise<{ businessId: string | null, navigation:
 }
 
 export default async function PricingPage() {
-    const plans = await getPlans();
+    let plans = await getPlans();
     const { businessId, navigation } = await getHeaderData();
+
+    // Implementación de Fallback: Si la base de datos está vacía, usar los planes por defecto
+    if (plans.length === 0) {
+        plans = DefaultSubscriptionPlans;
+    }
 
     return (
         <div className="w-full bg-background min-h-screen flex flex-col">
