@@ -1,4 +1,3 @@
-
 "use client";
 
 import Link from "next/link";
@@ -28,6 +27,7 @@ import {
   Ticket,
   Bot,
   Star,
+  Users,
 } from "lucide-react";
 
 import { SidebarMenu, SidebarMenuItem, SidebarMenuButton, useSidebar } from "@/components/ui/sidebar";
@@ -43,6 +43,7 @@ const allNavItems = [
   { href: "/dashboard/chatbot", icon: Bot, label: "Asistente IA", moduleId: 'chatbot-integrado-con-whatsapp-para-soporte-y-ventas'},
   { href: "/dashboard/messages", icon: Bell, label: "Notificaciones" },
   { href: "/dashboard/mensajes-clientes", icon: Mail, label: "Mensajes de Clientes" },
+  { href: "/dashboard/referidos", icon: Users, label: "Programa de Socios" },
   { href: "/dashboard/promotions", icon: Tag, label: "Promociones", moduleId: 'promotions' },
   { href: "/dashboard/cupones", icon: Ticket, label: "Cupones", moduleId: 'promotions' },
   { href: "/dashboard/contacto", icon: MessageSquare, label: "Soporte" },
