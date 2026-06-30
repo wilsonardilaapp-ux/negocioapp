@@ -30,6 +30,7 @@ import type { DirectoryRating } from '@/models/directory-rating';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cn } from "@/lib/utils";
+import BusinessCatalogQR from '@/components/directory/BusinessCatalogQR';
 
 export const dynamic = 'force-dynamic';
 
@@ -281,6 +282,8 @@ export default async function BusinessProfilePage({ params }: { params: { id: st
                                     {entry.socialFacebook && <a href={entry.socialFacebook} target="_blank" rel="noopener noreferrer"><FacebookIcon /></a>}
                                     {entry.socialTiktok && <a href={entry.socialTiktok} target="_blank" rel="noopener noreferrer"><TikTokIcon /></a>}
                                 </div>
+                                
+                                <BusinessCatalogQR businessId={entry.id} />
                             </div>
                             
                             <Button asChild size="lg" className="w-full rounded-[2rem] h-16 text-lg font-black group text-white bg-primary">
