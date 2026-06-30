@@ -138,6 +138,17 @@ function RegisterForm() {
   const firestore = useFirestore();
   const [showPassword, setShowPassword] = useState(false);
 
+  const form = useForm<z.infer<typeof registerSchema>>({
+    resolver: zodResolver(registerSchema),
+    defaultValues: {
+      name: "",
+      email: "",
+      password: "",
+      acceptTerms: false,
+      acceptFees: false,
+    },
+  });
+
   const generateUniqueReferralCode = useCallback(async (db: Firestore): Promise<string> => {
     let code = '';
     let isUnique = false;
