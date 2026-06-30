@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -94,9 +95,10 @@ export default function ReferidosPage() {
 
   const totalEarnedCapacity = useMemo(() => {
     if (!capacityLogs) return 0;
+    // Filtrado en el cliente para evitar necesidad de índices complejos y operador startsWith inexistente
     return capacityLogs
-      .filter(log => log.reason.startsWith('referido_confirmado'))
-      .reduce((sum, log) => sum + log.amount, 0);
+      .filter(log => log.reason && log.reason.indexOf('referido_confirmado') === 0)
+      .reduce((sum, log) => sum + (log.amount || 0), 0);
   }, [capacityLogs]);
 
   const handleCopy = () => {
@@ -223,11 +225,11 @@ export default function ReferidosPage() {
             </div>
             <div className="p-4 bg-muted/50 rounded-xl space-y-2">
               <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">¿Cómo funciona?</p>
-              <ol className="text-xs space-y-2 text-gray-600">
+              <ul className="text-xs space-y-2 text-gray-600">
                 <li className="flex gap-2"><span>1.</span> Comparte tu enlace.</li>
                 <li className="flex gap-2"><span>2.</span> Tu referido obtiene un beneficio al registrarse.</li>
                 <li className="flex gap-2"><span>3.</span> Cuando tu referido realice su primer pago, <strong>ambos ganan capacidad extra de por vida.</strong></li>
-              </ol>
+              </ul>
             </div>
           </CardContent>
         </Card>
@@ -258,10 +260,10 @@ export default function ReferidosPage() {
                     {referrals.map((ref) => (
                       <TableRow key={ref.id}>
                         <TableCell className="text-xs font-medium">
-                          {format(ref.createdAt.toDate(), 'dd/MM/yyyy', { locale: es })}
+                          {ref.createdAt ? format(ref.createdAt.toDate(), 'dd/MM/yyyy', { locale: es }) : '---'}
                         </TableCell>
                         <TableCell className="font-mono text-[10px] text-muted-foreground">
-                          {ref.referreeBusinessId.slice(0, 8)}...
+                          {ref.referreeBusinessId ? `${ref.referreeBusinessId.slice(0, 8)}...` : '---'}
                         </TableCell>
                         <TableCell>
                           {getStatusBadge(ref.status)}
