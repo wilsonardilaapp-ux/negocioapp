@@ -60,10 +60,10 @@ function CheckoutContent() {
   const businessRef = useMemoFirebase(() => !user ? null : doc(firestore, 'businesses', user.uid), [user, firestore]);
   const { data: business } = useDoc<Business>(businessRef);
 
-  // 2. Resolver Plan Seleccionado
+  // 2. Resolver Plan Seleccionado (Corregido para evitar TypeError)
   const selectedPlan = useMemo(() => {
     if (!planId) return null;
-    return allPlans.find(p => p.id === planId) || allHybridPlans.find(p => p.id === planId);
+    return allPlans?.find(p => p.id === planId) || allHybridPlans?.find(p => p.id === planId) || null;
   }, [planId, allPlans, allHybridPlans]);
 
   const isHybrid = selectedPlan && 'commissionType' in selectedPlan;
@@ -74,7 +74,7 @@ function CheckoutContent() {
     if (!selectedPlan || !user || !paymentConfig) return;
     setIsProcessing(true);
     try {
-      // Prioridad 1: Stripe con Checkout URL Directo
+      // Prioridad 1: Stripe activo con checkoutUrl
       if (paymentConfig.stripe?.enabled && paymentConfig.stripe?.checkoutUrl) {
         window.location.href = paymentConfig.stripe.checkoutUrl;
         return;
