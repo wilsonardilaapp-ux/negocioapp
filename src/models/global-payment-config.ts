@@ -57,5 +57,6 @@ export const HotmartPlanLinkSchema = z.object({
     planId: z.string(),
     planName: z.string(),
     hotmartUrl: z.string(),
+    enabled: z.boolean().optional(),
 });
 export type HotmartPlanLink = z.infer<typeof HotmartPlanLinkSchema>;

@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { CreditCard, Loader2, Save, Building, Smartphone, Building2, Store, DollarSign } from 'lucide-react';
+import { CreditCard, Loader2, Save, Building, Smartphone, Building2, Store, DollarSign, CheckCircle } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import type { GlobalPaymentConfig, HotmartPlanLink } from '@/models/global-payment-config';
 import QRForm from '@/components/pagos/qr-form';
@@ -16,6 +16,7 @@ import { useCollection, useFirestore, useMemoFirebase, setDocumentNonBlocking, u
 import { collection, doc, writeBatch } from 'firebase/firestore';
 import type { SubscriptionPlan } from '@/models/subscription-plan';
 import type { HybridPlan } from '@/models/hybrid-plan';
+import { Badge } from '@/components/ui/badge';
 
 const initialConfig: GlobalPaymentConfig = {
     nequi: { enabled: false, accountNumber: '', holderName: '', instructions: '', qrImageUrl: null },
@@ -60,7 +61,6 @@ export default function PaymentMethodsPage() {
 
     useEffect(() => {
         if (savedConfig) {
-            // Deep merge to ensure all keys from initialConfig are present, even if not in DB
             const mergedConfig: GlobalPaymentConfig = {
                 nequi: { ...initialConfig.nequi, ...savedConfig.nequi },
                 bancolombia: { ...initialConfig.bancolombia, ...savedConfig.bancolombia },
@@ -77,18 +77,17 @@ export default function PaymentMethodsPage() {
     useEffect(() => {
         const combinedLinks: HotmartPlanLink[] = [];
         
-        // Agregar planes estándar
         if (plans) {
             plans.forEach(p => {
                 combinedLinks.push({
                     planId: p.id,
                     planName: p.name,
                     hotmartUrl: (p as any).hotmartUrl || '',
+                    enabled: (p as any).hotmartEnabled ?? !!(p as any).hotmartUrl,
                 });
             });
         }
         
-        // Agregar planes híbridos
         if (hybridPlans) {
             hybridPlans.forEach(p => {
                 if (p.id) {
@@ -96,6 +95,7 @@ export default function PaymentMethodsPage() {
                         planId: p.id,
                         planName: `${p.name} (Híbrido)`,
                         hotmartUrl: (p as any).hotmartUrl || '',
+                        enabled: (p as any).hotmartEnabled ?? !!(p as any).hotmartUrl,
                     });
                 }
             });
@@ -117,6 +117,11 @@ export default function PaymentMethodsPage() {
         setHasChanges(true);
     };
 
+    const handleHotmartEnabledChange = (planId: string, value: boolean) => {
+        setHotmartLinks(prev => prev.map(p => p.planId === planId ? { ...p, enabled: value } : p));
+        setHasChanges(true);
+    };
+
     const handleSave = async () => {
         if (!firestore) {
             toast({ variant: "destructive", title: "Error", description: "No se pudo conectar a la base de datos." });
@@ -125,28 +130,34 @@ export default function PaymentMethodsPage() {
         setIsSaving(true);
         
         try {
-            // 1. Save general payment config
             if (paymentConfigDocRef) {
                 setDocumentNonBlocking(paymentConfigDocRef, config);
             }
 
-            // 2. Save Hotmart links in a batch for both collections
             const batch = writeBatch(firestore);
             hotmartLinks.forEach(link => {
-                // Verificar en planes estándar
                 const stdPlan = plans?.find(p => p.id === link.planId);
                 if (stdPlan) {
-                    if (link.hotmartUrl !== (stdPlan as any).hotmartUrl) {
-                        batch.update(doc(firestore, 'plans', link.planId), { hotmartUrl: link.hotmartUrl });
+                    const hasUrlChanged = link.hotmartUrl !== (stdPlan as any).hotmartUrl;
+                    const hasEnabledChanged = link.enabled !== (stdPlan as any).hotmartEnabled;
+                    if (hasUrlChanged || hasEnabledChanged) {
+                        batch.update(doc(firestore, 'plans', link.planId), { 
+                            hotmartUrl: link.hotmartUrl,
+                            hotmartEnabled: link.enabled 
+                        });
                     }
                     return;
                 }
                 
-                // Verificar en planes híbridos
                 const hybPlan = hybridPlans?.find(p => p.id === link.planId);
                 if (hybPlan) {
-                    if (link.hotmartUrl !== (hybPlan as any).hotmartUrl) {
-                        batch.update(doc(firestore, 'hybrid_plans', link.planId), { hotmartUrl: link.hotmartUrl });
+                    const hasUrlChanged = link.hotmartUrl !== (hybPlan as any).hotmartUrl;
+                    const hasEnabledChanged = link.enabled !== (hybPlan as any).hotmartEnabled;
+                    if (hasUrlChanged || hasEnabledChanged) {
+                        batch.update(doc(firestore, 'hybrid_plans', link.planId), { 
+                            hotmartUrl: link.hotmartUrl,
+                            hotmartEnabled: link.enabled 
+                        });
                     }
                     return;
                 }
@@ -255,9 +266,26 @@ export default function PaymentMethodsPage() {
                                 <p className="text-sm text-muted-foreground">Cargando planes...</p>
                             ) : hotmartLinks.length > 0 ? (
                                 hotmartLinks.map(plan => (
-                                    <div key={plan.planId}>
-                                        <Label htmlFor={`hotmart-${plan.planId}`}>{plan.planName}</Label>
-                                        <Input id={`hotmart-${plan.planId}`} placeholder="https://pay.hotmart.com/..." value={plan.hotmartUrl} onChange={e => handleHotmartLinkChange(plan.planId, e.target.value)} />
+                                    <div key={plan.planId} className="p-4 border rounded-lg space-y-3 bg-muted/20 animate-in fade-in zoom-in duration-300">
+                                        <div className="flex items-center justify-between">
+                                            <Label htmlFor={`hotmart-${plan.planId}`} className="font-bold text-sm truncate pr-2">{plan.planName}</Label>
+                                            <div className="flex items-center gap-2 shrink-0">
+                                                <span className="text-[10px] font-bold uppercase text-muted-foreground">{plan.enabled ? 'Activa' : 'Inactiva'}</span>
+                                                <Switch 
+                                                    id={`hotmart-switch-${plan.planId}`}
+                                                    checked={plan.enabled} 
+                                                    onCheckedChange={(checked) => handleHotmartEnabledChange(plan.planId, checked)} 
+                                                />
+                                            </div>
+                                        </div>
+                                        <Input 
+                                            id={`hotmart-${plan.planId}`} 
+                                            placeholder="https://pay.hotmart.com/..." 
+                                            value={plan.hotmartUrl} 
+                                            onChange={e => handleHotmartLinkChange(plan.planId, e.target.value)}
+                                            className="bg-white"
+                                            disabled={!plan.enabled}
+                                        />
                                     </div>
                                 ))
                             ) : (

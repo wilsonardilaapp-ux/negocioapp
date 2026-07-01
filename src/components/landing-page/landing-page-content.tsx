@@ -25,6 +25,7 @@ interface HotmartLink {
   planId: string;
   planName: string;
   hotmartUrl: string;
+  enabled: boolean;
 }
 
 interface LandingPageContentProps {
@@ -118,12 +119,11 @@ const getPlanButtonConfig = (plan: SubscriptionPlan | HybridPlan, hotmartLinks: 
     const price = isHybrid ? (plan as HybridPlan).basePrice : (plan as SubscriptionPlan).price;
 
     const handleRedirect = async () => {
-        if (hotmartLink?.hotmartUrl) {
+        if (hotmartLink?.enabled && hotmartLink?.hotmartUrl) {
           window.open(hotmartLink.hotmartUrl, '_blank');
           return;
         }
 
-        // Cambio quirúrgico: Capturar ref de la URL actual y propagarlo
         const refCode = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('ref') : null;
         const baseRegisterUrl = `/register?plan=${plan.id}`;
         const finalUrl = refCode ? `${baseRegisterUrl}&ref=${refCode}` : baseRegisterUrl;
@@ -316,11 +316,13 @@ export default function LandingPageContent({ data, plans = [], hybridPlans = [],
         planId: p.id,
         planName: p.name,
         hotmartUrl: (p as any).hotmartUrl || '',
+        enabled: !!(p as any).hotmartEnabled,
     }));
     const hybridLinks = (hybridPlans || []).map(p => ({
       planId: p.id || '',
       planName: p.name,
-      hotmartUrl: '', 
+      hotmartUrl: (p as any).hotmartUrl || '',
+      enabled: !!(p as any).hotmartEnabled,
     }));
     return [...links, ...hybridLinks];
   }, [plans, hybridPlans]);
