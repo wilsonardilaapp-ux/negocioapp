@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import type { SubscriptionPlan } from "@/models/subscription-plan";
 import type { HybridPlan } from "@/models/hybrid-plan";
 import { useMemo } from "react";
+import { useRouter } from "next/navigation";
 
 interface PlanComparisonTableProps {
   currentPlan: string;
@@ -30,6 +31,7 @@ const getPlanPrice = (plan: SubscriptionPlan | HybridPlan): number => {
 };
 
 export default function PlanComparisonTable({ currentPlan, allPlans, onSelectPlan }: PlanComparisonTableProps) {
+    const router = useRouter();
     
     const sortedPlans = useMemo(() => {
         return [...allPlans]
@@ -93,10 +95,25 @@ export default function PlanComparisonTable({ currentPlan, allPlans, onSelectPla
         const targetPrice = getPlanPrice(plan);
 
         if (targetPrice > currentPrice) {
-             return <Button className="w-full" onClick={() => onSelectPlan(plan)}>Actualizar →</Button>;
+             return (
+                <Button 
+                    className="w-full" 
+                    onClick={() => router.push(`/dashboard/subscription/checkout?plan=${plan.id}`)}
+                >
+                    Actualizar →
+                </Button>
+             );
         }
 
-        return <Button variant="outline" className="w-full" onClick={() => onSelectPlan(plan)}>Cambiar</Button>;
+        return (
+            <Button 
+                variant="outline" 
+                className="w-full" 
+                onClick={() => router.push(`/dashboard/subscription/checkout?plan=${plan.id}`)}
+            >
+                Cambiar
+            </Button>
+        );
     };
 
     return (
