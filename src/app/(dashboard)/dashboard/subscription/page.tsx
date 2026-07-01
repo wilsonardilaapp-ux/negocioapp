@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo, Suspense } from 'react';
@@ -77,13 +76,11 @@ function SubscriptionPageContent() {
   const [billingHistory, setBillingHistory] = useState<BillingRecord[]>([]);
   const [isBillingLoading, setIsBillingLoading] = useState(false);
   
-  // Cálculo de precio unificado para planes estándar e híbridos
   const planPrice = useMemo(() => {
     if (!planDetails) return 0;
     return 'basePrice' in planDetails ? (planDetails as HybridPlan).basePrice : (planDetails as SubscriptionPlan).price;
   }, [planDetails]);
 
-  // Fetch Billing History
   useEffect(() => {
     if (subscription?.stripeCustomerId) {
       setIsBillingLoading(true);
@@ -109,7 +106,6 @@ function SubscriptionPageContent() {
   }, [subscription?.stripeCustomerId]);
 
 
-  // Memoized Derived State
   const { currentPlanInfo, usageMetrics } = useMemo(() => {
     if (!planDetails) {
       return { currentPlanInfo: null, usageMetrics: [] };
@@ -512,7 +508,7 @@ function SubscriptionPageContent() {
                         await addDoc(collection(firestore, 'contactMessages'), {
                             name: business?.name || user.uid,
                             email: user.email || '',
-                            message: `Solicitud de activación de plan: ${planName}. El negocio ha indicado que realizó el pago manual. Por favor verifica y activa el plan correspondiente.`,
+                            body: `Solicitud de activación de plan: ${planName}. El negocio ha indicado que realizó el pago manual. Por favor verifica y activa el plan correspondiente.`,
                             source: 'payment_request',
                             planId: planId,
                             planName: planName,
