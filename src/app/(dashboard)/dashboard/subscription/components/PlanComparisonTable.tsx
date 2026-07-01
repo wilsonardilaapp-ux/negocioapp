@@ -18,7 +18,8 @@ interface PlanComparisonTableProps {
 
 const formatCurrency = (value: number | undefined | null) => {
     const safeValue = value ?? 0;
-    return `$${safeValue.toLocaleString('en-US')}`;
+    if (safeValue === 0) return '$0';
+    return `$${safeValue.toLocaleString('es-CO')}`;
 };
 
 // Helper robusto para obtener el precio de cualquier tipo de plan
@@ -31,7 +32,9 @@ const getPlanPrice = (plan: SubscriptionPlan | HybridPlan): number => {
 export default function PlanComparisonTable({ currentPlan, allPlans, onSelectPlan }: PlanComparisonTableProps) {
     
     const sortedPlans = useMemo(() => {
-        return [...allPlans].sort((a, b) => getPlanPrice(a) - getPlanPrice(b));
+        return [...allPlans]
+            .filter(plan => plan.isActive === true)
+            .sort((a, b) => getPlanPrice(a) - getPlanPrice(b));
     }, [allPlans]);
 
     const featureRows = useMemo(() => {
@@ -44,7 +47,7 @@ export default function PlanComparisonTable({ currentPlan, allPlans, onSelectPla
 
         const allFeatureStrings = new Set<string>();
         allPlans.forEach(plan => {
-            if (plan.features) {
+            if (plan.isActive === true && plan.features) {
                 plan.features.forEach(feature => {
                     const featureText = (typeof feature === 'string' ? feature : feature?.value) || '';
                     if (featureText) {
@@ -59,17 +62,6 @@ export default function PlanComparisonTable({ currentPlan, allPlans, onSelectPla
             getValue: (plan: SubscriptionPlan | HybridPlan) => {
                 const hasFeature = plan.features?.some(f => {
                     const featureText = (typeof f === 'string' ? f : f?.value) || '';
-                    // Comparación flexible
-                    const normalizedFeatureName = featureName.toLowerCase().replace(/[\d\s]/g, '');
-                    const normalizedFeatureText = featureText.toLowerCase();
-
-                    if (normalizedFeatureName === 'soporteprioritario') {
-                       return normalizedFeatureText.includes('prioritario') || normalizedFeatureText.includes('dedicado');
-                    }
-                    if (normalizedFeatureName === 'accesoapi') {
-                        return normalizedFeatureText.includes('api');
-                    }
-
                     return featureText === featureName;
                 });
                 return (
@@ -90,11 +82,13 @@ export default function PlanComparisonTable({ currentPlan, allPlans, onSelectPla
 
     const getButton = (plan: SubscriptionPlan | HybridPlan) => {
         const planId = plan.id;
-        if (planId === currentPlan) {
+        const planName = plan.name;
+        
+        if (planId === currentPlan || planName === currentPlan) {
             return <Button disabled variant="secondary" className="w-full">Plan Actual</Button>;
         }
         
-        const currentPlanDetails = allPlans.find(p => p.id === currentPlan);
+        const currentPlanDetails = allPlans.find(p => p.id === currentPlan || p.name === currentPlan);
         const currentPrice = currentPlanDetails ? getPlanPrice(currentPlanDetails) : 0;
         const targetPrice = getPlanPrice(plan);
 
@@ -117,11 +111,11 @@ export default function PlanComparisonTable({ currentPlan, allPlans, onSelectPla
             <TableRow>
               <TableHead className="w-[200px] bg-background sticky left-0 z-10">Característica</TableHead>
               {sortedPlans.map(plan => (
-                  <TableHead key={plan.id} className={cn("text-center min-w-[150px]", currentPlan === plan.id && "bg-primary/5")}>
+                  <TableHead key={plan.id} className={cn("text-center min-w-[150px]", (currentPlan === plan.id || currentPlan === plan.name) && "bg-primary/5")}>
                     <div className="flex flex-col items-center gap-1 py-2">
                         <span className="font-bold">{plan.name}</span>
                         {(plan as any).isMostPopular && (
-                            <Badge variant="default" className="text-[10px] h-5">Recomendado</Badge>
+                            <Badge variant="default" className="text-[10px] h-5 bg-green-600">Recomendado</Badge>
                         )}
                         {'commissionType' in plan && (
                              <Badge variant="outline" className="text-[10px] h-5 border-orange-200 text-orange-700 bg-orange-50">Híbrido</Badge>
@@ -136,7 +130,7 @@ export default function PlanComparisonTable({ currentPlan, allPlans, onSelectPla
               <TableRow key={feature}>
                 <TableCell className="font-medium bg-background sticky left-0 z-10 border-r">{feature}</TableCell>
                 {sortedPlans.map(plan => (
-                    <TableCell key={`${feature}-${plan.id}`} className={cn("text-center font-medium", currentPlan === plan.id && "bg-primary/5")}>
+                    <TableCell key={`${feature}-${plan.id}`} className={cn("text-center font-medium", (currentPlan === plan.id || currentPlan === plan.name) && "bg-primary/5")}>
                         {getValue(plan)}
                     </TableCell>
                 ))}
@@ -145,7 +139,7 @@ export default function PlanComparisonTable({ currentPlan, allPlans, onSelectPla
              <TableRow>
                 <TableCell className="bg-background sticky left-0 z-10 border-r"></TableCell>
                 {sortedPlans.map(plan => (
-                     <TableCell key={`button-${plan.id}`} className={cn("text-center p-4", currentPlan === plan.id && "bg-primary/5")}>
+                     <TableCell key={`button-${plan.id}`} className={cn("text-center p-4", (currentPlan === plan.id || currentPlan === plan.name) && "bg-primary/5")}>
                         {getButton(plan)}
                     </TableCell>
                 ))}
