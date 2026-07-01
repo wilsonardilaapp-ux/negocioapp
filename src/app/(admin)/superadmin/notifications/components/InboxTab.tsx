@@ -4,16 +4,14 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from '@/components/ui/badge';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { useCollection, useFirestore, useMemoFirebase, updateDocumentNonBlocking, addDocumentNonBlocking } from '@/firebase';
-import { collection, query, orderBy, doc, type Timestamp, writeBatch } from 'firebase/firestore';
+import { useCollection, useFirestore, useMemoFirebase, updateDocumentNonBlocking } from '@/firebase';
+import { collection, query, orderBy, doc, type Timestamp, writeBatch, getDocs, where, addDoc } from 'firebase/firestore';
 import type { ContactMessage } from '@/models/notification';
-import { Loader2, Inbox, Search, Mail, Phone, MessageSquare, CornerDownRight, X, Send, Trash2 } from 'lucide-react';
+import { Loader2, Inbox, Search, Phone, MessageSquare, CornerDownRight, Send, Trash2 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { cn } from '@/lib/utils';
 import {
   Dialog,
   DialogContent,
@@ -36,8 +34,6 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { sendAdminNotification } from '@/actions/notifications';
-
 
 // Main Component
 export default function InboxTab() {
@@ -50,7 +46,6 @@ export default function InboxTab() {
     const [isReplyModalOpen, setReplyModalOpen] = useState(false);
     const [isReplying, setIsReplying] = useState(false);
 
-    // NEW state for bulk selection
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
     const [isDeleting, setIsDeleting] = useState(false);
 
@@ -81,7 +76,6 @@ export default function InboxTab() {
 
     const unreadCount = useMemo(() => messages?.filter(m => !m.read).length || 0, [messages]);
     
-    // NEW bulk selection logic
     const selectedCount = selectedIds.length;
     const isAllSelected = selectedCount > 0 && selectedCount === filteredMessages.length;
     const isSomeSelected = selectedCount > 0 && !isAllSelected;
@@ -151,35 +145,50 @@ export default function InboxTab() {
         }
     };
     
-    const handleSendReply = async (replyBody: string) => {
+    const handleSendReply = async (replySubject: string, replyBody: string) => {
         if (!selectedMessage || !firestore) return;
         setIsReplying(true);
         try {
-            if (selectedMessage.source === 'client_reply' && selectedMessage.userId) {
-                await sendAdminNotification({
-                    recipients: [selectedMessage.userId],
-                    subject: `Re: ${selectedMessage.subject}`,
+            // 1. Identificar el businessId del destinatario
+            let targetBusinessId = selectedMessage.userId;
+
+            if (!targetBusinessId) {
+                const businessesQuery = query(
+                    collection(firestore, 'businesses'),
+                    where('ownerEmail', '==', selectedMessage.email),
+                    limit(1)
+                );
+                const businessSnap = await getDocs(businessesQuery);
+                if (!businessSnap.empty) {
+                    targetBusinessId = businessSnap.docs[0].id;
+                }
+            }
+
+            // 2. Si se encontró un negocio, enviar la notificación interna
+            if (targetBusinessId) {
+                const notificationsRef = collection(firestore, `businesses/${targetBusinessId}/notifications`);
+                await addDoc(notificationsRef, {
+                    fromSuperAdmin: true,
+                    subject: replySubject,
                     body: replyBody,
-                });
-            } else {
-                const replyCollectionRef = collection(firestore, `contactMessages/${selectedMessage.id}/replies`);
-                await addDocumentNonBlocking(replyCollectionRef, {
-                    body: replyBody,
-                    sentAt: new Date().toISOString(),
-                    from: 'superadmin',
+                    read: false,
+                    createdAt: new Date().toISOString(),
+                    type: 'general'
                 });
             }
 
+            // 3. Marcar el mensaje como respondido
             const msgRef = doc(firestore, 'contactMessages', selectedMessage.id);
             await updateDocumentNonBlocking(msgRef, { replied: true });
 
+            // 4. Integración con WhatsApp si aplica
             if (selectedMessage.whatsapp && selectedMessage.whatsapp.trim() !== '') {
                 const whatsappNumber = selectedMessage.whatsapp.replace(/\D/g, '');
                 const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(replyBody)}`;
                 window.open(whatsappUrl, '_blank');
-                toast({ title: "Respuesta guardada y WhatsApp abierto", description: "Tu mensaje se ha preparado en WhatsApp." });
+                toast({ title: "Respuesta registrada", description: "Notificación enviada al panel y WhatsApp abierto." });
             } else {
-                toast({ title: "Respuesta enviada", description: "Tu mensaje ha sido guardado en el sistema." });
+                toast({ title: "Respuesta enviada", description: "El cliente recibirá la notificación en su panel." });
             }
 
             setReplyModalOpen(false);
@@ -242,7 +251,6 @@ export default function InboxTab() {
                     </div>
                 </div>
 
-                {/* NEW BULK ACTION BAR */}
                 <div className="border rounded-t-md p-2 flex items-center gap-4 h-14">
                     <Checkbox
                         id="select-all-inbox"
@@ -332,13 +340,6 @@ export default function InboxTab() {
                         <DialogDescription>De: {selectedMessage?.name} ({selectedMessage?.email})</DialogDescription>
                     </DialogHeader>
                     <div className="py-4 space-y-4">
-                        {selectedMessage?.whatsapp && (
-                           <div className="flex items-center gap-2 text-sm">
-                                <Phone className="h-4 w-4 text-muted-foreground"/>
-                                <span>WhatsApp:</span>
-                                <a href={`https://wa.me/${selectedMessage.whatsapp.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">{selectedMessage.whatsapp}</a>
-                           </div>
-                        )}
                         <div className="p-4 bg-muted rounded-md whitespace-pre-wrap">{selectedMessage?.body}</div>
                     </div>
                     <DialogFooter>
@@ -368,20 +369,26 @@ export default function InboxTab() {
 }
 
 // Sub-component for the reply form
-const ReplyForm = ({ originalSubject, onSendReply, isSending }: { originalSubject: string, onSendReply: (body: string) => void, isSending: boolean }) => {
+const ReplyForm = ({ originalSubject, onSendReply, isSending }: { originalSubject: string, onSendReply: (subject: string, body: string) => void, isSending: boolean }) => {
+    const [replySubject, setReplySubject] = useState(`Re: ${originalSubject}`);
     const [replyBody, setReplyBody] = useState('');
+    
     return (
         <div className="space-y-4 py-4">
             <div className="space-y-1">
-                <Label>Asunto</Label>
-                <Input readOnly value={`Re: ${originalSubject}`} />
+                <Label htmlFor="reply-subject">Asunto</Label>
+                <Input 
+                    id="reply-subject"
+                    value={replySubject} 
+                    onChange={(e) => setReplySubject(e.target.value)} 
+                />
             </div>
             <div className="space-y-1">
                 <Label htmlFor="reply-body">Mensaje</Label>
                 <Textarea id="reply-body" value={replyBody} onChange={(e) => setReplyBody(e.target.value)} rows={6}/>
             </div>
              <DialogFooter>
-                <Button onClick={() => onSendReply(replyBody)} disabled={isSending || !replyBody.trim()}>
+                <Button onClick={() => onSendReply(replySubject, replyBody)} disabled={isSending || !replyBody.trim()}>
                     {isSending && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
                     <Send className="mr-2 h-4 w-4" />
                     Enviar Respuesta
