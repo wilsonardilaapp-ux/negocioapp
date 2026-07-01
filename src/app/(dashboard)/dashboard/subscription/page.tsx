@@ -28,7 +28,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Timestamp, doc, collection, setDoc } from 'firebase/firestore';
+import { Timestamp, doc, collection, setDoc, addDoc } from 'firebase/firestore';
 import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import type { SubscriptionPlan } from '@/models/subscription-plan';
 import type { HybridPlan } from '@/models/hybrid-plan';
@@ -504,6 +504,19 @@ function SubscriptionPageContent() {
                             status: 'pending_verification',
                             paymentMethod: 'manual'
                         });
+
+                        await addDoc(collection(firestore, 'contactMessages'), {
+                            name: business?.name || user.uid,
+                            email: user.email || '',
+                            message: `Solicitud de activación de plan: ${selectedPlanForPayment.name}. El negocio ha indicado que realizó el pago manual. Por favor verifica y activa el plan correspondiente.`,
+                            source: 'payment_request',
+                            planId: selectedPlanForPayment.id,
+                            planName: selectedPlanForPayment.name,
+                            businessId: user.uid,
+                            createdAt: Timestamp.now(),
+                            read: false
+                        });
+
                         setShowPaymentModal(false);
                         toast({ title: "Pago Notificado", description: "Tu pago está siendo verificado por el administrador." });
                     } catch (e) {
