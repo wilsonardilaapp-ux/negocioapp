@@ -32,7 +32,8 @@ import {
   Building2, 
   ShieldCheck, 
   Zap, 
-  Clock 
+  Clock,
+  ExternalLink
 } from "lucide-react";
 import { useToast } from '@/hooks/use-toast';
 import Image from 'next/image';
@@ -69,7 +70,7 @@ function CheckoutContent() {
   const isHybrid = selectedPlan && 'commissionType' in selectedPlan;
   const price = selectedPlan ? (isHybrid ? (selectedPlan as HybridPlan).basePrice : (selectedPlan as SubscriptionPlan).price) : 0;
 
-  // 3. Determinar Gateways Automáticos Activos
+  // 3. Determinar Gateways Automáticos y Hotmart Activos
   const activeAutoGateways = useMemo(() => {
     if (!paymentConfig) return [];
     return [
@@ -79,19 +80,21 @@ function CheckoutContent() {
     ].filter((g): g is { id: string; label: string } => !!g);
   }, [paymentConfig]);
 
+  // Verificar disponibilidad de Hotmart para este plan específico
+  const isHotmartEnabled = !!(selectedPlan && (selectedPlan as any).hotmartEnabled && (selectedPlan as any).hotmartUrl);
+
+  const hasAutoOptions = activeAutoGateways.length > 0 || isHotmartEnabled;
+
   // 4. Manejo de Pago Automático por Gateway
   const handleAutoPay = async (gatewayId: string) => {
     if (!selectedPlan || !user || !paymentConfig) return;
     setIsProcessing(true);
     try {
-      // Lógica específica por Gateway seleccionado
       if (gatewayId === 'stripe') {
-        // Opción A: Checkout URL Directa
         if (paymentConfig.stripe.checkoutUrl) {
           window.location.href = paymentConfig.stripe.checkoutUrl;
           return;
         }
-        // Opción B: Crear Sesión vía API
         const res = await fetch('/api/stripe/create-checkout-session', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -131,6 +134,13 @@ function CheckoutContent() {
     }
   };
 
+  // Redirección directa a Hotmart
+  const handleHotmartRedirect = () => {
+    if (selectedPlan && (selectedPlan as any).hotmartUrl) {
+      window.open((selectedPlan as any).hotmartUrl, '_blank');
+    }
+  };
+
   // 5. Manejo de Pago Manual
   const handleManualPayConfirm = async () => {
     if (!selectedPlan || !user || !firestore) return;
@@ -138,7 +148,6 @@ function CheckoutContent() {
     try {
       const planName = selectedPlan.name;
       
-      // Registrar solicitud técnica
       await addDoc(collection(firestore, 'paymentRequests'), {
         businessId: user.uid,
         businessName: business?.name || user.uid,
@@ -149,7 +158,6 @@ function CheckoutContent() {
         paymentMethod: 'manual'
       });
 
-      // Registrar notificación para el admin
       await addDoc(collection(firestore, 'contactMessages'), {
         name: business?.name || user.uid,
         email: user.email || '',
@@ -211,7 +219,6 @@ function CheckoutContent() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
-        {/* COLUMNA IZQUIERDA: RESUMEN */}
         <div className="lg:col-span-2 space-y-6">
           <Card className="border-2">
             <CardHeader className="bg-muted/30 border-b">
@@ -258,7 +265,6 @@ function CheckoutContent() {
           </div>
         </div>
 
-        {/* COLUMNA DERECHA: MÉTODOS DE PAGO */}
         <div className="lg:col-span-3 space-y-6">
           <Card className="shadow-lg border-primary/20">
             <CardHeader>
@@ -269,14 +275,14 @@ function CheckoutContent() {
             </CardHeader>
             <CardContent className="space-y-8">
               
-              {/* PAGO AUTOMÁTICO DINÁMICO */}
-              {activeAutoGateways.length > 0 && (
+              {hasAutoOptions && (
                 <div className="space-y-4">
                   <div className="flex items-center gap-2">
                     <Badge className="bg-primary text-white">Recomendado</Badge>
                     <span className="text-sm font-bold">Pago Automático</span>
                   </div>
                   <div className="flex flex-col gap-3">
+                    {/* Gateways Globales */}
                     {activeAutoGateways.map((gateway) => (
                       <Button 
                         key={gateway.id}
@@ -289,6 +295,20 @@ function CheckoutContent() {
                         Pagar con {gateway.label}
                       </Button>
                     ))}
+                    
+                    {/* Botón Específico de Hotmart para el plan */}
+                    {isHotmartEnabled && (
+                      <Button 
+                        size="lg" 
+                        variant="default"
+                        className="w-full h-14 text-lg font-bold shadow-md bg-[#FF4500] hover:bg-[#E03E00] text-white"
+                        onClick={handleHotmartRedirect}
+                        disabled={isProcessing}
+                      >
+                        <ExternalLink className="mr-2 h-5 w-5" />
+                        Pagar con Hotmart
+                      </Button>
+                    )}
                   </div>
                   <p className="text-[10px] text-center text-muted-foreground italic">
                     Redirección a plataforma de pago segura. La activación es automática tras la transacción.
@@ -296,9 +316,8 @@ function CheckoutContent() {
                 </div>
               )}
 
-              {activeAutoGateways.length > 0 && <div className="relative"><div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div><div className="relative flex justify-center text-xs uppercase"><span className="bg-background px-2 text-muted-foreground font-bold">O paga manualmente</span></div></div>}
+              {hasAutoOptions && <div className="relative"><div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div><div className="relative flex justify-center text-xs uppercase"><span className="bg-background px-2 text-muted-foreground font-bold">O paga manualmente</span></div></div>}
 
-              {/* PAGO MANUAL */}
               <div className="space-y-4">
                 <div className="flex items-center gap-2">
                   <Clock className="h-4 w-4 text-muted-foreground" />
@@ -306,7 +325,6 @@ function CheckoutContent() {
                 </div>
 
                 <Accordion type="single" collapsible className="w-full space-y-2">
-                  {/* NEQUI */}
                   {paymentConfig?.nequi?.enabled && (
                     <AccordionItem value="nequi" className="border rounded-xl px-4 bg-muted/20">
                       <AccordionTrigger className="hover:no-underline font-bold">
@@ -328,7 +346,6 @@ function CheckoutContent() {
                     </AccordionItem>
                   )}
 
-                  {/* BANCOLOMBIA */}
                   {paymentConfig?.bancolombia?.enabled && (
                     <AccordionItem value="bancolombia" className="border rounded-xl px-4 bg-muted/20">
                       <AccordionTrigger className="hover:no-underline font-bold">
@@ -349,7 +366,6 @@ function CheckoutContent() {
                     </AccordionItem>
                   )}
 
-                  {/* BRE-B */}
                   {paymentConfig?.breB?.enabled && (
                     <AccordionItem value="breb" className="border rounded-xl px-4 bg-muted/20">
                       <AccordionTrigger className="hover:no-underline font-bold">
