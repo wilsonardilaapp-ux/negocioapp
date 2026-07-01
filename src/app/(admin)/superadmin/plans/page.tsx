@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState } from 'react';
@@ -5,7 +6,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/com
 import { Button } from "@/components/ui/button";
 import { PlusCircle, Package, Loader2, RefreshCw } from 'lucide-react';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, doc, writeBatch } from 'firebase/firestore';
+import { collection, doc, writeBatch, getDocs } from 'firebase/firestore';
 import type { SubscriptionPlan } from '@/models/subscription-plan';
 import { DefaultSubscriptionPlans } from '@/models/subscription-plan';
 import { useToast } from '@/hooks/use-toast';
@@ -30,18 +31,56 @@ export default function PlansPage() {
         setIsDialogOpen(true);
     };
 
+    /**
+     * Restaura los planes por defecto asegurando que no se pierdan
+     * los enlaces de Hotmart ya configurados (Blindaje).
+     */
     const handleCreateDefaultPlans = async () => {
         if (!firestore) return;
-        const batch = writeBatch(firestore);
-        DefaultSubscriptionPlans.forEach(plan => {
-            const planRef = doc(firestore, 'plans', plan.id);
-            batch.set(planRef, plan);
-        });
-        await batch.commit();
-        toast({
-            title: 'Planes por Defecto Restaurados',
-            description: 'Los planes en la base de datos han sido actualizados con los valores correctos.',
-        });
+        
+        try {
+            const batch = writeBatch(firestore);
+            
+            // 1. Obtener datos actuales para preservar campos de Hotmart
+            const existingPlansSnap = await getDocs(collection(firestore, 'plans'));
+            const existingData = new Map<string, any>();
+            existingPlansSnap.forEach(doc => {
+                existingData.set(doc.id, doc.data());
+            });
+
+            // 2. Preparar el batch con merge manual para los campos protegidos
+            DefaultSubscriptionPlans.forEach(plan => {
+                const planRef = doc(firestore, 'plans', plan.id);
+                const current = existingData.get(plan.id);
+                
+                // Construimos el payload de restauración
+                const restorePayload: any = { ...plan };
+                
+                // BLINDAJE: Si ya existe configuración de Hotmart, la preservamos
+                if (current?.hotmartEnabled !== undefined) {
+                    restorePayload.hotmartEnabled = current.hotmartEnabled;
+                }
+                if (current?.hotmartUrl !== undefined) {
+                    restorePayload.hotmartUrl = current.hotmartUrl;
+                }
+                
+                batch.set(planRef, restorePayload, { merge: true });
+            });
+
+            await batch.commit();
+            
+            toast({
+                title: 'Planes por Defecto Restaurados',
+                description: 'Los planes se han actualizado manteniendo tu configuración de Hotmart.',
+            });
+        } catch (error: any) {
+            console.error("Error restaurando planes:", error);
+            toast({
+                variant: 'destructive',
+                title: 'Error de Restauración',
+                description: error.message || 'No se pudieron sincronizar los planes.'
+            });
+        }
     };
 
     return (

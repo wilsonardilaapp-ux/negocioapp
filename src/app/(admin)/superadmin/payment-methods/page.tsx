@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useMemo } from 'react';
@@ -6,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { CreditCard, Loader2, Save, Building, Smartphone, Building2, Store, DollarSign, CheckCircle } from 'lucide-react';
+import { CreditCard, Loader2, Save, Building, Smartphone, Building2, Store, DollarSign } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import type { GlobalPaymentConfig, HotmartPlanLink } from '@/models/global-payment-config';
 import QRForm from '@/components/pagos/qr-form';
@@ -16,7 +17,6 @@ import { useCollection, useFirestore, useMemoFirebase, setDocumentNonBlocking, u
 import { collection, doc, writeBatch } from 'firebase/firestore';
 import type { SubscriptionPlan } from '@/models/subscription-plan';
 import type { HybridPlan } from '@/models/hybrid-plan';
-import { Badge } from '@/components/ui/badge';
 
 const initialConfig: GlobalPaymentConfig = {
     nequi: { enabled: false, accountNumber: '', holderName: '', instructions: '', qrImageUrl: null },
@@ -82,8 +82,8 @@ export default function PaymentMethodsPage() {
                 combinedLinks.push({
                     planId: p.id,
                     planName: p.name,
-                    hotmartUrl: (p as any).hotmartUrl || '',
-                    enabled: (p as any).hotmartEnabled ?? !!(p as any).hotmartUrl,
+                    hotmartUrl: p.hotmartUrl || '',
+                    enabled: p.hotmartEnabled ?? !!p.hotmartUrl,
                 });
             });
         }
@@ -94,8 +94,8 @@ export default function PaymentMethodsPage() {
                     combinedLinks.push({
                         planId: p.id,
                         planName: `${p.name} (Híbrido)`,
-                        hotmartUrl: (p as any).hotmartUrl || '',
-                        enabled: (p as any).hotmartEnabled ?? !!(p as any).hotmartUrl,
+                        hotmartUrl: p.hotmartUrl || '',
+                        enabled: p.hotmartEnabled ?? !!p.hotmartUrl,
                     });
                 }
             });
@@ -138,8 +138,8 @@ export default function PaymentMethodsPage() {
             hotmartLinks.forEach(link => {
                 const stdPlan = plans?.find(p => p.id === link.planId);
                 if (stdPlan) {
-                    const hasUrlChanged = link.hotmartUrl !== (stdPlan as any).hotmartUrl;
-                    const hasEnabledChanged = link.enabled !== (stdPlan as any).hotmartEnabled;
+                    const hasUrlChanged = link.hotmartUrl !== stdPlan.hotmartUrl;
+                    const hasEnabledChanged = link.enabled !== stdPlan.hotmartEnabled;
                     if (hasUrlChanged || hasEnabledChanged) {
                         batch.update(doc(firestore, 'plans', link.planId), { 
                             hotmartUrl: link.hotmartUrl,
@@ -151,8 +151,8 @@ export default function PaymentMethodsPage() {
                 
                 const hybPlan = hybridPlans?.find(p => p.id === link.planId);
                 if (hybPlan) {
-                    const hasUrlChanged = link.hotmartUrl !== (hybPlan as any).hotmartUrl;
-                    const hasEnabledChanged = link.enabled !== (hybPlan as any).hotmartEnabled;
+                    const hasUrlChanged = link.hotmartUrl !== hybPlan.hotmartUrl;
+                    const hasEnabledChanged = link.enabled !== hybPlan.hotmartEnabled;
                     if (hasUrlChanged || hasEnabledChanged) {
                         batch.update(doc(firestore, 'hybrid_plans', link.planId), { 
                             hotmartUrl: link.hotmartUrl,

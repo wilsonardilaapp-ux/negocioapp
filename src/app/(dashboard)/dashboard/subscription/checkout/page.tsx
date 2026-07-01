@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, Suspense } from 'react';
@@ -61,7 +62,7 @@ function CheckoutContent() {
   const businessRef = useMemoFirebase(() => !user ? null : doc(firestore, 'businesses', user.uid), [user, firestore]);
   const { data: business } = useDoc<Business>(businessRef);
 
-  // 2. Resolver Plan Seleccionado
+  // 2. Resolver Plan Seleccionado con validación segura de tipos
   const selectedPlan = useMemo(() => {
     if (!planId) return null;
     return allPlans?.find(p => p.id === planId) || allHybridPlans?.find(p => p.id === planId) || null;
@@ -80,8 +81,8 @@ function CheckoutContent() {
     ].filter((g): g is { id: string; label: string } => !!g);
   }, [paymentConfig]);
 
-  // Verificar disponibilidad de Hotmart para este plan específico
-  const isHotmartEnabled = !!(selectedPlan && (selectedPlan as any).hotmartEnabled && (selectedPlan as any).hotmartUrl);
+  // Verificar disponibilidad de Hotmart usando los campos tipados del esquema
+  const isHotmartEnabled = !!(selectedPlan?.hotmartEnabled && selectedPlan?.hotmartUrl);
 
   const hasAutoOptions = activeAutoGateways.length > 0 || isHotmartEnabled;
 
@@ -136,8 +137,8 @@ function CheckoutContent() {
 
   // Redirección directa a Hotmart
   const handleHotmartRedirect = () => {
-    if (selectedPlan && (selectedPlan as any).hotmartUrl) {
-      window.open((selectedPlan as any).hotmartUrl, '_blank');
+    if (selectedPlan?.hotmartUrl) {
+      window.open(selectedPlan.hotmartUrl, '_blank');
     }
   };
 
@@ -296,7 +297,7 @@ function CheckoutContent() {
                       </Button>
                     ))}
                     
-                    {/* Botón Específico de Hotmart para el plan */}
+                    {/* Botón Específico de Hotmart para el plan usando tipos oficiales */}
                     {isHotmartEnabled && (
                       <Button 
                         size="lg" 
@@ -412,7 +413,7 @@ function CheckoutContent() {
 
 export default function CheckoutPage() {
   return (
-    <Suspense fallback={<div className="flex items-center justify-center h-screen"><Loader2 className="animate-spin h-8 w-8 text-primary" /></div>}>
+    <Suspense fallback={<div className="flex flex-col items-center justify-center h-[60vh] gap-4"><Loader2 className="h-10 w-10 animate-spin text-primary" /><p className="text-muted-foreground animate-pulse">Cargando...</p></div>}>
       <CheckoutContent />
     </Suspense>
   );

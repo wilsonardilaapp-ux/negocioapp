@@ -33,6 +33,8 @@ export const HybridPlanSchema = z.object({
   })).optional(),
   icon: z.string().optional(),
   themeColor: z.string().optional(),
+  hotmartEnabled: z.boolean().optional().default(false),
+  hotmartUrl: z.string().optional().default(''),
 });
 
 export type HybridPlan = z.infer<typeof HybridPlanSchema>;

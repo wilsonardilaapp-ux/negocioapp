@@ -26,6 +26,8 @@ export const SubscriptionPlanSchema = z.object({
     displayOrder: z.number().optional()
   })).describe("Lista de características clave para la página de precios."),
   limits: PlanLimitsSchema,
+  hotmartEnabled: z.boolean().optional().default(false),
+  hotmartUrl: z.string().optional().default(''),
 });
 
 export type SubscriptionPlan = z.infer<typeof SubscriptionPlanSchema>;
@@ -56,7 +58,9 @@ export const DefaultSubscriptionPlans: SubscriptionPlan[] = [
       coupons: 2,
       orders: 21,
       suggestions: 2,
-    }
+    },
+    hotmartEnabled: false,
+    hotmartUrl: '',
   },
   {
     id: 'pro',
@@ -82,7 +86,9 @@ export const DefaultSubscriptionPlans: SubscriptionPlan[] = [
       coupons: -1,
       orders: -1,
       suggestions: -1,
-    }
+    },
+    hotmartEnabled: false,
+    hotmartUrl: '',
   },
   {
     id: 'enterprise',
@@ -108,6 +114,8 @@ export const DefaultSubscriptionPlans: SubscriptionPlan[] = [
       coupons: -1,
       orders: -1,
       suggestions: -1,
-    }
+    },
+    hotmartEnabled: false,
+    hotmartUrl: '',
   },
 ];
