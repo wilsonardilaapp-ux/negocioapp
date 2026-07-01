@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useRouter, useSearchParams } from "next/navigation";
@@ -294,6 +293,7 @@ function RegisterForm() {
       await batch.commit();
 
       toast({ title: "Cuenta Creada", description: "Tu negocio ha sido aprobado automáticamente para el directorio." });
+      router.push('/dashboard');
       
     } catch (error: any) {
       console.error("Registration Error:", error);
@@ -338,15 +338,21 @@ function RegisterForm() {
             )} />
             <div className="space-y-4 pt-4 border-t">
               <FormField control={form.control} name="acceptTerms" render={({ field }) => (
-                <FormItem className="flex flex-row items-start space-x-3 p-2">
-                  <FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl>
-                  <div className="space-y-1 leading-none"><FormLabel className="text-sm font-normal">Acepto términos y condiciones.</FormLabel></div>
+                <FormItem>
+                  <div className="flex items-center gap-2">
+                    <FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl>
+                    <FormLabel className="text-sm font-normal cursor-pointer">Acepto términos y condiciones.</FormLabel>
+                  </div>
+                  <FormMessage />
                 </FormItem>
               )} />
               <FormField control={form.control} name="acceptFees" render={({ field }) => (
-                <FormItem className="flex flex-row items-start space-x-3 p-2">
-                  <FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl>
-                  <div className="space-y-1 leading-none"><FormLabel className="text-sm font-normal">Autorizo el cobro de comisiones.</FormLabel></div>
+                <FormItem>
+                  <div className="flex items-center gap-2">
+                    <FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl>
+                    <FormLabel className="text-sm font-normal cursor-pointer">Autorizo el cobro de comisiones.</FormLabel>
+                  </div>
+                  <FormMessage />
                 </FormItem>
               )} />
             </div>
