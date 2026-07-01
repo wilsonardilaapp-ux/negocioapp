@@ -293,7 +293,7 @@ function RegisterForm() {
       await batch.commit();
 
       toast({ title: "Cuenta Creada", description: "Tu negocio ha sido aprobado automáticamente para el directorio." });
-      router.push('/dashboard');
+      router.push(`/dashboard/subscription${planParam ? `?plan=${planParam}` : ''}`);
       
     } catch (error: any) {
       console.error("Registration Error:", error);
