@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo, Suspense } from 'react';
@@ -9,7 +8,7 @@ import UsageLimitsCard, { type UsageMetric } from './components/UsageLimitsCard'
 import PlanComparisonTable from './components/PlanComparisonTable';
 import BillingHistoryCard, { type BillingRecord } from './components/BillingHistoryCard';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Loader2, CreditCard, CheckCircle2, Zap } from "lucide-react";
+import { Loader2, CreditCard, CheckCircle2, Zap, LayoutDashboard, CheckCircle } from "lucide-react";
 import {
   Card,
   CardHeader,
@@ -29,7 +28,8 @@ function SubscriptionPageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { user } = useUser();
-  const [dismissedOnboarding, setDismissedOnboarding] = useState(false);
+  const planParam = searchParams.get('plan');
+  const [showBanner, setShowBanner] = useState(!!planParam);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
 
   const { 
@@ -49,17 +49,13 @@ function SubscriptionPageContent() {
   const [billingHistory, setBillingHistory] = useState<BillingRecord[]>([]);
   const [isBillingLoading, setIsBillingLoading] = useState(false);
   
-  const planParam = searchParams.get('plan');
-  const isNewUserOnboarding = !!planParam && !dismissedOnboarding;
+  // Calculate plan price using the union of types logic
+  const planPrice = useMemo(() => {
+    if (!planDetails) return 0;
+    return 'basePrice' in planDetails ? (planDetails as HybridPlan).basePrice : (planDetails as SubscriptionPlan).price;
+  }, [planDetails]);
 
-  // Encontrar los detalles del plan solicitado en la URL
-  const selectedPlanDetails = useMemo(() => {
-    if (!planParam) return null;
-    const combined = [...(allPlans || []), ...(allHybridPlans || [])];
-    return combined.find(p => p.id === planParam);
-  }, [planParam, allPlans, allHybridPlans]);
-
-  // --- Fetch Billing History ---
+  // Fetch Billing History
   useEffect(() => {
     if (subscription?.stripeCustomerId) {
       setIsBillingLoading(true);
@@ -85,7 +81,7 @@ function SubscriptionPageContent() {
   }, [subscription?.stripeCustomerId]);
 
 
-  // --- Memoized Derived State ---
+  // Memoized Derived State
   const { currentPlanInfo, usageMetrics } = useMemo(() => {
     if (!planDetails) {
       return { currentPlanInfo: null, usageMetrics: [] };
@@ -98,7 +94,6 @@ function SubscriptionPageContent() {
       ? periodEndDate < new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) 
       : false;
 
-    // Detectar precio basado en el tipo de plan (estándar vs híbrido)
     const price = 'basePrice' in planDetails ? (planDetails as any).basePrice : (planDetails as any).price;
 
     const currentPlanInfo: CurrentPlanInfo = {
@@ -126,13 +121,12 @@ function SubscriptionPageContent() {
   }, [subscription, planDetails, productsCount, blogPostsCount, landingPagesCount, plan, limits]);
 
   const handlePayNow = async () => {
-    if (!selectedPlanDetails || !user) return;
+    if (!planDetails || !user) return;
     
     setIsProcessingPayment(true);
     try {
-        const isHybrid = 'commissionType' in selectedPlanDetails;
+        const isHybrid = 'commissionType' in planDetails;
         
-        // Si es híbrido, por ahora redirigimos al admin para configuración manual o mostramos aviso
         if (isHybrid) {
             window.location.href = `/dashboard/pagos`;
             return;
@@ -142,7 +136,7 @@ function SubscriptionPageContent() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                priceId: (selectedPlanDetails as SubscriptionPlan).stripePriceId,
+                priceId: (planDetails as SubscriptionPlan).stripePriceId,
                 businessId: user.uid,
                 userId: user.uid,
                 email: user.email,
@@ -161,7 +155,6 @@ function SubscriptionPageContent() {
     }
   };
 
-  // --- Render: Loading global ---
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -181,54 +174,85 @@ function SubscriptionPageContent() {
         </CardHeader>
       </Card>
 
-      {/* SECCIÓN ADITIVA: CONFIRMAR PLAN (Solo si viene de registro con ?plan=) */}
-      {isNewUserOnboarding && selectedPlanDetails && (
+      {/* SECCIÓN CONFIRMA TU PLAN */}
+      {showBanner && planDetails && (
         <Card className="border-2 border-primary bg-primary/5 animate-in fade-in slide-in-from-top-4 duration-500 shadow-lg">
-            <CardHeader>
-                <div className="flex justify-between items-start">
-                    <div className="space-y-1">
-                        <CardTitle className="text-xl flex items-center gap-2">
-                            <Zap className="h-5 w-5 text-primary fill-primary" />
-                            Confirma tu plan y completa el pago
-                        </CardTitle>
-                        <CardDescription className="text-gray-600 font-medium">
-                            Estás a un paso de activar todas las funcionalidades de tu nuevo negocio.
-                        </CardDescription>
-                    </div>
-                    <Badge variant="default" className="text-sm font-black px-4 py-1.5 uppercase tracking-wider">
-                        {selectedPlanDetails.name}
-                    </Badge>
-                </div>
-            </CardHeader>
-            <CardContent>
-                <div className="flex items-baseline gap-2">
-                    <span className="text-3xl font-black text-gray-900">
-                        ${('basePrice' in selectedPlanDetails ? selectedPlanDetails.basePrice : selectedPlanDetails.price).toLocaleString('es-CO')}
-                    </span>
-                    <span className="text-muted-foreground text-sm font-medium">/mes</span>
-                </div>
-                <p className="text-sm text-gray-500 mt-2 italic">
-                    * El cobro se procesará a través de nuestra plataforma segura de pagos.
-                </p>
-            </CardContent>
-            <CardFooter className="flex flex-col sm:flex-row gap-3 pt-0">
-                <Button 
-                    onClick={handlePayNow} 
-                    disabled={isProcessingPayment} 
-                    className="flex-1 h-12 text-base font-bold shadow-md bg-primary hover:bg-primary/90"
-                >
-                    {isProcessingPayment ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <CreditCard className="mr-2 h-5 w-5" />}
-                    Pagar ahora
-                </Button>
-                <Button 
-                    variant="outline" 
-                    onClick={() => setDismissedOnboarding(true)} 
-                    disabled={isProcessingPayment}
-                    className="flex-1 h-12 border-primary/20 text-primary hover:bg-primary/5"
-                >
-                    Continuar con plan gratuito
-                </Button>
-            </CardFooter>
+            {planPrice === 0 ? (
+                /* Variante Plan Gratuito */
+                <>
+                    <CardHeader>
+                        <div className="flex justify-between items-start">
+                            <div className="space-y-1">
+                                <CardTitle className="text-xl flex items-center gap-2">
+                                    <CheckCircle className="h-5 w-5 text-green-600" />
+                                    ¡Tu plan está activo!
+                                </CardTitle>
+                                <CardDescription className="text-gray-600 font-medium">
+                                    Ya podés empezar a usar todas las funcionalidades disponibles.
+                                </CardDescription>
+                            </div>
+                        </div>
+                    </CardHeader>
+                    <CardFooter>
+                        <Button 
+                            onClick={() => router.push('/dashboard')}
+                            className="w-full sm:w-auto font-bold bg-primary hover:bg-primary/90"
+                        >
+                            <LayoutDashboard className="mr-2 h-4 w-4" />
+                            Ir al Dashboard
+                        </Button>
+                    </CardFooter>
+                </>
+            ) : (
+                /* Variante Plan de Pago */
+                <>
+                    <CardHeader>
+                        <div className="flex justify-between items-start">
+                            <div className="space-y-1">
+                                <CardTitle className="text-xl flex items-center gap-2">
+                                    <Zap className="h-5 w-5 text-primary fill-primary" />
+                                    Confirma tu plan y completa el pago
+                                </CardTitle>
+                                <CardDescription className="text-gray-600 font-medium">
+                                    Estás a un paso de activar todas las funcionalidades de tu plan.
+                                </CardDescription>
+                            </div>
+                            <Badge variant="default" className="text-sm font-black px-4 py-1.5 uppercase tracking-wider">
+                                {planDetails.name}
+                            </Badge>
+                        </div>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="flex items-baseline gap-2">
+                            <span className="text-3xl font-black text-gray-900">
+                                ${planPrice.toLocaleString('es-CO')}
+                            </span>
+                            <span className="text-muted-foreground text-sm font-medium">/mes</span>
+                        </div>
+                        <p className="text-sm text-gray-500 mt-2 italic">
+                            * El cobro se procesará a través de nuestra plataforma segura de pagos.
+                        </p>
+                    </CardContent>
+                    <CardFooter className="flex flex-col sm:flex-row gap-3 pt-0">
+                        <Button 
+                            onClick={handlePayNow} 
+                            disabled={isProcessingPayment} 
+                            className="flex-1 h-12 text-base font-bold shadow-md bg-primary hover:bg-primary/90"
+                        >
+                            {isProcessingPayment ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <CreditCard className="mr-2 h-5 w-5" />}
+                            Pagar ahora
+                        </Button>
+                        <Button 
+                            variant="outline" 
+                            onClick={() => setShowBanner(false)} 
+                            disabled={isProcessingPayment}
+                            className="flex-1 h-12 border-primary/20 text-primary hover:bg-primary/5"
+                        >
+                            Continuar con plan gratuito
+                        </Button>
+                    </CardFooter>
+                </>
+            )}
         </Card>
       )}
       
