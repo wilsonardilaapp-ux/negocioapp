@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo, Suspense } from 'react';
@@ -29,12 +28,12 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import type { Timestamp } from 'firebase/firestore';
+import { Timestamp, doc, collection, setDoc } from 'firebase/firestore';
 import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
-import { doc, collection } from 'firebase/firestore';
 import type { SubscriptionPlan } from '@/models/subscription-plan';
 import type { HybridPlan } from '@/models/hybrid-plan';
 import type { GlobalPaymentConfig } from '@/models/global-payment-config';
+import type { Business } from '@/models/business';
 import { useToast } from '@/hooks/use-toast';
 import { es } from 'date-fns/locale';
 import Image from 'next/image';
@@ -50,10 +49,15 @@ function SubscriptionPageContent() {
   const [showBanner, setShowBanner] = useState(!!planParam);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [selectedPlanForPayment, setSelectedPlanForPayment] = useState<SubscriptionPlan | HybridPlan | null>(null);
 
   // Leer configuración global de pagos
   const paymentConfigRef = useMemoFirebase(() => !firestore ? null : doc(firestore, 'globalConfig', 'payment_methods'), [firestore]);
   const { data: paymentConfig, isLoading: isPaymentConfigLoading } = useDoc<GlobalPaymentConfig>(paymentConfigRef);
+
+  // Leer datos del negocio para el nombre comercial
+  const businessDocRef = useMemoFirebase(() => !firestore || !user ? null : doc(firestore, 'businesses', user.uid), [firestore, user]);
+  const { data: business } = useDoc<Business>(businessDocRef);
 
   const { 
     subscription,
@@ -187,6 +191,7 @@ function SubscriptionPageContent() {
                         paymentConfig.daviplata?.enabled ||
                         paymentConfig.breB?.enabled;
       if (hasManual) {
+        setSelectedPlanForPayment(planToProcess);
         setShowPaymentModal(true);
         return;
       }
@@ -484,11 +489,31 @@ function SubscriptionPageContent() {
 
           <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => setShowPaymentModal(false)}>Cancelar</Button>
-            <Button onClick={() => {
-              setShowPaymentModal(false);
-              toast({ title: "Pago Notificado", description: "Tu pago está siendo verificado por el administrador." });
+            <Button 
+                disabled={isProcessingPayment}
+                onClick={async () => {
+                    if (!selectedPlanForPayment || !user || !firestore) return;
+                    setIsProcessingPayment(true);
+                    try {
+                        await setDoc(doc(collection(firestore, 'paymentRequests')), {
+                            businessId: user.uid,
+                            businessName: business?.name || '',
+                            planId: selectedPlanForPayment.id,
+                            planName: selectedPlanForPayment.name,
+                            requestedAt: Timestamp.now(),
+                            status: 'pending_verification',
+                            paymentMethod: 'manual'
+                        });
+                        setShowPaymentModal(false);
+                        toast({ title: "Pago Notificado", description: "Tu pago está siendo verificado por el administrador." });
+                    } catch (e) {
+                        toast({ variant: 'destructive', title: 'Error', description: 'No se pudo registrar la notificación de pago.' });
+                    } finally {
+                        setIsProcessingPayment(false);
+                    }
             }}>
-              Ya realicé el pago
+                {isProcessingPayment ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                Ya realicé el pago
             </Button>
           </DialogFooter>
         </DialogContent>
