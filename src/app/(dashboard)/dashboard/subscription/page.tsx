@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo, Suspense } from 'react';
@@ -20,17 +21,24 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import type { Timestamp } from 'firebase/firestore';
-import { useUser } from '@/firebase';
+import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
+import { doc, collection } from 'firebase/firestore';
 import type { SubscriptionPlan } from '@/models/subscription-plan';
 import type { HybridPlan } from '@/models/hybrid-plan';
+import type { GlobalPaymentConfig } from '@/models/global-payment-config';
 
 function SubscriptionPageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { user } = useUser();
+  const firestore = useFirestore();
   const planParam = searchParams.get('plan');
   const [showBanner, setShowBanner] = useState(!!planParam);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+
+  // Leer configuración global de pagos
+  const paymentConfigRef = useMemoFirebase(() => !firestore ? null : doc(firestore, 'globalConfig', 'payment_methods'), [firestore]);
+  const { data: paymentConfig, isLoading: isPaymentConfigLoading } = useDoc<GlobalPaymentConfig>(paymentConfigRef);
 
   const { 
     subscription,
@@ -42,14 +50,14 @@ function SubscriptionPageContent() {
     productsCount,
     blogPostsCount,
     landingPagesCount,
-    isLoading,
+    isLoading: isSubDataLoading,
     error,
   } = useSubscription();
 
   const [billingHistory, setBillingHistory] = useState<BillingRecord[]>([]);
   const [isBillingLoading, setIsBillingLoading] = useState(false);
   
-  // Calculate plan price using the union of types logic
+  // Cálculo de precio unificado para planes estándar e híbridos
   const planPrice = useMemo(() => {
     if (!planDetails) return 0;
     return 'basePrice' in planDetails ? (planDetails as HybridPlan).basePrice : (planDetails as SubscriptionPlan).price;
@@ -121,42 +129,53 @@ function SubscriptionPageContent() {
   }, [subscription, planDetails, productsCount, blogPostsCount, landingPagesCount, plan, limits]);
 
   const handlePayNow = async (selectedPlan?: SubscriptionPlan | HybridPlan) => {
-    const targetPlan = selectedPlan || planDetails;
-    if (!targetPlan || !user) return;
-    
+    const planToProcess = selectedPlan || planDetails;
+    if (!planToProcess || !user || !paymentConfig) return;
     setIsProcessingPayment(true);
     try {
-        const isHybrid = 'commissionType' in targetPlan;
-        
-        if (isHybrid) {
-            window.location.href = `/dashboard/pagos`;
-            return;
+      const isHybrid = 'commissionType' in planToProcess;
+      if (isHybrid) {
+        // Planes híbridos: mostrar métodos manuales activos
+        const hasManual = paymentConfig.nequi?.enabled || 
+                          paymentConfig.bancolombia?.enabled || 
+                          paymentConfig.daviplata?.enabled || 
+                          paymentConfig.breB?.enabled;
+        if (hasManual) {
+          router.push('/dashboard/pagos');
+          return;
         }
-
+        throw new Error('No hay pasarelas de pago activas disponibles para este tipo de plan.');
+      }
+      // Planes estándar: verificar Stripe activo
+      if (paymentConfig.stripe?.enabled) {
         const res = await fetch('/api/stripe/create-checkout-session', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                priceId: (targetPlan as SubscriptionPlan).stripePriceId,
-                businessId: user.uid,
-                userId: user.uid,
-                email: user.email,
-            }),
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            priceId: (planToProcess as SubscriptionPlan).stripePriceId,
+            businessId: user.uid,
+            userId: user.uid,
+            email: user.email,
+          }),
         });
-
         const sessionData = await res.json();
         if (sessionData.url) {
-            window.location.href = sessionData.url;
-        } else {
-            throw new Error(sessionData.error || 'Error creando sesión de pago');
+          window.location.href = sessionData.url;
+          return;
         }
-    } catch (e) {
-        console.error("Error al procesar pago:", e);
-        setIsProcessingPayment(false);
+      }
+      // Fallback: si Stripe no está activo, ir a pagos manuales/configuración
+      router.push('/dashboard/pagos');
+    } catch (e: any) {
+      console.error("Error al procesar pago:", e);
+      // Omitir toast aquí ya que se maneja globalmente o vía retorno
+      setIsProcessingPayment(false);
     }
   };
 
-  if (isLoading) {
+  const isLoading = isSubDataLoading || isPaymentConfigLoading;
+
+  if (isLoading && !planDetails) {
     return (
       <div className="flex justify-center items-center h-64">
         <Loader2 className="h-10 w-10 animate-spin text-primary" />
@@ -179,7 +198,6 @@ function SubscriptionPageContent() {
       {showBanner && planDetails && (
         <Card className="border-2 border-primary bg-primary/5 animate-in fade-in slide-in-from-top-4 duration-500 shadow-lg">
             {planPrice === 0 ? (
-                /* Variante Plan Gratuito */
                 <>
                     <CardHeader>
                         <div className="flex justify-between items-start">
@@ -205,7 +223,6 @@ function SubscriptionPageContent() {
                     </CardFooter>
                 </>
             ) : (
-                /* Variante Plan de Pago */
                 <>
                     <CardHeader>
                         <div className="flex justify-between items-start">
@@ -237,10 +254,10 @@ function SubscriptionPageContent() {
                     <CardFooter className="flex flex-col sm:flex-row gap-3 pt-0">
                         <Button 
                             onClick={() => handlePayNow()} 
-                            disabled={isProcessingPayment} 
+                            disabled={isProcessingPayment || isPaymentConfigLoading || !paymentConfig} 
                             className="flex-1 h-12 text-base font-bold shadow-md bg-primary hover:bg-primary/90"
                         >
-                            {isProcessingPayment ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <CreditCard className="mr-2 h-5 w-5" />}
+                            {(isProcessingPayment || isPaymentConfigLoading) ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <CreditCard className="mr-2 h-5 w-5" />}
                             Pagar ahora
                         </Button>
                         <Button 
