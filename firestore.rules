@@ -164,6 +164,11 @@ service cloud.firestore {
       allow create: if true;
       allow read, write: if isSuperAdmin();
     }
+    
+    match /paymentRequests/{requestId} {
+      allow create: if isAuthenticated();
+      allow read, write: if isSuperAdmin();
+    }
 
     // --- REGLA POR DEFECTO ---
     match /{document=**} {

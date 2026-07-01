@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo, Suspense } from 'react';
@@ -495,11 +496,14 @@ function SubscriptionPageContent() {
                     if (!selectedPlanForPayment || !user || !firestore) return;
                     setIsProcessingPayment(true);
                     try {
-                        await setDoc(doc(collection(firestore, 'paymentRequests')), {
+                        const planId = selectedPlanForPayment.id || 'unknown';
+                        const planName = selectedPlanForPayment.name || 'Plan';
+
+                        await addDoc(collection(firestore, 'paymentRequests'), {
                             businessId: user.uid,
-                            businessName: business?.name || '',
-                            planId: selectedPlanForPayment.id,
-                            planName: selectedPlanForPayment.name,
+                            businessName: business?.name || user.uid,
+                            planId: planId,
+                            planName: planName,
                             requestedAt: Timestamp.now(),
                             status: 'pending_verification',
                             paymentMethod: 'manual'
@@ -508,10 +512,10 @@ function SubscriptionPageContent() {
                         await addDoc(collection(firestore, 'contactMessages'), {
                             name: business?.name || user.uid,
                             email: user.email || '',
-                            message: `Solicitud de activación de plan: ${selectedPlanForPayment.name}. El negocio ha indicado que realizó el pago manual. Por favor verifica y activa el plan correspondiente.`,
+                            message: `Solicitud de activación de plan: ${planName}. El negocio ha indicado que realizó el pago manual. Por favor verifica y activa el plan correspondiente.`,
                             source: 'payment_request',
-                            planId: selectedPlanForPayment.id,
-                            planName: selectedPlanForPayment.name,
+                            planId: planId,
+                            planName: planName,
                             businessId: user.uid,
                             createdAt: Timestamp.now(),
                             read: false
@@ -520,6 +524,7 @@ function SubscriptionPageContent() {
                         setShowPaymentModal(false);
                         toast({ title: "Pago Notificado", description: "Tu pago está siendo verificado por el administrador." });
                     } catch (e) {
+                        console.error("Error al registrar notificación:", e);
                         toast({ variant: 'destructive', title: 'Error', description: 'No se pudo registrar la notificación de pago.' });
                     } finally {
                         setIsProcessingPayment(false);
