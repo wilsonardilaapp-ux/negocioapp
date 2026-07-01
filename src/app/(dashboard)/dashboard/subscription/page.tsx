@@ -9,7 +9,7 @@ import UsageLimitsCard, { type UsageMetric } from './components/UsageLimitsCard'
 import PlanComparisonTable from './components/PlanComparisonTable';
 import BillingHistoryCard, { type BillingRecord } from './components/BillingHistoryCard';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Loader2, CreditCard, CheckCircle2, Zap, LayoutDashboard, CheckCircle } from "lucide-react";
+import { Loader2, CreditCard, Zap, LayoutDashboard, CheckCircle, Smartphone, Building, Building2 } from "lucide-react";
 import {
   Card,
   CardHeader,
@@ -20,21 +20,36 @@ import {
 } from "@/components/ui/card";
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 import type { Timestamp } from 'firebase/firestore';
 import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { doc, collection } from 'firebase/firestore';
 import type { SubscriptionPlan } from '@/models/subscription-plan';
 import type { HybridPlan } from '@/models/hybrid-plan';
 import type { GlobalPaymentConfig } from '@/models/global-payment-config';
+import { useToast } from '@/hooks/use-toast';
+import { es } from 'date-fns/locale';
+import Image from 'next/image';
 
 function SubscriptionPageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { user } = useUser();
   const firestore = useFirestore();
+  const { toast } = useToast();
+  
   const planParam = searchParams.get('plan');
   const [showBanner, setShowBanner] = useState(!!planParam);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
 
   // Leer configuración global de pagos
   const paymentConfigRef = useMemoFirebase(() => !firestore ? null : doc(firestore, 'globalConfig', 'payment_methods'), [firestore]);
@@ -133,20 +148,12 @@ function SubscriptionPageContent() {
     if (!planToProcess || !user || !paymentConfig) return;
     setIsProcessingPayment(true);
     try {
-      const isHybrid = 'commissionType' in planToProcess;
-      if (isHybrid) {
-        // Planes híbridos: mostrar métodos manuales activos
-        const hasManual = paymentConfig.nequi?.enabled || 
-                          paymentConfig.bancolombia?.enabled || 
-                          paymentConfig.daviplata?.enabled || 
-                          paymentConfig.breB?.enabled;
-        if (hasManual) {
-          router.push('/dashboard/pagos');
-          return;
-        }
-        throw new Error('No hay pasarelas de pago activas disponibles para este tipo de plan.');
+      // PRIORIDAD 1: Stripe activo con checkoutUrl
+      if (paymentConfig.stripe?.enabled && paymentConfig.stripe?.checkoutUrl) {
+        window.location.href = paymentConfig.stripe.checkoutUrl;
+        return;
       }
-      // Planes estándar: verificar Stripe activo
+      // PRIORIDAD 2: Stripe activo con API (sin checkoutUrl)
       if (paymentConfig.stripe?.enabled) {
         const res = await fetch('/api/stripe/create-checkout-session', {
           method: 'POST',
@@ -164,11 +171,31 @@ function SubscriptionPageContent() {
           return;
         }
       }
-      // Fallback: si Stripe no está activo, ir a pagos manuales/configuración
-      router.push('/dashboard/pagos');
+      // PRIORIDAD 3: MercadoPago activo con checkoutUrl
+      if (paymentConfig.mercadoPago?.enabled && paymentConfig.mercadoPago?.checkoutUrl) {
+        window.location.href = paymentConfig.mercadoPago.checkoutUrl;
+        return;
+      }
+      // PRIORIDAD 4: PayPal activo con checkoutUrl
+      if (paymentConfig.paypal?.enabled && paymentConfig.paypal?.checkoutUrl) {
+        window.location.href = paymentConfig.paypal.checkoutUrl;
+        return;
+      }
+      // PRIORIDAD 5: Métodos manuales activos → abrir modal
+      const hasManual = paymentConfig.nequi?.enabled ||
+                        paymentConfig.bancolombia?.enabled ||
+                        paymentConfig.daviplata?.enabled ||
+                        paymentConfig.breB?.enabled;
+      if (hasManual) {
+        setShowPaymentModal(true);
+        return;
+      }
+      // Sin pasarelas activas
+      toast({ variant: "destructive", title: "Sin métodos de pago", description: "No hay métodos de pago disponibles en este momento." });
     } catch (e: any) {
       console.error("Error al procesar pago:", e);
-      // Omitir toast aquí ya que se maneja globalmente o vía retorno
+      toast({ variant: "destructive", title: "Error", description: e.message });
+    } finally {
       setIsProcessingPayment(false);
     }
   };
@@ -318,6 +345,154 @@ function SubscriptionPageContent() {
           <BillingHistoryCard billingHistory={billingHistory} isLoading={isBillingLoading} />
         </>
       )}
+
+      {/* MODAL DE PAGOS MANUALES */}
+      <Dialog open={showPaymentModal} onOpenChange={setShowPaymentModal}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Instrucciones de Pago</DialogTitle>
+            <DialogDescription>
+              Utiliza cualquiera de los siguientes métodos manuales para activar tu plan.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-6 py-4">
+            {paymentConfig?.nequi?.enabled && (
+              <Card className="border-primary/20">
+                <CardHeader className="flex flex-row items-center gap-3 pb-2">
+                  <Smartphone className="h-5 w-5 text-primary" />
+                  <CardTitle className="text-lg">Nequi</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Titular</Label>
+                      <p className="font-bold">{paymentConfig.nequi.holderName}</p>
+                    </div>
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Número de Cuenta</Label>
+                      <p className="font-bold">{paymentConfig.nequi.accountNumber}</p>
+                    </div>
+                  </div>
+                  {paymentConfig.nequi.qrImageUrl && (
+                    <div className="flex justify-center">
+                      <div className="relative h-48 w-48 border rounded-lg overflow-hidden bg-white p-2">
+                        <Image src={paymentConfig.nequi.qrImageUrl} alt="Nequi QR" fill className="object-contain" />
+                      </div>
+                    </div>
+                  )}
+                  {paymentConfig.nequi.instructions && (
+                    <p className="text-sm bg-muted p-3 rounded-md italic">{paymentConfig.nequi.instructions}</p>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
+            {paymentConfig?.bancolombia?.enabled && (
+              <Card className="border-primary/20">
+                <CardHeader className="flex flex-row items-center gap-3 pb-2">
+                  <Building className="h-5 w-5 text-primary" />
+                  <CardTitle className="text-lg">Bancolombia</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Titular</Label>
+                      <p className="font-bold">{paymentConfig.bancolombia.holderName}</p>
+                    </div>
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Número de Cuenta</Label>
+                      <p className="font-bold">{paymentConfig.bancolombia.accountNumber}</p>
+                    </div>
+                  </div>
+                  {paymentConfig.bancolombia.qrImageUrl && (
+                    <div className="flex justify-center">
+                      <div className="relative h-48 w-48 border rounded-lg overflow-hidden bg-white p-2">
+                        <Image src={paymentConfig.bancolombia.qrImageUrl} alt="Bancolombia QR" fill className="object-contain" />
+                      </div>
+                    </div>
+                  )}
+                  {paymentConfig.bancolombia.instructions && (
+                    <p className="text-sm bg-muted p-3 rounded-md italic">{paymentConfig.bancolombia.instructions}</p>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
+            {paymentConfig?.daviplata?.enabled && (
+              <Card className="border-primary/20">
+                <CardHeader className="flex flex-row items-center gap-3 pb-2">
+                  <Smartphone className="h-5 w-5 text-primary" />
+                  <CardTitle className="text-lg">Daviplata</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Titular</Label>
+                      <p className="font-bold">{paymentConfig.daviplata.holderName}</p>
+                    </div>
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Número de Cuenta</Label>
+                      <p className="font-bold">{paymentConfig.daviplata.accountNumber}</p>
+                    </div>
+                  </div>
+                  {paymentConfig.daviplata.qrImageUrl && (
+                    <div className="flex justify-center">
+                      <div className="relative h-48 w-48 border rounded-lg overflow-hidden bg-white p-2">
+                        <Image src={paymentConfig.daviplata.qrImageUrl} alt="Daviplata QR" fill className="object-contain" />
+                      </div>
+                    </div>
+                  )}
+                  {paymentConfig.daviplata.instructions && (
+                    <p className="text-sm bg-muted p-3 rounded-md italic">{paymentConfig.daviplata.instructions}</p>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
+            {paymentConfig?.breB?.enabled && (
+              <Card className="border-primary/20">
+                <CardHeader className="flex flex-row items-center gap-3 pb-2">
+                  <Building2 className="h-5 w-5 text-primary" />
+                  <CardTitle className="text-lg">Bre-B</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Comercio</Label>
+                      <p className="font-bold">{paymentConfig.breB.holderName}</p>
+                    </div>
+                    <div>
+                      <Label className="text-xs text-muted-foreground">{paymentConfig.breB.keyType}</Label>
+                      <p className="font-bold">{paymentConfig.breB.keyValue}</p>
+                    </div>
+                  </div>
+                  {paymentConfig.breB.qrImageUrl && (
+                    <div className="flex justify-center">
+                      <div className="relative h-48 w-48 border rounded-lg overflow-hidden bg-white p-2">
+                        <Image src={paymentConfig.breB.qrImageUrl} alt="Bre-B QR" fill className="object-contain" />
+                      </div>
+                    </div>
+                  )}
+                  {paymentConfig.breB.instructions && (
+                    <p className="text-sm bg-muted p-3 rounded-md italic">{paymentConfig.breB.instructions}</p>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setShowPaymentModal(false)}>Cancelar</Button>
+            <Button onClick={() => {
+              setShowPaymentModal(false);
+              toast({ title: "Pago Notificado", description: "Tu pago está siendo verificado por el administrador." });
+            }}>
+              Ya realicé el pago
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
