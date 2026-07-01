@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useCollection, useFirestore, useMemoFirebase, updateDocumentNonBlocking } from '@/firebase';
-import { collection, query, orderBy, doc, type Timestamp, writeBatch, getDocs, where, addDoc } from 'firebase/firestore';
+import { collection, query, orderBy, doc, type Timestamp, writeBatch, getDocs, where, addDoc, limit } from 'firebase/firestore';
 import type { ContactMessage } from '@/models/notification';
 import { Loader2, Inbox, Search, Phone, MessageSquare, CornerDownRight, Send, Trash2 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
