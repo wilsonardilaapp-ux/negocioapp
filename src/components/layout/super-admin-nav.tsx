@@ -1,4 +1,3 @@
-
 "use client";
 
 import Link from "next/link";
@@ -30,6 +29,7 @@ import {
   Search,
   Star,
   Gift,
+  Cookie,
 } from "lucide-react";
 
 import { SidebarMenu, SidebarMenuItem, SidebarMenuButton } from "@/components/ui/sidebar";
@@ -57,6 +57,7 @@ const navItemsList = [
   { href: "/superadmin/monitoreo", icon: Activity, label: "Monitoreo" },
   { href: "/superadmin/pistola-scanner", icon: ScanLine, label: "Pistola Escáner" },
   { href: "/superadmin/configuracion", icon: Settings, label: "Configuración" },
+  { href: "/superadmin/cookies", icon: Cookie, label: "Cookies" },
   { href: "/superadmin/analytics", icon: BarChart, label: "Métricas" },
   { href: "/superadmin/perfil", icon: UserCircle, label: "Perfil" },
 ];
