@@ -120,12 +120,13 @@ function SubscriptionPageContent() {
     return { currentPlanInfo, usageMetrics };
   }, [subscription, planDetails, productsCount, blogPostsCount, landingPagesCount, plan, limits]);
 
-  const handlePayNow = async () => {
-    if (!planDetails || !user) return;
+  const handlePayNow = async (selectedPlan?: SubscriptionPlan | HybridPlan) => {
+    const targetPlan = selectedPlan || planDetails;
+    if (!targetPlan || !user) return;
     
     setIsProcessingPayment(true);
     try {
-        const isHybrid = 'commissionType' in planDetails;
+        const isHybrid = 'commissionType' in targetPlan;
         
         if (isHybrid) {
             window.location.href = `/dashboard/pagos`;
@@ -136,7 +137,7 @@ function SubscriptionPageContent() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                priceId: (planDetails as SubscriptionPlan).stripePriceId,
+                priceId: (targetPlan as SubscriptionPlan).stripePriceId,
                 businessId: user.uid,
                 userId: user.uid,
                 email: user.email,
@@ -235,7 +236,7 @@ function SubscriptionPageContent() {
                     </CardContent>
                     <CardFooter className="flex flex-col sm:flex-row gap-3 pt-0">
                         <Button 
-                            onClick={handlePayNow} 
+                            onClick={() => handlePayNow()} 
                             disabled={isProcessingPayment} 
                             className="flex-1 h-12 text-base font-bold shadow-md bg-primary hover:bg-primary/90"
                         >
@@ -291,7 +292,11 @@ function SubscriptionPageContent() {
             </div>
           </div>
 
-          <PlanComparisonTable currentPlan={plan} allPlans={combinedPlans as any} />
+          <PlanComparisonTable 
+            currentPlan={plan} 
+            allPlans={combinedPlans as any} 
+            onSelectPlan={(selectedPlan) => handlePayNow(selectedPlan)}
+          />
 
           <BillingHistoryCard billingHistory={billingHistory} isLoading={isBillingLoading} />
         </>

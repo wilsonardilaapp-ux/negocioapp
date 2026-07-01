@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Check, X } from "lucide-react";
 import { cn } from "@/lib/utils";
-import Link from 'next/link';
 import type { SubscriptionPlan } from "@/models/subscription-plan";
 import type { HybridPlan } from "@/models/hybrid-plan";
 import { useMemo } from "react";
@@ -14,6 +13,7 @@ import { useMemo } from "react";
 interface PlanComparisonTableProps {
   currentPlan: string;
   allPlans: (SubscriptionPlan | HybridPlan)[];
+  onSelectPlan: (plan: SubscriptionPlan | HybridPlan) => void;
 }
 
 const formatCurrency = (value: number | undefined | null) => {
@@ -28,7 +28,7 @@ const getPlanPrice = (plan: SubscriptionPlan | HybridPlan): number => {
     return 0;
 };
 
-export default function PlanComparisonTable({ currentPlan, allPlans }: PlanComparisonTableProps) {
+export default function PlanComparisonTable({ currentPlan, allPlans, onSelectPlan }: PlanComparisonTableProps) {
     
     const sortedPlans = useMemo(() => {
         return [...allPlans].sort((a, b) => getPlanPrice(a) - getPlanPrice(b));
@@ -99,10 +99,10 @@ export default function PlanComparisonTable({ currentPlan, allPlans }: PlanCompa
         const targetPrice = getPlanPrice(plan);
 
         if (targetPrice > currentPrice) {
-             return <Button asChild className="w-full"><Link href="/pricing">Actualizar →</Link></Button>;
+             return <Button className="w-full" onClick={() => onSelectPlan(plan)}>Actualizar →</Button>;
         }
 
-        return <Button asChild variant="outline" className="w-full"><Link href="/pricing">Cambiar</Link></Button>;
+        return <Button variant="outline" className="w-full" onClick={() => onSelectPlan(plan)}>Cambiar</Button>;
     };
 
     return (
