@@ -60,7 +60,7 @@ function CheckoutContent() {
   const businessRef = useMemoFirebase(() => !user ? null : doc(firestore, 'businesses', user.uid), [user, firestore]);
   const { data: business } = useDoc<Business>(businessRef);
 
-  // 2. Resolver Plan Seleccionado (Corregido para evitar TypeError)
+  // 2. Resolver Plan Seleccionado
   const selectedPlan = useMemo(() => {
     if (!planId) return null;
     return allPlans?.find(p => p.id === planId) || allHybridPlans?.find(p => p.id === planId) || null;
@@ -69,19 +69,29 @@ function CheckoutContent() {
   const isHybrid = selectedPlan && 'commissionType' in selectedPlan;
   const price = selectedPlan ? (isHybrid ? (selectedPlan as HybridPlan).basePrice : (selectedPlan as SubscriptionPlan).price) : 0;
 
-  // 3. Manejo de Pago Automático
-  const handleAutoPay = async () => {
+  // 3. Determinar Gateways Automáticos Activos
+  const activeAutoGateways = useMemo(() => {
+    if (!paymentConfig) return [];
+    return [
+      paymentConfig.mercadoPago?.enabled && { id: 'mercadoPago', label: 'Mercado Pago' },
+      paymentConfig.stripe?.enabled && { id: 'stripe', label: 'Stripe' },
+      paymentConfig.paypal?.enabled && { id: 'paypal', label: 'PayPal' },
+    ].filter((g): g is { id: string; label: string } => !!g);
+  }, [paymentConfig]);
+
+  // 4. Manejo de Pago Automático por Gateway
+  const handleAutoPay = async (gatewayId: string) => {
     if (!selectedPlan || !user || !paymentConfig) return;
     setIsProcessing(true);
     try {
-      // Prioridad 1: Stripe activo con checkoutUrl
-      if (paymentConfig.stripe?.enabled && paymentConfig.stripe?.checkoutUrl) {
-        window.location.href = paymentConfig.stripe.checkoutUrl;
-        return;
-      }
-
-      // Prioridad 2: Stripe API
-      if (paymentConfig.stripe?.enabled) {
+      // Lógica específica por Gateway seleccionado
+      if (gatewayId === 'stripe') {
+        // Opción A: Checkout URL Directa
+        if (paymentConfig.stripe.checkoutUrl) {
+          window.location.href = paymentConfig.stripe.checkoutUrl;
+          return;
+        }
+        // Opción B: Crear Sesión vía API
         const res = await fetch('/api/stripe/create-checkout-session', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -99,19 +109,21 @@ function CheckoutContent() {
         }
       }
 
-      // Prioridad 3: MercadoPago
-      if (paymentConfig.mercadoPago?.enabled && paymentConfig.mercadoPago?.checkoutUrl) {
+      if (gatewayId === 'mercadoPago' && paymentConfig.mercadoPago.checkoutUrl) {
         window.location.href = paymentConfig.mercadoPago.checkoutUrl;
         return;
       }
 
-      // Prioridad 4: PayPal
-      if (paymentConfig.paypal?.enabled && paymentConfig.paypal?.checkoutUrl) {
+      if (gatewayId === 'paypal' && paymentConfig.paypal.checkoutUrl) {
         window.location.href = paymentConfig.paypal.checkoutUrl;
         return;
       }
 
-      toast({ variant: "destructive", title: "Error", description: "No hay pasarelas automáticas configuradas." });
+      toast({ 
+        variant: "destructive", 
+        title: "Configuración incompleta", 
+        description: `El método ${gatewayId} no tiene una URL de cobro configurada.` 
+      });
     } catch (e: any) {
       toast({ variant: "destructive", title: "Error", description: e.message });
     } finally {
@@ -119,7 +131,7 @@ function CheckoutContent() {
     }
   };
 
-  // 4. Manejo de Pago Manual
+  // 5. Manejo de Pago Manual
   const handleManualPayConfirm = async () => {
     if (!selectedPlan || !user || !firestore) return;
     setIsProcessing(true);
@@ -176,8 +188,6 @@ function CheckoutContent() {
       </div>
     );
   }
-
-  const hasAutoGateways = paymentConfig?.stripe?.enabled || paymentConfig?.mercadoPago?.enabled || paymentConfig?.paypal?.enabled;
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
@@ -259,29 +269,34 @@ function CheckoutContent() {
             </CardHeader>
             <CardContent className="space-y-8">
               
-              {/* PAGO AUTOMÁTICO */}
-              {hasAutoGateways && (
+              {/* PAGO AUTOMÁTICO DINÁMICO */}
+              {activeAutoGateways.length > 0 && (
                 <div className="space-y-4">
                   <div className="flex items-center gap-2">
                     <Badge className="bg-primary text-white">Recomendado</Badge>
                     <span className="text-sm font-bold">Pago Automático</span>
                   </div>
-                  <Button 
-                    size="lg" 
-                    className="w-full h-14 text-lg font-bold shadow-md bg-primary hover:bg-primary/90"
-                    onClick={handleAutoPay}
-                    disabled={isProcessing}
-                  >
-                    {isProcessing ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <CreditCard className="mr-2 h-5 w-5" />}
-                    Pagar Ahora y Activar
-                  </Button>
+                  <div className="flex flex-col gap-3">
+                    {activeAutoGateways.map((gateway) => (
+                      <Button 
+                        key={gateway.id}
+                        size="lg" 
+                        className="w-full h-14 text-lg font-bold shadow-md bg-primary hover:bg-primary/90"
+                        onClick={() => handleAutoPay(gateway.id)}
+                        disabled={isProcessing}
+                      >
+                        {isProcessing ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <CreditCard className="mr-2 h-5 w-5" />}
+                        Pagar con {gateway.label}
+                      </Button>
+                    ))}
+                  </div>
                   <p className="text-[10px] text-center text-muted-foreground italic">
                     Redirección a plataforma de pago segura. La activación es automática tras la transacción.
                   </p>
                 </div>
               )}
 
-              {hasAutoGateways && <div className="relative"><div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div><div className="relative flex justify-center text-xs uppercase"><span className="bg-background px-2 text-muted-foreground font-bold">O paga manualmente</span></div></div>}
+              {activeAutoGateways.length > 0 && <div className="relative"><div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div><div className="relative flex justify-center text-xs uppercase"><span className="bg-background px-2 text-muted-foreground font-bold">O paga manualmente</span></div></div>}
 
               {/* PAGO MANUAL */}
               <div className="space-y-4">
