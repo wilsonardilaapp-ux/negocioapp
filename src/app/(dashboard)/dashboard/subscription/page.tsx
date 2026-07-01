@@ -1,25 +1,37 @@
 
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, Suspense } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { useSubscription } from '@/hooks/useSubscription';
 import CurrentPlanCard, { type CurrentPlanInfo } from './components/CurrentPlanCard';
 import UsageLimitsCard, { type UsageMetric } from './components/UsageLimitsCard';
 import PlanComparisonTable from './components/PlanComparisonTable';
 import BillingHistoryCard, { type BillingRecord } from './components/BillingHistoryCard';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Loader2, CreditCard } from "lucide-react";
+import { Loader2, CreditCard, CheckCircle2, Zap } from "lucide-react";
 import {
   Card,
   CardHeader,
   CardTitle,
   CardDescription,
   CardContent,
+  CardFooter,
 } from "@/components/ui/card";
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import type { Timestamp } from 'firebase/firestore';
+import { useUser } from '@/firebase';
+import type { SubscriptionPlan } from '@/models/subscription-plan';
+import type { HybridPlan } from '@/models/hybrid-plan';
 
+function SubscriptionPageContent() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const { user } = useUser();
+  const [dismissedOnboarding, setDismissedOnboarding] = useState(false);
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
 
-export default function SubscriptionPage() {
   const { 
     subscription,
     allPlans,
@@ -37,6 +49,16 @@ export default function SubscriptionPage() {
   const [billingHistory, setBillingHistory] = useState<BillingRecord[]>([]);
   const [isBillingLoading, setIsBillingLoading] = useState(false);
   
+  const planParam = searchParams.get('plan');
+  const isNewUserOnboarding = !!planParam && !dismissedOnboarding;
+
+  // Encontrar los detalles del plan solicitado en la URL
+  const selectedPlanDetails = useMemo(() => {
+    if (!planParam) return null;
+    const combined = [...(allPlans || []), ...(allHybridPlans || [])];
+    return combined.find(p => p.id === planParam);
+  }, [planParam, allPlans, allHybridPlans]);
+
   // --- Fetch Billing History ---
   useEffect(() => {
     if (subscription?.stripeCustomerId) {
@@ -103,6 +125,42 @@ export default function SubscriptionPage() {
     return { currentPlanInfo, usageMetrics };
   }, [subscription, planDetails, productsCount, blogPostsCount, landingPagesCount, plan, limits]);
 
+  const handlePayNow = async () => {
+    if (!selectedPlanDetails || !user) return;
+    
+    setIsProcessingPayment(true);
+    try {
+        const isHybrid = 'commissionType' in selectedPlanDetails;
+        
+        // Si es híbrido, por ahora redirigimos al admin para configuración manual o mostramos aviso
+        if (isHybrid) {
+            window.location.href = `/dashboard/pagos`;
+            return;
+        }
+
+        const res = await fetch('/api/stripe/create-checkout-session', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                priceId: (selectedPlanDetails as SubscriptionPlan).stripePriceId,
+                businessId: user.uid,
+                userId: user.uid,
+                email: user.email,
+            }),
+        });
+
+        const sessionData = await res.json();
+        if (sessionData.url) {
+            window.location.href = sessionData.url;
+        } else {
+            throw new Error(sessionData.error || 'Error creando sesión de pago');
+        }
+    } catch (e) {
+        console.error("Error al procesar pago:", e);
+        setIsProcessingPayment(false);
+    }
+  };
+
   // --- Render: Loading global ---
   if (isLoading) {
     return (
@@ -122,6 +180,57 @@ export default function SubscriptionPage() {
           <CardDescription>Gestiona tu plan, revisa tus límites y mira tu historial de pagos.</CardDescription>
         </CardHeader>
       </Card>
+
+      {/* SECCIÓN ADITIVA: CONFIRMAR PLAN (Solo si viene de registro con ?plan=) */}
+      {isNewUserOnboarding && selectedPlanDetails && (
+        <Card className="border-2 border-primary bg-primary/5 animate-in fade-in slide-in-from-top-4 duration-500 shadow-lg">
+            <CardHeader>
+                <div className="flex justify-between items-start">
+                    <div className="space-y-1">
+                        <CardTitle className="text-xl flex items-center gap-2">
+                            <Zap className="h-5 w-5 text-primary fill-primary" />
+                            Confirma tu plan y completa el pago
+                        </CardTitle>
+                        <CardDescription className="text-gray-600 font-medium">
+                            Estás a un paso de activar todas las funcionalidades de tu nuevo negocio.
+                        </CardDescription>
+                    </div>
+                    <Badge variant="default" className="text-sm font-black px-4 py-1.5 uppercase tracking-wider">
+                        {selectedPlanDetails.name}
+                    </Badge>
+                </div>
+            </CardHeader>
+            <CardContent>
+                <div className="flex items-baseline gap-2">
+                    <span className="text-3xl font-black text-gray-900">
+                        ${('basePrice' in selectedPlanDetails ? selectedPlanDetails.basePrice : selectedPlanDetails.price).toLocaleString('es-CO')}
+                    </span>
+                    <span className="text-muted-foreground text-sm font-medium">/mes</span>
+                </div>
+                <p className="text-sm text-gray-500 mt-2 italic">
+                    * El cobro se procesará a través de nuestra plataforma segura de pagos.
+                </p>
+            </CardContent>
+            <CardFooter className="flex flex-col sm:flex-row gap-3 pt-0">
+                <Button 
+                    onClick={handlePayNow} 
+                    disabled={isProcessingPayment} 
+                    className="flex-1 h-12 text-base font-bold shadow-md bg-primary hover:bg-primary/90"
+                >
+                    {isProcessingPayment ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <CreditCard className="mr-2 h-5 w-5" />}
+                    Pagar ahora
+                </Button>
+                <Button 
+                    variant="outline" 
+                    onClick={() => setDismissedOnboarding(true)} 
+                    disabled={isProcessingPayment}
+                    className="flex-1 h-12 border-primary/20 text-primary hover:bg-primary/5"
+                >
+                    Continuar con plan gratuito
+                </Button>
+            </CardFooter>
+        </Card>
+      )}
       
       {error && (
         <Alert variant="destructive">
@@ -165,4 +274,12 @@ export default function SubscriptionPage() {
       )}
     </div>
   );
+}
+
+export default function SubscriptionPage() {
+    return (
+        <Suspense fallback={<div className="flex justify-center items-center h-64"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>}>
+            <SubscriptionPageContent />
+        </Suspense>
+    );
 }
