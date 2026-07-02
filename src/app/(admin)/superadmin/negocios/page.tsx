@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -53,6 +54,14 @@ const iconMap: { [key: string]: React.ReactNode } = {
   'chatbot-integrado-con-whatsapp-para-soporte-y-ventas': <Building2 className="w-4 h-4" />,
   promotions: <Tag className="w-4 h-4" />,
   default: <Puzzle className="w-4 h-4" />,
+};
+
+const normalizeId = (id: string): string => {
+  return id
+    .toLowerCase()
+    .trim()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
 };
 
 const StatusBadge = ({ status }: { status: EntityStatus | string | undefined }) => {
@@ -401,7 +410,7 @@ export default function BusinessesPage() {
         
         // 5. Activación Selectiva - NORMALIZADA PARA EVITAR DUPLICADOS
         assignedModules.forEach(rawId => {
-          const id = rawId.toLowerCase().trim();
+          const id = normalizeId(rawId);
           const extra = moduleExtras[rawId] || 0;
           batch.set(doc(firestore, `businesses/${selectedBusiness.id}/modules`, id), { status: 'active', extra }, { merge: true });
         });
@@ -432,7 +441,7 @@ export default function BusinessesPage() {
   };
   
   const toggleModuleAssignment = (moduleId: string) => {
-    setAssignedModules(prev => prev.includes(moduleId) ? prev.filter(id => id !== id) : [...prev, moduleId]);
+    setAssignedModules(prev => prev.includes(moduleId) ? prev.filter(id => id !== moduleId) : [...prev, moduleId]);
     if (assignedModules.includes(moduleId)) {
       setModuleExtras(prev => {
         const newExtras = { ...prev };
@@ -754,8 +763,9 @@ export default function BusinessesPage() {
                     }, []);
 
                     return displayedModules.map(moduleItem => {
-                      const isActive = assignedModules.includes(moduleItem.id);
-                      const isIncludedInPlan = includedModules.includes(moduleItem.id.toLowerCase().trim());
+                      const normalizedTargetId = normalizeId(moduleItem.id);
+                      const isActive = assignedModules.some(id => normalizeId(id) === normalizedTargetId);
+                      const isIncludedInPlan = includedModules.some((k: string) => normalizeId(k) === normalizedTargetId);
                       const validation = validateModuleExtra(selectedBusiness.planName, moduleExtras[moduleItem.id] || 0);
                       
                       return (
