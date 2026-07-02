@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useUser, useFirestore, useCollection, useMemoFirebase, setDocumentNonBlocking, updateDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase';
-import { collection, doc, writeBatch, getDocs, getDoc } from 'firebase/firestore';
+import { collection, doc, writeBatch, getDocs, getDoc, Timestamp } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -380,6 +380,19 @@ export default function BusinessesPage() {
           limitesExtra: limitesExtra
         };
         batch.update(businessRef, businessUpdateData);
+
+        // --- CORRECCIÓN CRÍTICA: Sincronizar Fuente de Verdad (Suscripción) ---
+        // Buscamos el ID técnico del plan basándonos en el nombre seleccionado en el modal
+        const targetPlan = allPlans.find(p => p.name === selectedBusiness.planName || p.id === selectedBusiness.planName);
+        const planIdToSync = targetPlan?.id || 'free';
+        const subscriptionRef = doc(firestore, `businesses/${selectedBusiness.id}/subscription`, 'current');
+        
+        batch.set(subscriptionRef, {
+            plan: planIdToSync,
+            status: 'active',
+            updatedAt: Timestamp.now()
+        }, { merge: true });
+        // ----------------------------------------------------------------------
         
         // 4. Limpieza: Desactivar todos los módulos y servicios existentes
         const currentModules = await getDocs(collection(firestore, `businesses/${selectedBusiness.id}/modules`));
