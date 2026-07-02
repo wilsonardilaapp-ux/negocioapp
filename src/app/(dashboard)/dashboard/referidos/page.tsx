@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useUser, useFirestore, useCollection, useDoc, useMemoFirebase } from '@/firebase';
 import { collection, query, where, orderBy, doc } from 'firebase/firestore';
 import { 
@@ -73,6 +73,13 @@ export default function ReferidosPage() {
   
   const { data: referrals, isLoading: loadingReferrals, error: referralsError } = useCollection<Referral>(referralsQuery);
 
+  // Log de diagnóstico crítico solicitado
+  useEffect(() => {
+    if (referralsError) {
+      console.error('REFERRALS QUERY ERROR:', referralsError);
+    }
+  }, [referralsError]);
+
   const logsQuery = useMemoFirebase(() => {
     if (!firestore || !user?.uid) return null;
     return query(
@@ -99,7 +106,11 @@ export default function ReferidosPage() {
   const totalEarnedCapacity = useMemo(() => {
     if (!capacityLogs) return 0;
     return capacityLogs
-      .filter(log => log.reason && (log.reason.startsWith('referido_confirmado') || log.reason === 'referido_confirmado_referente' || log.reason === 'referido_confirmado_referido'))
+      .filter(log => log.reason && (
+        log.reason.startsWith('referido_confirmado') || 
+        log.reason === 'referido_confirmado_referente' || 
+        log.reason === 'referido_confirmado_referido'
+      ))
       .reduce((sum, log) => sum + (log.amount || 0), 0);
   }, [capacityLogs]);
 
@@ -157,7 +168,9 @@ export default function ReferidosPage() {
           <AlertDescription>
             {referralsError.message.includes('permission-denied') 
               ? 'No tienes permisos para listar tus referidos. Contacta a soporte para verificar tu cuenta.' 
-              : 'Hubo un problema al cargar tus invitaciones. Por favor intenta refrescar la página.'}
+              : referralsError.message.includes('index')
+              ? 'Error técnico: Falta un índice en la base de datos para mostrar esta lista.'
+              : `Detalle del error: ${referralsError.message}`}
           </AlertDescription>
         </Alert>
       )}
