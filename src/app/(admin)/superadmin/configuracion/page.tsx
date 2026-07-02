@@ -20,7 +20,7 @@ import { z } from 'zod';
 import type { GlobalConfig } from '@/models/global-config';
 import { useToast } from "@/hooks/use-toast";
 import type { Business } from '@/models/business';
-import { UploadCloud, Image as ImageIcon, Loader2, Trash2 } from 'lucide-center';
+import { UploadCloud, Image as ImageIcon, Loader2, Trash2 } from 'lucide-react';
 import { uploadMedia } from '@/ai/flows/upload-media-flow';
 import NextImage from 'next/image';
 import { cn } from '@/lib/utils';
