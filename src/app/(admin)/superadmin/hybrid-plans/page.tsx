@@ -227,7 +227,6 @@ function HybridPlanDialog({ isOpen, onClose, plan }: { isOpen: boolean, onClose:
   useEffect(() => {
     if (isOpen) {
       if (plan) {
-        // Al cargar, ordenar características por displayOrder ascendente
         const sortedFeatures = [...(plan.features || [])].sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
         reset({ ...plan, features: sortedFeatures });
       } else {
@@ -276,7 +275,6 @@ function HybridPlanDialog({ isOpen, onClose, plan }: { isOpen: boolean, onClose:
     const planId = plan?.id || doc(collection(firestore, 'hybrid_plans')).id;
     const docRef = doc(firestore, 'hybrid_plans', planId);
 
-    // Asignar orden secuencial automáticamente basado en el orden actual del array
     const dataToSave = JSON.parse(JSON.stringify(data));
     dataToSave.id = planId;
     dataToSave.features = data.features.map((f, index) => ({
@@ -284,10 +282,10 @@ function HybridPlanDialog({ isOpen, onClose, plan }: { isOpen: boolean, onClose:
         displayOrder: index
     }));
     
-    // Normalización de módulos incluidos (Gating real)
+    // Normalización técnica agresiva al guardar: minúsculas, sin espacios extra y sin elementos vacíos
     dataToSave.includedModuleKeys = (data.includedModuleKeys || [])
         .map(k => k.toLowerCase().trim())
-        .filter(Boolean);
+        .filter(k => k.length > 0);
 
     const sourceForSlug = dataToSave.slug || dataToSave.name;
     dataToSave.slug = sourceForSlug
@@ -305,8 +303,6 @@ function HybridPlanDialog({ isOpen, onClose, plan }: { isOpen: boolean, onClose:
           onClose();
         })
         .catch(async (serverError) => {
-          console.error("ERROR CRÍTICO AL GUARDAR PLAN:", serverError);
-          
           const permissionError = new FirestorePermissionError({
             path: docRef.path,
             operation: plan?.id ? 'update' : 'create',
@@ -415,20 +411,21 @@ function HybridPlanDialog({ isOpen, onClose, plan }: { isOpen: boolean, onClose:
             </TabsContent>
 
             <TabsContent value="modules" className="space-y-4 pt-4">
-               <Label className="font-semibold">Módulos Incluidos</Label>
+               <Label className="font-semibold">Módulos Incluidos (Separados por coma)</Label>
                <Controller name="includedModuleKeys" control={control} render={({ field }) => (
                  <Input 
                    value={Array.isArray(field.value) ? field.value.join(', ') : ''} 
                    onChange={(e) => {
                        const val = e.target.value;
-                       // No filtramos las cadenas vacías mientras el usuario escribe para permitir la coma
-                       field.onChange(val.split(',').map(s => s.trim()));
+                       // Se permite la cadena cruda durante la edición para evitar bloqueos al escribir comas o espacios.
+                       // La normalización técnica ocurre en el onSubmit.
+                       field.onChange(val.split(',').map(s => s.trimStart()));
                    }}
                    placeholder="ej: catalogo, blog, promotions" 
                  />
                )} />
-               <p className="text-xs text-muted-foreground font-bold text-primary">
-                   Usa comas para separar los módulos. Se normalizarán automáticamente al guardar.
+               <p className="text-[11px] text-muted-foreground font-bold text-primary mt-2">
+                   IDs Técnicos Sugeridos: catalogo, blog, promotions, chatbot-integrado-con-whatsapp-para-soporte-y-ventas, motor-de-sugerencias-inteligentes.
                </p>
             </TabsContent>
 

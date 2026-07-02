@@ -29,10 +29,14 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
   firestore,
   auth,
 }) => {
-  // La red de Firestore está habilitada por defecto tras la inicialización.
-  // Llamar a enableNetwork de forma explícita puede causar conflictos de estado interno
-  // (Unexpected state) especialmente durante el montaje doble de React Strict Mode.
   const [isNetworkEnabled] = useState(true);
+
+  // Exponer instancia de auth globalmente para tareas de auditoría administrativa vía consola
+  useEffect(() => {
+    if (typeof window !== 'undefined' && auth) {
+      (window as any).firebaseAuth = auth;
+    }
+  }, [auth]);
 
   const contextValue = useMemo((): FirebaseContextState => {
     const servicesAvailable = !!(firebaseApp && firestore && auth);
