@@ -1,6 +1,7 @@
 
 export type GlobalConfig = {
     id: string;
+    name?: string;
     maintenance: boolean;
     logoURL: string;
     faviconUrl?: string; // Add faviconUrl
@@ -11,4 +12,3 @@ export type GlobalConfig = {
     allowUserRegistration: boolean;
     mainBusinessId?: string; // ID del negocio a mostrar en la página principal
 };
-

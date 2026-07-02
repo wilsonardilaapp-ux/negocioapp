@@ -7,6 +7,9 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Frown, ArrowLeft, Home } from 'lucide-react';
 
+/**
+ * Página 404 personalizada para Markix.
+ */
 export default function NotFound() {
   const router = useRouter();
 
@@ -23,7 +26,7 @@ export default function NotFound() {
         <h2 className="text-2xl font-bold text-gray-800 mb-4">Página no encontrada</h2>
         
         <p className="text-gray-500 leading-relaxed mb-8">
-          Lo sentimos, no pudimos encontrar la página que buscas. Es posible que el enlace esté roto o la página haya sido eliminada.
+          Lo sentimos, no pudimos encontrar la página que buscas en Markix. Es posible que el enlace esté roto o la página haya sido eliminada.
         </p>
         
         <div className="flex flex-col gap-3">
