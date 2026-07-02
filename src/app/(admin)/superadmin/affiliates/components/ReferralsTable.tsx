@@ -1,16 +1,17 @@
-
 'use client';
 
 import { useState } from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Search, Loader2, ArrowRight, UserCheck } from 'lucide-react';
+import { Search, Loader2, ArrowRight, CheckCircle } from 'lucide-react';
 import type { Referral } from '@/models/referral';
 import type { Business } from '@/models/business';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import ConfirmPaymentModal from './ConfirmPaymentModal';
 
 interface ReferralsTableProps {
   referrals: Referral[];
@@ -22,6 +23,7 @@ interface ReferralsTableProps {
 
 export default function ReferralsTable({ referrals, businesses, isLoading, onFilterChange, currentFilter }: ReferralsTableProps) {
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedReferral, setSelectedReferral] = useState<Referral | null>(null);
 
   const getBusinessName = (id: string) => {
     const b = businesses.find(item => item.id === id);
@@ -88,12 +90,13 @@ export default function ReferralsTable({ referrals, businesses, isLoading, onFil
               <TableHead>Código</TableHead>
               <TableHead>Estado</TableHead>
               <TableHead className="text-right">Premios</TableHead>
+              <TableHead className="text-right">Acciones</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={7} className="h-32 text-center">
+                <TableCell colSpan={8} className="h-32 text-center">
                   <Loader2 className="mx-auto h-8 w-8 animate-spin text-primary" />
                 </TableCell>
               </TableRow>
@@ -129,11 +132,24 @@ export default function ReferralsTable({ referrals, businesses, isLoading, onFil
                       {!r.referentRewardGranted && !r.referreeRewardGranted && <span className="text-[10px] text-muted-foreground italic">Pendiente</span>}
                     </div>
                   </TableCell>
+                  <TableCell className="text-right">
+                    {r.status === 'pending_payment' && (
+                      <Button 
+                        size="sm" 
+                        variant="default" 
+                        className="h-8 font-bold text-xs"
+                        onClick={() => setSelectedReferral(r)}
+                      >
+                        <CheckCircle className="mr-1.5 h-3.5 w-3.5" />
+                        Confirmar Pago
+                      </Button>
+                    )}
+                  </TableCell>
                 </TableRow>
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
+                <TableCell colSpan={8} className="h-32 text-center text-muted-foreground">
                   No se encontraron referidos con estos criterios.
                 </TableCell>
               </TableRow>
@@ -141,6 +157,14 @@ export default function ReferralsTable({ referrals, businesses, isLoading, onFil
           </TableBody>
         </Table>
       </div>
+
+      <ConfirmPaymentModal 
+        referral={selectedReferral}
+        isOpen={!!selectedReferral}
+        onClose={() => setSelectedReferral(null)}
+        referentName={selectedReferral ? getBusinessName(selectedReferral.referentBusinessId) : ''}
+        referreeName={selectedReferral ? getBusinessName(selectedReferral.referreeBusinessId) : ''}
+      />
     </div>
   );
 }
