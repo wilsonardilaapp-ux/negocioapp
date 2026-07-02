@@ -45,7 +45,7 @@ import { es } from 'date-fns/locale';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 export default function ReferidosPage() {
-  const { user } = useUser();
+  const { user, profile } = useUser();
   const firestore = useFirestore();
   const { toast } = useToast();
   const [copied, setCopied] = useState(false);
@@ -73,7 +73,7 @@ export default function ReferidosPage() {
   
   const { data: referrals, isLoading: loadingReferrals, error: referralsError } = useCollection<Referral>(referralsQuery);
 
-  // Log de diagnóstico crítico solicitado
+  // Diagnóstico de errores para desarrolladores
   useEffect(() => {
     if (referralsError) {
       console.error('REFERRALS QUERY ERROR:', referralsError);
@@ -109,7 +109,7 @@ export default function ReferidosPage() {
       .filter(log => log.reason && (
         log.reason.startsWith('referido_confirmado') || 
         log.reason === 'referido_confirmado_referente' || 
-        log.reason === 'referido_confirmado_referido'
+        log.reason === 'referido_confirmado_recompensa'
       ))
       .reduce((sum, log) => sum + (log.amount || 0), 0);
   }, [capacityLogs]);
@@ -167,10 +167,10 @@ export default function ReferidosPage() {
           <AlertTitle>Error de sincronización</AlertTitle>
           <AlertDescription>
             {referralsError.message.includes('permission-denied') 
-              ? 'No tienes permisos para listar tus referidos. Contacta a soporte para verificar tu cuenta.' 
+              ? 'No tienes permisos para ver esta lista. Contacta a soporte para verificar tu cuenta.' 
               : referralsError.message.includes('index')
-              ? 'Error técnico: Falta un índice en la base de datos para mostrar esta lista.'
-              : `Detalle del error: ${referralsError.message}`}
+              ? 'Estamos preparando el sistema para tu cuenta. Por favor, intenta de nuevo en unos minutos.'
+              : 'Lo sentimos, hubo un problema técnico al cargar tus invitaciones. Por favor, intenta más tarde.'}
           </AlertDescription>
         </Alert>
       )}

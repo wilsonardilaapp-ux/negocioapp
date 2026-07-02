@@ -1,10 +1,26 @@
 {
   "indexes": [
     {
-      "collectionGroup": "referrals",
+      "collectionId": "referrals",
       "queryScope": "COLLECTION",
       "fields": [
         { "fieldPath": "referentBusinessId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionId": "referrals",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "referreeBusinessId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionId": "referrals",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
         { "fieldPath": "createdAt", "order": "DESCENDING" }
       ]
     }
