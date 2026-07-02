@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useRef, useState, useEffect } from 'react';
@@ -31,7 +30,6 @@ function CarouselItemCard({ item, index, onUpload, onRemove, onSloganChange }: {
   onRemove: (id: string) => void;
   onSloganChange: (id: string, field: 'slogan', value: string) => void;
 }) {
-  const replaceInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
 
@@ -92,7 +90,7 @@ function CarouselItemCard({ item, index, onUpload, onRemove, onSloganChange }: {
                 <UploadCloud className="h-8 w-8 mx-auto text-muted-foreground" />
                 <p className="mt-2 font-semibold">Haz clic para subir una imagen o video</p>
                 <p className="text-lg font-bold text-muted-foreground mt-2">1920×600 px</p>
-                <p className="text-xs text-muted-foreground">Carrusel (productos de cualquier tipo)</p>
+                <p className="text-xs text-muted-foreground">Carrusel Markix</p>
               </div>
             )}
           </div>
@@ -192,29 +190,34 @@ export default function EditorHeaderConfigForm({ data, setData }: EditorHeaderCo
   const { data: business } = useDoc<Business>(businessDocRef);
 
   useEffect(() => {
-    // Ensure carousel items exist
-    if (!data.carouselItems || data.carouselItems.length < 3) {
-      const currentItems = data.carouselItems || [];
-      const newItems = Array.from({ length: 3 }, (_, i) => {
-        return currentItems[i] || { id: `carousel-item-${i+1}-${Date.now()}`, mediaUrl: null, mediaType: null, slogan: '' };
-      });
-       if (JSON.stringify(currentItems) !== JSON.stringify(newItems)) {
-         setData((prev) => ({ ...prev, carouselItems: newItems }));
-      }
-    }
-    // Pre-fill business info if not set
-    if (business && !data.businessInfo.name) {
-        setData((prev) => ({
-            ...prev,
-            businessInfo: {
-                ...prev.businessInfo,
+    // Logic to initialize fields if they are missing, without creating infinite loop
+    setData(prev => {
+        let changed = false;
+        const newData = { ...prev };
+
+        // Ensure carousel items exist with stable IDs
+        if (!newData.carouselItems || newData.carouselItems.length < 3) {
+            const currentItems = newData.carouselItems || [];
+            newData.carouselItems = Array.from({ length: 3 }, (_, i) => {
+                return currentItems[i] || { id: `item-${i+1}`, mediaUrl: null, mediaType: null, slogan: '' };
+            });
+            changed = true;
+        }
+
+        // Pre-fill business info if not set
+        if (business && !newData.businessInfo.name) {
+            newData.businessInfo = {
+                ...newData.businessInfo,
                 name: business.name,
                 email: user?.email || '',
-            }
-        }));
-    }
+            };
+            changed = true;
+        }
 
-  }, [data, setData, business, user]);
+        return changed ? newData : prev;
+    });
+
+  }, [business, user, setData]); // Only run when source of truth changes
 
   const handleInputChange = (section: keyof LandingHeaderConfigData, field: string, value: any) => {
     setData((prev) => ({
@@ -305,7 +308,7 @@ export default function EditorHeaderConfigForm({ data, setData }: EditorHeaderCo
         <div className="flex justify-between items-center">
             <div>
                 <CardTitle>Configurar Encabezado y Carrusel</CardTitle>
-                <CardDescription>Personaliza la cabecera que se mostrará en tu página principal pública.</CardDescription>
+                <CardDescription>Personaliza la cabecera que se mostrará en tu página principal pública de Markix.</CardDescription>
             </div>
             <div className="flex gap-2">
                 <Button variant="outline" onClick={handleReset}><RotateCcw className="mr-2 h-4 w-4"/> Restablecer</Button>
@@ -323,7 +326,7 @@ export default function EditorHeaderConfigForm({ data, setData }: EditorHeaderCo
                 onRemove={() => setData((prev) => ({ ...prev, banner: { mediaUrl: null, mediaType: null } }))}
                 aspectRatio="aspect-[1920/500]"
                 dimensions="1920 × 500 px (desktop)"
-                description="Dimensiones recomendadas"
+                description="Dimensiones recomendadas para Markix"
             />
         </div>
 
@@ -334,7 +337,7 @@ export default function EditorHeaderConfigForm({ data, setData }: EditorHeaderCo
               <Label htmlFor="banner-position">
                 {data.bannerPosition === 'above' ? 'Encima del Carrusel' : 'Debajo del Carrusel (Recomendado)'}
               </Label>
-              <p className="text-xs text-muted-foreground">Define el orden visual entre el carrusel y el banner principal.</p>
+              <p className="text-xs text-muted-foreground">Define el orden visual entre el carrusel y el banner principal en tu página de Markix.</p>
             </div>
             <Switch
               id="banner-position"
@@ -386,7 +389,7 @@ export default function EditorHeaderConfigForm({ data, setData }: EditorHeaderCo
         
         <div className="space-y-4">
             <Label className="text-lg font-semibold">Carrusel Promocional</Label>
-            <p className="text-sm text-muted-foreground">Sube aquí las imágenes o videos que se mostrarán en el carrusel principal de tu landing page (máximo 3).</p>
+            <p className="text-sm text-muted-foreground">Sube aquí las imágenes o videos que se mostrarán en el carrusel principal de tu landing page de Markix (máximo 3).</p>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {data.carouselItems.map((item, index) => (
                     <CarouselItemCard

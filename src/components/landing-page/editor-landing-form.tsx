@@ -445,716 +445,711 @@ export default function EditorLandingForm({ data, setData, plans, loadingPlans }
 
 
   return (
-    <Card>
-        <CardHeader>
-            <CardTitle>Panel de Edición</CardTitle>
-        </CardHeader>
-        <CardContent>
-            <Tabs defaultValue="hero" className="w-full">
-                <TabsList className="h-auto p-2 mb-4 bg-muted rounded-lg flex flex-wrap gap-2">
-                    <TabsTrigger value="hero">Principal</TabsTrigger>
-                    <TabsTrigger value="navigation">Navegación</TabsTrigger>
-                    <TabsTrigger value="carousel">Carrusel</TabsTrigger>
-                    <TabsTrigger value="sections">Secciones</TabsTrigger>
-                    <TabsTrigger value="testimonials">Testimonios</TabsTrigger>
-                    <TabsTrigger value="planes">Planes</TabsTrigger>
-                    <TabsTrigger value="seo">SEO</TabsTrigger>
-                    <TabsTrigger value="form">Formulario</TabsTrigger>
-                </TabsList>
-                
-                {/* HERO TAB */}
-                <TabsContent value="hero">
-                    <div className="space-y-4">
-                        <CardTitle className="text-lg">Configuración del Hero</CardTitle>
+    <div className="space-y-6">
+        <Tabs defaultValue="hero" className="w-full">
+            <TabsList className="h-auto p-2 mb-4 bg-muted rounded-lg flex flex-wrap gap-2">
+                <TabsTrigger value="hero">Principal</TabsTrigger>
+                <TabsTrigger value="navigation">Navegación</TabsTrigger>
+                <TabsTrigger value="carousel">Carrusel</TabsTrigger>
+                <TabsTrigger value="sections">Secciones</TabsTrigger>
+                <TabsTrigger value="testimonials">Testimonios</TabsTrigger>
+                <TabsTrigger value="planes">Planes</TabsTrigger>
+                <TabsTrigger value="seo">SEO</TabsTrigger>
+                <TabsTrigger value="form">Formulario</TabsTrigger>
+            </TabsList>
+            
+            {/* HERO TAB */}
+            <TabsContent value="hero">
+                <div className="space-y-4">
+                    <CardTitle className="text-lg">Configuración del Hero</CardTitle>
+                    <div>
+                        <Label htmlFor="hero-title">Título Principal</Label>
+                        <Input id="hero-title" value={data.hero.title} onChange={(e) => handleInputChange('hero', 'title', e.target.value)} />
+                    </div>
+                     <div>
+                        <Label htmlFor="hero-subtitle">Subtítulo</Label>
+                        <Input id="hero-subtitle" value={data.hero.subtitle} onChange={(e) => handleInputChange('hero', 'subtitle', e.target.value)} />
+                    </div>
+                    <div>
+                        <Label>Contenido Adicional</Label>
+                         <RichTextEditor
+                            value={data.hero.additionalContent}
+                            onChange={(content) => handleInputChange('hero', 'additionalContent', content)}
+                            placeholder="Escribe aquí..."
+                        />
+                    </div>
+                    <div>
+                        <Label htmlFor="hero-image">URL de Imagen del Hero</Label>
+                        <Input id="hero-image" value={data.hero.imageUrl ?? ''} onChange={(e) => handleInputChange('hero', 'imageUrl', e.target.value)} />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
                         <div>
-                            <Label htmlFor="hero-title">Título Principal</Label>
-                            <Input id="hero-title" value={data.hero.title} onChange={(e) => handleInputChange('hero', 'title', e.target.value)} />
-                        </div>
-                         <div>
-                            <Label htmlFor="hero-subtitle">Subtítulo</Label>
-                            <Input id="hero-subtitle" value={data.hero.subtitle} onChange={(e) => handleInputChange('hero', 'subtitle', e.target.value)} />
+                            <Label htmlFor="hero-cta-text">Texto del Botón CTA</Label>
+                            <Input id="hero-cta-text" value={data.hero.ctaButtonText} onChange={(e) => handleInputChange('hero', 'ctaButtonText', e.target.value)} />
                         </div>
                         <div>
-                            <Label>Contenido Adicional</Label>
-                             <RichTextEditor
-                                value={data.hero.additionalContent}
-                                onChange={(content) => handleInputChange('hero', 'additionalContent', content)}
-                                placeholder="Escribe aquí..."
-                            />
-                        </div>
-                        <div>
-                            <Label htmlFor="hero-image">URL de Imagen del Hero</Label>
-                            <Input id="hero-image" value={data.hero.imageUrl ?? ''} onChange={(e) => handleInputChange('hero', 'imageUrl', e.target.value)} />
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                            <div>
-                                <Label htmlFor="hero-cta-text">Texto del Botón CTA</Label>
-                                <Input id="hero-cta-text" value={data.hero.ctaButtonText} onChange={(e) => handleInputChange('hero', 'ctaButtonText', e.target.value)} />
-                            </div>
-                            <div>
-                                <Label htmlFor="hero-cta-url">URL del Botón CTA</Label>
-                                <Input id="hero-cta-url" value={data.hero.ctaButtonUrl} onChange={(e) => handleInputChange('hero', 'ctaButtonUrl', e.target.value)} />
-                            </div>
-                        </div>
-                        <div className="grid grid-cols-3 gap-4">
-                            <div>
-                                <Label htmlFor="hero-bg-color">Color de Fondo</Label>
-                                <Input id="hero-bg-color" type="color" value={data.hero.backgroundColor} onChange={(e) => handleInputChange('hero', 'backgroundColor', e.target.value)} className="p-1"/>
-                            </div>
-                            <div>
-                                <Label htmlFor="hero-text-color">Color de Texto</Label>
-                                <Input id="hero-text-color" type="color" value={data.hero.textColor} onChange={(e) => handleInputChange('hero', 'textColor', e.target.value)} className="p-1"/>
-                            </div>
-                            <div>
-                                <Label htmlFor="hero-btn-color">Color del Botón</Label>
-                                <Input id="hero-btn-color" type="color" value={data.hero.buttonColor} onChange={(e) => handleInputChange('hero', 'buttonColor', e.target.value)} className="p-1"/>
-                            </div>
-                        </div>
-                        
-                        {/* Social Media Section */}
-                        <div className="space-y-4 pt-4">
-                            <Label className="text-lg font-semibold">Redes Sociales</Label>
-                            <Card className="bg-muted/30">
-                                <CardContent className="p-6 space-y-4">
-                                    {Object.keys(data.header.socialLinks).map(key => (
-                                        <div key={key} className="flex items-center gap-4">
-                                            <div className={cn("h-10 w-10 flex-shrink-0 flex items-center justify-center rounded-full text-white", {
-                                                'bg-black': key === 'tiktok' || key === 'twitter',
-                                                'bg-gradient-to-br from-pink-500 via-red-500 to-yellow-500': key === 'instagram',
-                                                'bg-[#1877F2]': key === 'facebook',
-                                                'bg-[#25D366]': key === 'whatsapp',
-                                            })}>
-                                                {key === 'twitter' ? <XIcon className="h-5 w-5" /> : socialIcons[key as keyof typeof socialIcons]}
-                                            </div>
-                                            <Input 
-                                                placeholder={`https://www.${key}.com/...`}
-                                                value={(data.header.socialLinks as any)[key]}
-                                                onChange={e => {
-                                                    const updatedSocialLinks = { ...data.header.socialLinks, [key]: e.target.value };
-                                                    handleInputChange('header', 'socialLinks', updatedSocialLinks);
-                                                }}
-                                            />
-                                        </div>
-                                    ))}
-                                </CardContent>
-                            </Card>
+                            <Label htmlFor="hero-cta-url">URL del Botón CTA</Label>
+                            <Input id="hero-cta-url" value={data.hero.ctaButtonUrl} onChange={(e) => handleInputChange('hero', 'ctaButtonUrl', e.target.value)} />
                         </div>
                     </div>
-                </TabsContent>
+                    <div className="grid grid-cols-3 gap-4">
+                        <div>
+                            <Label htmlFor="hero-bg-color">Color de Fondo</Label>
+                            <Input id="hero-bg-color" type="color" value={data.hero.backgroundColor} onChange={(e) => handleInputChange('hero', 'backgroundColor', e.target.value)} className="p-1"/>
+                        </div>
+                        <div>
+                            <Label htmlFor="hero-text-color">Color de Texto</Label>
+                            <Input id="hero-text-color" type="color" value={data.hero.textColor} onChange={(e) => handleInputChange('hero', 'textColor', e.target.value)} className="p-1"/>
+                        </div>
+                        <div>
+                            <Label htmlFor="hero-btn-color">Color del Botón</Label>
+                            <Input id="hero-btn-color" type="color" value={data.hero.buttonColor} onChange={(e) => handleInputChange('hero', 'buttonColor', e.target.value)} className="p-1"/>
+                        </div>
+                    </div>
+                    
+                    {/* Social Media Section */}
+                    <div className="space-y-4 pt-4">
+                        <Label className="text-lg font-semibold">Redes Sociales</Label>
+                        <Card className="bg-muted/30">
+                            <CardContent className="p-6 space-y-4">
+                                {Object.keys(data.header.socialLinks).map(key => (
+                                    <div key={key} className="flex items-center gap-4">
+                                        <div className={cn("h-10 w-10 flex-shrink-0 flex items-center justify-center rounded-full text-white", {
+                                            'bg-black': key === 'tiktok' || key === 'twitter',
+                                            'bg-gradient-to-br from-pink-500 via-red-500 to-yellow-500': key === 'instagram',
+                                            'bg-[#1877F2]': key === 'facebook',
+                                            'bg-[#25D366]': key === 'whatsapp',
+                                        })}>
+                                            {key === 'twitter' ? <XIcon className="h-5 w-5" /> : socialIcons[key as keyof typeof socialIcons]}
+                                        </div>
+                                        <Input 
+                                            placeholder={`https://www.${key}.com/...`}
+                                            value={(data.header.socialLinks as any)[key]}
+                                            onChange={e => {
+                                                const updatedSocialLinks = { ...data.header.socialLinks, [key]: e.target.value };
+                                                handleInputChange('header', 'socialLinks', updatedSocialLinks);
+                                            }}
+                                        />
+                                    </div>
+                                ))}
+                            </CardContent>
+                        </Card>
+                    </div>
+                </div>
+            </TabsContent>
 
-                {/* NAVIGATION TAB */}
-                <TabsContent value="navigation">
-                    <Accordion type="multiple" defaultValue={["item-1"]} className="w-full space-y-4">
-                        <AccordionItem value="item-1" className="border rounded-lg">
-                            <AccordionTrigger className="p-4 text-lg font-semibold hover:no-underline">Barra Superior (Header)</AccordionTrigger>
-                            <AccordionContent className="space-y-6 pt-4 px-4">
-                                <div className="flex items-center justify-between rounded-lg border p-4">
-                                    <Label htmlFor="nav-enabled" className="flex flex-col space-y-1">
-                                        <span>Habilitar Barra Superior</span>
-                                        <span className="font-normal leading-snug text-muted-foreground">
-                                        Controla la visibilidad de toda la barra de navegación.
-                                        </span>
-                                    </Label>
-                                    <Switch
-                                        id="nav-enabled"
-                                        checked={data.navigation.enabled}
-                                        onCheckedChange={(checked) => handleInputChange('navigation', 'enabled', checked)}
+            {/* NAVIGATION TAB */}
+            <TabsContent value="navigation">
+                <Accordion type="multiple" defaultValue={["item-1"]} className="w-full space-y-4">
+                    <AccordionItem value="item-1" className="border rounded-lg">
+                        <AccordionTrigger className="p-4 text-lg font-semibold hover:no-underline">Barra Superior (Header)</AccordionTrigger>
+                        <AccordionContent className="space-y-6 pt-4 px-4">
+                            <div className="flex items-center justify-between rounded-lg border p-4">
+                                <Label htmlFor="nav-enabled" className="flex flex-col space-y-1">
+                                    <span>Habilitar Barra Superior</span>
+                                    <span className="font-normal leading-snug text-muted-foreground">
+                                    Controla la visibilidad de toda la barra de navegación.
+                                    </span>
+                                </Label>
+                                <Switch
+                                    id="nav-enabled"
+                                    checked={data.navigation.enabled}
+                                    onCheckedChange={(checked) => handleInputChange('navigation', 'enabled', checked)}
+                                />
+                            </div>
+
+                            <div className="space-y-4 p-4 border rounded-lg">
+                                <h3 className="font-medium">Sección de Logo</h3>
+                                <MediaUploader
+                                    mediaUrl={data.navigation.logoUrl}
+                                    mediaType="image"
+                                    onUpload={handleLogoUpload}
+                                    onRemove={() => handleInputChange('navigation', 'logoUrl', '')}
+                                    accept="image/*"
+                                    dimensions="500x500px"
+                                    description="Logo"
+                                    isIcon={true}
+                                />
+                                <div>
+                                    <Label htmlFor="nav-logo-alt">Texto Alternativo (si no hay logo)</Label>
+                                    <Input id="nav-logo-alt" value={data.navigation.logoAlt} onChange={(e) => handleInputChange('navigation', 'logoAlt', e.target.value)} />
+                                </div>
+                                <div>
+                                    <Label>Ancho del Logo: {data.navigation.logoWidth}px</Label>
+                                    <Slider
+                                        value={[data.navigation.logoWidth]}
+                                        onValueChange={(value) => handleInputChange('navigation', 'logoWidth', value[0])}
+                                        min={20}
+                                        max={300}
+                                        step={5}
                                     />
                                 </div>
+                                <div>
+                                    <Label>Alineación del Logo</Label>
+                                    <div className="flex gap-2 mt-2">
+                                        <Button variant={data.navigation.logoAlignment === 'left' ? 'secondary' : 'ghost'} size="icon" onClick={() => handleInputChange('navigation', 'logoAlignment', 'left')}><AlignLeft/></Button>
+                                        <Button variant={data.navigation.logoAlignment === 'center' ? 'secondary' : 'ghost'} size="icon" onClick={() => handleInputChange('navigation', 'logoAlignment', 'center')}><AlignCenter/></Button>
+                                        <Button variant={data.navigation.logoAlignment === 'right' ? 'secondary' : 'ghost'} size="icon" onClick={() => handleInputChange('navigation', 'logoAlignment', 'right')}><AlignRight/></Button>
+                                    </div>
+                                </div>
+                            </div>
 
-                                <div className="space-y-4 p-4 border rounded-lg">
-                                    <h3 className="font-medium">Sección de Logo</h3>
-                                    <MediaUploader
-                                        mediaUrl={data.navigation.logoUrl}
-                                        mediaType="image"
-                                        onUpload={handleLogoUpload}
-                                        onRemove={() => handleInputChange('navigation', 'logoUrl', '')}
-                                        accept="image/*"
-                                        dimensions="500x500px"
-                                        description="Logo"
-                                        isIcon={true}
-                                    />
+                            <div className="space-y-4 p-4 border rounded-lg">
+                                <h3 className="font-medium">Enlaces de Navegación</h3>
+                                <div className="space-y-3">
+                                    {data.navigation.links.map((link) => (
+                                        <div key={link.id} className="flex items-center gap-2 p-2 border rounded-md bg-muted/50">
+                                            <GripVertical className="h-5 w-5 text-muted-foreground cursor-grab" />
+                                            <div className="grid grid-cols-2 gap-2 flex-1">
+                                                <Input placeholder="Texto del enlace" value={link.text} onChange={(e) => handleNavLinkChange(link.id, 'text', e.target.value)} />
+                                                <Input placeholder="URL" value={link.url} onChange={(e) => handleNavLinkChange(link.id, 'url', e.target.value)} />
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <Label htmlFor={`enabled-${link.id}`} className="text-xs">Activado</Label>
+                                                <Switch id={`enabled-${link.id}`} checked={link.enabled} onCheckedChange={(checked) => handleNavLinkChange(link.id, 'enabled', checked)} />
+                                            </div>
+                                            <Button variant="ghost" size="icon" onClick={() => removeNavLink(link.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                                        </div>
+                                    ))}
+                                </div>
+                                <Button onClick={addNavLink}>Añadir Enlace</Button>
+                            </div>
+
+                            <div className="space-y-4 p-4 border rounded-lg">
+                                <h3 className="font-medium">Estilos</h3>
+                                <div className="grid grid-cols-3 gap-4">
                                     <div>
-                                        <Label htmlFor="nav-logo-alt">Texto Alternativo (si no hay logo)</Label>
-                                        <Input id="nav-logo-alt" value={data.navigation.logoAlt} onChange={(e) => handleInputChange('navigation', 'logoAlt', e.target.value)} />
+                                        <Label htmlFor="nav-bg-color">Color de Fondo</Label>
+                                        <Input id="nav-bg-color" type="color" value={data.navigation.backgroundColor} onChange={(e) => handleInputChange('navigation', 'backgroundColor', e.target.value)} className="p-1 h-10"/>
                                     </div>
                                     <div>
-                                        <Label>Ancho del Logo: {data.navigation.logoWidth}px</Label>
+                                        <Label htmlFor="nav-text-color">Color de Texto</Label>
+                                        <Input id="nav-text-color" type="color" value={data.navigation.textColor} onChange={(e) => handleInputChange('navigation', 'textColor', e.target.value)} className="p-1 h-10"/>
+                                    </div>
+                                    <div>
+                                        <Label htmlFor="nav-hover-color">Color de Hover</Label>
+                                        <Input id="nav-hover-color" type="color" value={data.navigation.hoverColor} onChange={(e) => handleInputChange('navigation', 'hoverColor', e.target.value)} className="p-1 h-10"/>
+                                    </div>
+                                </div>
+                                 <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <Label>Tamaño de Fuente: {data.navigation.fontSize}px</Label>
                                         <Slider
-                                            value={[data.navigation.logoWidth]}
-                                            onValueChange={(value) => handleInputChange('navigation', 'logoWidth', value[0])}
-                                            min={20}
-                                            max={300}
-                                            step={5}
+                                            value={[data.navigation.fontSize]}
+                                            onValueChange={(value) => handleInputChange('navigation', 'fontSize', value[0])}
+                                            min={12} max={24} step={1}
                                         />
                                     </div>
                                     <div>
-                                        <Label>Alineación del Logo</Label>
-                                        <div className="flex gap-2 mt-2">
-                                            <Button variant={data.navigation.logoAlignment === 'left' ? 'secondary' : 'ghost'} size="icon" onClick={() => handleInputChange('navigation', 'logoAlignment', 'left')}><AlignLeft/></Button>
-                                            <Button variant={data.navigation.logoAlignment === 'center' ? 'secondary' : 'ghost'} size="icon" onClick={() => handleInputChange('navigation', 'logoAlignment', 'center')}><AlignCenter/></Button>
-                                            <Button variant={data.navigation.logoAlignment === 'right' ? 'secondary' : 'ghost'} size="icon" onClick={() => handleInputChange('navigation', 'logoAlignment', 'right')}><AlignRight/></Button>
-                                        </div>
+                                        <Label>Espaciado entre enlaces: {data.navigation.spacing}</Label>
+                                        <Slider
+                                            value={[data.navigation.spacing]}
+                                            onValueChange={(value) => handleInputChange('navigation', 'spacing', value[0])}
+                                            min={1} max={10} step={1}
+                                        />
                                     </div>
                                 </div>
+                                <div className="flex items-center gap-2">
+                                    <Switch id="nav-shadow" checked={data.navigation.useShadow} onCheckedChange={(checked) => handleInputChange('navigation', 'useShadow', checked)} />
+                                    <Label htmlFor="nav-shadow">Añadir Sombra</Label>
+                                </div>
+                            </div>
+                        </AccordionContent>
+                    </AccordionItem>
+                    <AccordionItem value="item-2" className="border rounded-lg">
+                        <AccordionTrigger className="p-4 text-lg font-semibold hover:no-underline">Pie de Página (Footer)</AccordionTrigger>
+                        <AccordionContent className="p-4 pt-2 space-y-6">
+                            <div className="flex items-center justify-between rounded-lg border p-4">
+                                <Label htmlFor="footer-enabled" className="flex flex-col space-y-1">
+                                    <span>Habilitar Pie de Página</span>
+                                    <span className="font-normal leading-snug text-muted-foreground">
+                                    Controla la visibilidad de toda la sección del footer.
+                                    </span>
+                                </Label>
+                                <Switch
+                                    id="footer-enabled"
+                                    checked={data.footer.enabled}
+                                    onCheckedChange={(checked) => setData((prev) => ({ ...prev, footer: { ...prev.footer, enabled: checked }}))}
+                                />
+                            </div>
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle className="text-base">1. Información de Contacto</CardTitle>
+                                </CardHeader>
+                                <CardContent className="space-y-4">
+                                    <Input placeholder="Dirección física" value={data.footer.contactInfo.address} onChange={(e) => handleFooterChange('contactInfo', 'address', e.target.value)} />
+                                    <Input placeholder="Teléfono/WhatsApp" value={data.footer.contactInfo.phone} onChange={(e) => handleFooterChange('contactInfo', 'phone', e.target.value)} />
+                                    <Input placeholder="Correo electrónico" type="email" value={data.footer.contactInfo.email} onChange={(e) => handleFooterChange('contactInfo', 'email', e.target.value)} />
+                                    <Input placeholder="Horarios de atención" value={data.footer.contactInfo.hours} onChange={(e) => handleFooterChange('contactInfo', 'hours', e.target.value)} />
+                                </CardContent>
+                            </Card>
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle className="text-base">2. Enlaces Rápidos</CardTitle>
+                                </CardHeader>
+                                <CardContent className="space-y-2">
+                                    {data.footer.quickLinks.map(link => (
+                                        <div key={link.id} className="flex gap-2 items-center">
+                                            <Input placeholder="Texto" value={link.text} onChange={e => handleFooterLinkChange(link.id, 'text', e.target.value)} />
+                                            <Input placeholder="URL" value={link.url} onChange={e => handleFooterLinkChange(link.id, 'url', e.target.value)} />
+                                            <Button variant="ghost" size="icon" onClick={() => removeFooterLink(link.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                                        </div>
+                                    ))}
+                                    <Button variant="outline" size="sm" onClick={addFooterLink}>Añadir Enlace Rápido</Button>
+                                </CardContent>
+                            </Card>
+                            <Card>
+                                <CardHeader><CardTitle className="text-base">4. Redes Sociales</CardTitle></CardHeader>
+                                <CardContent className="space-y-2">
+                                    <Input placeholder="URL Facebook" value={data.footer.socialLinks.facebookUrl} onChange={e => handleFooterChange('socialLinks', 'facebookUrl', e.target.value)} />
+                                    <Input placeholder="URL Instagram" value={data.footer.socialLinks.instagramUrl} onChange={e => handleFooterChange('socialLinks', 'instagramUrl', e.target.value)} />
+                                    <Input placeholder="URL TikTok" value={data.footer.socialLinks.tiktokUrl} onChange={e => handleFooterChange('socialLinks', 'tiktokUrl', e.target.value)} />
+                                    <Input placeholder="URL YouTube" value={data.footer.socialLinks.youtubeUrl} onChange={e => handleFooterChange('socialLinks', 'youtubeUrl', e.target.value)} />
+                                    <Input placeholder="URL LinkedIn" value={data.footer.socialLinks.linkedinUrl} onChange={e => handleFooterChange('socialLinks', 'linkedinUrl', e.target.value)} />
+                                    <div className="flex items-center gap-2 pt-2">
+                                        <Switch id="footer-show-social" checked={data.footer.socialLinks.showIcons} onCheckedChange={checked => handleFooterChange('socialLinks', 'showIcons', checked)} />
+                                        <Label htmlFor="footer-show-social">Mostrar iconos de redes sociales</Label>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        </AccordionContent>
+                    </AccordionItem>
+                </Accordion>
+            </TabsContent>
 
-                                <div className="space-y-4 p-4 border rounded-lg">
-                                    <h3 className="font-medium">Enlaces de Navegación</h3>
-                                    <div className="space-y-3">
-                                        {data.navigation.links.map((link) => (
-                                            <div key={link.id} className="flex items-center gap-2 p-2 border rounded-md bg-muted/50">
-                                                <GripVertical className="h-5 w-5 text-muted-foreground cursor-grab" />
-                                                <div className="grid grid-cols-2 gap-2 flex-1">
-                                                    <Input placeholder="Texto del enlace" value={link.text} onChange={(e) => handleNavLinkChange(link.id, 'text', e.target.value)} />
-                                                    <Input placeholder="URL" value={link.url} onChange={(e) => handleNavLinkChange(link.id, 'url', e.target.value)} />
-                                                </div>
-                                                <div className="flex items-center gap-2">
-                                                    <Label htmlFor={`enabled-${link.id}`} className="text-xs">Activado</Label>
-                                                    <Switch id={`enabled-${link.id}`} checked={link.enabled} onCheckedChange={(checked) => handleNavLinkChange(link.id, 'enabled', checked)} />
-                                                </div>
-                                                <Button variant="ghost" size="icon" onClick={() => removeNavLink(link.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+            {/* CAROUSEL TAB */}
+            <TabsContent value="carousel">
+                 <EditorHeaderConfigForm
+                    data={data.header}
+                    setData={(valOrUpdater) => setData(prev => ({
+                        ...prev,
+                        header: typeof valOrUpdater === 'function'
+                            ? (valOrUpdater as any)(prev.header)
+                            : valOrUpdater
+                    }))}
+                />
+            </TabsContent>
+            
+            {/* SECTIONS TAB */}
+            <TabsContent value="sections">
+                <div className="space-y-4">
+                    <div className="flex justify-between items-center">
+                        <CardTitle className="text-lg">Secciones de Contenido</CardTitle>
+                        <Button onClick={addContentSection} size="sm">
+                            <PlusCircle className="mr-2 h-4 w-4" />
+                            Agregar Sección
+                        </Button>
+                    </div>
+                    {data.sections.length > 0 ? (
+                        <Accordion type="multiple" className="w-full space-y-4">
+                            {data.sections.map((section, index) => (
+                                <AccordionItem key={section.id} value={`item-${index}`} className="border rounded-lg bg-background">
+                                    <AccordionTrigger className="p-4 text-base font-semibold hover:no-underline">
+                                        <div className="flex items-center gap-2 flex-1 truncate">
+                                            <GripVertical className="h-5 w-5 text-muted-foreground cursor-grab" />
+                                            <span className="truncate">{section.title}</span>
+                                        </div>
+                                    </AccordionTrigger>
+                                    <AccordionContent className="p-4 pt-0 space-y-4">
+                                        <div className="flex justify-end">
+                                            <Button variant="destructive" size="sm" onClick={() => removeContentSection(section.id)}>
+                                                <Trash2 className="mr-2 h-4 w-4" />
+                                                Eliminar Sección
+                                            </Button>
+                                        </div>
+                                        <div>
+                                            <Label>Título</Label>
+                                            <Input value={section.title} onChange={(e) => updateContentSection(section.id, 'title', e.target.value)} />
+                                        </div>
+                                        <div>
+                                            <Label>Subtítulo</Label>
+                                            <Input value={section.subtitle} onChange={(e) => updateContentSection(section.id, 'subtitle', e.target.value)} />
+                                        </div>
+                                        <div>
+                                            <Label>Contenido</Label>
+                                            <RichTextEditor value={section.content} onChange={(content) => updateContentSection(section.id, 'content', content)} />
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <Label>Color de Fondo</Label>
+                                                <Input type="color" value={section.backgroundColor} onChange={(e) => updateContentSection(section.id, 'backgroundColor', e.target.value)} className="p-1 h-10" />
                                             </div>
-                                        ))}
-                                    </div>
-                                    <Button onClick={addNavLink}>Añadir Enlace</Button>
-                                </div>
-
-                                <div className="space-y-4 p-4 border rounded-lg">
-                                    <h3 className="font-medium">Estilos</h3>
-                                    <div className="grid grid-cols-3 gap-4">
-                                        <div>
-                                            <Label htmlFor="nav-bg-color">Color de Fondo</Label>
-                                            <Input id="nav-bg-color" type="color" value={data.navigation.backgroundColor} onChange={(e) => handleInputChange('navigation', 'backgroundColor', e.target.value)} className="p-1 h-10"/>
-                                        </div>
-                                        <div>
-                                            <Label htmlFor="nav-text-color">Color de Texto</Label>
-                                            <Input id="nav-text-color" type="color" value={data.navigation.textColor} onChange={(e) => handleInputChange('navigation', 'textColor', e.target.value)} className="p-1 h-10"/>
-                                        </div>
-                                        <div>
-                                            <Label htmlFor="nav-hover-color">Color de Hover</Label>
-                                            <Input id="nav-hover-color" type="color" value={data.navigation.hoverColor} onChange={(e) => handleInputChange('navigation', 'hoverColor', e.target.value)} className="p-1 h-10"/>
-                                        </div>
-                                    </div>
-                                     <div className="grid grid-cols-2 gap-4">
-                                        <div>
-                                            <Label>Tamaño de Fuente: {data.navigation.fontSize}px</Label>
-                                            <Slider
-                                                value={[data.navigation.fontSize]}
-                                                onValueChange={(value) => handleInputChange('navigation', 'fontSize', value[0])}
-                                                min={12} max={24} step={1}
-                                            />
-                                        </div>
-                                        <div>
-                                            <Label>Espaciado entre enlaces: {data.navigation.spacing}</Label>
-                                            <Slider
-                                                value={[data.navigation.spacing]}
-                                                onValueChange={(value) => handleInputChange('navigation', 'spacing', value[0])}
-                                                min={1} max={10} step={1}
-                                            />
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <Switch id="nav-shadow" checked={data.navigation.useShadow} onCheckedChange={(checked) => handleInputChange('navigation', 'useShadow', checked)} />
-                                        <Label htmlFor="nav-shadow">Añadir Sombra</Label>
-                                    </div>
-                                </div>
-                            </AccordionContent>
-                        </AccordionItem>
-                        <AccordionItem value="item-2" className="border rounded-lg">
-                            <AccordionTrigger className="p-4 text-lg font-semibold hover:no-underline">Pie de Página (Footer)</AccordionTrigger>
-                            <AccordionContent className="p-4 pt-2 space-y-6">
-                                <div className="flex items-center justify-between rounded-lg border p-4">
-                                    <Label htmlFor="footer-enabled" className="flex flex-col space-y-1">
-                                        <span>Habilitar Pie de Página</span>
-                                        <span className="font-normal leading-snug text-muted-foreground">
-                                        Controla la visibilidad de toda la sección del footer.
-                                        </span>
-                                    </Label>
-                                    <Switch
-                                        id="footer-enabled"
-                                        checked={data.footer.enabled}
-                                        onCheckedChange={(checked) => setData((prev) => ({ ...prev, footer: { ...prev.footer, enabled: checked }}))}
-                                    />
-                                </div>
-                                <Card>
-                                    <CardHeader>
-                                        <CardTitle className="text-base">1. Información de Contacto</CardTitle>
-                                    </CardHeader>
-                                    <CardContent className="space-y-4">
-                                        <Input placeholder="Dirección física" value={data.footer.contactInfo.address} onChange={(e) => handleFooterChange('contactInfo', 'address', e.target.value)} />
-                                        <Input placeholder="Teléfono/WhatsApp" value={data.footer.contactInfo.phone} onChange={(e) => handleFooterChange('contactInfo', 'phone', e.target.value)} />
-                                        <Input placeholder="Correo electrónico" type="email" value={data.footer.contactInfo.email} onChange={(e) => handleFooterChange('contactInfo', 'email', e.target.value)} />
-                                        <Input placeholder="Horarios de atención" value={data.footer.contactInfo.hours} onChange={(e) => handleFooterChange('contactInfo', 'hours', e.target.value)} />
-                                    </CardContent>
-                                </Card>
-                                <Card>
-                                    <CardHeader>
-                                        <CardTitle className="text-base">2. Enlaces Rápidos</CardTitle>
-                                    </CardHeader>
-                                    <CardContent className="space-y-2">
-                                        {data.footer.quickLinks.map(link => (
-                                            <div key={link.id} className="flex gap-2 items-center">
-                                                <Input placeholder="Texto" value={link.text} onChange={e => handleFooterLinkChange(link.id, 'text', e.target.value)} />
-                                                <Input placeholder="URL" value={link.url} onChange={e => handleFooterLinkChange(link.id, 'url', e.target.value)} />
-                                                <Button variant="ghost" size="icon" onClick={() => removeFooterLink(link.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                                            <div>
+                                                <Label>Color de Texto</Label>
+                                                <Input type="color" value={section.textColor} onChange={(e) => updateContentSection(section.id, 'textColor', e.target.value)} className="p-1 h-10" />
                                             </div>
-                                        ))}
-                                        <Button variant="outline" size="sm" onClick={addFooterLink}>Añadir Enlace Rápido</Button>
-                                    </CardContent>
-                                </Card>
-                                <Card>
-                                    <CardHeader><CardTitle className="text-base">4. Redes Sociales</CardTitle></CardHeader>
-                                    <CardContent className="space-y-2">
-                                        <Input placeholder="URL Facebook" value={data.footer.socialLinks.facebookUrl} onChange={e => handleFooterChange('socialLinks', 'facebookUrl', e.target.value)} />
-                                        <Input placeholder="URL Instagram" value={data.footer.socialLinks.instagramUrl} onChange={e => handleFooterChange('socialLinks', 'instagramUrl', e.target.value)} />
-                                        <Input placeholder="URL TikTok" value={data.footer.socialLinks.tiktokUrl} onChange={e => handleFooterChange('socialLinks', 'tiktokUrl', e.target.value)} />
-                                        <Input placeholder="URL YouTube" value={data.footer.socialLinks.youtubeUrl} onChange={e => handleFooterChange('socialLinks', 'youtubeUrl', e.target.value)} />
-                                        <Input placeholder="URL LinkedIn" value={data.footer.socialLinks.linkedinUrl} onChange={e => handleFooterChange('socialLinks', 'linkedinUrl', e.target.value)} />
-                                        <div className="flex items-center gap-2 pt-2">
-                                            <Switch id="footer-show-social" checked={data.footer.socialLinks.showIcons} onCheckedChange={checked => handleFooterChange('socialLinks', 'showIcons', checked)} />
-                                            <Label htmlFor="footer-show-social">Mostrar iconos de redes sociales</Label>
                                         </div>
-                                    </CardContent>
-                                </Card>
-                            </AccordionContent>
-                        </AccordionItem>
-                    </Accordion>
-                </TabsContent>
-
-                {/* CAROUSEL TAB */}
-                <TabsContent value="carousel">
-                     <EditorHeaderConfigForm
-                        data={data.header}
-                        setData={(valOrUpdater) => setData(prev => ({
-                            ...prev,
-                            header: typeof valOrUpdater === 'function'
-                                ? (valOrUpdater as any)(prev.header)
-                                : valOrUpdater
-                        }))}
-                    />
-                </TabsContent>
-                
-                {/* SECTIONS TAB */}
-                <TabsContent value="sections">
-                    <div className="space-y-4">
-                        <div className="flex justify-between items-center">
-                            <CardTitle className="text-lg">Secciones de Contenido</CardTitle>
-                            <Button onClick={addContentSection} size="sm">
-                                <PlusCircle className="mr-2 h-4 w-4" />
-                                Agregar Sección
-                            </Button>
-                        </div>
-                        {data.sections.length > 0 ? (
-                            <Accordion type="multiple" className="w-full space-y-4">
-                                {data.sections.map((section, index) => (
-                                    <AccordionItem key={section.id} value={`item-${index}`} className="border rounded-lg bg-background">
-                                        <AccordionTrigger className="p-4 text-base font-semibold hover:no-underline">
-                                            <div className="flex items-center gap-2 flex-1 truncate">
-                                                <GripVertical className="h-5 w-5 text-muted-foreground cursor-grab" />
-                                                <span className="truncate">{section.title}</span>
-                                            </div>
-                                        </AccordionTrigger>
-                                        <AccordionContent className="p-4 pt-0 space-y-4">
-                                            <div className="flex justify-end">
-                                                <Button variant="destructive" size="sm" onClick={() => removeContentSection(section.id)}>
-                                                    <Trash2 className="mr-2 h-4 w-4" />
-                                                    Eliminar Sección
+                                        <div className="p-4 border rounded-md mt-4 space-y-4">
+                                            <div className="flex justify-between items-center">
+                                                <h4 className="font-medium">Subsecciones (Tarjetas/Columnas)</h4>
+                                                <Button variant="outline" size="sm" onClick={() => addSubSection(section.id)}>
+                                                    <PlusCircle className="mr-2 h-4 w-4" />
+                                                    Añadir Tarjeta
                                                 </Button>
                                             </div>
-                                            <div>
-                                                <Label>Título</Label>
-                                                <Input value={section.title} onChange={(e) => updateContentSection(section.id, 'title', e.target.value)} />
-                                            </div>
-                                            <div>
-                                                <Label>Subtítulo</Label>
-                                                <Input value={section.subtitle} onChange={(e) => updateContentSection(section.id, 'subtitle', e.target.value)} />
-                                            </div>
-                                            <div>
-                                                <Label>Contenido</Label>
-                                                <RichTextEditor value={section.content} onChange={(content) => updateContentSection(section.id, 'content', content)} />
-                                            </div>
-                                            <div className="grid grid-cols-2 gap-4">
-                                                <div>
-                                                    <Label>Color de Fondo</Label>
-                                                    <Input type="color" value={section.backgroundColor} onChange={(e) => updateContentSection(section.id, 'backgroundColor', e.target.value)} className="p-1 h-10" />
-                                                </div>
-                                                <div>
-                                                    <Label>Color de Texto</Label>
-                                                    <Input type="color" value={section.textColor} onChange={(e) => updateContentSection(section.id, 'textColor', e.target.value)} className="p-1 h-10" />
-                                                </div>
-                                            </div>
-                                            <div className="p-4 border rounded-md mt-4 space-y-4">
-                                                <div className="flex justify-between items-center">
-                                                    <h4 className="font-medium">Subsecciones (Tarjetas/Columnas)</h4>
-                                                    <Button variant="outline" size="sm" onClick={() => addSubSection(section.id)}>
-                                                        <PlusCircle className="mr-2 h-4 w-4" />
-                                                        Añadir Tarjeta
-                                                    </Button>
-                                                </div>
-                                                {section.subsections.length > 0 ? (
-                                                    <div className="space-y-4">
-                                                        {section.subsections.map(sub => (
-                                                            <div key={sub.id} className="p-3 border rounded-lg bg-muted/50 space-y-3">
-                                                                <div className="flex justify-between items-center">
-                                                                    <p className="font-semibold text-sm">{sub.title}</p>
-                                                                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => removeSubSection(section.id, sub.id)}>
-                                                                        <Trash2 className="h-4 w-4 text-destructive" />
-                                                                    </Button>
+                                            {section.subsections.length > 0 ? (
+                                                <div className="space-y-4">
+                                                    {section.subsections.map(sub => (
+                                                        <div key={sub.id} className="p-3 border rounded-lg bg-muted/50 space-y-3">
+                                                            <div className="flex justify-between items-center">
+                                                                <p className="font-semibold text-sm">{sub.title}</p>
+                                                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => removeSubSection(section.id, sub.id)}>
+                                                                    <Trash2 className="h-4 w-4 text-destructive" />
+                                                                </Button>
+                                                            </div>
+                                                            <div className="space-y-2">
+                                                                <MediaUploader
+                                                                    mediaUrl={sub.imageUrl}
+                                                                    mediaType={sub.mediaType}
+                                                                    onUpload={(file) => handleSubSectionMediaUpload(section.id, sub.id, file)}
+                                                                    onRemove={() => updateSubSection(section.id, sub.id, 'imageUrl', null)}
+                                                                    aspectRatio="aspect-[4/3]"
+                                                                    dimensions="600x400px (4:3)"
+                                                                    description="Imagen para tarjeta"
+                                                                />
+                                                                <div>
+                                                                    <Label htmlFor={`sub-title-${sub.id}`}>Título Tarjeta</Label>
+                                                                    <Input id={`sub-title-${sub.id}`} value={sub.title} onChange={(e) => updateSubSection(section.id, sub.id, 'title', e.target.value)} />
                                                                 </div>
-                                                                <div className="space-y-2">
-                                                                    <MediaUploader
-                                                                        mediaUrl={sub.imageUrl}
-                                                                        mediaType={sub.mediaType}
-                                                                        onUpload={(file) => handleSubSectionMediaUpload(section.id, sub.id, file)}
-                                                                        onRemove={() => updateSubSection(section.id, sub.id, 'imageUrl', null)}
-                                                                        aspectRatio="aspect-[4/3]"
-                                                                        dimensions="600x400px (4:3)"
-                                                                        description="Imagen para tarjeta"
+                                                                <div>
+                                                                    <Label htmlFor={`sub-desc-${sub.id}`}>Descripción</Label>
+                                                                    <RichTextEditor 
+                                                                        value={sub.description} 
+                                                                        onChange={(content) => updateSubSection(section.id, sub.id, 'description', content)} 
                                                                     />
-                                                                    <div>
-                                                                        <Label htmlFor={`sub-title-${sub.id}`}>Título Tarjeta</Label>
-                                                                        <Input id={`sub-title-${sub.id}`} value={sub.title} onChange={(e) => updateSubSection(section.id, sub.id, 'title', e.target.value)} />
-                                                                    </div>
-                                                                    <div>
-                                                                        <Label htmlFor={`sub-desc-${sub.id}`}>Descripción</Label>
-                                                                        <RichTextEditor 
-                                                                            value={sub.description} 
-                                                                            onChange={(content) => updateSubSection(section.id, sub.id, 'description', content)} 
-                                                                        />
-                                                                    </div>
                                                                 </div>
                                                             </div>
-                                                        ))}
-                                                    </div>
-                                                ) : (
-                                                    <p className="text-sm text-muted-foreground text-center py-4">No hay subsecciones todavía.</p>
-                                                )}
-                                            </div>
-                                        </AccordionContent>
-                                    </AccordionItem>
-                                ))}
-                            </Accordion>
-                        ) : (
-                            <div className="flex flex-col items-center justify-center text-center p-10 h-64 border rounded-md bg-muted/20">
-                                <p className="text-muted-foreground">Aún no has agregado ninguna sección de contenido.</p>
-                                <p className="text-sm text-muted-foreground">¡Haz clic en "Agregar Sección" para comenzar!</p>
-                            </div>
-                        )}
-                    </div>
-                </TabsContent>
-                
-                {/* TESTIMONIALS TAB */}
-                <TabsContent value="testimonials">
-                    <div className="space-y-4">
-                        <div className="flex justify-between items-center">
-                            <CardTitle className="text-lg">Testimonios de Clientes</CardTitle>
-                            <Button onClick={addTestimonial} size="sm">
-                                <PlusCircle className="mr-2 h-4 w-4" />
-                                Agregar Testimonio
-                            </Button>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                <p className="text-sm text-muted-foreground text-center py-4">No hay subsecciones todavía.</p>
+                                            )}
+                                        </div>
+                                    </AccordionContent>
+                                </AccordionItem>
+                            ))}
+                        </Accordion>
+                    ) : (
+                        <div className="flex flex-col items-center justify-center text-center p-10 h-64 border rounded-md bg-muted/20">
+                            <p className="text-muted-foreground">Aún no has agregado ninguna sección de contenido.</p>
+                            <p className="text-sm text-muted-foreground">¡Haz clic en "Agregar Sección" para comenzar!</p>
                         </div>
-                        {data.testimonials.length > 0 ? (
-                            <Accordion type="multiple" className="w-full space-y-4">
-                                {data.testimonials.map((testimonial, index) => (
-                                    <AccordionItem key={testimonial.id} value={`testimonial-${index}`} className="border rounded-lg bg-background">
-                                        <AccordionTrigger className="p-4 text-base font-semibold hover:no-underline">
-                                            <div className="flex items-center gap-2 flex-1 truncate">
-                                                <GripVertical className="h-5 w-5 text-muted-foreground cursor-grab" />
-                                                <span className="truncate">{testimonial.authorName}</span>
-                                            </div>
-                                        </AccordionTrigger>
-                                        <AccordionContent className="p-4 pt-0 space-y-4">
-                                            <div className="flex justify-end">
-                                                <Button variant="destructive" size="sm" onClick={() => removeTestimonial(testimonial.id)}>
-                                                    <Trash2 className="mr-2 h-4 w-4" />
-                                                    Eliminar Testimonio
-                                                </Button>
-                                            </div>
-                                            <div className="grid grid-cols-2 gap-4">
-                                                <div>
-                                                    <Label>Nombre del Autor</Label>
-                                                    <Input value={testimonial.authorName} onChange={(e) => updateTestimonial(testimonial.id, 'authorName', e.target.value)} />
-                                                </div>
-                                                <div>
-                                                    <Label>Cargo del Autor</Label>
-                                                    <Input value={testimonial.authorRole} onChange={(e) => updateTestimonial(testimonial.id, 'authorRole', e.target.value)} />
-                                                </div>
+                    )}
+                </div>
+            </TabsContent>
+            
+            {/* TESTIMONIALS TAB */}
+            <TabsContent value="testimonials">
+                <div className="space-y-4">
+                    <div className="flex justify-between items-center">
+                        <CardTitle className="text-lg">Testimonios de Clientes</CardTitle>
+                        <Button onClick={addTestimonial} size="sm">
+                            <PlusCircle className="mr-2 h-4 w-4" />
+                            Agregar Testimonio
+                        </Button>
+                    </div>
+                    {data.testimonials.length > 0 ? (
+                        <Accordion type="multiple" className="w-full space-y-4">
+                            {data.testimonials.map((testimonial, index) => (
+                                <AccordionItem key={testimonial.id} value={`testimonial-${index}`} className="border rounded-lg bg-background">
+                                    <AccordionTrigger className="p-4 text-base font-semibold hover:no-underline">
+                                        <div className="flex items-center gap-2 flex-1 truncate">
+                                            <GripVertical className="h-5 w-5 text-muted-foreground cursor-grab" />
+                                            <span className="truncate">{testimonial.authorName}</span>
+                                        </div>
+                                    </AccordionTrigger>
+                                    <AccordionContent className="p-4 pt-0 space-y-4">
+                                        <div className="flex justify-end">
+                                            <Button variant="destructive" size="sm" onClick={() => removeTestimonial(testimonial.id)}>
+                                                <Trash2 className="mr-2 h-4 w-4" />
+                                                Eliminar Testimonio
+                                            </Button>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <Label>Nombre del Autor</Label>
+                                                <Input value={testimonial.authorName} onChange={(e) => updateTestimonial(testimonial.id, 'authorName', e.target.value)} />
                                             </div>
                                             <div>
-                                                <Label>Avatar del Autor</Label>
+                                                <Label>Cargo del Autor</Label>
+                                                <Input value={testimonial.authorRole} onChange={(e) => updateTestimonial(testimonial.id, 'authorRole', e.target.value)} />
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <Label>Avatar del Autor</Label>
+                                            <MediaUploader
+                                                mediaUrl={testimonial.avatarUrl}
+                                                mediaType={testimonial.avatarUrl ? 'image' : null}
+                                                onUpload={(file) => handleTestimonialAvatarUpload(testimonial.id, file)}
+                                                onRemove={() => updateTestimonial(testimonial.id, 'avatarUrl', `https://i.pravatar.cc/100?u=${testimonial.id}`)}
+                                                aspectRatio="aspect-square"
+                                                dimensions="100x100px"
+                                                description="Avatar"
+                                                accept="image/*"
+                                            />
+                                        </div>
+                                        <div>
+                                            <Label>Testimonio</Label>
+                                            <RichTextEditor value={testimonial.text} onChange={(content) => updateTestimonial(testimonial.id, 'text', content)} />
+                                        </div>
+                                        <div>
+                                            <Label>Calificación (1-5 estrellas)</Label>
+                                            <div className="flex items-center gap-1 mt-2">
+                                                {[1, 2, 3, 4, 5].map(star => (
+                                                    <Button key={star} variant="ghost" size="icon" onClick={() => updateTestimonial(testimonial.id, 'rating', star)}>
+                                                        <Star className={cn("h-5 w-5", testimonial.rating >= star ? "text-yellow-400 fill-yellow-400" : "text-muted-foreground")} />
+                                                    </Button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </AccordionContent>
+                                </AccordionItem>
+                            ))}
+                        </Accordion>
+                    ) : (
+                        <div className="flex flex-col items-center justify-center text-center p-10 h-64 border rounded-md bg-muted/20">
+                            <p className="text-muted-foreground">Aún no has agregado ningún testimonio.</p>
+                            <p className="text-sm text-muted-foreground">¡Haz clic en "Agregar Testimonio" para empezar!</p>
+                        </div>
+                    )}
+                </div>
+            </TabsContent>
+
+            {/* PLANES TAB */}
+            <TabsContent value="planes">
+                <div className="space-y-4">
+                    <div className="flex justify-between items-center">
+                        <CardTitle className="text-lg">Configuración de Planes/Precios</CardTitle>
+                        <Button onClick={addPlan} size="sm">
+                            <PlusCircle className="mr-2 h-4 w-4" />
+                            Agregar Plan
+                        </Button>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                        Define los productos o servicios con precio que quieres ofrecer en tu página.
+                    </p>
+                    
+                    {(data.plans && data.plans.length > 0) ? (
+                        <Accordion type="multiple" className="w-full space-y-4">
+                            {data.plans.map((plan, index) => (
+                                <AccordionItem key={plan.id} value={`plan-${index}`} className="border rounded-lg bg-background">
+                                    <AccordionTrigger className="p-4 text-base font-semibold hover:no-underline">
+                                        <div className="flex items-center gap-2 flex-1 truncate">
+                                            <GripVertical className="h-5 w-5 text-muted-foreground cursor-grab" />
+                                            <span className="truncate">{plan.name || 'Sin nombre'} - {plan.currency}{plan.price}</span>
+                                        </div>
+                                    </AccordionTrigger>
+                                    <AccordionContent className="p-4 pt-0 space-y-4">
+                                        <div className="flex justify-end">
+                                            <Button variant="destructive" size="sm" onClick={() => removePlan(plan.id)}>
+                                                <Trash2 className="mr-2 h-4 w-4" />
+                                                Eliminar Plan
+                                            </Button>
+                                        </div>
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                            <div className="md:col-span-1">
+                                                <Label>Imagen del Plan / Producto</Label>
                                                 <MediaUploader
-                                                    mediaUrl={testimonial.avatarUrl}
-                                                    mediaType={testimonial.avatarUrl ? 'image' : null}
-                                                    onUpload={(file) => handleTestimonialAvatarUpload(testimonial.id, file)}
-                                                    onRemove={() => updateTestimonial(testimonial.id, 'avatarUrl', `https://i.pravatar.cc/100?u=${testimonial.id}`)}
+                                                    mediaUrl={plan.imageUrl || null}
+                                                    mediaType={plan.imageUrl ? 'image' : null}
+                                                    onUpload={(file) => handlePlanImageUpload(plan.id, file)}
+                                                    onRemove={() => updatePlan(plan.id, 'imageUrl', null)}
                                                     aspectRatio="aspect-square"
-                                                    dimensions="100x100px"
-                                                    description="Avatar"
+                                                    dimensions="400x400px"
+                                                    description="Imagen"
                                                     accept="image/*"
                                                 />
                                             </div>
-                                            <div>
-                                                <Label>Testimonio</Label>
-                                                <RichTextEditor value={testimonial.text} onChange={(content) => updateTestimonial(testimonial.id, 'text', content)} />
-                                            </div>
-                                            <div>
-                                                <Label>Calificación (1-5 estrellas)</Label>
-                                                <div className="flex items-center gap-1 mt-2">
-                                                    {[1, 2, 3, 4, 5].map(star => (
-                                                        <Button key={star} variant="ghost" size="icon" onClick={() => updateTestimonial(testimonial.id, 'rating', star)}>
-                                                            <Star className={cn("h-5 w-5", testimonial.rating >= star ? "text-yellow-400 fill-yellow-400" : "text-muted-foreground")} />
-                                                        </Button>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        </AccordionContent>
-                                    </AccordionItem>
-                                ))}
-                            </Accordion>
-                        ) : (
-                            <div className="flex flex-col items-center justify-center text-center p-10 h-64 border rounded-md bg-muted/20">
-                                <p className="text-muted-foreground">Aún no has agregado ningún testimonio.</p>
-                                <p className="text-sm text-muted-foreground">¡Haz clic en "Agregar Testimonio" para empezar!</p>
-                            </div>
-                        )}
-                    </div>
-                </TabsContent>
-
-                {/* PLANES TAB */}
-                <TabsContent value="planes">
-                    <div className="space-y-4">
-                        <div className="flex justify-between items-center">
-                            <CardTitle className="text-lg">Configuración de Planes/Precios</CardTitle>
-                            <Button onClick={addPlan} size="sm">
-                                <PlusCircle className="mr-2 h-4 w-4" />
-                                Agregar Plan
-                            </Button>
-                        </div>
-                        <p className="text-sm text-muted-foreground">
-                            Define los productos o servicios con precio que quieres ofrecer en tu página.
-                        </p>
-                        
-                        {(data.plans && data.plans.length > 0) ? (
-                            <Accordion type="multiple" className="w-full space-y-4">
-                                {data.plans.map((plan, index) => (
-                                    <AccordionItem key={plan.id} value={`plan-${index}`} className="border rounded-lg bg-background">
-                                        <AccordionTrigger className="p-4 text-base font-semibold hover:no-underline">
-                                            <div className="flex items-center gap-2 flex-1 truncate">
-                                                <GripVertical className="h-5 w-5 text-muted-foreground cursor-grab" />
-                                                <span className="truncate">{plan.name || 'Sin nombre'} - {plan.currency}{plan.price}</span>
-                                            </div>
-                                        </AccordionTrigger>
-                                        <AccordionContent className="p-4 pt-0 space-y-4">
-                                            <div className="flex justify-end">
-                                                <Button variant="destructive" size="sm" onClick={() => removePlan(plan.id)}>
-                                                    <Trash2 className="mr-2 h-4 w-4" />
-                                                    Eliminar Plan
-                                                </Button>
-                                            </div>
-                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                                <div className="md:col-span-1">
-                                                    <Label>Imagen del Plan / Producto</Label>
-                                                    <MediaUploader
-                                                        mediaUrl={plan.imageUrl || null}
-                                                        mediaType={plan.imageUrl ? 'image' : null}
-                                                        onUpload={(file) => handlePlanImageUpload(plan.id, file)}
-                                                        onRemove={() => updatePlan(plan.id, 'imageUrl', null)}
-                                                        aspectRatio="aspect-square"
-                                                        dimensions="400x400px"
-                                                        description="Imagen"
-                                                        accept="image/*"
-                                                    />
-                                                </div>
-                                                <div className="md:col-span-2 space-y-4">
-                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                        <div>
-                                                            <Label>Nombre del Plan</Label>
-                                                            <Input value={plan.name} onChange={(e) => updatePlan(plan.id, 'name', e.target.value)} />
-                                                        </div>
-                                                        <div className="grid grid-cols-3 gap-2">
-                                                            <div>
-                                                                <Label>Moneda</Label>
-                                                                <Input value={plan.currency} onChange={(e) => updatePlan(plan.id, 'currency', e.target.value)} />
-                                                            </div>
-                                                            <div>
-                                                                <Label>Precio</Label>
-                                                                <Input type="number" value={plan.price} onChange={(e) => updatePlan(plan.id, 'price', Number(e.target.value))} />
-                                                            </div>
-                                                            <div>
-                                                                <Label>Periodo</Label>
-                                                                <Input value={plan.period} onChange={(e) => updatePlan(plan.id, 'period', e.target.value)} placeholder="/mes" />
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                    <div>
-                                                        <Label>Descripción</Label>
-                                                        <Input value={plan.description} onChange={(e) => updatePlan(plan.id, 'description', e.target.value)} />
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            
-                                            <div className="space-y-4 p-4 border rounded-lg">
-                                                <div className="flex justify-between items-center">
-                                                    <h4 className="text-sm font-semibold">Características</h4>
-                                                    <Button variant="outline" size="sm" type="button" onClick={() => addPlanFeature(plan.id)}>
-                                                        <PlusCircle className="mr-2 h-3 w-3" /> Añadir
-                                                    </Button>
-                                                </div>
-                                                <div className="space-y-2">
-                                                    {plan.features.map((feature) => (
-                                                        <div key={feature.id} className="flex gap-2">
-                                                            <Input 
-                                                                value={feature.value} 
-                                                                onChange={(e) => updatePlanFeature(plan.id, feature.id, e.target.value)} 
-                                                                placeholder="Ej: Acceso ilimitado"
-                                                            />
-                                                            <Button variant="ghost" size="icon" type="button" onClick={() => removePlanFeature(plan.id, feature.id)}>
-                                                                <X className="h-4 w-4 text-destructive" />
-                                                            </Button>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            </div>
-
-                                            <div className="grid grid-cols-2 gap-4">
-                                                <div>
-                                                    <Label>Texto del Botón</Label>
-                                                    <Input value={plan.buttonText} onChange={(e) => updatePlan(plan.id, 'buttonText', e.target.value)} />
-                                                </div>
-                                                <div>
-                                                    <Label>URL del Botón</Label>
-                                                    <Input value={plan.buttonUrl} onChange={(e) => updatePlan(plan.id, 'buttonUrl', e.target.value)} />
-                                                </div>
-                                            </div>
-                                            
-                                            <div className="flex items-center gap-2 bg-primary/5 p-3 rounded-lg border border-primary/20">
-                                                <Switch id={`popular-${plan.id}`} checked={plan.isPopular} onCheckedChange={(val) => updatePlan(plan.id, 'isPopular', val)} />
-                                                <Label htmlFor={`popular-${plan.id}`} className="font-bold text-primary cursor-pointer">Marcar como plan recomendado / popular</Label>
-                                            </div>
-                                        </AccordionContent>
-                                    </AccordionItem>
-                                ))}
-                            </Accordion>
-                        ) : (
-                            <div className="flex flex-col items-center justify-center text-center p-10 h-64 border rounded-md bg-muted/20">
-                                <p className="text-muted-foreground font-medium">No has configurado planes todavía.</p>
-                                <p className="text-sm text-muted-foreground">¡Crea tu primer plan de precios para tu landing!</p>
-                            </div>
-                        )}
-                    </div>
-                </TabsContent>
-
-                {/* SEO TAB */}
-                <TabsContent value="seo">
-                    <div className="space-y-4">
-                        <CardTitle className="text-lg">Configuración SEO</CardTitle>
-                        <div>
-                            <Label htmlFor="seo-title">Título SEO</Label>
-                            <Input id="seo-title" value={data.seo.title} onChange={(e) => handleInputChange('seo', 'title', e.target.value)} />
-                        </div>
-                        <div>
-                            <Label htmlFor="seo-description">Descripción SEO</Label>
-                             <Input id="seo-description" value={data.seo.description} onChange={(e) => handleInputChange('seo', 'description', e.target.value)} />
-                        </div>
-                        <div>
-                            <Label htmlFor="seo-keywords">Palabras Clave</Label>
-                            <div className="flex gap-2">
-                                <Input
-                                    id="seo-keywords"
-                                    value={newKeyword}
-                                    onChange={(e) => setNewKeyword(e.target.value)}
-                                    onKeyDown={(e) => e.key === 'Enter' && addKeyword()}
-                                />
-                                <Button onClick={addKeyword}>Añadir</Button>
-                            </div>
-                             <div className="flex flex-wrap gap-2 mt-2">
-                                {data.seo.keywords.map(keyword => (
-                                <Badge key={keyword} variant="secondary" className="flex items-center gap-1">
-                                    {keyword}
-                                    <button onClick={() => removeKeyword(keyword)} className="rounded-full hover:bg-muted-foreground/20 p-0.5">
-                                        <X className="h-3 w-3" />
-                                    </button>
-                                </Badge>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
-                </TabsContent>
-                
-                {/* FORM TAB */}
-                <TabsContent value="form">
-                    <div className="space-y-6">
-                        <Card>
-                            <CardHeader>
-                                <CardTitle className="text-lg">Editor Visual de Formulario</CardTitle>
-                                <p className="text-sm text-muted-foreground">Arrastra y edita los campos de tu formulario.</p>
-                            </CardHeader>
-                            <CardContent className="space-y-4">
-                                {data.form.fields.map((field, index) => (
-                                    <Card key={field.id} className="p-4 bg-muted/50">
-                                        <div className="flex items-start gap-4">
-                                            <GripVertical className="h-5 w-5 text-muted-foreground cursor-grab mt-2.5" />
-                                            <div className="flex-1 space-y-4">
+                                            <div className="md:col-span-2 space-y-4">
                                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                                     <div>
-                                                        <Label htmlFor={`label-${field.id}`}>Etiqueta</Label>
-                                                        <Input id={`label-${field.id}`} value={field.label} onChange={(e) => updateFormField(field.id, 'label', e.target.value)} />
+                                                        <Label>Nombre del Plan</Label>
+                                                        <Input value={plan.name} onChange={(e) => updatePlan(plan.id, 'name', e.target.value)} />
                                                     </div>
-                                                    <div>
-                                                        <Label htmlFor={`type-${field.id}`}>Tipo de Campo</Label>
-                                                        <Select value={field.type} onValueChange={(value) => updateFormField(field.id, 'type', value)}>
-                                                            <SelectTrigger id={`type-${field.id}`}>
-                                                                <SelectValue placeholder="Seleccionar tipo" />
-                                                            </SelectTrigger>
-                                                            <SelectContent>
-                                                                <SelectItem value="text">Texto</SelectItem>
-                                                                <SelectItem value="email">Email</SelectItem>
-                                                                <SelectItem value="textarea">Área de texto</SelectItem>
-                                                                <SelectItem value="tel">Teléfono</SelectItem>
-                                                                <SelectItem value="number">Número</SelectItem>
-                                                            </SelectContent>
-                                                        </Select>
+                                                    <div className="grid grid-cols-3 gap-2">
+                                                        <div>
+                                                            <Label>Moneda</Label>
+                                                            <Input value={plan.currency} onChange={(e) => updatePlan(plan.id, 'currency', e.target.value)} />
+                                                        </div>
+                                                        <div>
+                                                            <Label>Precio</Label>
+                                                            <Input type="number" value={plan.price} onChange={(e) => updatePlan(plan.id, 'price', Number(e.target.value))} />
+                                                        </div>
+                                                        <div>
+                                                            <Label>Periodo</Label>
+                                                            <Input value={plan.period} onChange={(e) => updatePlan(plan.id, 'period', e.target.value)} placeholder="/mes" />
+                                                        </div>
                                                     </div>
                                                 </div>
                                                 <div>
-                                                    <Label htmlFor={`placeholder-${field.id}`}>Placeholder</Label>
-                                                    <Input id={`placeholder-${field.id}`} value={field.placeholder} onChange={(e) => updateFormField(field.id, 'placeholder', e.target.value)} />
-                                                </div>
-                                                <div className="flex items-center justify-between">
-                                                    <div className="flex items-center space-x-2">
-                                                        <Switch id={`required-${field.id}`} checked={field.required} onCheckedChange={(checked) => updateFormField(field.id, 'required', checked)} />
-                                                        <Label htmlFor={`required-${field.id}`}>Requerido</Label>
-                                                    </div>
-                                                    <Button variant="ghost" size="icon" onClick={() => removeFormField(field.id)}>
-                                                        <Trash2 className="h-4 w-4 text-destructive" />
-                                                    </Button>
+                                                    <Label>Descripción</Label>
+                                                    <Input value={plan.description} onChange={(e) => updatePlan(plan.id, 'description', e.target.value)} />
                                                 </div>
                                             </div>
                                         </div>
-                                    </Card>
-                                ))}
-                                <Button onClick={addFormField} variant="outline" className="w-full">
-                                    <PlusCircle className="mr-2 h-4 w-4" />
-                                    Agregar Campo
-                                </Button>
-                            </CardContent>
-                        </Card>
-                        <Card>
-                            <CardHeader>
-                                <CardTitle className="text-lg">Configuración del Correo</CardTitle>
-                                <p className="text-sm text-muted-foreground">Define a dónde llegarán los mensajes.</p>
-                            </CardHeader>
-                            <CardContent>
-                                <div>
-                                    <Label htmlFor="form-email">Correo de Destino</Label>
-                                    <Input id="form-email" type="email" value={data.form.destinationEmail} onChange={(e) => handleInputChange('form', 'destinationEmail', e.target.value)} placeholder="tu-correo@ejemplo.com" />
-                                </div>
-                            </CardContent>
-                        </Card>
+                                        
+                                        <div className="space-y-4 p-4 border rounded-lg">
+                                            <div className="flex justify-between items-center">
+                                                <h4 className="text-sm font-semibold">Características</h4>
+                                                <Button variant="outline" size="sm" type="button" onClick={() => addPlanFeature(plan.id)}>
+                                                    <PlusCircle className="mr-2 h-3 w-3" /> Añadir
+                                                </Button>
+                                            </div>
+                                            <div className="space-y-2">
+                                                {plan.features.map((feature) => (
+                                                    <div key={feature.id} className="flex gap-2">
+                                                        <Input 
+                                                            value={feature.value} 
+                                                            onChange={(e) => updatePlanFeature(plan.id, feature.id, e.target.value)} 
+                                                            placeholder="Ej: Acceso ilimitado"
+                                                        />
+                                                        <Button variant="ghost" size="icon" type="button" onClick={() => removePlanFeature(plan.id, feature.id)}>
+                                                            <X className="h-4 w-4 text-destructive" />
+                                                        </Button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <Label>Texto del Botón</Label>
+                                                <Input value={plan.buttonText} onChange={(e) => updatePlan(plan.id, 'buttonText', e.target.value)} />
+                                            </div>
+                                            <div>
+                                                <Label>URL del Botón</Label>
+                                                <Input value={plan.buttonUrl} onChange={(e) => updatePlan(plan.id, 'buttonUrl', e.target.value)} />
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="flex items-center gap-2 bg-primary/5 p-3 rounded-lg border border-primary/20">
+                                            <Switch id={`popular-${plan.id}`} checked={plan.isPopular} onCheckedChange={(val) => updatePlan(plan.id, 'isPopular', val)} />
+                                            <Label htmlFor={`popular-${plan.id}`} className="font-bold text-primary cursor-pointer">Marcar como plan recomendado / popular</Label>
+                                        </div>
+                                    </AccordionContent>
+                                </AccordionItem>
+                            ))}
+                        </Accordion>
+                    ) : (
+                        <div className="flex flex-col items-center justify-center text-center p-10 h-64 border rounded-md bg-muted/20">
+                            <p className="text-muted-foreground font-medium">No has configurado planes todavía.</p>
+                            <p className="text-sm text-muted-foreground">¡Crea tu primer plan de precios para tu landing!</p>
+                        </div>
+                    )}
+                </div>
+            </TabsContent>
+
+            {/* SEO TAB */}
+            <TabsContent value="seo">
+                <div className="space-y-4">
+                    <CardTitle className="text-lg">Configuración SEO</CardTitle>
+                    <div>
+                        <Label htmlFor="seo-title">Título SEO</Label>
+                        <Input id="seo-title" value={data.seo.title} onChange={(e) => handleInputChange('seo', 'title', e.target.value)} />
                     </div>
-                </TabsContent>
-            </Tabs>
-        </CardContent>
-    </Card>
+                    <div>
+                        <Label htmlFor="seo-description">Descripción SEO</Label>
+                         <Input id="seo-description" value={data.seo.description} onChange={(e) => handleInputChange('seo', 'description', e.target.value)} />
+                    </div>
+                    <div>
+                        <Label htmlFor="seo-keywords">Palabras Clave</Label>
+                        <div className="flex gap-2">
+                            <Input
+                                id="seo-keywords"
+                                value={newKeyword}
+                                onChange={(e) => setNewKeyword(e.target.value)}
+                                onKeyDown={(e) => e.key === 'Enter' && addKeyword()}
+                            />
+                            <Button onClick={addKeyword}>Añadir</Button>
+                        </div>
+                         <div className="flex flex-wrap gap-2 mt-2">
+                            {data.seo.keywords.map(keyword => (
+                            <Badge key={keyword} variant="secondary" className="flex items-center gap-1">
+                                {keyword}
+                                <button onClick={() => removeKeyword(keyword)} className="rounded-full hover:bg-muted-foreground/20 p-0.5">
+                                    <X className="h-3 w-3" />
+                                </button>
+                            </Badge>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            </TabsContent>
+            
+            {/* FORM TAB */}
+            <TabsContent value="form">
+                <div className="space-y-6">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="text-lg">Editor Visual de Formulario</CardTitle>
+                            <p className="text-sm text-muted-foreground">Arrastra y edita los campos de tu formulario.</p>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            {data.form.fields.map((field, index) => (
+                                <Card key={field.id} className="p-4 bg-muted/50">
+                                    <div className="flex items-start gap-4">
+                                        <GripVertical className="h-5 w-5 text-muted-foreground cursor-grab mt-2.5" />
+                                        <div className="flex-1 space-y-4">
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                <div>
+                                                    <Label htmlFor={`label-${field.id}`}>Etiqueta</Label>
+                                                    <Input id={`label-${field.id}`} value={field.label} onChange={(e) => updateFormField(field.id, 'label', e.target.value)} />
+                                                </div>
+                                                <div>
+                                                    <Label htmlFor={`type-${field.id}`}>Tipo de Campo</Label>
+                                                    <Select value={field.type} onValueChange={(value) => updateFormField(field.id, 'type', value)}>
+                                                        <SelectTrigger id={`type-${field.id}`}>
+                                                            <SelectValue placeholder="Seleccionar tipo" />
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                            <SelectItem value="text">Texto</SelectItem>
+                                                            <SelectItem value="email">Email</SelectItem>
+                                                            <SelectItem value="textarea">Área de texto</SelectItem>
+                                                            <SelectItem value="tel">Teléfono</SelectItem>
+                                                            <SelectItem value="number">Número</SelectItem>
+                                                        </SelectContent>
+                                                    </Select>
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <Label htmlFor={`placeholder-${field.id}`}>Placeholder</Label>
+                                                <Input id={`placeholder-${field.id}`} value={field.placeholder} onChange={(e) => updateFormField(field.id, 'placeholder', e.target.value)} />
+                                            </div>
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex items-center space-x-2">
+                                                    <Switch id={`required-${field.id}`} checked={field.required} onCheckedChange={(checked) => updateFormField(field.id, 'required', checked)} />
+                                                    <Label htmlFor={`required-${field.id}`}>Requerido</Label>
+                                                </div>
+                                                <Button variant="ghost" size="icon" onClick={() => removeFormField(field.id)}>
+                                                    <Trash2 className="h-4 w-4 text-destructive" />
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </Card>
+                            ))}
+                            <Button onClick={addFormField} variant="outline" className="w-full">
+                                <PlusCircle className="mr-2 h-4 w-4" />
+                                Agregar Campo
+                            </Button>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="text-lg">Configuración del Correo</CardTitle>
+                            <p className="text-sm text-muted-foreground">Define a dónde llegarán los mensajes.</p>
+                        </CardHeader>
+                        <CardContent>
+                            <div>
+                                <Label htmlFor="form-email">Correo de Destino</Label>
+                                <Input id="form-email" type="email" value={data.form.destinationEmail} onChange={(e) => handleInputChange('form', 'destinationEmail', e.target.value)} placeholder="tu-correo@ejemplo.com" />
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
+            </TabsContent>
+        </Tabs>
+    </div>
   );
 }
