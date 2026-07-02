@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -31,7 +32,8 @@ import {
   Gift, 
   Share2,
   Clock,
-  CheckCircle2
+  CheckCircle2,
+  AlertCircle
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { Business } from '@/models/business';
@@ -40,6 +42,7 @@ import type { ExtraCapacityLog } from '@/models/extra-capacity-log';
 import type { AffiliateConfig } from '@/models/affiliate-config';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 export default function ReferidosPage() {
   const { user } = useUser();
@@ -67,7 +70,8 @@ export default function ReferidosPage() {
       orderBy('createdAt', 'desc')
     );
   }, [firestore, user?.uid]);
-  const { data: referrals, isLoading: loadingReferrals } = useCollection<Referral>(referralsQuery);
+  
+  const { data: referrals, isLoading: loadingReferrals, error: referralsError } = useCollection<Referral>(referralsQuery);
 
   const logsQuery = useMemoFirebase(() => {
     if (!firestore || !user?.uid) return null;
@@ -95,7 +99,7 @@ export default function ReferidosPage() {
   const totalEarnedCapacity = useMemo(() => {
     if (!capacityLogs) return 0;
     return capacityLogs
-      .filter(log => log.reason && log.reason.startsWith('referido_confirmado'))
+      .filter(log => log.reason && (log.reason.startsWith('referido_confirmado') || log.reason === 'referido_confirmado_referente' || log.reason === 'referido_confirmado_referido'))
       .reduce((sum, log) => sum + (log.amount || 0), 0);
   }, [capacityLogs]);
 
@@ -135,7 +139,7 @@ export default function ReferidosPage() {
     <div className="flex flex-col gap-6 animate-in fade-in duration-500">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-black tracking-tight">Programa de Socios</h1>
+          <h1 className="text-3xl font-black tracking-tight text-gray-900">Programa de Socios</h1>
           <p className="text-muted-foreground">Invita a otros negocios y gana capacidad extra para tu catálogo.</p>
         </div>
         <div className="flex items-center gap-2 px-4 py-2 bg-primary/10 rounded-full border border-primary/20">
@@ -145,6 +149,18 @@ export default function ReferidosPage() {
           </span>
         </div>
       </div>
+
+      {referralsError && (
+        <Alert variant="destructive" className="border-destructive/50 bg-destructive/5">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Error de sincronización</AlertTitle>
+          <AlertDescription>
+            {referralsError.message.includes('permission-denied') 
+              ? 'No tienes permisos para listar tus referidos. Contacta a soporte para verificar tu cuenta.' 
+              : 'Hubo un problema al cargar tus invitaciones. Por favor intenta refrescar la página.'}
+          </AlertDescription>
+        </Alert>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
@@ -174,7 +190,7 @@ export default function ReferidosPage() {
             <div className="text-2xl font-black">{loadingReferrals ? "..." : stats.pending}</div>
           </CardContent>
         </Card>
-        <Card className="bg-primary text-primary-foreground">
+        <Card className="bg-primary text-primary-foreground shadow-lg border-none">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-xs font-bold uppercase tracking-widest opacity-80">Capacidad Ganada</CardTitle>
             <TrendingUp className="h-4 w-4" />
@@ -199,7 +215,7 @@ export default function ReferidosPage() {
                 <Input 
                   value={business?.referralCode || ''} 
                   readOnly 
-                  className="font-mono font-bold text-center text-lg bg-muted/30"
+                  className="font-mono font-bold text-center text-lg bg-muted/30 h-12"
                 />
               </div>
             </div>
@@ -209,7 +225,7 @@ export default function ReferidosPage() {
                 <Input 
                   value={referralLink} 
                   readOnly 
-                  className="text-xs h-10"
+                  className="text-xs h-10 bg-white"
                 />
                 <Button 
                   size="icon" 
@@ -221,12 +237,12 @@ export default function ReferidosPage() {
                 </Button>
               </div>
             </div>
-            <div className="p-4 bg-muted/50 rounded-xl space-y-2">
+            <div className="p-4 bg-muted/50 rounded-xl space-y-3">
               <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">¿Cómo funciona?</p>
-              <ul className="text-xs space-y-2 text-gray-600">
-                <li className="flex gap-2"><span>1.</span> Comparte tu enlace.</li>
-                <li className="flex gap-2"><span>2.</span> Tu referido obtiene un beneficio al registrarse.</li>
-                <li className="flex gap-2"><span>3.</span> Cuando tu referido realice su primer pago, <strong>ambos ganan capacidad extra de por vida.</strong></li>
+              <ul className="text-xs space-y-3 text-gray-600">
+                <li className="flex gap-2 items-start"><span className="text-primary font-bold">1.</span> <span>Comparte tu enlace con un amigo que tenga un negocio.</span></li>
+                <li className="flex gap-2 items-start"><span className="text-primary font-bold">2.</span> <span>Tu referido obtiene beneficios exclusivos al registrarse con tu código.</span></li>
+                <li className="flex gap-2 items-start"><span className="text-primary font-bold">3.</span> <span>Cuando tu referido realice su primer pago, <strong>ambos ganan capacidad extra de productos para siempre.</strong></span></li>
               </ul>
             </div>
           </CardContent>
@@ -239,12 +255,12 @@ export default function ReferidosPage() {
           </CardHeader>
           <CardContent>
             {loadingReferrals ? (
-              <div className="space-y-2">
+              <div className="space-y-3">
                 <Skeleton className="h-10 w-full" />
-                <Skeleton className="h-20 w-full" />
+                <Skeleton className="h-32 w-full" />
               </div>
             ) : referrals && referrals.length > 0 ? (
-              <div className="rounded-md border">
+              <div className="rounded-xl border overflow-hidden">
                 <Table>
                   <TableHeader className="bg-muted/50">
                     <TableRow>
@@ -256,7 +272,7 @@ export default function ReferidosPage() {
                   </TableHeader>
                   <TableBody>
                     {referrals.map((ref) => (
-                      <TableRow key={ref.id}>
+                      <TableRow key={ref.id} className="hover:bg-muted/30 transition-colors">
                         <TableCell className="text-xs font-medium">
                           {ref.createdAt ? format(ref.createdAt.toDate(), 'dd/MM/yyyy', { locale: es }) : '---'}
                         </TableCell>
@@ -268,9 +284,11 @@ export default function ReferidosPage() {
                         </TableCell>
                         <TableCell className="text-right">
                           {ref.referentRewardGranted ? (
-                            <span className="text-xs font-black text-green-600">+{config?.rewardReferent || 5} items</span>
+                            <span className="text-xs font-black text-green-600 flex items-center justify-end gap-1">
+                              <Gift className="h-3.5 w-3.5" /> +{config?.rewardReferent || 5} items
+                            </span>
                           ) : (
-                            <span className="text-xs text-muted-foreground">Pendiente</span>
+                            <span className="text-xs text-muted-foreground italic">Pendiente</span>
                           )}
                         </TableCell>
                       </TableRow>
@@ -279,16 +297,19 @@ export default function ReferidosPage() {
                 </Table>
               </div>
             ) : (
-              <div className="flex flex-col items-center justify-center py-12 text-center space-y-4">
+              <div className="flex flex-col items-center justify-center py-16 text-center space-y-4 border-2 border-dashed rounded-3xl">
                 <div className="p-4 bg-muted rounded-full">
-                  <Users className="h-8 w-8 text-muted-foreground/40" />
+                  <Users className="h-10 w-10 text-muted-foreground/40" />
                 </div>
                 <div className="space-y-1">
-                  <p className="font-bold text-gray-700">Aún no tienes referidos</p>
-                  <p className="text-xs text-muted-foreground max-w-[250px]">
-                    Comparte tu enlace para empezar a ganar beneficios exclusivos.
+                  <p className="font-bold text-gray-700 text-lg">Aún no tienes referidos</p>
+                  <p className="text-sm text-muted-foreground max-w-[280px]">
+                    Empieza a compartir tu enlace para ganar capacidad extra y escalar tu negocio.
                   </p>
                 </div>
+                <Button variant="outline" className="font-bold" onClick={handleCopy}>
+                  Copiar mi enlace ahora
+                </Button>
               </div>
             )}
           </CardContent>

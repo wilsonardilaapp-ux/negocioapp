@@ -69,7 +69,13 @@ service cloud.firestore {
     // --- PROGRAMA DE SOCIOS (REFERIDOS) ---
 
     match /referrals/{id} {
-      allow list: if isSuperAdmin();
+      // Permitir 'list' si el usuario es el referente o el referido del documento
+      // Nota: En queries, Firestore valida que la regla se cumpla para TODOS los resultados potenciales.
+      allow list: if isAuthenticated() && (
+        isSuperAdmin() ||
+        resource.data.referentBusinessId == request.auth.uid ||
+        resource.data.referreeBusinessId == request.auth.uid
+      );
       allow get: if isAuthenticated() && (
         isSuperAdmin() ||
         resource.data.referentBusinessId == request.auth.uid ||
@@ -80,7 +86,7 @@ service cloud.firestore {
     }
 
     match /extraCapacityLogs/{id} {
-      allow list: if isSuperAdmin();
+      allow list: if isSuperAdmin() || (isAuthenticated() && resource.data.businessId == request.auth.uid);
       allow get: if isAuthenticated() && (
         isSuperAdmin() || 
         resource.data.businessId == request.auth.uid
@@ -164,7 +170,7 @@ service cloud.firestore {
       allow create: if true;
       allow read, write: if isSuperAdmin();
     }
-
+    
     match /paymentRequests/{requestId} {
       allow create: if isAuthenticated();
       allow read, write: if isSuperAdmin();
