@@ -39,7 +39,7 @@ export default async function PrivacyPolicyPage() {
                     </CardHeader>
                     <CardContent className="prose prose-lg max-w-none text-justify">
                         <h2>1. Introducción</h2>
-                        <p>En Zentry, tu privacidad es de suma importancia para nosotros. Esta Política de Privacidad explica qué información recopilamos, cómo la usamos, la almacenamos y la protegemos. Esta política se aplica a todos los usuarios de nuestra plataforma SaaS.</p>
+                        <p>En Markix, tu privacidad es de suma importancia para nosotros. Esta Política de Privacidad explica qué información recopilamos, cómo la usamos, la almacenamos y la protegemos. Esta política se aplica a todos los usuarios de nuestra plataforma SaaS.</p>
 
                         <h2>2. Información que Recopilamos</h2>
                         <ul>
@@ -81,7 +81,7 @@ export default async function PrivacyPolicyPage() {
                         <p>Nos reservamos el derecho de actualizar esta política de privacidad en cualquier momento. Te notificaremos sobre cualquier cambio material publicando la nueva política en esta página y, si es apropiado, a través de una notificación por correo electrónico.</p>
 
                         <h2>11. Información de Contacto</h2>
-                        <p>Si tienes alguna pregunta o inquietud sobre esta Política de Privacidad o nuestras prácticas de datos, por favor, no dudes en contactarnos en nuestro correo de soporte: CONTACTO@PENDIENTE-DEFINIR.com.</p>
+                        <p>Si tienes alguna pregunta o inquietud sobre esta Política de Privacidad o nuestras prácticas de datos, por favor, no dudes en contactarnos en nuestro correo de soporte: CONTACTO@MARKIX.com.</p>
 
                         <p className="text-sm text-muted-foreground pt-4">Última actualización: 24 de julio de 2024</p>
                     </CardContent>

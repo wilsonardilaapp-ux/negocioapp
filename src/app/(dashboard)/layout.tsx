@@ -178,13 +178,13 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     <SidebarProvider>
       <FaviconInjector 
         faviconUrl={business?.faviconUrl || business?.logoURL} 
-        title={business?.name ? `Dashboard - ${business.name}` : 'Zentry Dashboard'} 
+        title={business?.name ? `Dashboard - ${business.name}` : 'Markix Dashboard'} 
       />
       <Sidebar>
         <SidebarHeader>
           <Link href="/dashboard" className="flex items-center gap-2">
             <Logo className="w-8 h-8 text-primary" />
-            <span className="text-lg font-semibold font-headline">Zentry</span>
+            <span className="text-lg font-semibold font-headline">Markix</span>
           </Link>
         </SidebarHeader>
         <SidebarContent>

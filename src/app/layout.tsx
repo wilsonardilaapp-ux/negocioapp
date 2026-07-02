@@ -10,7 +10,7 @@ const ptSans = PT_Sans({
 });
 
 export const metadata: Metadata = {
-  title: 'Zentry Platform',
+  title: 'Markix Platform',
   description: 'Plataforma para la gestión de productos de salud y bienestar.',
 };
 

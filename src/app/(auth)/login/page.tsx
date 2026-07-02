@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState } from 'react';
@@ -91,7 +90,7 @@ export default function LoginPage() {
   return (
     <Card className="shadow-lg border-none">
       <CardHeader className="text-center space-y-1">
-        <CardTitle className="text-3xl font-black tracking-tight text-primary">Zentry</CardTitle>
+        <CardTitle className="text-3xl font-black tracking-tight text-primary">Markix</CardTitle>
         <CardDescription>Accede con tu cuenta de administrador</CardDescription>
       </CardHeader>
       <Form {...form}>

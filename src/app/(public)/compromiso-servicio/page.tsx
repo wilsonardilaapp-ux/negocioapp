@@ -30,10 +30,10 @@ export default async function ServiceCommitmentPage() {
             <main className="container mx-auto px-4 py-16 md:py-24">
                 <Card className="max-w-4xl mx-auto shadow-lg">
                     <CardHeader className="text-center">
-                        <CardTitle className="text-3xl md:text-4xl font-bold text-primary">Compromiso de Servicio Zentry</CardTitle>
+                        <CardTitle className="text-3xl md:text-4xl font-bold text-primary">Compromiso de Servicio Markix</CardTitle>
                     </CardHeader>
                     <CardContent className="prose prose-lg max-w-none text-justify">
-                        <p className="lead">En <strong>Zentry</strong>, nuestra misión es empoderar a los negocios mediante tecnología de vanguardia y una operatividad simplificada. Este documento establece los niveles de servicio y el compromiso que adquirimos con cada uno de nuestros clientes.</p>
+                        <p className="lead">En <strong>Markix</strong>, nuestra misión es empoderar a los negocios mediante tecnología de vanguardia y una operatividad simplificada. Este documento establece los niveles de servicio y el compromiso que adquirimos con cada uno de nuestros clientes.</p>
 
                         <h2>1. Disponibilidad de la Plataforma (Uptime)</h2>
                         <p>Nos comprometemos a mantener una disponibilidad del 99.9% en nuestra infraestructura central. Esto incluye el acceso a tu dashboard administrativo y la visualización de tus landing pages públicas y catálogos.</p>
@@ -47,12 +47,12 @@ export default async function ServiceCommitmentPage() {
                         </ul>
 
                         <h2>3. Seguridad y Respaldo de Datos</h2>
-                        <p>Tus datos son tu activo más valioso. Zentry implementa respaldos diarios automáticos y utiliza cifrado de grado bancario para proteger la información de tus clientes y transacciones.</p>
+                        <p>Tus datos son tu activo más valioso. Markix implementa respaldos diarios automáticos y utiliza cifrado de grado bancario para proteger la información de tus clientes y transacciones.</p>
 
                         <h2>4. Actualizaciones y Mejoras</h2>
-                        <p>Zentry es una plataforma viva. Como parte de nuestro compromiso, recibirás actualizaciones constantes de seguridad y nuevas funcionalidades sin costo adicional, asegurando que tu negocio siempre esté a la vanguardia tecnológica.</p>
+                        <p>Markix es una plataforma viva. Como parte de nuestro compromiso, recibirás actualizaciones constantes de seguridad y nuevas funcionalidades sin costo adicional, asegurando que tu negocio siempre esté a la vanguardia tecnológica.</p>
 
-                        <p className="text-sm text-muted-foreground pt-4">Versión 1.0 - Zentry Service Level Agreement</p>
+                        <p className="text-sm text-muted-foreground pt-4">Versión 1.0 - Markix Service Level Agreement</p>
                     </CardContent>
                 </Card>
             </main>

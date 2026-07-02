@@ -66,9 +66,9 @@ async function getMainBusinessData(): Promise<{ id: string | null, data: any | n
 
 const fallbackData: LandingPageData = {
   hero: {
-    title: 'Zentry: La plataforma integral para tu éxito digital',
+    title: 'Markix: La plataforma integral para tu éxito digital',
     subtitle: 'Todo lo que tu negocio necesita en un solo lugar',
-    additionalContent: '<p><strong>Zentry</strong> es el aliado tecnológico definitivo para tu transformación digital. Nuestra plataforma centraliza catálogos inteligentes, blogs profesionales, motores de sugerencias con IA y una gestión de pedidos optimizada para que puedas escalar tu negocio sin límites.</p>',
+    additionalContent: '<p><strong>Markix</strong> es el aliado tecnológico definitivo para tu transformación digital. Nuestra plataforma centraliza catálogos inteligentes, blogs profesionales, motores de sugerencias con IA y una gestión de pedidos optimizada para que puedas escalar tu negocio sin límites.</p>',
     imageUrl: 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?q=80&w=2026&auto=format&fit=crop',
     ctaButtonText: 'Ver Planes y Precios',
     ctaButtonUrl: '#precios',
@@ -79,10 +79,10 @@ const fallbackData: LandingPageData = {
   navigation: {
     enabled: true,
     logoUrl: '',
-    logoAlt: 'Logo Zentry',
+    logoAlt: 'Logo Markix',
     logoWidth: 120,
     logoAlignment: 'left',
-    businessName: 'Zentry',
+    businessName: 'Markix',
     links: [
       { id: 'nav-link-1', text: 'Inicio', url: '/', openInNewTab: false, enabled: true },
       { id: 'nav-link-2', text: 'Planes', url: '#precios', openInNewTab: false, enabled: true },
@@ -101,9 +101,9 @@ const fallbackData: LandingPageData = {
   testimonials: [],
   plans: [],
   seo: {
-    title: 'Zentry | Plataforma SaaS de Gestión Empresarial',
-    description: 'Centraliza y automatiza tu negocio con Zentry. Catálogos, IA, Blog y más.',
-    keywords: ['zentry', 'saas', 'gestión', 'negocio', 'catálogo'],
+    title: 'Markix | Plataforma SaaS de Gestión Empresarial',
+    description: 'Centraliza y automatiza tu negocio con Markix. Catálogos, IA, Blog y más.',
+    keywords: ['markix', 'saas', 'gestión', 'negocio', 'catálogo'],
   },
   form: {
     fields: [
@@ -112,7 +112,7 @@ const fallbackData: LandingPageData = {
         { id: 'form-field-3', label: 'WhatsApp', type: 'tel', placeholder: 'ej. 3228831634', required: false },
         { id: 'form-field-4', label: 'Mensaje', type: 'textarea', placeholder: 'Escribe tu consulta aquí...', required: true },
     ],
-    destinationEmail: 'CONTACTO@PENDIENTE-DEFINIR.com',
+    destinationEmail: 'CONTACTO@MARKIX.com',
   },
   header: {
     banner: {
@@ -120,10 +120,10 @@ const fallbackData: LandingPageData = {
       mediaType: null,
     },
     businessInfo: {
-      name: 'Zentry Platform',
+      name: 'Markix Platform',
       address: 'Soporte Global Online',
       phone: '3228831634',
-      email: 'CONTACTO@PENDIENTE-DEFINIR.com',
+      email: 'CONTACTO@MARKIX.com',
     },
     socialLinks: {
       tiktok: '',
@@ -142,9 +142,9 @@ const fallbackData: LandingPageData = {
   footer: {
     enabled: true,
     contactInfo: {
-      address: 'Central de Operaciones Zentry',
+      address: 'Central de Operaciones Markix',
       phone: '3228831634',
-      email: 'CONTACTO@PENDIENTE-DEFINIR.com',
+      email: 'CONTACTO@MARKIX.com',
       hours: 'Lunes a Viernes, 9am - 6pm',
     },
     quickLinks: [
@@ -174,7 +174,7 @@ const fallbackData: LandingPageData = {
     },
     certifications: [],
     copyright: {
-      companyName: 'Zentry',
+      companyName: 'Markix',
       additionalText: 'Todos los derechos reservados.',
     },
     cta: {
@@ -220,7 +220,7 @@ export default async function RootPage() {
     }
 
     const faviconUrl = mainBusiness.data?.faviconUrl || mainBusiness.data?.logoURL || null;
-    const siteTitle = mainBusiness.data?.name || "Zentry Platform";
+    const siteTitle = mainBusiness.data?.name || "Markix Platform";
 
     return (
       <main className="w-full">

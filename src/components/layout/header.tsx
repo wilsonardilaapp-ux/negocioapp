@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from "react";
@@ -39,7 +38,7 @@ interface HeaderProps {
 
 export default function Header({ businessId, navigation }: HeaderProps) {
   const logoUrl = navigation?.logoUrl;
-  const businessName = navigation?.businessName || "Negocio V03";
+  const businessName = navigation?.businessName || "Markix Platform";
 
   return (
     <header 

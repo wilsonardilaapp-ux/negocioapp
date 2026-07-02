@@ -56,7 +56,7 @@ const initialLandingPageData: LandingPageData = {
   hero: {
     title: 'Innovación que impulsa tu negocio al futuro',
     subtitle: 'Transformamos tecnología en crecimiento real',
-    additionalContent: '<p>En <strong>Zentry</strong>, optimizamos tus procesos y potenciamos tus resultados.</p>',
+    additionalContent: '<p>En <strong>Markix</strong>, optimizamos tus procesos y potenciamos tus resultados.</p>',
     imageUrl: 'https://picsum.photos/seed/vintagecar/1200/800',
     ctaButtonText: 'Contáctanos',
     ctaButtonUrl: '#contact',
@@ -105,7 +105,7 @@ const initialLandingPageData: LandingPageData = {
     socialLinks: { facebookUrl: '', instagramUrl: '', tiktokUrl: '', youtubeUrl: '', linkedinUrl: '', showIcons: true },
     logo: { url: null, slogan: '' },
     certifications: [],
-    copyright: { companyName: 'Zentry', additionalText: 'Todos los derechos reservados.' },
+    copyright: { companyName: 'Markix', additionalText: 'Todos los derechos reservados.' },
     cta: { text: '¡Empieza Ahora!', url: '#', enabled: false },
     visuals: { backgroundImageUrl: null, opacity: 80, backgroundColor: '#f8f9fa', textColor: '#6c757d', darkMode: false, showBackToTop: true },
     adminExtras: { systemVersion: '1.0.0', supportLink: '#', documentationLink: '#' },
@@ -224,7 +224,7 @@ function RegisterForm() {
         ownerEmail: normalizedEmail,
         status: 'active',
         logoURL: 'https://seeklogo.com/images/E/eco-friendly-logo-7087A22106-seeklogo.com.png',
-        description: 'Bienvenido a mi negocio en Zentry.',
+        description: 'Bienvenido a mi negocio en Markix.',
         planName: planDetails?.name || 'Plan Gratuito',
         // --- Referral System ---
         referralCode: generatedReferralCode,
@@ -305,7 +305,7 @@ function RegisterForm() {
     <Card className="shadow-xl">
       <CardHeader className="text-center">
         <CardTitle className="text-3xl font-headline font-bold text-primary">Crea tu Cuenta</CardTitle>
-        <CardDescription>Únete a Zentry y escala tu negocio hoy mismo.</CardDescription>
+        <CardDescription>Únete a Markix y escala tu negocio hoy mismo.</CardDescription>
       </CardHeader>
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)}>
@@ -359,7 +359,7 @@ function RegisterForm() {
           </CardContent>
           <CardFooter className="flex flex-col gap-4">
             <Button className="w-full h-12 text-lg font-bold" type="submit" disabled={form.formState.isSubmitting}>
-              {form.formState.isSubmitting ? "Preparando..." : "Crear Cuenta Zentry"}
+              {form.formState.isSubmitting ? "Preparando..." : "Crear Cuenta Markix"}
             </Button>
           </CardFooter>
         </form>

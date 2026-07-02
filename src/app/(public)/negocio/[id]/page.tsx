@@ -119,7 +119,7 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
     const entry = await getBusinessEntry(params.id);
     if (!entry) return { title: 'Negocio no encontrado' };
     return {
-        title: `${entry.name} | Directorio Zentry`,
+        title: `${entry.name} | Directorio Markix`,
         description: entry.description?.substring(0, 160),
     };
 }
@@ -137,7 +137,7 @@ export default async function BusinessProfilePage({ params }: { params: { id: st
 
     return (
         <div className="min-h-screen bg-gray-50/30 flex flex-col">
-            <FaviconInjector faviconUrl={faviconUrl} title={`${entry.name} | Directorio Zentry`} />
+            <FaviconInjector faviconUrl={faviconUrl} title={`${entry.name} | Directorio Markix`} />
             <Header businessId={entry.id} navigation={null} />
             
             <main className="flex-grow">

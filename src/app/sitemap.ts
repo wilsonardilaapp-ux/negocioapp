@@ -1,11 +1,10 @@
-
 import { MetadataRoute } from 'next';
 import { getAdminFirestore } from '@/firebase/server-init';
 import { DIRECTORY_CATEGORIES } from '@/models/business-directory';
 import type { Business } from '@/models/business';
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://zentry.com';
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://markix.com';
 
   const staticRoutes: MetadataRoute.Sitemap = [
     {

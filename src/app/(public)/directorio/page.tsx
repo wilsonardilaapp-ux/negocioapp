@@ -16,7 +16,7 @@ import SearchBar from './SearchBar';
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
-    title: 'Directorio de Negocios | Zentry',
+    title: 'Directorio de Negocios | Markix',
     description: 'Explora el directorio de negocios líderes. Encuentra profesionales verificados cerca de ti.',
 };
 
@@ -94,14 +94,14 @@ export default async function DirectoryPage({
 
     return (
         <div className="min-h-screen bg-gray-50/30 flex flex-col">
-            <FaviconInjector faviconUrl={faviconUrl} title="Directorio de Negocios | Zentry" />
+            <FaviconInjector faviconUrl={faviconUrl} title="Directorio de Negocios | Markix" />
             <Header businessId={null} navigation={null} />
             
             <main className="flex-grow">
                 <section className="bg-primary/5 border-b py-16 md:py-24">
                     <div className="container mx-auto px-4 text-center space-y-6">
                         <h1 className="text-4xl md:text-6xl font-black tracking-tight text-gray-900">
-                            Directorio Zentry
+                            Directorio Markix
                         </h1>
                         <p className="text-lg md:text-xl text-gray-600 max-w-2xl mx-auto">
                             Conecta con los mejores negocios y servicios locales en una sola plataforma.

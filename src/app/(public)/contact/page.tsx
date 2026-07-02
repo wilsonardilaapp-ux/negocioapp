@@ -74,7 +74,7 @@ export default function ContactoPage() {
     const getHeaderData = async () => {
         try {
             const configSnap = await getDoc(doc(firestore, "globalConfig", "system"));
-            const mainBusinessId = configSnap.exists() ? configSnap.data().mainBusinessId : null;
+            const mainBusinessId = configSnap.exists ? configSnap.data().mainBusinessId : null;
 
             if (!mainBusinessId) {
                 setHeaderData({ businessId: null, navigation: null });
@@ -82,7 +82,7 @@ export default function ContactoPage() {
             }
 
             const landingSnap = await getDoc(doc(firestore, "businesses", mainBusinessId, "landingPages", "main"));
-            const navigation = landingSnap.exists() ? (landingSnap.data() as LandingPageData).navigation : null;
+            const navigation = landingSnap.exists ? (landingSnap.data() as LandingPageData).navigation : null;
             
             setHeaderData({ businessId: mainBusinessId, navigation });
         } catch (error) {
@@ -142,11 +142,11 @@ export default function ContactoPage() {
   };
 
   const contactInfo = [
-    { icon: Mail, text: "CONTACTO@PENDIENTE-DEFINIR.com", href: "mailto:CONTACTO@PENDIENTE-DEFINIR.com" },
+    { icon: Mail, text: "CONTACTO@MARKIX.com", href: "mailto:CONTACTO@MARKIX.com" },
     { icon: WhatsAppIcon, text: "3228831634", href: "https://api.whatsapp.com/send?phone=3228831634" },
-    { icon: Instagram, text: "@ZentryApp", href: "#" },
-    { icon: Facebook, text: "ZentryApp", href: "#" },
-    { icon: TikTokIcon, text: "@ZentryApp", href: "#" },
+    { icon: Instagram, text: "@MarkixApp", href: "#" },
+    { icon: Facebook, text: "MarkixApp", href: "#" },
+    { icon: TikTokIcon, text: "@MarkixApp", href: "#" },
   ];
 
   return (
@@ -299,7 +299,7 @@ export default function ContactoPage() {
         {/* CTA Section */}
         <section className="text-center mt-20 bg-white py-16 rounded-lg shadow-sm">
             <h2 className="text-3xl font-bold text-gray-900">¿Listo para transformar tu negocio?</h2>
-            <p className="mt-2 text-gray-600 max-w-xl mx-auto">Únete a miles de negocios que ya están creciendo de forma más inteligente con Zentry.</p>
+            <p className="mt-2 text-gray-600 max-w-xl mx-auto">Únete a miles de negocios que ya están creciendo de forma más inteligente con Markix.</p>
             <div className="mt-8 flex justify-center gap-4">
                 <Button size="lg" asChild><Link href="/register">Empieza gratis hoy</Link></Button>
                 <Button size="lg" variant="outline" asChild><Link href="/#precios">Ver planes y precios</Link></Button>

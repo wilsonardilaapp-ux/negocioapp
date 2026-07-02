@@ -87,7 +87,7 @@ export default function SuperAdminLayout({ children }: { children: ReactNode }) 
         <SidebarHeader>
           <Link href="/superadmin" className="flex items-center gap-2">
             <Logo className="w-8 h-8 text-primary" />
-            <span className="text-lg font-semibold font-headline">Zentry</span>
+            <span className="text-lg font-semibold font-headline">Markix</span>
           </Link>
         </SidebarHeader>
         <SidebarContent>

@@ -3,7 +3,7 @@
     "User": {
       "title": "User",
       "type": "object",
-      "description": "Represents a user of the Zentry platform.",
+      "description": "Represents a user of the Markix platform.",
       "properties": {
         "id": { "type": "string" },
         "name": { "type": "string" },

@@ -38,13 +38,13 @@ export default async function TermsAndConditionsPage() {
                     </CardHeader>
                     <CardContent className="prose prose-lg max-w-none text-justify">
                         <h2>1. Introducción</h2>
-                        <p>Bienvenido a Zentry. Estos términos y condiciones describen las reglas y regulaciones para el uso de nuestro software como servicio (SaaS). Al acceder a este servicio, asumimos que aceptas estos términos y condiciones. No continúes usando Zentry si no estás de acuerdo con todos los términos y condiciones establecidos en esta página.</p>
+                        <p>Bienvenido a Markix. Estos términos y condiciones describen las reglas y regulaciones para el uso de nuestro software como servicio (SaaS). Al acceder a este servicio, asumimos que aceptas estos términos y condiciones. No continúes usando Markix si no estás de acuerdo con todos los términos y condiciones establecidos en esta página.</p>
 
                         <h2>2. Definiciones</h2>
                         <ul>
-                            <li><strong>"Servicio"</strong> se refiere a la plataforma SaaS Zentry.</li>
+                            <li><strong>"Servicio"</strong> se refiere a la plataforma SaaS Markix.</li>
                             <li><strong>"Usuario"</strong>, <strong>"Tú"</strong> y <strong>"Tu"</strong> se refieren a ti, la persona que accede al servicio.</li>
-                            <li><strong>"La Compañía"</strong>, <strong>"Nosotros"</strong> y <strong>"Nuestro"</strong> se refieren a Zentry.</li>
+                            <li><strong>"La Compañía"</strong>, <strong>"Nosotros"</strong> y <strong>"Nuestro"</strong> se refieren a Markix.</li>
                         </ul>
 
                         <h2>3. Uso del Servicio</h2>

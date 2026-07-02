@@ -20,7 +20,7 @@ import { z } from 'zod';
 import type { GlobalConfig } from '@/models/global-config';
 import { useToast } from "@/hooks/use-toast";
 import type { Business } from '@/models/business';
-import { UploadCloud, Image as ImageIcon, Loader2, Trash2 } from 'lucide-react';
+import { UploadCloud, Image as ImageIcon, Loader2, Trash2 } from 'lucide-center';
 import { uploadMedia } from '@/ai/flows/upload-media-flow';
 import NextImage from 'next/image';
 import { cn } from '@/lib/utils';
@@ -89,7 +89,7 @@ export default function SettingsPage() {
       <Card>
         <CardHeader>
           <CardTitle>Configuración Global</CardTitle>
-          <CardDescription>Ajusta la configuración general de la plataforma Zentry.</CardDescription>
+          <CardDescription>Ajusta la configuración general de la plataforma Markix.</CardDescription>
         </CardHeader>
       </Card>
       
@@ -161,7 +161,7 @@ export default function SettingsPage() {
                 name="supportEmail"
                 control={control}
                 render={({ field }) => (
-                    <Input id="supportEmail" placeholder="soporte@ecosalud.com" {...field} />
+                    <Input id="supportEmail" placeholder="soporte@markix.com" {...field} />
                 )}
               />
               {errors.supportEmail && <p className="text-sm text-destructive">{errors.supportEmail.message}</p>}
