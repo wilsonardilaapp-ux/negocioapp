@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useMemo, useState, useEffect, useCallback } from 'react';
@@ -210,6 +209,7 @@ export function useSubscription() {
   const landingPagesCount = landingPages?.length ?? 0;
   const ordersCount = orders?.length ?? 0;
   const suggestionsCount = suggestions?.length ?? 0;
+  const commissionsCount = orders?.filter(o => o.orderStatus !== 'Cancelado').length ?? 0;
   const couponsCount = coupons?.length ?? 0;
   const promotionsCount = promotions?.length ?? 0;
 
@@ -250,6 +250,7 @@ export function useSubscription() {
     landingPagesCount,
     ordersCount,
     suggestionsCount,
+    commissionsCount,
     couponsCount,
     promotionsCount,
     canAddBlogPosts,

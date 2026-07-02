@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -400,7 +399,7 @@ export default function BusinessesPage() {
         const currentServices = await getDocs(collection(firestore, `businesses/${selectedBusiness.id}/services`));
         currentServices.forEach(sDoc => batch.update(sDoc.ref, { status: 'inactive' }));
         
-        // 5. Activación Selectiva - NORMALIZADA
+        // 5. Activación Selectiva - NORMALIZADA PARA EVITAR DUPLICADOS
         assignedModules.forEach(rawId => {
           const id = rawId.toLowerCase().trim();
           const extra = moduleExtras[rawId] || 0;
