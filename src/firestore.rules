@@ -69,8 +69,6 @@ service cloud.firestore {
     // --- PROGRAMA DE SOCIOS (REFERIDOS) ---
 
     match /referrals/{id} {
-      // Permitir 'list' si el usuario es el referente o el referido del documento
-      // Nota: En queries, Firestore valida que la regla se cumpla para TODOS los resultados potenciales.
       allow list: if isAuthenticated() && (
         isSuperAdmin() ||
         resource.data.referentBusinessId == request.auth.uid ||
@@ -81,7 +79,14 @@ service cloud.firestore {
         resource.data.referentBusinessId == request.auth.uid ||
         resource.data.referreeBusinessId == request.auth.uid
       );
-      allow create: if isAuthenticated();
+      // Blindaje de creación: Garantiza que el usuario no pueda falsificar invitaciones o premios
+      allow create: if isAuthenticated() &&
+        request.resource.data.referreeBusinessId == request.auth.uid &&
+        request.resource.data.status == 'pending_payment' &&
+        request.resource.data.referentRewardGranted == false &&
+        request.resource.data.referreeRewardGranted == false &&
+        get(/databases/$(database)/documents/businesses/$(request.resource.data.referentBusinessId)).data.referralCode == request.resource.data.referralCode;
+      
       allow update, delete: if isSuperAdmin();
     }
 
