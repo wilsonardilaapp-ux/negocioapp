@@ -79,13 +79,20 @@ service cloud.firestore {
         resource.data.referentBusinessId == request.auth.uid ||
         resource.data.referreeBusinessId == request.auth.uid
       );
-      // Blindaje de creación: Garantiza que el usuario no pueda falsificar invitaciones o premios
-      allow create: if isAuthenticated() &&
-        request.resource.data.referreeBusinessId == request.auth.uid &&
-        request.resource.data.status == 'pending_payment' &&
-        request.resource.data.referentRewardGranted == false &&
-        request.resource.data.referreeRewardGranted == false &&
-        get(/databases/$(database)/documents/businesses/$(request.resource.data.referentBusinessId)).data.referralCode == request.resource.data.referralCode;
+      
+      allow create: if isAuthenticated() && (
+        // El Super Admin puede crear referidos (ej. vinculaciones manuales)
+        isSuperAdmin() || 
+        (
+          // El usuario regular solo puede registrarse a sí mismo como referido (flujo automático)
+          request.resource.data.referreeBusinessId == request.auth.uid &&
+          request.resource.data.referentBusinessId != request.resource.data.referreeBusinessId &&
+          request.resource.data.status == 'pending_payment' &&
+          request.resource.data.referentRewardGranted == false &&
+          request.resource.data.referreeRewardGranted == false &&
+          get(/databases/$(database)/documents/businesses/$(request.resource.data.referentBusinessId)).data.referralCode == request.resource.data.referralCode
+        )
+      );
       
       allow update, delete: if isSuperAdmin();
     }
