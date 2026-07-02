@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -381,8 +382,7 @@ export default function BusinessesPage() {
         };
         batch.update(businessRef, businessUpdateData);
 
-        // --- CORRECCIÓN CRÍTICA: Sincronizar Fuente de Verdad (Suscripción) ---
-        // Buscamos el ID técnico del plan basándonos en el nombre seleccionado en el modal
+        // --- Sincronizar Fuente de Verdad (Suscripción) ---
         const targetPlan = allPlans.find(p => p.name === selectedBusiness.planName || p.id === selectedBusiness.planName);
         const planIdToSync = targetPlan?.id || 'free';
         const subscriptionRef = doc(firestore, `businesses/${selectedBusiness.id}/subscription`, 'current');
@@ -392,7 +392,6 @@ export default function BusinessesPage() {
             status: 'active',
             updatedAt: Timestamp.now()
         }, { merge: true });
-        // ----------------------------------------------------------------------
         
         // 4. Limpieza: Desactivar todos los módulos y servicios existentes
         const currentModules = await getDocs(collection(firestore, `businesses/${selectedBusiness.id}/modules`));
@@ -401,9 +400,10 @@ export default function BusinessesPage() {
         const currentServices = await getDocs(collection(firestore, `businesses/${selectedBusiness.id}/services`));
         currentServices.forEach(sDoc => batch.update(sDoc.ref, { status: 'inactive' }));
         
-        // 5. Activación Selectiva
-        assignedModules.forEach(id => {
-          const extra = moduleExtras[id] || 0;
+        // 5. Activación Selectiva - NORMALIZADA
+        assignedModules.forEach(rawId => {
+          const id = rawId.toLowerCase().trim();
+          const extra = moduleExtras[rawId] || 0;
           batch.set(doc(firestore, `businesses/${selectedBusiness.id}/modules`, id), { status: 'active', extra }, { merge: true });
         });
         
@@ -433,7 +433,7 @@ export default function BusinessesPage() {
   };
   
   const toggleModuleAssignment = (moduleId: string) => {
-    setAssignedModules(prev => prev.includes(moduleId) ? prev.filter(id => id !== moduleId) : [...prev, moduleId]);
+    setAssignedModules(prev => prev.includes(moduleId) ? prev.filter(id => id !== id) : [...prev, moduleId]);
     if (assignedModules.includes(moduleId)) {
       setModuleExtras(prev => {
         const newExtras = { ...prev };
@@ -561,7 +561,6 @@ export default function BusinessesPage() {
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center justify-end gap-3">
-                        {/* SWITCH DE ACTIVACIÓN/DESACTIVACIÓN */}
                         <div className="flex items-center gap-2 mr-1">
                           <Label className="text-[10px] font-bold text-muted-foreground uppercase">{business.status === 'active' ? 'ON' : 'OFF'}</Label>
                           <Switch 
@@ -612,7 +611,6 @@ export default function BusinessesPage() {
         </CardContent>
       </Card>
       
-      {/* Nuevo Negocio Modal */}
       <Dialog open={showBusinessModal} onOpenChange={setShowBusinessModal}>
         <DialogContent className="max-w-lg">
           <DialogHeader><DialogTitle>Nuevo Negocio</DialogTitle><DialogDescription>Registra un nuevo negocio en la plataforma</DialogDescription></DialogHeader>
@@ -648,7 +646,6 @@ export default function BusinessesPage() {
         </DialogContent>
       </Dialog>
       
-      {/* Alerta de Desactivación */}
       <AlertDialog open={isStatusDialogOpen} onOpenChange={setIsStatusDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -670,7 +667,6 @@ export default function BusinessesPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-       {/* Gestionar Negocio Modal */}
        <Dialog open={showManageModal} onOpenChange={setShowManageModal}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -746,7 +742,6 @@ export default function BusinessesPage() {
                     const currentPlan = allPlans.find(p => p.name === selectedBusiness.planName || p.id === selectedBusiness.planName);
                     const includedModules = (currentPlan as any)?.includedModuleKeys || [];
 
-                    // Deduplicación lógica de módulos por nombre, priorizando el ID oficial
                     const displayedModules = (modules || []).reduce((acc: Module[], current) => {
                       const x = acc.find(item => item.name === current.name);
                       if (!x) {
@@ -761,7 +756,7 @@ export default function BusinessesPage() {
 
                     return displayedModules.map(moduleItem => {
                       const isActive = assignedModules.includes(moduleItem.id);
-                      const isIncludedInPlan = includedModules.includes(moduleItem.id);
+                      const isIncludedInPlan = includedModules.includes(moduleItem.id.toLowerCase().trim());
                       const validation = validateModuleExtra(selectedBusiness.planName, moduleExtras[moduleItem.id] || 0);
                       
                       return (

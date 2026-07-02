@@ -160,8 +160,8 @@ export function useSubscription() {
 
     const activeModuleIds = new Set<string>();
     
-    // 1. Módulos incluidos por defecto en la definición del plan (Firestore)
-    details?.includedModuleKeys?.forEach(key => activeModuleIds.add(key));
+    // 1. Módulos incluidos por defecto en la definición del plan (Firestore) - NORMALIZADOS
+    details?.includedModuleKeys?.forEach(key => activeModuleIds.add(key.toLowerCase().trim()));
 
     // 2. Módulos premium "forzados" por ID o nombre (Red de seguridad robusta)
     const PREMIUM_PLAN_IDS = new Set([
@@ -180,15 +180,14 @@ export function useSubscription() {
         activeModuleIds.add('chatbot-integrado-con-whatsapp-para-soporte-y-ventas');
     }
 
-    // 3. SOBRESCRITURA FINAL: Estado de módulos específicos del negocio (base de datos)
-    // CRÍTICO: Este paso debe ir al final para que las desactivaciones manuales en 
-    // "Gestionar Negocio" tengan prioridad absoluta sobre los valores por defecto del plan.
+    // 3. SOBRESCRITURA FINAL: Estado de módulos específicos del negocio (base de datos) - NORMALIZADOS
     dbModules?.forEach(m => {
+        const cleanId = m.id.toLowerCase().trim();
         if (m.status === 'active') {
-            activeModuleIds.add(m.id);
+            activeModuleIds.add(cleanId);
         } else if (m.status === 'inactive') {
             // Si el admin lo desactivó manualmente, lo borramos de la lista de activos
-            activeModuleIds.delete(m.id);
+            activeModuleIds.delete(cleanId);
         }
     });
 
@@ -235,7 +234,8 @@ export function useSubscription() {
   }, [memoizedSubscriptionValues.limits.suggestions]);
 
   const isModuleAuthorized = useCallback((moduleId: string): boolean => {
-      return memoizedSubscriptionValues.activeModuleIds.has(moduleId);
+      // Normalización defensiva al consultar autorización
+      return memoizedSubscriptionValues.activeModuleIds.has(moduleId.toLowerCase().trim());
   }, [memoizedSubscriptionValues.activeModuleIds]);
 
   return {
