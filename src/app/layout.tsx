@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { PT_Sans } from 'next/font/google';
 import './globals.css';
 import { Providers } from './providers';
+import FaviconInjector from '@/components/layout/FaviconInjector';
 
 const ptSans = PT_Sans({
   subsets: ['latin'],
@@ -23,6 +24,7 @@ export default function RootLayout({
     <html lang="es" suppressHydrationWarning>
       <body className={`${ptSans.variable} font-body antialiased`}>
         <Providers>
+          <FaviconInjector sourceType="platform" />
           {children}
         </Providers>
       </body>
