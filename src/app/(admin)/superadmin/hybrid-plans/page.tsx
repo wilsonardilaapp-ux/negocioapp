@@ -284,6 +284,11 @@ function HybridPlanDialog({ isOpen, onClose, plan }: { isOpen: boolean, onClose:
         displayOrder: index
     }));
     
+    // Normalización de módulos incluidos (Gating real)
+    dataToSave.includedModuleKeys = (data.includedModuleKeys || [])
+        .map(k => k.toLowerCase().trim())
+        .filter(Boolean);
+
     const sourceForSlug = dataToSave.slug || dataToSave.name;
     dataToSave.slug = sourceForSlug
         .toLowerCase()
@@ -414,11 +419,17 @@ function HybridPlanDialog({ isOpen, onClose, plan }: { isOpen: boolean, onClose:
                <Controller name="includedModuleKeys" control={control} render={({ field }) => (
                  <Input 
                    value={Array.isArray(field.value) ? field.value.join(', ') : ''} 
-                   onChange={(e) => field.onChange(e.target.value.split(',').map(s => s.trim()).filter(Boolean))}
+                   onChange={(e) => {
+                       const val = e.target.value;
+                       // No filtramos las cadenas vacías mientras el usuario escribe para permitir la coma
+                       field.onChange(val.split(',').map(s => s.trim()));
+                   }}
                    placeholder="ej: catalogo, blog, promotions" 
                  />
                )} />
-               <p className="text-xs text-muted-foreground">Escribe las IDs de los módulos separados por coma.</p>
+               <p className="text-xs text-muted-foreground font-bold text-primary">
+                   Usa comas para separar los módulos. Se normalizarán automáticamente al guardar.
+               </p>
             </TabsContent>
 
             <TabsContent value="limits" className="space-y-6 pt-4">
