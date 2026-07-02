@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -74,7 +75,8 @@ export default function ContactoPage() {
     const getHeaderData = async () => {
         try {
             const configSnap = await getDoc(doc(firestore, "globalConfig", "system"));
-            const mainBusinessId = configSnap.exists ? configSnap.data().mainBusinessId : null;
+            const configData = configSnap.exists() ? configSnap.data() : null;
+            const mainBusinessId = configData?.mainBusinessId;
 
             if (!mainBusinessId) {
                 setHeaderData({ businessId: null, navigation: null });
@@ -82,7 +84,7 @@ export default function ContactoPage() {
             }
 
             const landingSnap = await getDoc(doc(firestore, "businesses", mainBusinessId, "landingPages", "main"));
-            const navigation = landingSnap.exists ? (landingSnap.data() as LandingPageData).navigation : null;
+            const navigation = landingSnap.exists() ? landingSnap.data()?.navigation : null;
             
             setHeaderData({ businessId: mainBusinessId, navigation });
         } catch (error) {
