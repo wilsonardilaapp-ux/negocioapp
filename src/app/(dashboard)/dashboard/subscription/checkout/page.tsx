@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, Suspense } from 'react';
@@ -34,7 +33,8 @@ import {
   ShieldCheck, 
   Zap, 
   Clock,
-  ExternalLink
+  ExternalLink,
+  Wallet
 } from "lucide-react";
 import { useToast } from '@/hooks/use-toast';
 import Image from 'next/image';
@@ -78,6 +78,7 @@ function CheckoutContent() {
       paymentConfig.mercadoPago?.enabled && { id: 'mercadoPago', label: 'Mercado Pago' },
       paymentConfig.stripe?.enabled && { id: 'stripe', label: 'Stripe' },
       paymentConfig.paypal?.enabled && { id: 'paypal', label: 'PayPal' },
+      paymentConfig.wompi?.enabled && paymentConfig.wompi.checkoutUrl && { id: 'wompi', label: 'Wompi' },
     ].filter((g): g is { id: string; label: string } => !!g);
   }, [paymentConfig]);
 
@@ -120,6 +121,11 @@ function CheckoutContent() {
 
       if (gatewayId === 'paypal' && paymentConfig.paypal.checkoutUrl) {
         window.location.href = paymentConfig.paypal.checkoutUrl;
+        return;
+      }
+
+      if (gatewayId === 'wompi' && paymentConfig.wompi?.checkoutUrl) {
+        window.location.href = paymentConfig.wompi.checkoutUrl;
         return;
       }
 
@@ -326,6 +332,27 @@ function CheckoutContent() {
                 </div>
 
                 <Accordion type="single" collapsible className="w-full space-y-2">
+                  {paymentConfig?.wompi?.enabled && paymentConfig.wompi.qrImageUrl && (
+                    <AccordionItem value="wompi" className="border rounded-xl px-4 bg-muted/20">
+                      <AccordionTrigger className="hover:no-underline font-bold">
+                        <div className="flex items-center gap-3">
+                          <Wallet className="h-5 w-5 text-primary" />
+                          Wompi (Transferencia)
+                        </div>
+                      </AccordionTrigger>
+                      <AccordionContent className="space-y-4 pt-2">
+                        <div className="grid grid-cols-2 gap-4 text-sm bg-white p-3 rounded-lg border">
+                          <div><p className="text-[10px] text-muted-foreground uppercase font-bold">Titular</p><p className="font-bold">{paymentConfig.wompi.holderName}</p></div>
+                          <div><p className="text-[10px] text-muted-foreground uppercase font-bold">Referencia</p><p className="font-bold">{paymentConfig.wompi.accountNumber}</p></div>
+                        </div>
+                        {paymentConfig.wompi.qrImageUrl && (
+                          <div className="flex justify-center bg-white p-4 rounded-lg border"><Image src={paymentConfig.wompi.qrImageUrl} alt="QR Wompi" width={160} height={160} className="object-contain" /></div>
+                        )}
+                        {paymentConfig.wompi.instructions && <p className="text-xs italic text-muted-foreground bg-muted p-2 rounded">{paymentConfig.wompi.instructions}</p>}
+                      </AccordionContent>
+                    </AccordionItem>
+                  )}
+
                   {paymentConfig?.nequi?.enabled && (
                     <AccordionItem value="nequi" className="border rounded-xl px-4 bg-muted/20">
                       <AccordionTrigger className="hover:no-underline font-bold">

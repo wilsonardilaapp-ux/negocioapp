@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useMemo } from 'react';
@@ -7,11 +6,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { CreditCard, Loader2, Save, Building, Smartphone, Building2, Store, DollarSign } from 'lucide-react';
+import { CreditCard, Loader2, Save, Building, Smartphone, Building2, Store, DollarSign, Wallet } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
-import type { GlobalPaymentConfig, HotmartPlanLink } from '@/models/global-payment-config';
+import type { GlobalPaymentConfig, HotmartPlanLink, WompiConfig } from '@/models/global-payment-config';
 import QRForm from '@/components/pagos/qr-form';
 import BreBForm from '@/components/pagos/breb-form';
+import WompiForm from '@/components/pagos/wompi-form';
 import ApiGatewayForm from '@/components/pagos/api-gateway-form';
 import { useCollection, useFirestore, useMemoFirebase, setDocumentNonBlocking, useDoc } from '@/firebase';
 import { collection, doc, writeBatch } from 'firebase/firestore';
@@ -26,6 +26,7 @@ const initialConfig: GlobalPaymentConfig = {
     stripe: { enabled: false, mode: 'sandbox', secretKey: '', instructions: '', checkoutUrl: '', webhookUrl: '', webhookSecret: '' },
     paypal: { enabled: false, mode: 'sandbox', clientId: '', clientSecret: '', instructions: '', checkoutUrl: '', webhookUrl: '' },
     mercadoPago: { enabled: false, mode: 'sandbox', publicKey: '', accessToken: '', instructions: '', checkoutUrl: '', webhookUrl: '' },
+    wompi: { enabled: false, checkoutUrl: '', qrImageUrl: null, accountNumber: '', holderName: '', instructions: '' },
 };
 
 const PaymentMethodCard = ({ title, children, icon: Icon }: { title: string, children: React.ReactNode, icon: React.ElementType }) => (
@@ -69,6 +70,7 @@ export default function PaymentMethodsPage() {
                 stripe: { ...initialConfig.stripe, ...savedConfig.stripe },
                 paypal: { ...initialConfig.paypal, ...savedConfig.paypal },
                 mercadoPago: { ...initialConfig.mercadoPago, ...savedConfig.mercadoPago },
+                wompi: { ...initialConfig.wompi, ...(savedConfig.wompi || {}) },
             };
             setConfig(mergedConfig);
         }
@@ -131,7 +133,7 @@ export default function PaymentMethodsPage() {
         
         try {
             if (paymentConfigDocRef) {
-                setDocumentNonBlocking(paymentConfigDocRef, config);
+                setDocumentNonBlocking(paymentConfigDocRef, config, { merge: true });
             }
 
             const batch = writeBatch(firestore);
@@ -198,6 +200,14 @@ export default function PaymentMethodsPage() {
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
                 <div className="lg:col-span-2 space-y-6">
+                    <PaymentMethodCard title="Wompi (Híbrido)" icon={Wallet}>
+                        <div className="flex items-center space-x-2">
+                            <Switch id="wompi-enabled" checked={config.wompi?.enabled || false} onCheckedChange={checked => handleConfigChange('wompi', {...config.wompi, enabled: checked})} />
+                            <Label htmlFor="wompi-enabled">Habilitar Wompi</Label>
+                        </div>
+                        {config.wompi?.enabled && <WompiForm data={config.wompi} setData={(data) => handleConfigChange('wompi', data)} />}
+                    </PaymentMethodCard>
+
                     <PaymentMethodCard title="Nequi (QR)" icon={Smartphone}>
                         <div className="flex items-center space-x-2">
                             <Switch id="nequi-enabled" checked={config.nequi.enabled} onCheckedChange={checked => handleConfigChange('nequi', {...config.nequi, enabled: checked})} />

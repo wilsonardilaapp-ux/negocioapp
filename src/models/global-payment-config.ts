@@ -41,6 +41,17 @@ export const ApiGatewayConfigSchema = z.object({
 });
 export type ApiGatewayConfig = z.infer<typeof ApiGatewayConfigSchema>;
 
+// Wompi is hybrid: can have a checkout link and a manual QR
+export const WompiConfigSchema = z.object({
+  enabled: z.boolean(),
+  checkoutUrl: z.string().url().optional().or(z.literal('')),
+  qrImageUrl: z.string().nullable().optional(),
+  accountNumber: z.string().optional(),
+  holderName: z.string().optional(),
+  instructions: z.string().optional(),
+});
+export type WompiConfig = z.infer<typeof WompiConfigSchema>;
+
 // Main configuration object schema
 export const GlobalPaymentConfigSchema = z.object({
   nequi: QRConfigSchema,
@@ -50,6 +61,7 @@ export const GlobalPaymentConfigSchema = z.object({
   stripe: ApiGatewayConfigSchema,
   mercadoPago: ApiGatewayConfigSchema,
   paypal: ApiGatewayConfigSchema,
+  wompi: WompiConfigSchema.optional(),
 });
 export type GlobalPaymentConfig = z.infer<typeof GlobalPaymentConfigSchema>;
 
