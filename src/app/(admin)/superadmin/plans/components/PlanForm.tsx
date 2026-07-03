@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useForm, Controller, useFieldArray } from 'react-hook-form';
@@ -31,7 +30,7 @@ import {
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
   useSortable,
-} from '@dnd-kit/sortable';
+} from '@nd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 
 interface PlanFormProps {
@@ -84,6 +83,11 @@ export default function PlanForm({ existingPlan, onClose }: PlanFormProps) {
         name: "features",
     });
 
+    const { fields: extraLimitFields, append: appendExtraLimit, remove: removeExtraLimit } = useFieldArray({
+        control,
+        name: "extraLimits",
+    });
+
     const sensors = useSensors(
         useSensor(PointerSensor),
         useSensor(KeyboardSensor, {
@@ -105,6 +109,7 @@ export default function PlanForm({ existingPlan, onClose }: PlanFormProps) {
                 ...existingPlan,
                 isActive: existingPlan.isActive ?? true,
                 features: featuresAsObjects,
+                extraLimits: existingPlan.extraLimits || [],
                 limits: {
                     ...existingPlan.limits,
                     promotions: existingPlan.limits.promotions ?? 0,
@@ -123,6 +128,7 @@ export default function PlanForm({ existingPlan, onClose }: PlanFormProps) {
                 isMostPopular: false,
                 isActive: true,
                 features: [{ value: '', displayOrder: 0 }],
+                extraLimits: [],
                 limits: {
                     products: 0,
                     blogPosts: 0,
@@ -166,82 +172,114 @@ export default function PlanForm({ existingPlan, onClose }: PlanFormProps) {
     };
 
     return (
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 max-h-[80vh] overflow-y-auto p-1 pr-4">
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 max-h-[80vh] overflow-y-auto p-1 pr-4 text-foreground">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                     <Label htmlFor="id">ID del Plan</Label>
                     <Input id="id" {...register('id')} placeholder="ej. pro, enterprise" disabled={!!existingPlan} />
-                    {errors.id && <p className="text-sm text-destructive mt-1">{errors.id.message}</p>}
+                    {errors.id && <p className="text-sm text-destructive mt-1 font-semibold">{errors.id.message}</p>}
                 </div>
                 <div>
                     <Label htmlFor="name">Nombre del Plan</Label>
                     <Input id="name" {...register('name')} placeholder="ej. Plan Profesional" />
-                    {errors.name && <p className="text-sm text-destructive mt-1">{errors.name.message}</p>}
+                    {errors.name && <p className="text-sm text-destructive mt-1 font-semibold">{errors.name.message}</p>}
                 </div>
             </div>
 
             <div>
                 <Label htmlFor="description">Descripción</Label>
                 <Textarea id="description" {...register('description')} placeholder="Una descripción corta y atractiva del plan." />
-                {errors.description && <p className="text-sm text-destructive mt-1">{errors.description.message}</p>}
+                {errors.description && <p className="text-sm text-destructive mt-1 font-semibold">{errors.description.message}</p>}
             </div>
 
              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                     <Label htmlFor="price">Precio (USD/mes)</Label>
                     <Input id="price" type="number" step="1" {...register('price', { valueAsNumber: true })} />
-                    {errors.price && <p className="text-sm text-destructive mt-1">{errors.price.message}</p>}
+                    {errors.price && <p className="text-sm text-destructive mt-1 font-semibold">{errors.price.message}</p>}
                 </div>
                 <div>
                     <Label htmlFor="stripePriceId">ID de Precio de Stripe</Label>
                     <Input id="stripePriceId" {...register('stripePriceId')} placeholder="price_..." />
-                    {errors.stripePriceId && <p className="text-sm text-destructive mt-1">{errors.stripePriceId.message}</p>}
+                    {errors.stripePriceId && <p className="text-sm text-destructive mt-1 font-semibold">{errors.stripePriceId.message}</p>}
                 </div>
             </div>
 
-            <div className="space-y-4 rounded-lg border p-4">
-                <h4 className="font-semibold">Límites (-1 para ilimitado)</h4>
+            <div className="space-y-4 rounded-lg border p-4 bg-card">
+                <h4 className="font-bold text-lg">Límites (-1 para ilimitado)</h4>
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                     <div>
                         <Label htmlFor="limits.products">Productos</Label>
                         <Input id="limits.products" type="number" {...register('limits.products', { valueAsNumber: true })} />
-                        {errors.limits?.products && <p className="text-sm text-destructive mt-1">{errors.limits.products.message}</p>}
                     </div>
                     <div>
                         <Label htmlFor="limits.blogPosts">Posts de Blog</Label>
                         <Input id="limits.blogPosts" type="number" {...register('limits.blogPosts', { valueAsNumber: true })} />
-                        {errors.limits?.blogPosts && <p className="text-sm text-destructive mt-1">{errors.limits.blogPosts.message}</p>}
                     </div>
                      <div>
                         <Label htmlFor="limits.landingPages">Landing Pages</Label>
                         <Input id="limits.landingPages" type="number" {...register('limits.landingPages', { valueAsNumber: true })} />
-                        {errors.limits?.landingPages && <p className="text-sm text-destructive mt-1">{errors.limits.landingPages.message}</p>}
                     </div>
                     <div>
                         <Label htmlFor="limits.promotions">Promociones</Label>
                         <Input id="limits.promotions" type="number" {...register('limits.promotions', { valueAsNumber: true })} />
-                        {errors.limits?.promotions && <p className="text-sm text-destructive mt-1">{errors.limits.promotions.message}</p>}
                     </div>
                     <div>
                         <Label htmlFor="limits.coupons">Cupones</Label>
                         <Input id="limits.coupons" type="number" {...register('limits.coupons', { valueAsNumber: true })} />
-                        {errors.limits?.coupons && <p className="text-sm text-destructive mt-1">{errors.limits.coupons.message}</p>}
                     </div>
                     <div>
                         <Label htmlFor="limits.orders">Pedidos / mes</Label>
                         <Input id="limits.orders" type="number" {...register('limits.orders', { valueAsNumber: true })} />
-                        {errors.limits?.orders && <p className="text-sm text-destructive mt-1">{errors.limits.orders.message}</p>}
                     </div>
                     <div>
                         <Label htmlFor="limits.suggestions">Sugerencias</Label>
                         <Input id="limits.suggestions" type="number" {...register('limits.suggestions', { valueAsNumber: true })} />
-                        {errors.limits?.suggestions && <p className="text-sm text-destructive mt-1">{errors.limits.suggestions.message}</p>}
+                    </div>
+                </div>
+
+                <div className="space-y-4 pt-4 border-t">
+                    <div className="flex items-center justify-between">
+                        <Label className="font-bold">Campos Técnicos Extra</Label>
+                        <Button 
+                            type="button" 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={() => appendExtraLimit({ key: '', value: 0 })}
+                            className="font-bold"
+                        >
+                            <PlusCircle className="h-4 w-4 mr-2" />
+                            Añadir campo
+                        </Button>
+                    </div>
+                    <div className="space-y-3">
+                        {extraLimitFields.map((field, index) => (
+                            <div key={field.id} className="flex gap-4 items-end bg-muted/20 p-3 rounded-lg border animate-in fade-in slide-in-from-top-1 duration-200">
+                                <div className="flex-1 space-y-1">
+                                    <Label className="text-[10px] uppercase font-bold text-muted-foreground">Nombre del Campo</Label>
+                                    <Input {...register(`extraLimits.${index}.key` as const)} placeholder="ej: max_storage_mb" />
+                                </div>
+                                <div className="w-32 space-y-1">
+                                    <Label className="text-[10px] uppercase font-bold text-muted-foreground">Valor</Label>
+                                    <Input type="number" {...register(`extraLimits.${index}.value` as const, { valueAsNumber: true })} />
+                                </div>
+                                <Button 
+                                    type="button" 
+                                    variant="ghost" 
+                                    size="icon" 
+                                    onClick={() => removeExtraLimit(index)}
+                                    className="text-destructive hover:bg-destructive/10"
+                                >
+                                    <Trash2 className="h-4 w-4" />
+                                </Button>
+                            </div>
+                        ))}
                     </div>
                 </div>
             </div>
             
-            <div className="space-y-4 rounded-lg border p-4">
-                <h4 className="font-semibold">Lista de Características</h4>
+            <div className="space-y-4 rounded-lg border p-4 bg-card">
+                <h4 className="font-bold text-lg">Lista de Características</h4>
                 
                 <DndContext
                     sensors={sensors}
@@ -266,9 +304,9 @@ export default function PlanForm({ existingPlan, onClose }: PlanFormProps) {
                     </SortableContext>
                 </DndContext>
 
-                {errors.features && <p className="text-sm text-destructive mt-1">Todas las características deben tener contenido.</p>}
+                {errors.features && <p className="text-sm text-destructive mt-1 font-semibold">Todas las características deben tener contenido.</p>}
                 
-                <Button type="button" variant="outline" size="sm" onClick={() => append({ value: '', displayOrder: fields.length })}>
+                <Button type="button" variant="outline" size="sm" onClick={() => append({ value: '', displayOrder: fields.length })} className="font-bold">
                     <PlusCircle className="mr-2 h-4 w-4" />
                     Añadir Característica
                 </Button>
@@ -280,7 +318,7 @@ export default function PlanForm({ existingPlan, onClose }: PlanFormProps) {
                         <Switch id="isActive" checked={field.value} onCheckedChange={field.onChange} />
                     )} />
                     <div className="space-y-0.5">
-                        <Label htmlFor="isActive" className="text-base">Plan Activo</Label>
+                        <Label htmlFor="isActive" className="text-base font-bold">Plan Activo</Label>
                         <p className="text-xs text-muted-foreground">Define si el plan está disponible para los usuarios.</p>
                     </div>
                 </div>
@@ -290,15 +328,15 @@ export default function PlanForm({ existingPlan, onClose }: PlanFormProps) {
                         <Switch id="isMostPopular" checked={field.value} onCheckedChange={field.onChange} />
                     )} />
                     <div className="space-y-0.5">
-                        <Label htmlFor="isMostPopular" className="text-base">Plan Destacado</Label>
+                        <Label htmlFor="isMostPopular" className="text-base font-bold">Plan Destacado</Label>
                         <p className="text-xs text-muted-foreground">Muestra el badge "Más Popular" en la tabla de precios.</p>
                     </div>
                 </div>
             </div>
 
-            <div className="flex justify-end gap-2 pt-4">
-                <Button type="button" variant="outline" onClick={onClose}>Cancelar</Button>
-                <Button type="submit" disabled={isSubmitting}>
+            <div className="flex justify-end gap-2 pt-4 border-t">
+                <Button type="button" variant="outline" onClick={onClose} className="font-bold">Cancelar</Button>
+                <Button type="submit" disabled={isSubmitting} className="font-bold">
                     {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     {isSubmitting ? 'Guardando...' : existingPlan ? 'Guardar Cambios' : 'Crear Plan'}
                 </Button>

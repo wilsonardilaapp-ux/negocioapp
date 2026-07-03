@@ -1,4 +1,3 @@
-
 import { z } from 'zod';
 
 export const PlanLimitsSchema = z.object({
@@ -26,6 +25,10 @@ export const SubscriptionPlanSchema = z.object({
     displayOrder: z.number().optional()
   })).describe("Lista de características clave para la página de precios."),
   limits: PlanLimitsSchema,
+  extraLimits: z.array(z.object({ 
+    key: z.string().min(1, 'La clave es requerida'), 
+    value: z.number() 
+  })).optional(),
   hotmartEnabled: z.boolean().optional().default(false),
   hotmartUrl: z.string().optional().default(''),
 });
@@ -59,6 +62,7 @@ export const DefaultSubscriptionPlans: SubscriptionPlan[] = [
       orders: 21,
       suggestions: 2,
     },
+    extraLimits: [],
     hotmartEnabled: false,
     hotmartUrl: '',
   },
@@ -87,6 +91,7 @@ export const DefaultSubscriptionPlans: SubscriptionPlan[] = [
       orders: -1,
       suggestions: -1,
     },
+    extraLimits: [],
     hotmartEnabled: false,
     hotmartUrl: '',
   },
@@ -115,6 +120,7 @@ export const DefaultSubscriptionPlans: SubscriptionPlan[] = [
       orders: -1,
       suggestions: -1,
     },
+    extraLimits: [],
     hotmartEnabled: false,
     hotmartUrl: '',
   },
