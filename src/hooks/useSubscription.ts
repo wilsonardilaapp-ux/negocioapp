@@ -20,7 +20,7 @@ const LOADING_TIMEOUT_MS = 10_000;
 
 /**
  * Normaliza un ID técnico eliminando mayúsculas, espacios y acentos.
- * Blindaje contra datos mal formateados en la base de datos.
+ * Se utiliza slugify para garantizar consistencia con los nombres de planes.
  */
 const normalizeId = (id: string | undefined): string => {
   if (!id) return "";
@@ -29,6 +29,7 @@ const normalizeId = (id: string | undefined): string => {
     .trim()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, '-')
     .replace(/[^a-z0-9-]/g, "");
 };
 

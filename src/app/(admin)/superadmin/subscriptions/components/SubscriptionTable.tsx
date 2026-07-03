@@ -55,7 +55,7 @@ export function SubscriptionTable({ clients, isLoading, allPlans }: Subscription
     if ((planDetails as any)?.isMostPopular) return "default";
     switch (plan) {
       case "pro": return "default";
-      case "enterprise": return "destructive"; // You can define a gold/yellow variant
+      case "enterprise": return "destructive"; 
       case "free": 
       case "plan-crecimiento":
         return "secondary";
@@ -101,7 +101,7 @@ export function SubscriptionTable({ clients, isLoading, allPlans }: Subscription
                 ))}
             </SelectContent>
         </Select>
-        <Select value={statusFilter} onValueChange={setFilterStatus}>
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
             <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="Filtrar por estado" />
             </SelectTrigger>

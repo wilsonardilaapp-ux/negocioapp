@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useMemo } from "react";
@@ -40,16 +39,16 @@ export default function SubscriptionsPage() {
   const summary = useMemo(() => {
     const counts: Record<string, number> = {
       total: clients.length,
-      free: 0,
+      'plan-crecimiento': 0,
       pro: 0,
       enterprise: 0,
     };
     clients.forEach(client => {
-        const planId = client.subscription?.plan || 'free';
+        const planId = client.subscription?.plan || 'plan-crecimiento';
         if (planId in counts) {
             counts[planId]++;
         } else {
-             // Optionally handle new plans if you want to see them in summary
+             // Optionally handle new plans
         }
     });
     return counts;
@@ -79,11 +78,11 @@ export default function SubscriptionsPage() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Plan Free</CardTitle>
+            <CardTitle className="text-sm font-medium">Plan Free (Crecimiento)</CardTitle>
             <Star className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{isLoading ? "..." : summary.free}</div>
+            <div className="text-2xl font-bold">{isLoading ? "..." : (summary['plan-crecimiento'] || 0)}</div>
           </CardContent>
         </Card>
         <Card>
