@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useTransition, useEffect, useMemo } from 'react';
@@ -53,7 +52,7 @@ export default function HybridPlansPage() {
 
   const plans = useMemo(() => {
     if (!unsortedPlans) return [];
-    return [...unsortedPlans].sort((a, b) => a.basePrice - b.basePrice);
+    return [...unsortedPlans].sort((a, b) => (a.basePrice || 0) - (b.basePrice || 0));
   }, [unsortedPlans]);
 
   const handleOpenDialog = (plan: HybridPlan | null) => {
@@ -207,6 +206,7 @@ function HybridPlanDialog({ isOpen, onClose, plan }: { isOpen: boolean, onClose:
   });
 
   const { fields, append, remove, move } = useFieldArray({ control, name: 'features' });
+  const { fields: extraLimitFields, append: appendExtraLimit, remove: removeExtraLimit } = useFieldArray({ control, name: 'extraLimits' });
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -219,7 +219,11 @@ function HybridPlanDialog({ isOpen, onClose, plan }: { isOpen: boolean, onClose:
     if (isOpen) {
       if (plan) {
         const sortedFeatures = [...(plan.features || [])].sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
-        reset({ ...plan, features: sortedFeatures });
+        reset({ 
+          ...plan, 
+          features: sortedFeatures,
+          extraLimits: plan.extraLimits || []
+        });
       } else {
         reset({
           name: '',
@@ -393,6 +397,44 @@ function HybridPlanDialog({ isOpen, onClose, plan }: { isOpen: boolean, onClose:
                     <Input type="number" {...register(`limits.${key as keyof HybridPlan['limits']}`, { valueAsNumber: true })} />
                   </div>
                 ))}
+              </div>
+
+              <div className="space-y-4 pt-4 border-t">
+                <div className="flex items-center justify-between">
+                    <Label className="font-bold">Límites Técnicos Extra</Label>
+                    <Button 
+                        type="button" 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => appendExtraLimit({ key: '', value: 0 })}
+                    >
+                        <PlusCircle className="h-4 w-4 mr-2" />
+                        Añadir campo
+                    </Button>
+                </div>
+                <div className="space-y-3">
+                    {extraLimitFields.map((field, index) => (
+                        <div key={field.id} className="flex gap-4 items-end bg-muted/20 p-3 rounded-lg border animate-in fade-in slide-in-from-top-1 duration-200">
+                            <div className="flex-1 space-y-1">
+                                <Label className="text-[10px] uppercase font-bold text-muted-foreground">Nombre del Campo</Label>
+                                <Input {...register(`extraLimits.${index}.key` as const)} placeholder="ej: max_storage_mb" />
+                            </div>
+                            <div className="w-32 space-y-1">
+                                <Label className="text-[10px] uppercase font-bold text-muted-foreground">Valor</Label>
+                                <Input type="number" {...register(`extraLimits.${index}.value` as const, { valueAsNumber: true })} />
+                            </div>
+                            <Button 
+                                type="button" 
+                                variant="ghost" 
+                                size="icon" 
+                                onClick={() => removeExtraLimit(index)}
+                                className="text-destructive hover:bg-destructive/10"
+                            >
+                                <Trash2 className="h-4 w-4" />
+                            </Button>
+                        </div>
+                    ))}
+                </div>
               </div>
             </TabsContent>
 
