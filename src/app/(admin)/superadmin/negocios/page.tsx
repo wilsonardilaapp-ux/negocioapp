@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -169,8 +170,8 @@ export default function BusinessesPage() {
         (business.ownerName && business.ownerName.toLowerCase().includes(searchBusiness.toLowerCase())) ||
         (business.ownerEmail && business.ownerEmail.toLowerCase().includes(searchBusiness.toLowerCase()));
       
-      const matchedPlan = allPlans.find(p => p.id === business.planName || p.name === business.planName);
-      const planNameForFilter = matchedPlan?.id || business.planName || 'plan-crecimiento';
+      const matchedPlan = allPlans.find(p => p.id === business.planName || p.name === business.planName || p.slug === business.planName);
+      const planNameForFilter = matchedPlan?.id || business.planName || 'WxZYuL7JwmkSKBXGn1QZ';
       
       const planMatch = filterPlan === 'all' || planNameForFilter === filterPlan;
       const statusMatch = filterStatus === 'all' || business.status === filterStatus;
@@ -265,8 +266,8 @@ export default function BusinessesPage() {
         const subSnap = await getDoc(doc(firestore, `businesses/${business.id}/subscription`, 'current'));
         const subData = subSnap.exists() ? subSnap.data() as any : null;
         
-        const actualPlanId = (subData?.status === 'active' ? subData.plan : null) || business.planName || 'plan-crecimiento';
-        const currentPlanDetails = allPlans.find(p => p.id === actualPlanId || p.name === actualPlanId);
+        const actualPlanId = (subData?.status === 'active' ? subData.plan : null) || business.planName || 'WxZYuL7JwmkSKBXGn1QZ';
+        const currentPlanDetails = allPlans.find(p => p.id === actualPlanId || p.name === actualPlanId || p.slug === actualPlanId);
         const resolvedPlanName = currentPlanDetails?.name || business.planName || 'Plan Crecimiento';
 
         if (business.planName !== resolvedPlanName) {
@@ -370,8 +371,8 @@ export default function BusinessesPage() {
         };
         batch.update(businessRef, businessUpdateData);
 
-        const targetPlan = allPlans.find(p => p.name === selectedBusiness.planName || p.id === selectedBusiness.planName);
-        const planIdToSync = targetPlan?.id || 'plan-crecimiento';
+        const targetPlan = allPlans.find(p => p.name === selectedBusiness.planName || p.id === selectedBusiness.planName || p.slug === selectedBusiness.planName);
+        const planIdToSync = targetPlan?.id || 'WxZYuL7JwmkSKBXGn1QZ';
         const subscriptionRef = doc(firestore, `businesses/${selectedBusiness.id}/subscription`, 'current');
         
         batch.set(subscriptionRef, {
@@ -538,7 +539,7 @@ export default function BusinessesPage() {
                     <td className="px-6 py-4">
                         <Badge variant="outline" className="font-semibold text-xs py-0.5 px-2 bg-muted/30">
                             {(() => {
-                                const matched = allPlans.find(p => p.id === business.planName || p.name === business.planName);
+                                const matched = allPlans.find(p => p.id === business.planName || p.name === business.planName || p.slug === business.planName);
                                 return matched ? matched.name : (business.planName || 'Plan Crecimiento');
                             })()}
                         </Badge>
@@ -684,7 +685,7 @@ export default function BusinessesPage() {
                 <div className="mt-2 col-span-2">
                     <p className="text-[10px] uppercase font-bold text-muted-foreground mb-1">Plan de Suscripción (Fuente de Verdad)</p>
                     <Select 
-                        value={allPlans.find(p => p.name === selectedBusiness.planName || p.id === selectedBusiness.planName)?.id || 'plan-crecimiento'} 
+                        value={allPlans.find(p => p.name === selectedBusiness.planName || p.id === selectedBusiness.planName || p.slug === selectedBusiness.planName)?.id || 'WxZYuL7JwmkSKBXGn1QZ'} 
                         onValueChange={(val) => {
                             const newPlan = allPlans.find(p => p.id === val);
                             if (newPlan) {
@@ -729,7 +730,7 @@ export default function BusinessesPage() {
                 
                 <div className="grid grid-cols-1 gap-2">
                   {(() => {
-                    const currentPlan = allPlans.find(p => p.name === selectedBusiness.planName || p.id === selectedBusiness.planName);
+                    const currentPlan = allPlans.find(p => p.name === selectedBusiness.planName || p.id === selectedBusiness.planName || p.slug === selectedBusiness.planName);
                     const includedModules = (currentPlan as any)?.includedModuleKeys || [];
 
                     const displayedModules = (modules || []).reduce((acc: Module[], current) => {

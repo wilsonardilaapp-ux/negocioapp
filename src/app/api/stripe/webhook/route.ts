@@ -1,3 +1,4 @@
+
 import { NextResponse } from 'next/server';
 import { stripe, getPlanFromPriceId } from '@/lib/stripe';
 import { getAdminFirestore } from '@/firebase/server-init';
@@ -91,9 +92,9 @@ export async function POST(req: Request) {
 
         const businessDoc = businessQuery.docs[0];
 
-        // Degradar a plan híbrido gratuito
+        // Degradar a plan híbrido gratuito real (WxZYuL7JwmkSKBXGn1QZ)
         const subscriptionData = {
-            plan: 'plan-crecimiento',
+            plan: 'WxZYuL7JwmkSKBXGn1QZ',
             status: 'canceled',
             stripeSubscriptionId: null, // Limpiar
             currentPeriodEnd: null,

@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useRouter, useSearchParams } from "next/navigation";
@@ -280,7 +281,7 @@ function RegisterForm() {
       
       const subscriptionDocRef = doc(firestore, `businesses/${newUser.uid}/subscription`, 'current');
       const subscriptionData: Subscription = {
-        plan: planParam || 'plan-crecimiento',
+        plan: planParam || 'WxZYuL7JwmkSKBXGn1QZ',
         status: 'active',
         stripeCustomerId: null,
         stripeSubscriptionId: null,

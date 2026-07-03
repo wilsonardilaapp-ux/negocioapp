@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useMemo, useState, useEffect, useCallback } from 'react';
@@ -144,18 +145,18 @@ export function useSubscription() {
     const subscriptionPlanId = subscription?.plan;
     const businessPlanName = (businessData as any)?.planName;
     
-    let currentPlanId = 'plan-crecimiento';
+    let currentPlanId = 'WxZYuL7JwmkSKBXGn1QZ';
 
     if (subscriptionPlanId && subscription?.status === 'active') {
         currentPlanId = subscriptionPlanId;
-    } else if (businessPlanName && businessPlanName !== 'Plan Gratuito') {
+    } else if (businessPlanName && businessPlanName !== 'Plan Crecimiento') {
         currentPlanId = businessPlanName;
-    } else if (businessPlanName === 'Plan Gratuito' && subscriptionPlanId) {
+    } else if (businessPlanName === 'Plan Crecimiento' && subscriptionPlanId) {
         currentPlanId = subscriptionPlanId;
     }
 
-    const details = allPlans?.find(p => p.id === currentPlanId || p.name === currentPlanId) || 
-                       allHybridPlans?.find(p => p.id === currentPlanId || p.name === currentPlanId);
+    const details = allPlans?.find(p => p.id === currentPlanId || p.name === currentPlanId || p.slug === currentPlanId) || 
+                       allHybridPlans?.find(p => p.id === currentPlanId || p.name === currentPlanId || p.slug === currentPlanId);
 
     const defaultLimits: PlanLimits = { products: 4, blogPosts: 4, landingPages: 1, coupons: 0, promotions: 0, orders: -1, suggestions: 0 };
 
@@ -215,7 +216,7 @@ export function useSubscription() {
       plan: details?.name || currentPlanId,
       isActive: !!details || subscription?.status === 'active',
       limits: mergedLimits,
-      isFree: normalizedName.includes('gratuito') || normalizedName === 'free' || normalizedName === 'plan-crecimiento',
+      isFree: normalizedName.includes('gratuito') || normalizedName === 'free' || normalizedName === 'plan-crecimiento' || normalizedName.includes('crecimiento'),
       isPro: normalizedName.includes('pro'),
       isEnterprise: normalizedName.includes('enterprise') || normalizedName.includes('estandar'),
       planDetails: details || null,

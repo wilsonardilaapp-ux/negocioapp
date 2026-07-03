@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useMemo } from "react";
@@ -44,7 +45,7 @@ export function SubscriptionTable({ clients, isLoading, allPlans }: Subscription
       const searchMatch =
         client.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         client.email.toLowerCase().includes(searchTerm.toLowerCase());
-      const planMatch = planFilter === "all" || (client.subscription?.plan || 'plan-crecimiento') === planFilter;
+      const planMatch = planFilter === "all" || (client.subscription?.plan || 'WxZYuL7JwmkSKBXGn1QZ') === planFilter;
       const statusMatch = statusFilter === "all" || (client.subscription?.status || 'canceled') === statusFilter;
       return searchMatch && planMatch && statusMatch;
     });
@@ -57,7 +58,7 @@ export function SubscriptionTable({ clients, isLoading, allPlans }: Subscription
       case "pro": return "default";
       case "enterprise": return "destructive"; 
       case "free": 
-      case "plan-crecimiento":
+      case "WxZYuL7JwmkSKBXGn1QZ":
         return "secondary";
       default: return "outline";
     }
@@ -135,7 +136,7 @@ export function SubscriptionTable({ clients, isLoading, allPlans }: Subscription
                     ? client.subscription.currentPeriodEnd.toDate() < new Date() 
                     : false;
                 
-                const planDetails = allPlans.find(p => p.id === client.subscription?.plan);
+                const planDetails = allPlans.find(p => p.id === client.subscription?.plan || p.name === client.subscription?.plan || p.slug === client.subscription?.plan);
                 const paymentMethod = client.subscription?.paymentMethod || 'stripe';
 
                 return (
