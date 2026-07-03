@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -13,11 +12,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useFirestore, addDocumentNonBlocking } from '@/firebase';
-import { collection } from 'firebase/firestore';
+import { collection, doc, getDoc } from 'firebase/firestore';
 import type { ContactMessage } from '@/models/notification';
 import { Loader2, Mail, Phone, Instagram, Facebook, ShieldCheck, HeartHandshake, History, ArrowLeft, Send } from "lucide-react";
 import Link from 'next/link';
 import { TikTokIcon, WhatsAppIcon } from '@/components/icons';
+import Header from "@/components/layout/header";
+import Footer from "@/components/layout/footer";
+import type { LandingPageData } from '@/models/landing-page';
 
 
 // List of country codes
@@ -69,6 +71,37 @@ export default function ContactoPage() {
   const { toast } = useToast();
   const firestore = useFirestore();
 
+  // State for header/footer data
+  const [headerData, setHeaderData] = React.useState<{ businessId: string | null, navigation: LandingPageData['navigation'] | null }>({ businessId: null, navigation: null });
+
+  // Fetch header data on client side
+  React.useEffect(() => {
+    if (!firestore) return;
+    
+    const getHeaderData = async () => {
+        try {
+            const configSnap = await getDoc(doc(firestore, "globalConfig", "system"));
+            const configData = configSnap.exists() ? configSnap.data() : null;
+            const mainBusinessId = configData?.mainBusinessId;
+
+            if (!mainBusinessId) {
+                setHeaderData({ businessId: null, navigation: null });
+                return;
+            }
+
+            const landingSnap = await getDoc(doc(firestore, "businesses", mainBusinessId, "landingPages", "main"));
+            const navigation = landingSnap.exists() ? (landingSnap.data() as LandingPageData).navigation : null;
+            
+            setHeaderData({ businessId: mainBusinessId, navigation });
+        } catch (error) {
+            console.error("Error fetching header data:", error);
+            setHeaderData({ businessId: null, navigation: null });
+        }
+    };
+
+    getHeaderData();
+  }, [firestore]);
+
   const { register, handleSubmit, control, reset, formState: { errors, isSubmitting } } = useForm<ContactFormData>({
     resolver: zodResolver(contactSchema),
   });
@@ -80,7 +113,7 @@ export default function ContactoPage() {
     }
 
     try {
-      const fullWhatsapp = data.countryCode && data.whatsapp ? `${data.countryCode}${data.whatsapp.replace(/\D/g, '')}` : undefined;
+      const fullWhatsapp = data.countryCode && data.whatsapp ? `${data.countryCode}${data.whatsapp.replace(/\s/g, '')}` : undefined;
 
       const submissionData: Omit<ContactMessage, 'id' | 'replied' | 'read'> = {
         name: data.name,
@@ -125,6 +158,7 @@ export default function ContactoPage() {
 
   return (
     <div className="w-full bg-gray-50/50">
+      <Header businessId={headerData.businessId} navigation={headerData.navigation} />
       <main className="container mx-auto px-4 py-16">
         {/* Hero Section */}
         <section className="text-center max-w-3xl mx-auto mb-16">
@@ -272,13 +306,14 @@ export default function ContactoPage() {
         {/* CTA Section */}
         <section className="text-center mt-20 bg-white py-16 rounded-lg shadow-sm">
             <h2 className="text-3xl font-bold text-gray-900">¿Listo para transformar tu negocio?</h2>
-            <p className="mt-2 text-gray-600 max-w-xl mx-auto">Únete a miles de negocios que ya están creciendo de forma más inteligente con Zentry.</p>
+            <p className="mt-2 text-gray-600 max-w-xl mx-auto">Únete a miles de negocios que ya están creciendo de forma más inteligente con Markix.</p>
             <div className="mt-8 flex justify-center gap-4">
                 <Button size="lg" asChild><Link href="/register">Empieza gratis hoy</Link></Button>
                 <Button size="lg" variant="outline" asChild><Link href="/#precios">Ver planes y precios</Link></Button>
             </div>
         </section>
       </main>
+      <Footer />
     </div>
   );
 }
