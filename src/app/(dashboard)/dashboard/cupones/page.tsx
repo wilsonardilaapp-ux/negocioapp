@@ -25,7 +25,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue 
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Edit, Trash2, Loader2, Ticket, Clock, AlertTriangle, Lock, Info } from 'lucide-react';
+import { PlusCircle, Edit, Trash2, Loader2, Ticket, Clock, AlertTriangle, Lock, Info, Frown } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import type { Coupon, CouponType, UsageLimitType } from '@/models/coupon';
@@ -40,7 +40,7 @@ const formatCurrency = (value: number) => new Intl.NumberFormat('es-CO', { style
 export default function CuponesPage() {
   const { user } = useUser();
   const { coupons, isLoading: isCouponsLoading } = useCoupons();
-  const { limits, plan, couponsCount, isLoading: isSubLoading } = useSubscription();
+  const { limits, plan, couponsCount, isModuleAuthorized, isLoading: isSubLoading } = useSubscription();
   const { toast } = useToast();
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -68,6 +68,24 @@ export default function CuponesPage() {
 
   if (isLoading) {
     return <div className="flex items-center justify-center h-64"><Loader2 className="animate-spin h-8 w-8 text-primary" /></div>;
+  }
+
+  // Guarda de autorización unificada con el sidebar
+  if (!isModuleAuthorized('promotions')) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Módulo de Cupones Desactivado</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col items-center justify-center text-center gap-4 min-h-[400px]">
+          <Frown className="h-12 w-12 text-muted-foreground" />
+          <h3 className="text-xl font-semibold">Funcionalidad no disponible</h3>
+          <p className="text-muted-foreground max-w-sm">
+            El módulo de "Cupones" no está activo en tu plan actual. Por favor, contacta al administrador de la plataforma para más información.
+          </p>
+        </CardContent>
+      </Card>
+    );
   }
 
   const couponLimitReached = limits.coupons !== -1 && couponsCount >= limits.coupons;
