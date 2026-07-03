@@ -26,11 +26,13 @@ export default function SuggestionsPage() {
     const [editingRule, setEditingRule] = useState<SuggestionRule | null>(null);
     const [isSyncing, setIsSyncing] = useState(false);
 
-    const { plan, limits, suggestionsCount, isLoading: isSubscriptionLoading } = useSubscription();
-
-    const suggestionsModuleQuery = useMemoFirebase(() => 
-        !firestore ? null : doc(firestore, 'modules', 'motor-de-sugerencias-inteligentes'), 
-    [firestore]);
+    const { 
+        plan, 
+        limits, 
+        suggestionsCount, 
+        isModuleAuthorized,
+        isLoading: isSubscriptionLoading 
+    } = useSubscription();
     
     const productsQuery = useMemoFirebase(() => 
         !firestore || !user ? null : collection(firestore, `businesses/${user.uid}/products`),
@@ -40,7 +42,6 @@ export default function SuggestionsPage() {
         !firestore || !user ? null : collection(firestore, `businesses/${user.uid}/suggestionRules`),
     [firestore, user]);
 
-    const { data: suggestionModule, isLoading: isModulesLoading } = useDoc<Module>(suggestionsModuleQuery);
     const { data: products, isLoading: areProductsLoading } = useCollection<Product>(productsQuery);
     const { data: rules, isLoading: areRulesLoading } = useCollection<SuggestionRule>(rulesQuery);
     
@@ -83,7 +84,7 @@ export default function SuggestionsPage() {
         setIsFormOpen(true);
     };
     
-    const isLoading = isModulesLoading || areProductsLoading || areRulesLoading || isSubscriptionLoading;
+    const isLoading = areProductsLoading || areRulesLoading || isSubscriptionLoading;
 
     if (isLoading && !rules) {
         return (
@@ -94,7 +95,7 @@ export default function SuggestionsPage() {
         );
     }
 
-    if (!suggestionModule || suggestionModule.status === 'inactive') {
+    if (!isModuleAuthorized('motor-de-sugerencias-inteligentes')) {
         return (
             <Card>
                 <CardHeader>
@@ -106,7 +107,7 @@ export default function SuggestionsPage() {
                     </div>
                     <h3 className="text-xl font-semibold">Motor de Sugerencias en Mantenimiento</h3>
                     <p className="text-muted-foreground max-w-sm">
-                        Esta funcionalidad no está activa. Por favor, contacta al administrador de la plataforma para más información.
+                        Esta funcionalidad no está activa en tu plan actual. Por favor, contacta al administrador de la plataforma para más información.
                     </p>
                 </CardContent>
             </Card>
