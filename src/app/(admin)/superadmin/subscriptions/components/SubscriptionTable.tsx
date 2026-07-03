@@ -14,9 +14,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   DropdownMenu,
-  DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { MoreHorizontal, Loader2, UserX } from "lucide-react";
@@ -101,7 +101,7 @@ export function SubscriptionTable({ clients, isLoading, allPlans }: Subscription
                 ))}
             </SelectContent>
         </Select>
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
+        <Select value={statusFilter} onValueChange={setFilterStatus}>
             <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="Filtrar por estado" />
             </SelectTrigger>

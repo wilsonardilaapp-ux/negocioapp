@@ -147,7 +147,7 @@ function RegisterForm() {
       if (snap.empty) isUnique = true;
     }
     return code;
-  }, []);
+  } , []);
 
   async function onSubmit(values: z.infer<typeof registerSchema>) {
     if (!auth || !firestore) return;
