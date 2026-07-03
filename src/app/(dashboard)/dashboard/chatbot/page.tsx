@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useRef, ChangeEvent, useEffect, useMemo } from "react";
@@ -42,11 +41,11 @@ const initialChatbotConfig: Partial<ChatbotConfig> = {
     token: ''
   },
   business: {
-    name: '', // Vacío está bien aquí - el usuario lo llenará
+    name: '',
     type: 'Otro',
     description: '',
     logoUrl: '',
-    avatarUrl: '' // Campo añadido
+    avatarUrl: ''
   },
   communication: {
     tone: 'Amigable y cercano',
@@ -76,7 +75,6 @@ const ManualEntryDialog = ({ user, firestore, onSaved }: { user: any, firestore:
 
     setIsLoading(true);
     try {
-      // 1. Si hay imagen, subirla a Cloudinary
       let imageUrl = '';
       if (image) {
         const reader = new FileReader();
@@ -93,16 +91,15 @@ const ManualEntryDialog = ({ user, firestore, onSaved }: { user: any, firestore:
         });
       }
 
-      // 2. Guardar en Firestore
       const docId = doc(collection(firestore, 'businesses', user.uid, 'chatbotConfig', 'main', 'knowledgeBase')).id;
       
       const newDoc: Omit<KnowledgeDocument, 'id'> & { isManual: boolean } = {
         fileName: title,
         fileType: 'text/manual',
-        status: 'ready', // Listo inmediatamente
+        status: 'ready',
         createdAt: new Date().toISOString(),
-        content: content, // El texto que leerá el bot
-        fileUrl: imageUrl || '', // URL de la imagen para que el bot la envíe
+        content: content,
+        fileUrl: imageUrl || '',
         isManual: true
       };
 
@@ -181,7 +178,7 @@ const KnowledgeBaseManager = () => {
     return collection(firestore, 'businesses', user.uid, 'chatbotConfig', 'main', 'knowledgeBase');
   }, [firestore, user]);
 
-  const { data: files, isLoading: areFilesLoading, error: filesError } = useCollection<KnowledgeDocument>(knowledgeBaseQuery);
+  const { data: files, isLoading: areFilesLoading } = useCollection<KnowledgeDocument>(knowledgeBaseQuery);
 
   const handleFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
     const newFile = event.target.files?.[0];
@@ -277,7 +274,7 @@ const KnowledgeBaseManager = () => {
       <CardContent className="space-y-6">
         
         <div className="flex justify-end">
-            <ManualEntryDialog user={user} firestore={firestore} onSaved={() => { /* No-op, real-time updates handle refresh */ }} />
+            <ManualEntryDialog user={user} firestore={firestore} onSaved={() => { }} />
         </div>
 
         <div>
@@ -375,7 +372,6 @@ const ChatbotAnalytics = () => {
     const satisfactionRatings = conversations.filter(c => c.satisfactionRating).map(c => c.satisfactionRating!);
     const avgSatisfaction = satisfactionRatings.length > 0 ? satisfactionRatings.reduce((a, b) => a + b, 0) / satisfactionRatings.length : 0;
     
-    // Agrupar por día
     const activityByDay: { [key: string]: number } = {};
     conversations.forEach(c => {
         const day = new Date(c.startTime).toLocaleDateString('es-CO', { month: 'short', day: 'numeric' });
@@ -388,7 +384,7 @@ const ChatbotAnalytics = () => {
       resolutionRate: total > 0 ? (resolved / total) * 100 : 0,
       avgSatisfaction: avgSatisfaction,
       dailyActivity,
-      intents: [], // Esta parte requeriría datos de `ChatMessage`
+      intents: [],
     };
   }, [conversations]);
 
@@ -497,21 +493,21 @@ export default function ChatbotPage() {
         }
         
     }, [config, isLoading, reset, user]);
+
+    const isAuthorized = isModuleAuthorized('chatbot-integrado-con-whatsapp-para-soporte-y-ventas');
     
-   const handleSave = async () => {
+    const handleSave = async () => {
         if (!configDocRef || !user || !firestore) return;
         const currentData = getValues();
         
         setIsSaving(true);
         try {
-            // Write private config
             setDocumentNonBlocking(configDocRef, {
                 ...currentData,
                 id: 'main',
                 businessId: user!.uid
             });
 
-            // Denormalize public config to landing page document
             const landingPageDocRef = doc(firestore, 'businesses', user.uid, 'landingPages', 'main');
             const publicChatbotData = {
                 chatbot: {
@@ -547,7 +543,6 @@ export default function ChatbotPage() {
 
         setIsSaving(true);
         try {
-            
             const testConfig: ChatbotConfig = {
                 id: 'main',
                 businessId: user.uid,
@@ -580,7 +575,6 @@ export default function ChatbotPage() {
             }
             
             reset(testConfig);
-            
             toast({ title: 'Éxito', description: 'Base de datos reseteada con datos de prueba' });
             
         } catch (error) {
@@ -590,8 +584,6 @@ export default function ChatbotPage() {
             setIsSaving(false);
         }
     };
-    
-    const isConnected = watch('whatsApp.connected');
     
     const handleVerifyConnection = () => {
         const { number, token } = getValues('whatsApp');
@@ -626,13 +618,8 @@ export default function ChatbotPage() {
         reader.onloadend = async () => {
             try {
                 const mediaDataUri = reader.result as string;
-                
-                const result = await uploadMedia({ 
-                    mediaDataUri,
-                });
-                
+                const result = await uploadMedia({ mediaDataUri });
                 setValue(`business.${field}`, result.secure_url);
-
                 toast({ title: `¡${field === 'logoUrl' ? 'Logo' : 'Avatar'} actualizado!`, description: 'Tu nueva imagen se ha guardado.' });
             } catch (error: any) {
                 toast({ variant: 'destructive', title: 'Error al subir', description: error.message });
@@ -647,7 +634,7 @@ export default function ChatbotPage() {
         return <div className="flex justify-center items-center h-full py-20"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
     }
 
-    if (!isModuleAuthorized('chatbot-integrado-con-whatsapp-para-soporte-y-ventas')) {
+    if (!isAuthorized) {
         return (
             <Card>
                 <CardHeader>
@@ -663,6 +650,8 @@ export default function ChatbotPage() {
             </Card>
         );
     }
+
+    const isConnected = watch('whatsApp.connected');
 
     return (
         <div className="flex flex-col gap-6">
