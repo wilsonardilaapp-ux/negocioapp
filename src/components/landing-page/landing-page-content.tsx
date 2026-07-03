@@ -444,7 +444,7 @@ export default function LandingPageContent({ data, plans = [], hybridPlans = [],
                       <Menu className="h-6 w-6" />
                     </Button>
                   </SheetTrigger>
-                  <SheetContent side="right" className="flex flex-col gap-6 pt-12" style={navStyle}>
+                  <SheetContent side="left" className="flex flex-col gap-6 pt-12" style={navStyle}>
                     <SheetHeader className="sr-only">
                       <SheetTitle>Menú de navegación</SheetTitle>
                     </SheetHeader>
