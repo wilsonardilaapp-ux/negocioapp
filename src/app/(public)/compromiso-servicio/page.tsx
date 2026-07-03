@@ -1,32 +1,17 @@
-import { getAdminFirestore } from "@/firebase/server-init";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import Footer from "@/components/layout/footer";
 import Header from "@/components/layout/header";
-import type { LandingPageData } from "@/models/landing-page";
+import { getLandingData } from "@/lib/get-landing-data";
 
-async function getHeaderData(): Promise<{ businessId: string | null, navigation: LandingPageData['navigation'] | null }> {
-    try {
-        const db = await getAdminFirestore();
-        const configSnap = await db.collection("globalConfig").doc("system").get();
-        const mainBusinessId = configSnap.exists ? configSnap.data()?.mainBusinessId : null;
-
-        if (!mainBusinessId) return { businessId: null, navigation: null };
-
-        const landingSnap = await db.collection("businesses").doc(mainBusinessId).collection("landingPages").doc("main").get();
-        const navigation = landingSnap.exists ? (landingSnap.data() as LandingPageData).navigation : null;
-        
-        return { businessId: mainBusinessId, navigation };
-    } catch (error) {
-        return { businessId: null, navigation: null };
-    }
-}
+export const dynamic = 'force-dynamic';
 
 export default async function ServiceCommitmentPage() {
-    const { businessId, navigation } = await getHeaderData();
+    const landingData = await getLandingData();
+    const navigation = landingData?.navigation || null;
 
     return (
         <div className="w-full bg-background">
-            <Header businessId={businessId} navigation={navigation} />
+            <Header businessId={null} navigation={navigation} />
             <main className="container mx-auto px-4 py-16 md:py-24">
                 <Card className="max-w-4xl mx-auto shadow-lg">
                     <CardHeader className="text-center">

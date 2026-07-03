@@ -1,42 +1,16 @@
-
-import { initializeApp, getApps, getApp } from "firebase/app";
-import { getFirestore, doc, getDoc } from "firebase/firestore";
-import { firebaseConfig } from "@/firebase/config";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import Footer from "@/components/layout/footer";
 import Header from "@/components/layout/header";
-import type { LandingPageData } from "@/models/landing-page";
-import { Users, Target, Zap, Shield, Handshake, TrendingUp } from "lucide-react";
+import { getLandingData } from "@/lib/get-landing-data";
+import { Zap, Handshake, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Link from 'next/link';
 
-
-// Initialize Firebase for server-side fetching
-const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
-const db = getFirestore(app);
-
-// Data fetching function for header
-async function getHeaderData(): Promise<{ businessId: string | null, navigation: LandingPageData['navigation'] | null }> {
-    try {
-        const configSnap = await getDoc(doc(db, "globalConfig", "system"));
-        const mainBusinessId = configSnap.exists() ? configSnap.data().mainBusinessId : null;
-
-        if (!mainBusinessId) {
-            return { businessId: null, navigation: null };
-        }
-
-        const landingSnap = await getDoc(doc(db, "businesses", mainBusinessId, "landingPages", "main"));
-        const navigation = landingSnap.exists() ? (landingSnap.data() as LandingPageData).navigation : null;
-        
-        return { businessId: mainBusinessId, navigation };
-    } catch (error) {
-        console.error("Error fetching header data:", error);
-        return { businessId: null, navigation: null };
-    }
-}
+export const dynamic = 'force-dynamic';
 
 export default async function AboutUsPage() {
-    const { businessId, navigation } = await getHeaderData();
+    const landingData = await getLandingData();
+    const navigation = landingData?.navigation || null;
 
     const values = [
         {
@@ -58,7 +32,7 @@ export default async function AboutUsPage() {
 
     return (
         <div className="w-full bg-gray-50">
-            <Header businessId={businessId} navigation={navigation} />
+            <Header businessId={null} navigation={navigation} />
             
             {/* Hero Section */}
             <section className="bg-white text-center py-20 md:py-32">
