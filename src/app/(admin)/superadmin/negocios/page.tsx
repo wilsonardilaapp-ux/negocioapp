@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -60,7 +61,8 @@ const normalizeId = (id: string): string => {
     .toLowerCase()
     .trim()
     .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "");
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9-]/g, "");
 };
 
 const StatusBadge = ({ status }: { status: EntityStatus | string | undefined }) => {
@@ -212,11 +214,9 @@ export default function BusinessesPage() {
     if (!firestore) return;
     
     if (!checked) {
-      // Intenta desactivar: abrir diálogo
       setBusinessToDeactivate(business);
       setIsStatusDialogOpen(true);
     } else {
-      // Activar directamente
       try {
         const businessRef = doc(firestore, 'businesses', business.id);
         await updateDocumentNonBlocking(businessRef, { status: 'active' });
@@ -261,13 +261,10 @@ export default function BusinessesPage() {
         const subSnap = await getDoc(doc(firestore, `businesses/${business.id}/subscription`, 'current'));
         const subData = subSnap.exists() ? subSnap.data() as any : null;
         
-        // Priorizar suscripción si está activa
         const actualPlanId = (subData?.status === 'active' ? subData.plan : null) || business.planName || 'free';
-
         const currentPlanDetails = allPlans.find(p => p.id === actualPlanId || p.name === actualPlanId);
         const resolvedPlanName = currentPlanDetails?.name || business.planName || 'Plan Gratuito';
 
-        // Actualización silenciosa si hay desajuste
         if (business.planName !== resolvedPlanName) {
             updateDocumentNonBlocking(doc(firestore, 'businesses', business.id), { planName: resolvedPlanName });
         }
@@ -302,7 +299,6 @@ export default function BusinessesPage() {
 
         if (currentPlanDetails && 'limits' in currentPlanDetails) {
             setCurrentPlanLimits(currentPlanDetails.limits);
-            
             const tiers = ['FREE', 'BASIC', 'PRO', 'ENTERPRISE'];
             const currentTierId = currentPlanDetails.id?.toUpperCase() || '';
             const tierIndex = tiers.findIndex(t => currentTierId.includes(t));
@@ -310,7 +306,6 @@ export default function BusinessesPage() {
             if (tierIndex !== -1 && tierIndex < tiers.length - 1) {
                 const nextTierId = tiers[tierIndex + 1];
                 const nextPlan = plans?.find(p => p.id.toUpperCase().includes(nextTierId));
-                
                 if (nextPlan) {
                     setNextPlanLimits(nextPlan.limits);
                     setNextPlanName(nextPlan.name);
@@ -320,9 +315,6 @@ export default function BusinessesPage() {
             } else {
                 setNextPlanLimits(null);
             }
-        } else {
-            setCurrentPlanLimits({});
-            setNextPlanLimits(null);
         }
 
         const businessDoc = business as any;
@@ -350,35 +342,20 @@ export default function BusinessesPage() {
   
   const handleSaveManageBusiness = async () => {
     if (!selectedBusiness || !firestore) return;
-    
     setIsSavingChanges(true);
 
     try {
         const batch = writeBatch(firestore);
 
-        // 1. Validar extras de módulos
         for (const moduleId of assignedModules) {
           const extra = moduleExtras[moduleId] || 0;
           const validation = validateModuleExtra(selectedBusiness.planName, extra);
-          if (!validation.valid) {
-            throw new Error(`Error en módulo ${moduleId}: ${validation.error}`);
-          }
+          if (!validation.valid) throw new Error(`Error en módulo ${moduleId}: ${validation.error}`);
         }
 
-        // 2. Validar límites de plan
-        const validation = validateLimitesExtra(
-          nextPlanName || 'Superior',
-          currentPlanLimits,
-          nextPlanLimits,
-          limitesExtra
-        );
-
-        if (!validation.valid) {
-          const errorMsg = Object.values(validation.errors).join('\n');
-          throw new Error(`Error en Límites Extra:\n${errorMsg}`);
-        }
+        const validation = validateLimitesExtra(nextPlanName || 'Superior', currentPlanLimits, nextPlanLimits, limitesExtra);
+        if (!validation.valid) throw new Error(`Error en Límites Extra:\n${Object.values(validation.errors).join('\n')}`);
         
-        // 3. Actualizar documento principal del negocio
         const businessRef = doc(firestore, 'businesses', selectedBusiness.id);
         const businessUpdateData: any = {
           status: selectedBusiness.status,
@@ -389,7 +366,6 @@ export default function BusinessesPage() {
         };
         batch.update(businessRef, businessUpdateData);
 
-        // --- Sincronizar Fuente de Verdad (Suscripción) ---
         const targetPlan = allPlans.find(p => p.name === selectedBusiness.planName || p.id === selectedBusiness.planName);
         const planIdToSync = targetPlan?.id || 'free';
         const subscriptionRef = doc(firestore, `businesses/${selectedBusiness.id}/subscription`, 'current');
@@ -400,14 +376,12 @@ export default function BusinessesPage() {
             updatedAt: Timestamp.now()
         }, { merge: true });
         
-        // 4. Limpieza: Desactivar todos los módulos y servicios existentes
         const currentModules = await getDocs(collection(firestore, `businesses/${selectedBusiness.id}/modules`));
         currentModules.forEach(mDoc => batch.update(mDoc.ref, { status: 'inactive' }));
         
         const currentServices = await getDocs(collection(firestore, `businesses/${selectedBusiness.id}/services`));
         currentServices.forEach(sDoc => batch.update(sDoc.ref, { status: 'inactive' }));
         
-        // 5. Activación Selectiva - NORMALIZADA PARA EVITAR DUPLICADOS
         assignedModules.forEach(rawId => {
           const id = normalizeId(rawId);
           const extra = moduleExtras[rawId] || 0;
@@ -418,22 +392,12 @@ export default function BusinessesPage() {
             batch.set(doc(firestore, `businesses/${selectedBusiness.id}/services`, id), { status: 'active' }, { merge: true });
         });
 
-        // 6. Persistencia Atómica
         await batch.commit();
-        
-        toast({ 
-            title: "Cambios guardados", 
-            description: `Se ha sincronizado el perfil de ${selectedBusiness.name}.` 
-        });
-        
+        toast({ title: "Cambios guardados", description: `Se ha sincronizado el perfil de ${selectedBusiness.name}.` });
         setShowManageModal(false);
     } catch (e: any) {
         console.error("Error al guardar gestión de negocio:", e);
-        toast({ 
-            variant: 'destructive', 
-            title: 'No se pudo guardar', 
-            description: e.message || 'Ocurrió un error inesperado.' 
-        });
+        toast({ variant: 'destructive', title: 'No se pudo guardar', description: e.message || 'Ocurrió un error inesperado.' });
     } finally {
         setIsSavingChanges(false);
     }
@@ -751,14 +715,9 @@ export default function BusinessesPage() {
 
                     const displayedModules = (modules || []).reduce((acc: Module[], current) => {
                       const x = acc.find(item => item.name === current.name);
-                      if (!x) {
-                        return acc.concat([current]);
-                      } else {
-                        if (current.id === 'chatbot-integrado-con-whatsapp-para-soporte-y-ventas') {
-                            return acc.map(item => item.name === current.name ? current : item);
-                        }
-                        return acc;
-                      }
+                      if (!x) return acc.concat([current]);
+                      if (current.id === 'chatbot-integrado-con-whatsapp-para-soporte-y-ventas') return acc.map(item => item.name === current.name ? current : item);
+                      return acc;
                     }, []);
 
                     return displayedModules.map(moduleItem => {
@@ -827,12 +786,6 @@ export default function BusinessesPage() {
                     );
                   })}
                 </div>
-                {nextPlanName && (
-                  <p className="mt-4 text-[11px] text-muted-foreground italic flex items-center gap-1.5">
-                    <AlertCircle className="h-3 w-3" />
-                    Las características actuales se comparan con el plan superior ({nextPlanName}).
-                  </p>
-                )}
               </div>
             </div>
           )}

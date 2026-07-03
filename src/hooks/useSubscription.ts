@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useMemo, useState, useEffect, useCallback } from 'react';
@@ -20,6 +21,7 @@ const LOADING_TIMEOUT_MS = 10_000;
 
 /**
  * Normaliza un ID técnico eliminando mayúsculas, espacios y acentos.
+ * Blindaje contra datos mal formateados en la base de datos.
  */
 const normalizeId = (id: string | undefined): string => {
   if (!id) return "";
@@ -27,7 +29,8 @@ const normalizeId = (id: string | undefined): string => {
     .toLowerCase()
     .trim()
     .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "");
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9-]/g, "");
 };
 
 export function useSubscription() {
@@ -173,14 +176,14 @@ export function useSubscription() {
     const activeFromDB = new Set<string>();
     const inactiveFromDB = new Set<string>();
     
-    // 1. Recopilar estados de la base de datos con normalización
+    // 1. Recopilar estados de la base de datos con normalización defensiva
     dbModules?.forEach(m => {
         const cleanId = normalizeId(m.id);
         if (m.status === 'active') activeFromDB.add(cleanId);
         else if (m.status === 'inactive') inactiveFromDB.add(cleanId);
     });
     
-    // 2. Módulos incluidos por defecto en el plan
+    // 2. Módulos incluidos por defecto en el plan (Normalizados)
     details?.includedModuleKeys?.forEach(key => activeModuleIds.add(normalizeId(key)));
 
     // 3. Red de seguridad Premium (Hardcoded)
@@ -203,21 +206,18 @@ export function useSubscription() {
     // 4. SOBRESCRITURA FINAL: Priorizar ACTIVE de la DB, luego procesar INACTIVE
     activeFromDB.forEach(id => activeModuleIds.add(id));
     inactiveFromDB.forEach(id => {
-        // Solo borramos si el ID normalizado no está presente como ACTIVE (en ninguna variante de casing)
         if (!activeFromDB.has(id)) {
             activeModuleIds.delete(id);
         }
     });
 
-    const planType = normalizedName;
-
     return {
       plan: details?.name || currentPlanId,
       isActive: !!details || subscription?.status === 'active',
       limits: mergedLimits,
-      isFree: planType.includes('gratuito') || planType === 'free',
-      isPro: planType.includes('pro'),
-      isEnterprise: planType.includes('enterprise') || planType.includes('estandar'),
+      isFree: normalizedName.includes('gratuito') || normalizedName === 'free',
+      isPro: normalizedName.includes('pro'),
+      isEnterprise: normalizedName.includes('enterprise') || normalizedName.includes('estandar'),
       planDetails: details || null,
       activeModuleIds,
     };

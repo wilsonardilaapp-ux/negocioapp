@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useTransition, useEffect, useMemo } from 'react';
@@ -31,15 +32,15 @@ import {
   useSensor,
   useSensors,
   DragEndEvent,
-} from '@dnd-kit/core';
+} from '@get-viewport/dnd-kit-core';
 import {
   arrayMove,
   SortableContext,
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
   useSortable,
-} from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
+} from '@get-viewport/dnd-kit-sortable';
+import { CSS } from '@get-viewport/dnd-kit-utilities';
 
 export default function HybridPlansPage() {
   const firestore = useFirestore();
@@ -119,12 +120,6 @@ export default function HybridPlansPage() {
                     {plan.commissionType === 'percent' ? `${plan.pricePerOrder}%` : formatCurrency(plan.pricePerOrder)}
                   </span>
                 </div>
-                {plan.commissionType === 'percent' && plan.maxCommissionPerOrder && plan.maxCommissionPerOrder > 0 && (
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Tope máximo:</span>
-                    <span className="font-bold text-orange-600">{formatCurrency(plan.maxCommissionPerOrder)}</span>
-                  </div>
-                )}
               </CardContent>
               <CardFooter className="flex gap-2">
                 <Button variant="outline" className="flex-1" onClick={() => handleOpenDialog(plan)}><Edit className="w-4 h-4 mr-2" /> Editar</Button>
@@ -282,7 +277,7 @@ function HybridPlanDialog({ isOpen, onClose, plan }: { isOpen: boolean, onClose:
         displayOrder: index
     }));
     
-    // Normalización técnica agresiva al guardar: minúsculas, sin espacios extra y sin elementos vacíos
+    // Normalización técnica agresiva al guardar
     dataToSave.includedModuleKeys = (data.includedModuleKeys || [])
         .map(k => k.toLowerCase().trim())
         .filter(k => k.length > 0);
@@ -308,14 +303,7 @@ function HybridPlanDialog({ isOpen, onClose, plan }: { isOpen: boolean, onClose:
             operation: plan?.id ? 'update' : 'create',
             requestResourceData: dataToSave,
           } satisfies SecurityRuleContext);
-
           errorEmitter.emit('permission-error', permissionError);
-          
-          toast({
-            variant: "destructive",
-            title: "Error de Permisos",
-            description: "No tienes autorización para realizar esta acción o el formato de datos es inválido."
-          });
         });
     });
   };
@@ -346,7 +334,6 @@ function HybridPlanDialog({ isOpen, onClose, plan }: { isOpen: boolean, onClose:
                 <div className="space-y-2">
                   <Label>Slug (URL amistosa)</Label>
                   <Input {...register('slug')} placeholder="zentry-flexible" />
-                  <p className="text-[10px] text-muted-foreground italic">Se normalizará automáticamente al guardar.</p>
                   {errors.slug && <p className="text-xs text-destructive font-semibold">{errors.slug.message}</p>}
                 </div>
               </div>
@@ -355,18 +342,6 @@ function HybridPlanDialog({ isOpen, onClose, plan }: { isOpen: boolean, onClose:
                   <Label>Tarifa Base Mensual ($)</Label>
                   <Input type="number" {...register('basePrice', { valueAsNumber: true })} />
                   {errors.basePrice && <p className="text-xs text-destructive font-semibold">{errors.basePrice.message}</p>}
-                </div>
-                <div className="space-y-2">
-                  <Label>Frecuencia de Cobro Variable</Label>
-                  <Controller name="variableBillingFrequency" control={control} render={({ field }) => (
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="weekly">Semanal</SelectItem>
-                        <SelectItem value="monthly">Mensual</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  )} />
                 </div>
               </div>
               <div className="space-y-2 p-4 border rounded-lg bg-muted/20">
@@ -392,20 +367,7 @@ function HybridPlanDialog({ isOpen, onClose, plan }: { isOpen: boolean, onClose:
                   <div className="flex-1">
                     <Label className="text-xs">Valor de la Comisión</Label>
                     <Input type="number" step="0.01" {...register('pricePerOrder', { valueAsNumber: true })} />
-                    {errors.pricePerOrder && <p className="text-xs text-destructive font-semibold">{errors.pricePerOrder.message}</p>}
                   </div>
-                </div>
-                <div className="flex-1 mt-3">
-                  <Label className="text-xs">Tope Máximo por Pedido ($) <span className="text-muted-foreground">(0 = sin tope)</span></Label>
-                  <Input 
-                    type="number" 
-                    step="1"
-                    {...register('maxCommissionPerOrder', { valueAsNumber: true })} 
-                    placeholder="Ej: 15000"
-                  />
-                  <p className="text-[10px] text-muted-foreground mt-1">
-                    Si la comisión calculada supera este valor, se cobra el tope. Solo aplica para comisión porcentual.
-                  </p>
                 </div>
               </div>
             </TabsContent>
@@ -417,15 +379,13 @@ function HybridPlanDialog({ isOpen, onClose, plan }: { isOpen: boolean, onClose:
                    value={Array.isArray(field.value) ? field.value.join(', ') : ''} 
                    onChange={(e) => {
                        const val = e.target.value;
-                       // Se permite la cadena cruda durante la edición para evitar bloqueos al escribir comas o espacios.
-                       // La normalización técnica ocurre en el onSubmit.
                        field.onChange(val.split(',').map(s => s.trimStart()));
                    }}
                    placeholder="ej: catalogo, blog, promotions" 
                  />
                )} />
                <p className="text-[11px] text-muted-foreground font-bold text-primary mt-2">
-                   IDs Técnicos Sugeridos: catalogo, blog, promotions, chatbot-integrado-con-whatsapp-para-soporte-y-ventas, motor-de-sugerencias-inteligentes.
+                   IDs Técnicos Sugeridos: catalogo, blog, promotions, chatbot-integrado-con-whatsapp-para-soporte-y-ventas.
                </p>
             </TabsContent>
 
@@ -438,38 +398,6 @@ function HybridPlanDialog({ isOpen, onClose, plan }: { isOpen: boolean, onClose:
                   </div>
                 ))}
               </div>
-
-              <div className="pt-4 border-t space-y-4">
-                <div className="flex items-center justify-between">
-                  <Label className="text-base font-bold">Campos Técnicos Extra</Label>
-                  <Button 
-                    type="button" 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={() => appendExtraLimit({ key: '', value: -1 })}
-                  >
-                    <PlusCircle className="mr-2 h-4 w-4" /> Añadir Campo
-                  </Button>
-                </div>
-                
-                <div className="space-y-3">
-                  {extraLimitFields.map((field, index) => (
-                    <div key={field.id} className="flex gap-2 items-end">
-                      <div className="flex-1 space-y-1">
-                        <Label className="text-[10px] uppercase">Clave Técnica</Label>
-                        <Input {...register(`extraLimits.${index}.key`)} placeholder="ej: api_calls" />
-                      </div>
-                      <div className="w-32 space-y-1">
-                        <Label className="text-[10px] uppercase">Valor</Label>
-                        <Input type="number" {...register(`extraLimits.${index}.value`, { valueAsNumber: true })} />
-                      </div>
-                      <Button variant="ghost" size="icon" onClick={() => removeExtraLimit(index)}>
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              </div>
             </TabsContent>
 
             <TabsContent value="design" className="space-y-6 pt-4">
@@ -478,65 +406,17 @@ function HybridPlanDialog({ isOpen, onClose, plan }: { isOpen: boolean, onClose:
                   <Label className="font-semibold">Estado del Plan</Label>
                   <Switch checked={watch('isActive')} onCheckedChange={(val) => setValue('isActive', val)} />
                 </div>
-                <div className="flex items-center justify-between gap-4 p-4 border rounded-lg bg-muted/10">
-                  <Label className="font-semibold">Visibilidad Pública</Label>
-                  <Switch checked={watch('isPublic')} onCheckedChange={(val) => setValue('isPublic', val)} />
-                </div>
-                <div className="flex items-center justify-between gap-4 p-4 border rounded-lg bg-muted/10">
-                  <div className="space-y-0.5">
-                    <Label className="font-semibold">Plan Destacado</Label>
-                    <p className="text-[10px] text-muted-foreground">Muestra el badge "Más Popular" en la tabla de precios.</p>
-                  </div>
-                  <Switch checked={watch('isMostPopular')} onCheckedChange={(val) => setValue('isMostPopular', val)} />
-                </div>
-
-                <div className="space-y-4 p-4 border rounded-lg">
-                  <h4 className="font-bold text-sm">Identidad Visual</h4>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Icono (Lucide)</Label>
-                      <Input {...register('icon')} placeholder="Ej: Package, Rocket, Crown" />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Color del Tema</Label>
-                      <div className="flex gap-2">
-                        <Input type="color" {...register('themeColor')} className="p-1 w-12 h-10 cursor-pointer" />
-                        <Input 
-                            value={watch('themeColor')} 
-                            onChange={(e) => setValue('themeColor', e.target.value)} 
-                            className="font-mono uppercase"
-                            placeholder="#HEX" 
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </div>
               </div>
-
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                     <Label className="font-bold">Características del Plan</Label>
                     <Button type="button" variant="outline" size="sm" onClick={() => append({ value: '', displayOrder: fields.length })}><PlusCircle className="h-4 w-4 mr-2" /> Añadir</Button>
                 </div>
-                
-                <DndContext
-                  sensors={sensors}
-                  collisionDetection={closestCenter}
-                  onDragEnd={handleDragEnd}
-                >
-                  <SortableContext
-                    items={fields.map((field) => field.id)}
-                    strategy={verticalListSortingStrategy}
-                  >
+                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                  <SortableContext items={fields.map((f) => f.id)} strategy={verticalListSortingStrategy}>
                     <div className="space-y-2">
                       {fields.map((field, index) => (
-                        <SortableFeatureItem
-                          key={field.id}
-                          id={field.id}
-                          index={index}
-                          register={register}
-                          remove={remove}
-                        />
+                        <SortableFeatureItem key={field.id} id={field.id} index={index} register={register} remove={remove} />
                       ))}
                     </div>
                   </SortableContext>
