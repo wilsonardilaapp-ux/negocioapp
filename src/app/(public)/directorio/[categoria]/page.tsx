@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { getAdminFirestore } from "@/firebase/server-init";
 import Header from '@/components/layout/header';
@@ -12,6 +11,7 @@ import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import { cn } from "@/lib/utils";
 import FaviconInjector from '@/components/layout/FaviconInjector';
+import { getLandingData } from '@/lib/get-landing-data';
 
 export const dynamic = 'force-dynamic';
 
@@ -128,9 +128,10 @@ export default async function CategoryPage({ params, searchParams }: { params: {
     // Asegurar que searchParams no sea null
     const safeSearchParams = searchParams || {};
     
-    const [data, faviconUrl] = await Promise.all([
+    const [data, faviconUrl, landingData] = await Promise.all([
         getEntriesByCategory(params.categoria, safeSearchParams.sub),
-        getGlobalFavicon()
+        getGlobalFavicon(),
+        getLandingData()
     ]);
 
     if (!data) {
@@ -142,7 +143,7 @@ export default async function CategoryPage({ params, searchParams }: { params: {
     return (
         <div className="min-h-screen bg-gray-50/30 flex flex-col">
             <FaviconInjector faviconUrl={faviconUrl} title={pageTitle} />
-            <Header businessId={null} navigation={null} />
+            <Header businessId={null} navigation={landingData?.navigation || null} />
             
             <main className="flex-grow container mx-auto px-4 py-12">
                 <div className="mb-10 space-y-4">
