@@ -115,7 +115,7 @@ async function getGlobalFavicon() {
     }
 }
 
-export async function generateMetadata({ params }: { params: { id: string } }): Promise<Metadata> {
+export async function generateMetadata({ params }: { params: { id: string } }) {
     const entry = await getBusinessEntry(params.id);
     if (!entry) return { title: 'Negocio no encontrado' };
     return {
@@ -136,10 +136,31 @@ export default async function BusinessProfilePage({ params }: { params: { id: st
     // FIX: Prioridad corregida. Negocio primero, plataforma como fallback.
     const faviconUrl = entry.faviconUrl || entry.logoURL || globalFavicon || null;
 
+    const navigation = {
+        enabled: true,
+        links: [
+            { id: '1', text: 'Sobre nosotros', url: '#', enabled: true, openInNewTab: false },
+            { id: '2', text: 'Catálogo', url: '#', enabled: true, openInNewTab: false },
+            { id: '3', text: 'Opiniones', url: '#ratings-section', enabled: true, openInNewTab: false },
+            { id: '4', text: 'Contacto', url: '#', enabled: true, openInNewTab: false },
+        ],
+        logoUrl: entry.logoURL,
+        businessName: entry.name,
+        logoAlt: entry.name,
+        logoWidth: 120,
+        logoAlignment: 'left' as const,
+        backgroundColor: '#FFFFFF',
+        textColor: '#000000',
+        hoverColor: '#4CAF50',
+        fontSize: 16,
+        spacing: 4,
+        useShadow: true,
+    };
+
     return (
         <div className="min-h-screen bg-gray-50/30 flex flex-col">
             <FaviconInjector faviconUrl={faviconUrl} title={`${entry.name} | Directorio Markix`} />
-            <Header businessId={entry.id} navigation={null} />
+            <Header businessId={entry.id} navigation={navigation} />
             
             <main className="flex-grow">
                 <div className="bg-white border-b">
