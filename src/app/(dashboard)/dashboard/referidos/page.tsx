@@ -106,11 +106,7 @@ export default function ReferidosPage() {
   const totalEarnedCapacity = useMemo(() => {
     if (!capacityLogs) return 0;
     return capacityLogs
-      .filter(log => log.reason && (
-        log.reason.startsWith('referido_confirmado') || 
-        log.reason === 'referido_confirmado_referente' || 
-        log.reason === 'referido_confirmado_recompensa'
-      ))
+      .filter(log => log.reason && log.reason.startsWith('referido_confirmado'))
       .reduce((sum, log) => sum + (log.amount || 0), 0);
   }, [capacityLogs]);
 
