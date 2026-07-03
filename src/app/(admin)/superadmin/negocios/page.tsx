@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -14,6 +13,8 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  SelectGroup,
+  SelectLabel,
 } from '@/components/ui/select';
 import {
   Dialog,
@@ -115,8 +116,11 @@ export default function BusinessesPage() {
   const { data: services } = useCollection<SystemService>(useMemoFirebase(() => collection(firestore, 'systemServices'), [firestore]));
   const { data: modules } = useCollection<Module>(useMemoFirebase(() => collection(firestore, 'modules'), [firestore]));
 
-  // Unify all available plans for easy lookup
-  const allPlans = useMemo(() => [...(plans || []), ...(hybridPlans || [])], [plans, hybridPlans]);
+  // Unify all available plans for easy lookup with origin tracking
+  const allPlans = useMemo(() => [
+    ...(plans || []).map(p => ({ ...p, origin: 'standard' as const })),
+    ...(hybridPlans || []).map(p => ({ ...p, origin: 'hybrid' as const }))
+  ], [plans, hybridPlans]);
 
   // Filter State
   const [searchBusiness, setSearchBusiness] = useState('');
@@ -461,10 +465,29 @@ export default function BusinessesPage() {
             />
           </div>
           <Select value={filterPlan} onValueChange={setFilterPlan}>
-            <SelectTrigger className="w-40"><SelectValue placeholder="Plan" /></SelectTrigger>
+            <SelectTrigger className="w-48"><SelectValue placeholder="Plan" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos los planes</SelectItem>
-              {allPlans.map(plan => <SelectItem key={plan.id} value={plan.id!}>{plan.name}</SelectItem>)}
+              <SelectGroup>
+                <SelectLabel>Planes Estándar</SelectLabel>
+                {allPlans.filter(p => p.origin === 'standard').map(plan => (
+                  <SelectItem key={plan.id} value={plan.id!}>
+                    <span className={cn(!plan.isActive && "text-muted-foreground italic")}>
+                      {plan.name}{!plan.isActive && " (Inactivo)"}
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+              <SelectGroup>
+                <SelectLabel>Planes Híbridos</SelectLabel>
+                {allPlans.filter(p => p.origin === 'hybrid').map(plan => (
+                  <SelectItem key={plan.id} value={plan.id!}>
+                    <span className={cn(!plan.isActive && "text-muted-foreground italic")}>
+                      {plan.name}{!plan.isActive && " (Inactivo)"}
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectGroup>
             </SelectContent>
           </Select>
           <Select value={filterStatus} onValueChange={setFilterStatus}>
