@@ -155,8 +155,8 @@ export function useSubscription() {
         currentPlanId = subscriptionPlanId;
     }
 
-    const details = allPlans?.find(p => p.id === currentPlanId || p.name === currentPlanId || p.slug === currentPlanId) || 
-                       allHybridPlans?.find(p => p.id === currentPlanId || p.name === currentPlanId || p.slug === currentPlanId);
+    const details = allPlans?.find(p => p.id === currentPlanId || p.name === currentPlanId || ('slug' in p && p.slug === currentPlanId)) || 
+                       allHybridPlans?.find(p => p.id === currentPlanId || p.name === currentPlanId || ('slug' in p && p.slug === currentPlanId));
 
     const defaultLimits: PlanLimits = { products: 4, blogPosts: 4, landingPages: 1, coupons: 0, promotions: 0, orders: -1, suggestions: 0 };
 
