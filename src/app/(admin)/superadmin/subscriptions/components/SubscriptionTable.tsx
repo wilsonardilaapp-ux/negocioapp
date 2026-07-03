@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useMemo } from "react";
@@ -136,7 +135,7 @@ export function SubscriptionTable({ clients, isLoading, allPlans }: Subscription
                     ? client.subscription.currentPeriodEnd.toDate() < new Date() 
                     : false;
                 
-                const planDetails = allPlans.find(p => p.id === client.subscription?.plan || p.name === client.subscription?.plan || p.slug === client.subscription?.plan);
+                const planDetails = allPlans.find(p => p.id === client.subscription?.plan || p.name === client.subscription?.plan || ('slug' in p && p.slug === client.subscription?.plan));
                 const paymentMethod = client.subscription?.paymentMethod || 'stripe';
 
                 return (
