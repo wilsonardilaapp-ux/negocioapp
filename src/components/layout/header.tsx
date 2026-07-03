@@ -56,13 +56,41 @@ export default function Header({ businessId, navigation }: HeaderProps) {
         style={headerStyle}
     >
       <div className="container flex items-center justify-between px-4 py-2 md:px-6">
-        <Link href="/" className="flex items-center gap-2">
-          {logoUrl ? (
-             <img src={logoUrl} alt={businessName} style={{ width: `${navigation?.logoWidth || 80}px`, height: 'auto', maxHeight: '64px' }} />
-          ) : (
-             <Logo className="h-8 w-8 text-primary" />
-          )}
-        </Link>
+        <div className="flex items-center gap-4">
+          {/* Mobile Navigation - Moved to the left of the logo */}
+          <div className="md:hidden">
+            <Sheet open={isMenuOpen} onOpenChange={setIsMenuOpen}>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="icon" aria-label="Abrir menú">
+                  <Menu className="h-6 w-6" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="left" className="flex flex-col gap-6 pt-12" style={headerStyle}>
+                <SheetHeader className="sr-only">
+                  <SheetTitle>Menú de navegación</SheetTitle>
+                </SheetHeader>
+                {navigation?.links?.filter(l => l.enabled).map(link => (
+                  <Link 
+                    key={link.id} 
+                    href={getLinkUrl(link, businessId)} 
+                    onClick={() => setIsMenuOpen(false)}
+                    className="text-lg font-semibold hover:opacity-70 transition-opacity"
+                  >
+                    {link.text}
+                  </Link>
+                ))}
+              </SheetContent>
+            </Sheet>
+          </div>
+
+          <Link href="/" className="flex items-center gap-2">
+            {logoUrl ? (
+              <img src={logoUrl} alt={businessName} style={{ width: `${navigation?.logoWidth || 80}px`, height: 'auto', maxHeight: '64px' }} />
+            ) : (
+              <Logo className="h-8 w-8 text-primary" />
+            )}
+          </Link>
+        </div>
 
         {/* Desktop Navigation */}
         <nav className="hidden md:flex items-center gap-6">
@@ -81,32 +109,6 @@ export default function Header({ businessId, navigation }: HeaderProps) {
                 </Link>
               ))}
         </nav>
-
-        {/* Mobile Navigation */}
-        <div className="md:hidden">
-          <Sheet open={isMenuOpen} onOpenChange={setIsMenuOpen}>
-            <SheetTrigger asChild>
-              <Button variant="ghost" size="icon" aria-label="Abrir menú">
-                <Menu className="h-6 w-6" />
-              </Button>
-            </SheetTrigger>
-            <SheetContent side="right" className="flex flex-col gap-6 pt-12" style={headerStyle}>
-              <SheetHeader className="sr-only">
-                <SheetTitle>Menú de navegación</SheetTitle>
-              </SheetHeader>
-              {navigation?.links?.filter(l => l.enabled).map(link => (
-                <Link 
-                  key={link.id} 
-                  href={getLinkUrl(link, businessId)} 
-                  onClick={() => setIsMenuOpen(false)}
-                  className="text-lg font-semibold hover:opacity-70 transition-opacity"
-                >
-                  {link.text}
-                </Link>
-              ))}
-            </SheetContent>
-          </Sheet>
-        </div>
       </div>
     </header>
   );
