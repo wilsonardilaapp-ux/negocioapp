@@ -1,7 +1,20 @@
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-    transpilePackages: ['lucide-react', 'recharts', 'date-fns', 'embla-carousel-react', 'embla-carousel-autoplay'],
+    transpilePackages: [
+        'lucide-react', 
+        'recharts', 
+        'date-fns', 
+        'embla-carousel-react', 
+        'embla-carousel-autoplay',
+        'firebase',
+        '@firebase/app',
+        '@firebase/auth',
+        '@firebase/firestore',
+        '@firebase/functions',
+        '@firebase/storage',
+        '@firebase/util'
+    ],
     experimental: {
         serverComponentsExternalPackages: [
             '@opentelemetry/api', 
