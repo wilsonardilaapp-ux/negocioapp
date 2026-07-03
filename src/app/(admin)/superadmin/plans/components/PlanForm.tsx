@@ -30,7 +30,7 @@ import {
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
   useSortable,
-} from '@nd-kit/sortable';
+} from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 
 interface PlanFormProps {
@@ -248,7 +248,7 @@ export default function PlanForm({ existingPlan, onClose }: PlanFormProps) {
                             onClick={() => appendExtraLimit({ key: '', value: 0 })}
                             className="font-bold"
                         >
-                            <PlusCircle className="h-4 w-4 mr-2" />
+                            <PlusCircle className="mr-2 h-4 w-4 mr-2" />
                             Añadir campo
                         </Button>
                     </div>
