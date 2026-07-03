@@ -12,6 +12,7 @@ import type { Metadata } from 'next';
 import { cn } from "@/lib/utils";
 import FaviconInjector from '@/components/layout/FaviconInjector';
 import { getLandingData } from '@/lib/get-landing-data';
+import SearchBar from "../SearchBar";
 import {
   Accordion,
   AccordionContent,
@@ -158,13 +159,19 @@ export default async function CategoryPage({ params, searchParams }: { params: {
                             <ChevronLeft className="h-4 w-4" /> Volver al directorio
                         </Button>
                     </Link>
-                    <div className="space-y-2">
-                        <h1 className="text-4xl font-black text-gray-900 tracking-tight">
-                            {data.category}
-                        </h1>
-                        <p className="text-gray-500">
-                            Explora los mejores perfiles verificados en {data.category.toLowerCase()}.
-                        </p>
+                    <div className="space-y-4">
+                        <div className="space-y-2">
+                            <h1 className="text-4xl font-black text-gray-900 tracking-tight">
+                                {data.category}
+                            </h1>
+                            <p className="text-gray-500">
+                                Explora los mejores perfiles verificados en {data.category.toLowerCase()}.
+                            </p>
+                        </div>
+                        
+                        <div className="max-w-2xl pt-2">
+                            <SearchBar />
+                        </div>
                     </div>
                 </div>
 
