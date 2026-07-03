@@ -169,7 +169,7 @@ export default async function CategoryPage({ params, searchParams }: { params: {
                             </p>
                         </div>
                         
-                        <div className="max-w-2xl pt-2">
+                        <div className="max-w-2xl mx-auto pt-2">
                             <SearchBar />
                         </div>
                     </div>
