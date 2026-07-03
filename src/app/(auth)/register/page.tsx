@@ -137,17 +137,6 @@ function RegisterForm() {
   const firestore = useFirestore();
   const [showPassword, setShowPassword] = useState(false);
 
-  const form = useForm<z.infer<typeof registerSchema>>({
-    resolver: zodResolver(registerSchema),
-    defaultValues: {
-      name: "",
-      email: "",
-      password: "",
-      acceptTerms: false,
-      acceptFees: false,
-    },
-  });
-
   const generateUniqueReferralCode = useCallback(async (db: Firestore): Promise<string> => {
     let code = '';
     let isUnique = false;
@@ -225,7 +214,7 @@ function RegisterForm() {
         status: 'active',
         logoURL: 'https://seeklogo.com/images/E/eco-friendly-logo-7087A22106-seeklogo.com.png',
         description: 'Bienvenido a mi negocio en Markix.',
-        planName: planDetails?.name || 'Plan Gratuito',
+        planName: planDetails?.name || 'Plan Crecimiento',
         // --- Referral System ---
         referralCode: generatedReferralCode,
         referredByBusinessId,
@@ -280,7 +269,7 @@ function RegisterForm() {
       
       const subscriptionDocRef = doc(firestore, `businesses/${newUser.uid}/subscription`, 'current');
       const subscriptionData: Subscription = {
-        plan: planParam || 'free',
+        plan: planParam || 'plan-crecimiento',
         status: 'active',
         stripeCustomerId: null,
         stripeSubscriptionId: null,

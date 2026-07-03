@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useMemo, useState, useEffect, useCallback } from 'react';
@@ -144,7 +143,7 @@ export function useSubscription() {
     const subscriptionPlanId = subscription?.plan;
     const businessPlanName = (businessData as any)?.planName;
     
-    let currentPlanId = 'free';
+    let currentPlanId = 'plan-crecimiento';
 
     if (subscriptionPlanId && subscription?.status === 'active') {
         currentPlanId = subscriptionPlanId;
@@ -215,7 +214,7 @@ export function useSubscription() {
       plan: details?.name || currentPlanId,
       isActive: !!details || subscription?.status === 'active',
       limits: mergedLimits,
-      isFree: normalizedName.includes('gratuito') || normalizedName === 'free',
+      isFree: normalizedName.includes('gratuito') || normalizedName === 'free' || normalizedName === 'plan-crecimiento',
       isPro: normalizedName.includes('pro'),
       isEnterprise: normalizedName.includes('enterprise') || normalizedName.includes('estandar'),
       planDetails: details || null,

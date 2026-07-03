@@ -170,7 +170,7 @@ export default function BusinessesPage() {
         (business.ownerEmail && business.ownerEmail.toLowerCase().includes(searchBusiness.toLowerCase()));
       
       const matchedPlan = allPlans.find(p => p.id === business.planName || p.name === business.planName);
-      const planNameForFilter = matchedPlan?.id || business.planName || 'free';
+      const planNameForFilter = matchedPlan?.id || business.planName || 'plan-crecimiento';
       
       const planMatch = filterPlan === 'all' || planNameForFilter === filterPlan;
       const statusMatch = filterStatus === 'all' || business.status === filterStatus;
@@ -265,9 +265,9 @@ export default function BusinessesPage() {
         const subSnap = await getDoc(doc(firestore, `businesses/${business.id}/subscription`, 'current'));
         const subData = subSnap.exists() ? subSnap.data() as any : null;
         
-        const actualPlanId = (subData?.status === 'active' ? subData.plan : null) || business.planName || 'free';
+        const actualPlanId = (subData?.status === 'active' ? subData.plan : null) || business.planName || 'plan-crecimiento';
         const currentPlanDetails = allPlans.find(p => p.id === actualPlanId || p.name === actualPlanId);
-        const resolvedPlanName = currentPlanDetails?.name || business.planName || 'Plan Gratuito';
+        const resolvedPlanName = currentPlanDetails?.name || business.planName || 'Plan Crecimiento';
 
         if (business.planName !== resolvedPlanName) {
             updateDocumentNonBlocking(doc(firestore, 'businesses', business.id), { planName: resolvedPlanName });
@@ -371,7 +371,7 @@ export default function BusinessesPage() {
         batch.update(businessRef, businessUpdateData);
 
         const targetPlan = allPlans.find(p => p.name === selectedBusiness.planName || p.id === selectedBusiness.planName);
-        const planIdToSync = targetPlan?.id || 'free';
+        const planIdToSync = targetPlan?.id || 'plan-crecimiento';
         const subscriptionRef = doc(firestore, `businesses/${selectedBusiness.id}/subscription`, 'current');
         
         batch.set(subscriptionRef, {
@@ -470,21 +470,17 @@ export default function BusinessesPage() {
               <SelectItem value="all">Todos los planes</SelectItem>
               <SelectGroup>
                 <SelectLabel>Planes Estándar</SelectLabel>
-                {allPlans.filter(p => p.origin === 'standard').map(plan => (
+                {allPlans.filter(p => p.origin === 'standard' && p.isActive).map(plan => (
                   <SelectItem key={plan.id} value={plan.id!}>
-                    <span className={cn(!plan.isActive && "text-muted-foreground italic")}>
-                      {plan.name}{!plan.isActive && " (Inactivo)"}
-                    </span>
+                    {plan.name}
                   </SelectItem>
                 ))}
               </SelectGroup>
               <SelectGroup>
                 <SelectLabel>Planes Híbridos</SelectLabel>
-                {allPlans.filter(p => p.origin === 'hybrid').map(plan => (
+                {allPlans.filter(p => p.origin === 'hybrid' && p.isActive).map(plan => (
                   <SelectItem key={plan.id} value={plan.id!}>
-                    <span className={cn(!plan.isActive && "text-muted-foreground italic")}>
-                      {plan.name}{!plan.isActive && " (Inactivo)"}
-                    </span>
+                    {plan.name}
                   </SelectItem>
                 ))}
               </SelectGroup>
@@ -543,7 +539,7 @@ export default function BusinessesPage() {
                         <Badge variant="outline" className="font-semibold text-xs py-0.5 px-2 bg-muted/30">
                             {(() => {
                                 const matched = allPlans.find(p => p.id === business.planName || p.name === business.planName);
-                                return matched ? matched.name : (business.planName || 'Plan Gratuito');
+                                return matched ? matched.name : (business.planName || 'Plan Crecimiento');
                             })()}
                         </Badge>
                     </td>
@@ -688,7 +684,7 @@ export default function BusinessesPage() {
                 <div className="mt-2 col-span-2">
                     <p className="text-[10px] uppercase font-bold text-muted-foreground mb-1">Plan de Suscripción (Fuente de Verdad)</p>
                     <Select 
-                        value={allPlans.find(p => p.name === selectedBusiness.planName || p.id === selectedBusiness.planName)?.id || 'free'} 
+                        value={allPlans.find(p => p.name === selectedBusiness.planName || p.id === selectedBusiness.planName)?.id || 'plan-crecimiento'} 
                         onValueChange={(val) => {
                             const newPlan = allPlans.find(p => p.id === val);
                             if (newPlan) {

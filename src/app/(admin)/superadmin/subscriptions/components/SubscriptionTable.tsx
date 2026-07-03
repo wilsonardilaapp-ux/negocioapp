@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useMemo } from "react";
@@ -45,7 +44,7 @@ export function SubscriptionTable({ clients, isLoading, allPlans }: Subscription
       const searchMatch =
         client.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         client.email.toLowerCase().includes(searchTerm.toLowerCase());
-      const planMatch = planFilter === "all" || (client.subscription?.plan || 'free') === planFilter;
+      const planMatch = planFilter === "all" || (client.subscription?.plan || 'plan-crecimiento') === planFilter;
       const statusMatch = statusFilter === "all" || (client.subscription?.status || 'canceled') === statusFilter;
       return searchMatch && planMatch && statusMatch;
     });
@@ -57,7 +56,9 @@ export function SubscriptionTable({ clients, isLoading, allPlans }: Subscription
     switch (plan) {
       case "pro": return "default";
       case "enterprise": return "destructive"; // You can define a gold/yellow variant
-      case "free": return "secondary";
+      case "free": 
+      case "plan-crecimiento":
+        return "secondary";
       default: return "outline";
     }
   };
@@ -95,7 +96,7 @@ export function SubscriptionTable({ clients, isLoading, allPlans }: Subscription
             </SelectTrigger>
             <SelectContent>
                 <SelectItem value="all">Todos los Planes</SelectItem>
-                {allPlans.map(plan => (
+                {allPlans.filter(p => p.isActive).map(plan => (
                   <SelectItem key={plan.id} value={plan.id!}>{plan.name}</SelectItem>
                 ))}
             </SelectContent>
