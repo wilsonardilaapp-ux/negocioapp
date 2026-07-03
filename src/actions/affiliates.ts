@@ -78,10 +78,10 @@ export async function confirmReferralPayment(referralId: string, adminId: string
         businessId: referral.referentBusinessId,
         businessName: referentName,
         amount: config.rewardReferent,
-        reason: `referido_confirmado_referente (Ref: ${referral.referralCode})`,
+        reason: 'referido_confirmado_referente',
         origin: 'manual',
         adminId: adminId,
-        notes: `Pago confirmado manualmente por administrador.`,
+        notes: `Pago confirmado manualmente por administrador. Ref: ${referral.referralCode}`,
         createdAt: now as any
       };
 
@@ -89,10 +89,10 @@ export async function confirmReferralPayment(referralId: string, adminId: string
         businessId: referral.referreeBusinessId,
         businessName: referreeName,
         amount: config.rewardReferree,
-        reason: `referido_confirmado_referido (Ref: ${referral.referralCode})`,
+        reason: 'referido_confirmado_referido',
         origin: 'manual',
         adminId: adminId,
-        notes: `Recompensa de bienvenida (pago inicial confirmado).`,
+        notes: `Recompensa de bienvenida (pago inicial confirmado). Ref: ${referral.referralCode}`,
         createdAt: now as any
       };
 
