@@ -5,11 +5,12 @@ import { usePathname } from 'next/navigation';
 import { useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { doc } from 'firebase/firestore';
 import type { GlobalConfig } from '@/models/global-config';
+import { useFaviconOverride } from '@/context/FaviconOverrideContext';
 
 /**
  * Inyecta dinámicamente el favicon y el título en el head del documento.
- * Incluye lógica de limpieza para restaurar el estado anterior al navegar
- * fuera de páginas con branding específico de negocio.
+ * Incluye lógica de coordinación para evitar colisiones entre el branding
+ * global y el específico de negocios.
  */
 export default function FaviconInjector({ 
   faviconUrl: propFaviconUrl, 
@@ -22,6 +23,7 @@ export default function FaviconInjector({
 }) {
   const firestore = useFirestore();
   const pathname = usePathname();
+  const { hasManualOverride, setHasManualOverride } = useFaviconOverride();
 
   const configRef = useMemoFirebase(() => 
     sourceType === 'platform' ? doc(firestore, 'globalConfig', 'system') : null, 
@@ -33,8 +35,23 @@ export default function FaviconInjector({
   const finalFaviconUrl = sourceType === 'platform' ? config?.faviconUrl : propFaviconUrl;
   const finalTitle = sourceType === 'platform' ? (config?.name || 'Markix Platform') : (propTitle || 'Markix');
 
+  // EFECTO 1: Gestión de la señal de anulación
+  useEffect(() => {
+    if (sourceType === 'manual') {
+      setHasManualOverride(true);
+      return () => setHasManualOverride(false);
+    }
+  }, [sourceType, setHasManualOverride]);
+
+  // EFECTO 2: Inyección en el DOM
   useEffect(() => {
     if (typeof window === 'undefined') return;
+
+    // BLOQUEO DE SEGURIDAD: Si soy el inyector de plataforma y hay un negocio activo, no hago nada.
+    // Esto evita el flicker y que la plataforma sobreescriba al negocio cuando Firestore resuelve.
+    if (sourceType === 'platform' && hasManualOverride) {
+      return;
+    }
 
     // Guardar estado actual antes de aplicar cambios para el cleanup
     const prevTitle = document.title;
@@ -82,8 +99,6 @@ export default function FaviconInjector({
     }
 
     // LÓGICA DE LIMPIEZA (CLEANUP)
-    // Solo restauramos si es una inyección manual (página de negocio/catálogo).
-    // El inyector de 'platform' en el RootLayout debe persistir.
     return () => {
       if (sourceType === 'manual') {
         if (prevTitle) document.title = prevTitle;
@@ -96,7 +111,7 @@ export default function FaviconInjector({
       }
     };
     
-  }, [finalFaviconUrl, finalTitle, pathname, sourceType]);
+  }, [finalFaviconUrl, finalTitle, pathname, sourceType, hasManualOverride]);
 
   return null;
 }
