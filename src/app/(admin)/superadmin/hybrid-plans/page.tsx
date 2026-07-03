@@ -32,15 +32,15 @@ import {
   useSensor,
   useSensors,
   DragEndEvent,
-} from '@get-viewport/dnd-kit-core';
+} from '@dnd-kit/core';
 import {
   arrayMove,
   SortableContext,
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
   useSortable,
-} from '@get-viewport/dnd-kit-sortable';
-import { CSS } from '@get-viewport/dnd-kit-utilities';
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 export default function HybridPlansPage() {
   const firestore = useFirestore();
@@ -207,10 +207,6 @@ function HybridPlanDialog({ isOpen, onClose, plan }: { isOpen: boolean, onClose:
   });
 
   const { fields, append, remove, move } = useFieldArray({ control, name: 'features' });
-  const { fields: extraLimitFields, append: appendExtraLimit, remove: removeExtraLimit } = useFieldArray({
-    control,
-    name: "extraLimits",
-  });
 
   const sensors = useSensors(
     useSensor(PointerSensor),
