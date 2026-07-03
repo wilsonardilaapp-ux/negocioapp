@@ -31,31 +31,18 @@ import { PlusCircle, Edit, Trash2, Loader2, Tag, Frown, Info } from 'lucide-reac
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import type { Promotion } from '@/models/promotion';
-import type { Module } from '@/models/module';
-import { doc } from 'firebase/firestore';
 import { useSubscription } from '@/hooks/useSubscription';
 import { LimitBanner } from '@/components/dashboard/LimitBanner';
 import { cn } from "@/lib/utils";
 
 export default function PromotionsPage() {
   const { user } = useUser();
-  const firestore = useFirestore();
   const { promotions, isLoading: arePromosLoading } = usePromotions();
   const { toast } = useToast();
-  const { limits, plan, promotionsCount, isLoading: isSubscriptionLoading } = useSubscription();
+  const { limits, plan, promotionsCount, isModuleAuthorized, isLoading: isSubscriptionLoading } = useSubscription();
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingPromo, setEditingPromo] = useState<Promotion | null>(null);
-
-  const globalModuleRef = useMemoFirebase(() => 
-    !firestore ? null : doc(firestore, 'modules', 'promotions'), 
-  [firestore]);
-  const { data: globalModule, isLoading: isGlobalLoading } = useDoc<Module>(globalModuleRef);
-
-  const businessModuleRef = useMemoFirebase(() => 
-    !firestore || !user ? null : doc(firestore, `businesses/${user.uid}/modules`, 'promotions'), 
-  [firestore, user]);
-  const { data: businessModule, isLoading: isBusinessModuleLoading } = useDoc<Module>(businessModuleRef);
 
   const handleToggleActive = async (id: string, current: boolean) => {
     try {
@@ -97,19 +84,14 @@ export default function PromotionsPage() {
     return colors[type];
   };
 
-  const isLoading = isGlobalLoading || isBusinessModuleLoading || isSubscriptionLoading || arePromosLoading;
+  const isLoading = isSubscriptionLoading || arePromosLoading;
 
   if (isLoading) {
     return <div className="flex items-center justify-center h-64"><Loader2 className="animate-spin h-8 w-8 text-primary" /></div>;
   }
 
-  const isModuleActiveGlobally = globalModule?.status === 'active';
-  const isAssignedToBusiness = businessModule?.status === 'active';
-  const hasPlanPermission = limits.promotions !== 0;
-
-  const moduleInactive = !isModuleActiveGlobally || (!isAssignedToBusiness && !hasPlanPermission);
-
-  if (moduleInactive) {
+  // Sincronización con el sidebar: Usamos isModuleAuthorized('promotions')
+  if (!isModuleAuthorized('promotions')) {
     return (
         <Card>
             <CardHeader>
@@ -142,7 +124,7 @@ export default function PromotionsPage() {
         </CardHeader>
         <CardContent>
             <div className="flex items-center gap-2 rounded-lg border bg-secondary/50 p-3 text-sm">
-                <Input className="h-5 w-5 text-muted-foreground" />
+                <Tag className="h-5 w-5 text-muted-foreground" />
                 <p className="text-muted-foreground">
                     Límite de promociones: <span className="font-bold">{promotionsCount} / {limits.promotions === -1 ? '∞' : limits.promotions}</span>.
                 </p>
