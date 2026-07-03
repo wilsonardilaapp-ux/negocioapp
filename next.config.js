@@ -1,9 +1,15 @@
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-    transpilePackages: ['lucide-react'],
+    transpilePackages: ['lucide-react', 'recharts', 'date-fns', 'embla-carousel-react', 'embla-carousel-autoplay'],
     experimental: {
-        serverComponentsExternalPackages: ['@opentelemetry/api', 'firebase-admin', 'cloudinary', 'pdf-parse'],
+        serverComponentsExternalPackages: [
+            '@opentelemetry/api', 
+            '@opentelemetry/instrumentation', 
+            'firebase-admin', 
+            'cloudinary', 
+            'pdf-parse'
+        ],
         serverActions: {
             bodySizeLimit: '50mb',
         },
@@ -12,6 +18,7 @@ const nextConfig = {
         if (isServer) {
           config.externals.push('require-in-the-middle');
           config.externals.push('@opentelemetry/instrumentation');
+          config.externals.push('@opentelemetry/api');
         }
         return config;
     },
