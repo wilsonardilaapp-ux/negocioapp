@@ -70,7 +70,7 @@ export default function PaymentMethodsPage() {
                 stripe: { ...initialConfig.stripe, ...savedConfig.stripe },
                 paypal: { ...initialConfig.paypal, ...savedConfig.paypal },
                 mercadoPago: { ...initialConfig.mercadoPago, ...savedConfig.mercadoPago },
-                wompi: { ...initialConfig.wompi, ...(savedConfig.wompi || {}) },
+                wompi: savedConfig.wompi ? { ...initialConfig.wompi, ...savedConfig.wompi } : initialConfig.wompi,
             };
             setConfig(mergedConfig);
         }
