@@ -12,6 +12,12 @@ import type { Metadata } from 'next';
 import { cn } from "@/lib/utils";
 import FaviconInjector from '@/components/layout/FaviconInjector';
 import { getLandingData } from '@/lib/get-landing-data';
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 
 export const dynamic = 'force-dynamic';
 
@@ -165,7 +171,54 @@ export default async function CategoryPage({ params, searchParams }: { params: {
                 <div className="flex flex-col lg:flex-row gap-8">
                     {/* Sidebar de Subcategorías */}
                     <aside className="lg:w-64 space-y-8">
-                        <div className="bg-white p-6 rounded-2xl border shadow-sm">
+                        {/* Versión Móvil: Acordeón colapsable */}
+                        <div className="lg:hidden">
+                            <Accordion 
+                                type="single" 
+                                collapsible 
+                                className="w-full bg-white rounded-2xl border shadow-sm overflow-hidden"
+                                defaultValue={safeSearchParams.sub ? "subcategories" : undefined}
+                            >
+                                <AccordionItem value="subcategories" className="border-none">
+                                    <AccordionTrigger className="px-6 py-4 hover:no-underline font-bold text-gray-900">
+                                        <div className="flex items-center gap-2">
+                                            <Filter className="h-4 w-4 text-primary" /> Subcategorías
+                                        </div>
+                                    </AccordionTrigger>
+                                    <AccordionContent className="px-6 pb-4">
+                                        <div className="space-y-1">
+                                            <Link 
+                                                href={`/directorio/${params.categoria}`}
+                                                className={cn(
+                                                    "block px-3 py-2 rounded-lg text-sm transition-colors",
+                                                    !safeSearchParams.sub ? "bg-primary text-white font-bold" : "text-gray-600 hover:bg-primary/5 hover:text-primary"
+                                                )}
+                                            >
+                                                Todas
+                                            </Link>
+                                            {data.subcategories.map(sub => {
+                                                const isSelected = normalizeString(safeSearchParams.sub) === normalizeString(sub);
+                                                return (
+                                                    <Link 
+                                                        key={sub} 
+                                                        href={`/directorio/${params.categoria}?sub=${encodeURIComponent(sub)}`}
+                                                        className={cn(
+                                                            "block px-3 py-2 rounded-lg text-sm transition-colors",
+                                                            isSelected ? "bg-primary text-white font-bold" : "text-gray-600 hover:bg-primary/5 hover:text-primary"
+                                                        )}
+                                                    >
+                                                        {sub}
+                                                    </Link>
+                                                );
+                                            })}
+                                        </div>
+                                    </AccordionContent>
+                                </AccordionItem>
+                            </Accordion>
+                        </div>
+
+                        {/* Versión Desktop: Lista estática original */}
+                        <div className="hidden lg:block bg-white p-6 rounded-2xl border shadow-sm">
                             <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
                                 <Filter className="h-4 w-4 text-primary" /> Subcategorías
                             </h3>

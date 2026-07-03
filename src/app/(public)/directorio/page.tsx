@@ -13,6 +13,12 @@ import type { Metadata } from 'next';
 import FaviconInjector from '@/components/layout/FaviconInjector';
 import SearchBar from './SearchBar';
 import { getLandingData } from '@/lib/get-landing-data';
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 
 export const dynamic = 'force-dynamic';
 
@@ -118,7 +124,34 @@ export default async function DirectoryPage({
 
                     <div className="flex flex-col lg:flex-row gap-8">
                         <aside className="lg:w-64 space-y-8">
-                            <div>
+                            {/* Versión Móvil: Acordeón colapsable */}
+                            <div className="lg:hidden">
+                                <Accordion type="single" collapsible className="w-full bg-white rounded-2xl border shadow-sm overflow-hidden">
+                                    <AccordionItem value="categories" className="border-none">
+                                        <AccordionTrigger className="px-6 py-4 hover:no-underline font-bold text-gray-900">
+                                            <div className="flex items-center gap-2">
+                                                <Filter className="h-4 w-4 text-primary" /> Categorías
+                                            </div>
+                                        </AccordionTrigger>
+                                        <AccordionContent className="px-6 pb-4">
+                                            <div className="space-y-1">
+                                                {dynamicCategories.map(category => (
+                                                    <Link 
+                                                        key={category} 
+                                                        href={`/directorio/${encodeURIComponent(category.toLowerCase())}`}
+                                                        className="block px-3 py-2 rounded-lg text-sm text-gray-600 hover:bg-primary/5 hover:text-primary transition-colors"
+                                                    >
+                                                        {category}
+                                                    </Link>
+                                                ))}
+                                            </div>
+                                        </AccordionContent>
+                                    </AccordionItem>
+                                </Accordion>
+                            </div>
+
+                            {/* Versión Desktop: Lista estática original */}
+                            <div className="hidden lg:block">
                                 <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
                                     <Filter className="h-4 w-4" /> Categorías
                                 </h3>
