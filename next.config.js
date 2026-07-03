@@ -1,8 +1,9 @@
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+    transpilePackages: ['lucide-react'],
     experimental: {
-        serverComponentsExternalPackages: ['@opentelemetry/api', 'firebase-admin', 'cloudinary'],
+        serverComponentsExternalPackages: ['@opentelemetry/api', 'firebase-admin', 'cloudinary', 'pdf-parse'],
         serverActions: {
             bodySizeLimit: '50mb',
         },
