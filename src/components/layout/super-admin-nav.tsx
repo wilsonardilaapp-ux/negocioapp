@@ -32,7 +32,7 @@ import {
   Cookie,
 } from "lucide-react";
 
-import { SidebarMenu, SidebarMenuItem, SidebarMenuButton } from "@/components/ui/sidebar";
+import { SidebarMenu, SidebarMenuItem, SidebarMenuButton, useSidebar } from "@/components/ui/sidebar";
 
 const navItemsList = [
   { href: "/superadmin", icon: LayoutDashboard, label: "Dashboard" },
@@ -65,6 +65,7 @@ const navItemsList = [
 export function SuperAdminNav() {
   const pathname = usePathname();
   const firestore = useFirestore();
+  const { setOpenMobile } = useSidebar();
 
   const modulesQuery = useMemoFirebase(
     () => (!firestore ? null : collection(firestore, 'modules')),
@@ -88,6 +89,7 @@ export function SuperAdminNav() {
             asChild
             isActive={pathname.startsWith(item.href) && (item.href !== "/superadmin" || pathname === "/superadmin")}
             tooltip={item.label}
+            onClick={() => setOpenMobile(false)}
           >
             <Link href={item.href}>
               <item.icon />
