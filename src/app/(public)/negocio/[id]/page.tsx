@@ -133,7 +133,8 @@ export default async function BusinessProfilePage({ params }: { params: { id: st
 
     if (!entry) notFound();
 
-    const faviconUrl = globalFavicon || entry.faviconUrl || entry.logoURL || null;
+    // FIX: Prioridad corregida. Negocio primero, plataforma como fallback.
+    const faviconUrl = entry.faviconUrl || entry.logoURL || globalFavicon || null;
 
     return (
         <div className="min-h-screen bg-gray-50/30 flex flex-col">
