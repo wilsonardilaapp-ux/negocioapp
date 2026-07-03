@@ -5,7 +5,7 @@ import Link from 'next/link';
 import type { LandingPageData, NavLink, CustomPlan } from '@/models/landing-page';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { MessageCircle, Phone, Mail, Clock, MapPin, Youtube, Linkedin, Star, Loader2, Check } from 'lucide-react';
+import { MessageCircle, Phone, Mail, Clock, MapPin, Youtube, Linkedin, Star, Loader2, Check, Menu } from 'lucide-react';
 import { PublicContactForm } from './public-contact-form';
 import { TikTokIcon, WhatsAppIcon, XIcon, FacebookIcon, InstagramIcon, YoutubeIcon } from '@/components/icons';
 import { cn } from '@/lib/utils';
@@ -14,6 +14,7 @@ import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious
 import Autoplay from "embla-carousel-autoplay";
 import type { SubscriptionPlan } from '@/models/subscription-plan';
 import type { HybridPlan } from '@/models/hybrid-plan';
+import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetHeader } from "@/components/ui/sheet";
 
 interface PlanButton {
   label: string;
@@ -308,6 +309,7 @@ const PlanCard = ({
 
 export default function LandingPageContent({ data, plans = [], hybridPlans = [], businessId, logoUrl }: LandingPageContentProps) {
   const { hero, navigation, sections, testimonials, form, footer, header, plans: customPlans } = data;
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const finalLogoUrl = logoUrl || navigation.logoUrl;
 
@@ -440,12 +442,40 @@ export default function LandingPageContent({ data, plans = [], hybridPlans = [],
                 <span className="font-bold text-xl">{navigation.businessName}</span>
               )}
             </div>
+
+            {/* Desktop Menu */}
             <div className="hidden md:flex items-center gap-6">
               {navigation.links.filter(l => l.enabled).map(link => (
                 <a key={link.id} href={getLinkUrl(link, businessId)} className="hover:opacity-70 transition-opacity" style={{ fontSize: `${navigation.fontSize}px` }}>
                   {link.text}
                 </a>
               ))}
+            </div>
+
+            {/* Mobile Menu Trigger */}
+            <div className="md:hidden">
+              <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
+                <SheetTrigger asChild>
+                  <Button variant="ghost" size="icon" aria-label="Abrir menú">
+                    <Menu className="h-6 w-6" />
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="right" className="flex flex-col gap-6 pt-12" style={navStyle}>
+                  <SheetHeader className="sr-only">
+                    <SheetTitle>Menú de navegación</SheetTitle>
+                  </SheetHeader>
+                  {navigation.links.filter(l => l.enabled).map(link => (
+                    <a 
+                      key={link.id} 
+                      href={getLinkUrl(link, businessId)} 
+                      onClick={() => setIsMobileMenuOpen(false)}
+                      className="text-lg font-semibold hover:opacity-70 transition-opacity"
+                    >
+                      {link.text}
+                    </a>
+                  ))}
+                </SheetContent>
+              </Sheet>
             </div>
           </div>
         </nav>

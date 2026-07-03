@@ -1,9 +1,13 @@
 'use client';
 
 import * as React from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { Logo } from "@/components/icons";
 import type { LandingPageData, NavLink } from "@/models/landing-page";
+import { Menu } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetHeader } from "@/components/ui/sheet";
 
 const getLinkUrl = (link: NavLink, currentBusinessId: string | null | undefined): string => {
   // 1. Prioritize a specific, non-placeholder URL from the data
@@ -37,16 +41,19 @@ interface HeaderProps {
 }
 
 export default function Header({ businessId, navigation }: HeaderProps) {
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const logoUrl = navigation?.logoUrl;
   const businessName = navigation?.businessName || "Markix Platform";
+
+  const headerStyle = {
+    backgroundColor: navigation?.backgroundColor || 'hsl(var(--card))',
+    color: navigation?.textColor || 'hsl(var(--card-foreground))'
+  };
 
   return (
     <header 
         className="sticky top-0 z-50 w-full border-b bg-card shadow-sm"
-        style={{
-            backgroundColor: navigation?.backgroundColor || 'hsl(var(--card))',
-            color: navigation?.textColor || 'hsl(var(--card-foreground))'
-        }}
+        style={headerStyle}
     >
       <div className="container flex items-center justify-between px-4 py-2 md:px-6">
         <Link href="/" className="flex items-center gap-2">
@@ -56,7 +63,9 @@ export default function Header({ businessId, navigation }: HeaderProps) {
              <Logo className="h-8 w-8 text-primary" />
           )}
         </Link>
-        <nav className="hidden items-center gap-6 md:flex">
+
+        {/* Desktop Navigation */}
+        <nav className="hidden md:flex items-center gap-6">
            {navigation?.links?.filter(l => l.enabled).map(link => (
                 <Link 
                     key={link.id} 
@@ -72,6 +81,32 @@ export default function Header({ businessId, navigation }: HeaderProps) {
                 </Link>
               ))}
         </nav>
+
+        {/* Mobile Navigation */}
+        <div className="md:hidden">
+          <Sheet open={isMenuOpen} onOpenChange={setIsMenuOpen}>
+            <SheetTrigger asChild>
+              <Button variant="ghost" size="icon" aria-label="Abrir menú">
+                <Menu className="h-6 w-6" />
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="right" className="flex flex-col gap-6 pt-12" style={headerStyle}>
+              <SheetHeader className="sr-only">
+                <SheetTitle>Menú de navegación</SheetTitle>
+              </SheetHeader>
+              {navigation?.links?.filter(l => l.enabled).map(link => (
+                <Link 
+                  key={link.id} 
+                  href={getLinkUrl(link, businessId)} 
+                  onClick={() => setIsMenuOpen(false)}
+                  className="text-lg font-semibold hover:opacity-70 transition-opacity"
+                >
+                  {link.text}
+                </Link>
+              ))}
+            </SheetContent>
+          </Sheet>
+        </div>
       </div>
     </header>
   );
