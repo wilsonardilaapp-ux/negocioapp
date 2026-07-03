@@ -12,11 +12,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Loader2, Save, Wifi, WifiOff, UploadCloud, FileText, Trash2, CheckCircle, AlertTriangle, MessageSquare, BadgePercent, Smile } from "lucide-react";
+import { Loader2, Save, Wifi, WifiOff, UploadCloud, FileText, Trash2, CheckCircle, AlertTriangle, MessageSquare, BadgePercent, Smile, Frown } from "lucide-react";
 import Image from "next/image";
 import { useToast } from "@/hooks/use-toast";
 import { useUser, useFirestore, useDoc, useCollection, useMemoFirebase, setDocumentNonBlocking, addDocumentNonBlocking, deleteDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase";
-import { collection, doc, query, orderBy, limit, getDoc, setDoc } from 'firebase/firestore';
+import { doc, collection, query, orderBy, limit, getDoc, setDoc } from 'firebase/firestore';
 import type { ChatbotConfig, KnowledgeDocument } from '@/models/chatbot-config';
 import { uploadMedia } from '@/ai/flows/upload-media-flow';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
@@ -24,6 +24,7 @@ import { BarChart, Bar, LineChart, Line, CartesianGrid, XAxis, YAxis } from "rec
 import type { ChatConversation } from "@/models/chatbot-config";
 import type { Integration, CloudinaryFields } from "@/models/integration";
 import { extractTextFromPDF } from '@/actions/extract-pdf-text';
+import { useSubscription } from "@/hooks/useSubscription";
 import {
   Dialog,
   DialogContent,
@@ -461,6 +462,7 @@ export default function ChatbotPage() {
     const { user } = useUser();
     const firestore = useFirestore();
     const { toast } = useToast();
+    const { isModuleAuthorized, isLoading: isSubLoading } = useSubscription();
     const [isVerifying, setIsVerifying] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     
@@ -641,8 +643,25 @@ export default function ChatbotPage() {
         };
     };
 
-    if (isLoading && !config) {
-        return <div className="flex justify-center items-center h-full"><Loader2 className="h-8 w-8 animate-spin" /></div>;
+    if (isLoading || isSubLoading) {
+        return <div className="flex justify-center items-center h-full py-20"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
+    }
+
+    if (!isModuleAuthorized('chatbot-integrado-con-whatsapp-para-soporte-y-ventas')) {
+        return (
+            <Card>
+                <CardHeader>
+                    <CardTitle>Módulo de Chatbot Desactivado</CardTitle>
+                </CardHeader>
+                <CardContent className="flex flex-col items-center justify-center text-center gap-4 min-h-[400px]">
+                    <Frown className="h-12 w-12 text-muted-foreground" />
+                    <h3 className="text-xl font-semibold">Funcionalidad no disponible</h3>
+                    <p className="text-muted-foreground max-w-sm">
+                        El módulo de "Chatbot IA" no está activo en tu plan actual. Por favor, contacta al administrador de la plataforma para más información.
+                    </p>
+                </CardContent>
+            </Card>
+        );
     }
 
     return (
