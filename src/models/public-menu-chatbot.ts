@@ -1,5 +1,5 @@
 import { Timestamp } from 'firebase/firestore';
-import { z } from 'genkit';
+import { z } from 'zod';
 
 export interface PublicMenuChatbotConfig {
   assistantName: string;
