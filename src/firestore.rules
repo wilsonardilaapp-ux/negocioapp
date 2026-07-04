@@ -171,6 +171,10 @@ service cloud.firestore {
     match /hybrid_plans/{planId} { allow read, list: if true; allow write: if isSuperAdmin(); }
     match /plans/{planId} { allow read, list: if true; allow write: if isSuperAdmin(); }
     match /globalConfig/{document=**} { allow read, list: if true; allow write: if isSuperAdmin(); }
+    
+    // Módulos y Servicios del Sistema (Lectura Pública)
+    match /modules/{moduleId} { allow read, list: if true; allow write: if isSuperAdmin(); }
+    match /systemServices/{serviceId} { allow read, list: if true; allow write: if isSuperAdmin(); }
 
     match /users/{userId} {
       allow get: if isAuthenticated() && (request.auth.uid == userId || isSuperAdmin());
