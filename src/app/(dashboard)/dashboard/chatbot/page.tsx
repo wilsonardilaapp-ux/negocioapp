@@ -14,7 +14,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Loader2, Save, Wifi, WifiOff, UploadCloud, FileText, Trash2, CheckCircle, AlertTriangle, MessageSquare, BadgePercent, Smile, Frown } from "lucide-react";
 import Image from "next/image";
 import { useToast } from "@/hooks/use-toast";
-import { useUser, useFirestore, useDoc, useCollection, useMemoFirebase, setDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase";
+import { useUser, useFirestore, useDoc, useCollection, useMemoFirebase, setDocumentNonBlocking, updateDocumentNonBlocking, deleteDocumentNonBlocking } from "@/firebase";
 import { doc, collection, query, orderBy, limit, setDoc } from 'firebase/firestore';
 import type { ChatbotConfig, KnowledgeDocument } from '@/models/chatbot-config';
 import { uploadMedia } from '@/ai/flows/upload-media-flow';
