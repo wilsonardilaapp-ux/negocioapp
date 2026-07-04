@@ -426,6 +426,14 @@ export default function LandingPageContent({ data, plans = [], hybridPlans = [],
     </section>
   );
 
+  // Helper para limpiar números de teléfono de forma segura
+  const cleanPhoneString = (val: string | undefined | null) => {
+    if (!val) return '';
+    return String(val).replace(/\D/g, '').trim();
+  };
+
+  const whatsappFloatingNumber = cleanPhoneString(data.header?.socialLinks?.whatsapp || footer.contactInfo.phone || '3228831634');
+
   return (
     <div className="flex flex-col">
       {/* Navegación */}
@@ -717,8 +725,9 @@ export default function LandingPageContent({ data, plans = [], hybridPlans = [],
         </footer>
       )}
 
+      {/* Botón flotante de WhatsApp con número sanitizado estrictamente */}
       <a 
-        href={`https://api.whatsapp.com/send?phone=${String(data.header?.socialLinks?.whatsapp || footer.contactInfo.phone || '3228831634').replace(/\D/g, '')}`} 
+        href={`https://api.whatsapp.com/send?phone=${whatsappFloatingNumber}`} 
         target="_blank" 
         rel="noopener noreferrer"
         className="fixed bottom-8 right-8 z-50 bg-[#25D366] text-white p-4 rounded-full shadow-2xl hover:scale-110 transition-transform flex items-center justify-center"
