@@ -54,6 +54,7 @@ const allNavItems = [
   { href: "/dashboard/kardex", icon: Package, label: "Inventario Kardex", moduleId: 'inventario-kardex' },
   { href: "/dashboard/configuracion/factura", icon: FileText, label: "Editor Factura", moduleId: 'catalogo' },
   { href: "/dashboard/configuracion/impresoras", icon: Printer, label: "Impresoras", moduleId: 'catalogo' },
+  { href: "/dashboard/configuracion/chatbot-menu", icon: Bot, label: "Chatbot Menú", moduleId: 'public-menu-chatbot' },
   { href: "/dashboard/pistola-scanner", icon: ScanLine, label: "Pistola Escáner", moduleId: 'pistola-escaner' },
   { href: "/dashboard/backups", icon: HardDrive, label: "Backups" },
   { href: "/dashboard/subscription", icon: CreditCard, label: "Suscripción" },
