@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -12,7 +11,7 @@ import { useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { doc, setDoc, Timestamp, increment } from 'firebase/firestore';
 import { publicMenuChatbotFlow } from '@/ai/flows/public-menu-chatbot-flow';
 import type { PublicMenuChatbotConfig, LocalMessage } from '@/models/public-menu-chatbot';
-import { DEFAULT_CHATBOT_CONFIG } from '@/models/public-menu-chatbot';
+import { DEFAULT_CHATBOT_CONFIG, PUBLIC_MENU_CHATBOT_MODULE_ID } from '@/models/public-menu-chatbot';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import type { Module } from '@/models/module';
@@ -33,7 +32,7 @@ export function PublicMenuChatWidget({ businessId, isPreview = false }: PublicMe
 
   // 1. Suscripción al estado GLOBAL del módulo (Control maestro de Super Admin)
   const globalModuleRef = useMemoFirebase(
-    () => doc(firestore, 'modules', 'publicMenuChatbot'),
+    () => doc(firestore, 'modules', PUBLIC_MENU_CHATBOT_MODULE_ID),
     [firestore]
   );
   const { data: globalModule } = useDoc<Module>(globalModuleRef);

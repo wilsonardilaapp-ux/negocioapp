@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -51,9 +50,10 @@ import {
   Building2,
   Pencil,
   AlertTriangle,
-  Lock
+  Lock,
+  CheckCircle
 } from 'lucide-react';
-import { PublicMenuChatbotConfig, DEFAULT_CHATBOT_CONFIG, PublicMenuAutoResponse } from '@/models/public-menu-chatbot';
+import { PublicMenuChatbotConfig, DEFAULT_CHATBOT_CONFIG, PublicMenuAutoResponse, PUBLIC_MENU_CHATBOT_MODULE_ID } from '@/models/public-menu-chatbot';
 import { PublicMenuChatWidget } from '@/components/public-menu-chatbot/PublicMenuChatWidget';
 import { uploadMedia } from '@/ai/flows/upload-media-flow';
 import type { Business } from '@/models/business';
@@ -72,7 +72,7 @@ export default function ChatbotMenuConfigPage() {
 
   // 0. Validación de Módulo Global (Super Admin)
   const globalModuleRef = useMemoFirebase(
-    () => doc(firestore, 'modules', 'publicMenuChatbot'),
+    () => doc(firestore, 'modules', PUBLIC_MENU_CHATBOT_MODULE_ID),
     [firestore]
   );
   const { data: globalModule, isLoading: loadingGlobalModule } = useDoc<Module>(globalModuleRef);
@@ -433,7 +433,7 @@ export default function ChatbotMenuConfigPage() {
                             <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest">Productos en Memoria</p>
                         </div>
                         <div className="flex items-start gap-3 p-3 bg-green-50 border border-green-100 rounded-xl text-xs text-green-700">
-                          <Info className="h-4 w-4 shrink-0 mt-0.5" />
+                          <CheckCircle className="h-4 w-4 shrink-0 mt-0.5" />
                           <p>La IA conoce tus precios y categorías actuales. Cualquier cambio en tu catálogo se refleja inmediatamente en sus respuestas.</p>
                         </div>
                     </CardContent>

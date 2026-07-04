@@ -1,6 +1,12 @@
 import { Timestamp } from 'firebase/firestore';
 import { z } from 'zod';
 
+/**
+ * Identificador único y centralizado del módulo en la colección 'modules'.
+ * Corresponde al ID real guardado en Firestore.
+ */
+export const PUBLIC_MENU_CHATBOT_MODULE_ID = 'public-menu-chatbot';
+
 export interface PublicMenuChatbotConfig {
   assistantName: string;
   greetingMessage: string;

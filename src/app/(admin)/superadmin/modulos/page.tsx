@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useCollection, useFirestore, useMemoFirebase, setDocumentNonBlocking, deleteDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase';
@@ -44,6 +43,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { useState, useEffect } from 'react';
 import type { Module } from '@/models/module';
+import { PUBLIC_MENU_CHATBOT_MODULE_ID } from '@/models/public-menu-chatbot';
 
 const moduleSchema = z.object({
   name: z.string().min(3, { message: "El nombre debe tener al menos 3 caracteres." }),
@@ -60,7 +60,7 @@ const DEFAULT_MODULES = [
   { name: 'Chatbot de Soporte WhatsApp', description: 'Asistente IA para atención al cliente integrado con WhatsApp API.', limit: -1, idOverride: 'chatbot-integrado-con-whatsapp-para-soporte-y-ventas' },
   { name: 'Google Analytics', description: 'Integración de métricas avanzadas para la landing page.', limit: -1, idOverride: 'google-analytics' },
   { name: 'Directorio de Negocios', description: 'Módulo para listar el negocio en el directorio público de la plataforma.', limit: -1, idOverride: 'business-directory' },
-  { name: 'Chatbot Menú Público', description: 'Asistente virtual para el menú público que responde preguntas de los visitantes sobre productos, precios, horarios y promociones del negocio.', limit: -1, idOverride: 'publicMenuChatbot' },
+  { name: 'Chatbot Menú Público', description: 'Asistente virtual para el menú público que responde preguntas de los visitantes sobre productos, precios, horarios y promociones del negocio.', limit: -1, idOverride: PUBLIC_MENU_CHATBOT_MODULE_ID },
 ];
 
 export default function ModulesPage() {
@@ -119,7 +119,7 @@ export default function ModulesPage() {
 
     try {
       await setDocumentNonBlocking(docRef, moduleData, { merge: true });
-      toast({ title: editingModule ? "Módulo actualizado" : "Módulo creado" });
+      toast({ title: typeof editingModule === 'object' && editingModule !== null ? "Módulo actualizado" : "Módulo creado" });
       handleCloseDialog();
     } catch (e) {
       toast({ variant: 'destructive', title: "Error al guardar" });
@@ -187,12 +187,12 @@ export default function ModulesPage() {
                 <div>
                   <Label htmlFor="name">Nombre</Label>
                   <Input id="name" {...register('name')} />
-                  {errors.name && <p className="text-xs text-destructive mt-1">{errors.name.message}</p>}
+                  {errors.name && <p className="text-sm text-destructive mt-1">{errors.name.message}</p>}
                 </div>
                 <div>
                   <Label htmlFor="description">Descripción</Label>
                   <Textarea id="description" {...register('description')} />
-                  {errors.description && <p className="text-xs text-destructive mt-1">{errors.description.message}</p>}
+                  {errors.description && <p className="text-sm text-destructive mt-1">{errors.description.message}</p>}
                 </div>
                 <div>
                   <Label htmlFor="limit">Límite por defecto (-1 para ilimitado)</Label>
