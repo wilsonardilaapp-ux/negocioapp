@@ -29,10 +29,16 @@ export interface PublicMenuAutoResponse {
 export interface PublicMenuConversation {
   id: string;
   sessionId: string;
-  startTime: string;
+  startTime: Timestamp;
   status: 'active' | 'closed';
   messagesCount: number;
   satisfactionRating?: number;
+}
+
+export interface LocalMessage {
+  role: 'user' | 'model';
+  content: string;
+  timestamp: Date;
 }
 
 export const DEFAULT_CHATBOT_CONFIG: PublicMenuChatbotConfig = {
@@ -51,7 +57,7 @@ export const DEFAULT_CHATBOT_CONFIG: PublicMenuChatbotConfig = {
   isActive: false,
 };
 
-// --- NUEVOS SCHEMAS PARA EL FLUJO DE IA ---
+// --- SCHEMAS PARA EL FLUJO DE IA ---
 
 export const PublicMenuChatbotInputSchema = z.object({
   businessId: z.string().describe('ID único del negocio'),
