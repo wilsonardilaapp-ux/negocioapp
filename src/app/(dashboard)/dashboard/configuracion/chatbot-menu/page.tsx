@@ -45,7 +45,8 @@ import {
   Building2,
   ChevronRight,
   UploadCloud,
-  Pencil
+  Pencil,
+  CheckCircle
 } from 'lucide-react';
 import { PublicMenuChatbotConfig, DEFAULT_CHATBOT_CONFIG, PublicMenuAutoResponse } from '@/models/public-menu-chatbot';
 import { PublicMenuChatWidget } from '@/components/public-menu-chatbot/PublicMenuChatWidget';
