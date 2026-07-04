@@ -124,7 +124,7 @@ type Provider = 'google' | 'openai' | 'groq' | 'nanobanana' | 'deepseek' | 'qwen
 type TestStatus = 'idle' | 'testing' | 'success' | 'error';
 type ModalState = { isOpen: boolean; title: string; message: string };
 
-const AIProviderForm = ({
+export const AIProviderForm = ({
   integration, onSave, onCancel, isSaving,
 }: {
   integration: Integration;
@@ -484,8 +484,6 @@ export default function IntegrationsPage() {
           const correspondingModule = modules?.find(m => m.id === integration.id);
           const isModuleActive = !!correspondingModule && correspondingModule.status === 'active';
           
-          // DIRECT FIX: We allow the Super Admin to edit and toggle even if the module is inactive
-          // but we show a warning icon if the module isn't active.
           const isControlDisabled = isSaving || isUpdatingStatus || isDeleting;
           const tooltipMessage = !isModuleActive ? 'Módulo inactivo: Los clientes no verán esta funcionalidad hasta que actives el módulo en la página correspondiente.' : '';
 
