@@ -1,8 +1,9 @@
+
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { useUser, useFirestore, useDoc, useMemoFirebase, setDocumentNonBlocking, addDocumentNonBlocking } from '@/firebase';
-import { doc, collection, query, orderBy, deleteDoc } from 'firebase/firestore';
+import { useUser, useFirestore, useDoc, useMemoFirebase, setDocumentNonBlocking, addDocumentNonBlocking, useCollection } from '@/firebase';
+import { doc, collection, query, orderBy, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
@@ -58,7 +59,6 @@ import {
 import { PublicMenuChatbotConfig, DEFAULT_CHATBOT_CONFIG, PublicMenuAutoResponse } from '@/models/public-menu-chatbot';
 import { PublicMenuChatWidget } from '@/components/public-menu-chatbot/PublicMenuChatWidget';
 import { uploadMedia } from '@/ai/flows/upload-media-flow';
-import { useCollection } from '@/firebase';
 import type { Business } from '@/models/business';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -71,33 +71,33 @@ export default function ChatbotMenuConfigPage() {
   const [isUploading, setIsUploading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
-  // 1. Suscripción a Configuración Principal
+  // 1. Suscripción a Configuración Principal (Documento main)
   const configRef = useMemoFirebase(
-    () => (user ? doc(firestore, `businesses/${user.uid}/publicMenuChatbot`, 'config') : null),
+    () => (user ? doc(firestore, 'businesses', user.uid, 'publicMenuChatbot', 'main') : null),
     [firestore, user]
   );
   const { data: savedConfig, isLoading: loadingConfig } = useDoc<PublicMenuChatbotConfig>(configRef);
   const [localConfig, setLocalConfig] = useState<PublicMenuChatbotConfig>(DEFAULT_CHATBOT_CONFIG);
 
-  // 2. Suscripción a Respuestas Automáticas
+  // 2. Suscripción a Respuestas Automáticas (Subcolección de main)
   const responsesRef = useMemoFirebase(
-    () => (user ? collection(firestore, `businesses/${user.uid}/publicMenuChatbot`, 'responses') : null),
+    () => (user ? collection(firestore, 'businesses', user.uid, 'publicMenuChatbot', 'main', 'responses') : null),
     [firestore, user]
   );
   const { data: rawResponses, isLoading: loadingResponses } = useCollection<PublicMenuAutoResponse>(
-    useMemoFirebase(() => (responsesRef ? query(responsesRef, orderBy('createdAt', 'desc')) : null), [responsesRef])
+    useMemoFirebase(() => (responsesRef ? query(responsesRef, orderBy('updatedAt', 'desc')) : null), [responsesRef])
   );
 
-  // 3. Suscripción a Datos del Negocio (Conocimiento)
+  // 3. Suscripción a Datos del Negocio
   const businessRef = useMemoFirebase(
     () => (user ? doc(firestore, 'businesses', user.uid) : null),
     [firestore, user]
   );
   const { data: business } = useDoc<Business>(businessRef);
 
-  // 4. Suscripción a Catálogo Público (Resumen)
+  // 4. Suscripción a Catálogo Público
   const catalogRef = useMemoFirebase(
-    () => (user ? doc(firestore, `businesses/${user.uid}/publicData`, 'catalog') : null),
+    () => (user ? doc(firestore, 'businesses', user.uid, 'publicData', 'catalog') : null),
     [firestore, user]
   );
   const { data: catalog } = useDoc<any>(catalogRef);
@@ -130,11 +130,6 @@ export default function ChatbotMenuConfigPage() {
   const handleUploadImage = async (e: React.ChangeEvent<HTMLInputElement>, field: keyof PublicMenuChatbotConfig) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
-    if (file.size > 5 * 1024 * 1024) {
-      toast({ variant: 'destructive', title: 'Archivo muy grande', description: 'El límite es 5MB.' });
-      return;
-    }
 
     setIsUploading(true);
     try {
@@ -307,22 +302,6 @@ export default function ChatbotMenuConfigPage() {
                       ) : <Bot className="h-10 w-10 text-muted-foreground" />}
                     </div>
                     <input type="file" id="avatar-upload" className="hidden" accept="image/*" onChange={e => handleUploadImage(e, 'avatarUrl')} />
-                    {!localConfig.avatarUrl && <Button variant="outline" size="sm" onClick={() => document.getElementById('avatar-upload')?.click()}><UploadCloud className="mr-2 h-4 w-4" /> Subir Avatar</Button>}
-                  </div>
-                </div>
-                
-                <div className="space-y-4 pt-4 border-t">
-                  <Label>Logo del Chat (opcional)</Label>
-                  <div className="relative aspect-video w-full rounded-lg border-2 border-dashed flex items-center justify-center overflow-hidden bg-muted group">
-                    {localConfig.logoUrl ? (
-                      <>
-                        <Image src={localConfig.logoUrl} alt="Logo chat" fill className="object-contain" />
-                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                          <Button variant="ghost" size="icon" className="text-white" onClick={() => document.getElementById('logo-upload')?.click()}><Pencil className="h-4 w-4" /></Button>
-                        </div>
-                      </>
-                    ) : <Button variant="ghost" onClick={() => document.getElementById('logo-upload')?.click()}><Plus className="mr-2 h-4 w-4" /> Añadir Logo</Button>}
-                    <input type="file" id="logo-upload" className="hidden" accept="image/*" onChange={e => handleUploadImage(e, 'logoUrl')} />
                   </div>
                 </div>
               </CardContent>
@@ -403,17 +382,12 @@ export default function ChatbotMenuConfigPage() {
                     <span className="font-bold">{business?.name}</span>
                     <span className="text-muted-foreground">Teléfono:</span>
                     <span className="font-bold">{business?.phone || 'N/A'}</span>
-                    <span className="text-muted-foreground">Dirección:</span>
-                    <span className="font-bold truncate">{business?.address || 'N/A'}</span>
                   </div>
                 </div>
                 <div className="flex items-start gap-3 p-3 bg-blue-50 border border-blue-100 rounded-xl text-xs text-blue-700">
                   <Info className="h-4 w-4 shrink-0 mt-0.5" />
-                  <p>Esta información se sincroniza automáticamente desde <strong>Perfil del Negocio</strong>. El chatbot la usará para responder sobre ubicación y contacto.</p>
+                  <p>Esta información se sincroniza automáticamente desde <strong>Perfil del Negocio</strong>.</p>
                 </div>
-                <Button variant="outline" size="sm" asChild className="w-full">
-                  <Link href="/dashboard/perfil">Editar Datos de Negocio <ExternalLink className="ml-2 h-3 w-3" /></Link>
-                </Button>
               </CardContent>
             </Card>
 
@@ -428,18 +402,7 @@ export default function ChatbotMenuConfigPage() {
                     <p className="text-2xl font-black text-primary">{catalog?.products?.length || 0}</p>
                     <p className="text-[10px] uppercase font-bold text-muted-foreground">Productos Activos</p>
                   </div>
-                  <div className="p-4 bg-primary/5 border border-primary/10 rounded-xl text-center">
-                    <p className="text-2xl font-black text-primary">{catalog?.headerConfig?.carouselItems?.filter((i: any) => i.mediaUrl).length || 0}</p>
-                    <p className="text-[10px] uppercase font-bold text-muted-foreground">Promos Visuales</p>
-                  </div>
                 </div>
-                <div className="flex items-start gap-3 p-3 bg-green-50 border border-green-100 rounded-xl text-xs text-green-700">
-                  <CheckCircle className="h-4 w-4 shrink-0 mt-0.5" />
-                  <p>La IA conoce tus precios y categorías actuales. Cualquier cambio en tu catálogo se refleja inmediatamente en sus respuestas.</p>
-                </div>
-                <Button variant="outline" size="sm" asChild className="w-full">
-                  <Link href="/dashboard/catalogo">Gestionar Catálogo <ChevronRight className="ml-2 h-3 w-3" /></Link>
-                </Button>
               </CardContent>
             </Card>
           </div>
@@ -447,11 +410,6 @@ export default function ChatbotMenuConfigPage() {
 
         <TabsContent value="preview" className="pt-2 h-[650px] relative">
           <div className="absolute inset-0 bg-slate-100 rounded-2xl flex items-center justify-center overflow-hidden border-4 border-white shadow-inner">
-             <div className="text-center max-w-sm px-6">
-                <Bot className="h-16 w-16 text-muted-foreground/20 mx-auto mb-4" />
-                <h3 className="text-xl font-bold text-gray-400 uppercase tracking-widest mb-2">Modo Simulador</h3>
-                <p className="text-gray-400 text-sm mb-8">Usa el widget de la derecha para probar respuestas manuales y de IA basadas en tu configuración actual.</p>
-             </div>
              {user?.uid && <PublicMenuChatWidget businessId={user.uid} isPreview={true} />}
           </div>
         </TabsContent>
@@ -495,13 +453,9 @@ export default function ChatbotMenuConfigPage() {
                     value={localConfig.autoOpenDelay} 
                     onChange={e => setLocalConfig({...localConfig, autoOpenDelay: Number(e.target.value)})} 
                   />
-                  <p className="text-[10px] text-muted-foreground italic">0 = no abrir automáticamente</p>
                 </div>
               </div>
             </CardContent>
-            <CardFooter className="bg-muted/30 border-t p-4 text-xs flex items-center gap-2 text-muted-foreground">
-               <Info className="h-3 w-3" /> Este módulo requiere que el Administrador Global te haya asignado el permiso de 'Chatbot Menú Público'.
-            </CardFooter>
           </Card>
         </TabsContent>
       </Tabs>
