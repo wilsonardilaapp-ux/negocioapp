@@ -15,6 +15,7 @@ import type { PublicMenuChatbotConfig, LocalMessage } from '@/models/public-menu
 import { DEFAULT_CHATBOT_CONFIG } from '@/models/public-menu-chatbot';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import type { Module } from '@/models/module';
 
 interface PublicMenuChatWidgetProps {
   businessId: string;
@@ -30,7 +31,14 @@ export function PublicMenuChatWidget({ businessId, isPreview = false }: PublicMe
   const [sessionId, setSessionId] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // 1. Suscripción a la configuración (Ruta Doc: 4 segmentos)
+  // 1. Suscripción al estado GLOBAL del módulo (Control maestro de Super Admin)
+  const globalModuleRef = useMemoFirebase(
+    () => doc(firestore, 'modules', 'publicMenuChatbot'),
+    [firestore]
+  );
+  const { data: globalModule } = useDoc<Module>(globalModuleRef);
+
+  // 2. Suscripción a la configuración del negocio (Control local del cliente)
   const configRef = useMemoFirebase(() => 
     doc(firestore, `businesses/${businessId}/publicMenuChatbot`, 'main'), 
     [firestore, businessId]
@@ -62,7 +70,7 @@ export function PublicMenuChatWidget({ businessId, isPreview = false }: PublicMe
 
     try {
       if (!isPreview) {
-        // Registro en subcolección conversations del documento main (Ruta Doc: 6 segmentos)
+        // Registro en subcolección conversations del documento main
         const convRef = doc(firestore, `businesses/${businessId}/publicMenuChatbot/main/conversations`, sessionId);
         setDoc(convRef, {
           sessionId,
@@ -80,14 +88,18 @@ export function PublicMenuChatWidget({ businessId, isPreview = false }: PublicMe
     }
   };
 
-  if (!config.isActive && !isPreview) return null;
+  // LÓGICA DE VISIBILIDAD: El módulo debe estar activo globalmente Y habilitado por el negocio
+  const isGlobalActive = globalModule?.status === 'active';
+  const isLocalActive = config.isActive === true;
+
+  if (!isPreview && (!isGlobalActive || !isLocalActive)) return null;
 
   const positionClass = config.position === 'bottom-left' ? 'left-6' : 'right-6';
 
   return (
     <div className={cn("fixed bottom-6 z-[100] flex flex-col items-end", positionClass)}>
       {isOpen && (
-        <Card className="w-[320px] sm:w-[380px] h-[500px] mb-4 shadow-2xl flex flex-col border-2 overflow-hidden">
+        <Card className="w-[320px] sm:w-[380px] h-[500px] mb-4 shadow-2xl flex flex-col border-2 overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-300">
           <CardHeader className="p-4 border-b flex flex-row items-center justify-between" style={{ backgroundColor: config.headerColor }}>
             <div className="flex items-center gap-3">
               <Avatar className="h-10 w-10 border-2 border-white/20">
@@ -96,7 +108,7 @@ export function PublicMenuChatWidget({ businessId, isPreview = false }: PublicMe
               </Avatar>
               <CardTitle className="text-sm font-bold text-white">{config.assistantName}</CardTitle>
             </div>
-            <Button variant="ghost" size="icon" className="text-white h-8 w-8" onClick={() => setIsOpen(false)}><X className="h-5 w-5" /></Button>
+            <Button variant="ghost" size="icon" className="text-white h-8 w-8 hover:bg-white/10" onClick={() => setIsOpen(false)}><X className="h-5 w-5" /></Button>
           </CardHeader>
 
           <ScrollArea className="flex-1 p-4" ref={scrollRef} style={{ backgroundColor: config.secondaryColor }}>
@@ -112,14 +124,14 @@ export function PublicMenuChatWidget({ businessId, isPreview = false }: PublicMe
 
           <CardFooter className="p-4 border-t bg-white">
             <div className="flex w-full gap-2">
-              <Input placeholder="Pregunta..." value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleSend()} className="h-10" />
-              <Button size="icon" onClick={handleSend} disabled={isLoading || !input.trim()} style={{ backgroundColor: config.buttonColor }}><Send className="h-4 w-4" /></Button>
+              <Input placeholder="Pregunta algo..." value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleSend()} className="h-10" />
+              <Button size="icon" onClick={handleSend} disabled={isLoading || !input.trim()} style={{ backgroundColor: config.buttonColor }} className="hover:opacity-90"><Send className="h-4 w-4" /></Button>
             </div>
           </CardFooter>
         </Card>
       )}
 
-      <Button size="lg" className="rounded-full h-16 w-16 shadow-xl" style={{ backgroundColor: config.buttonColor }} onClick={() => setIsOpen(!isOpen)}>{isOpen ? <X className="h-8 w-8" /> : <MessageCircle className="h-8 w-8" />}</Button>
+      <Button size="lg" className="rounded-full h-16 w-16 shadow-xl hover:scale-105 transition-transform" style={{ backgroundColor: config.buttonColor }} onClick={() => setIsOpen(!isOpen)}>{isOpen ? <X className="h-8 w-8" /> : <MessageCircle className="h-8 w-8" />}</Button>
     </div>
   );
 }

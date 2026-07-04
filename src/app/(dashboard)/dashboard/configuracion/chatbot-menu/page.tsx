@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useUser, useFirestore, useDoc, useMemoFirebase, setDocumentNonBlocking, addDocumentNonBlocking, useCollection } from '@/firebase';
-import { doc, collection, query, orderBy, deleteDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, collection, query, orderBy, deleteDoc } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
@@ -48,28 +48,35 @@ import {
   Eye, 
   Info, 
   Search, 
-  ExternalLink, 
-  LayoutGrid, 
   Building2,
-  ChevronRight,
-  UploadCloud,
   Pencil,
-  CheckCircle
+  AlertTriangle,
+  Lock
 } from 'lucide-react';
 import { PublicMenuChatbotConfig, DEFAULT_CHATBOT_CONFIG, PublicMenuAutoResponse } from '@/models/public-menu-chatbot';
 import { PublicMenuChatWidget } from '@/components/public-menu-chatbot/PublicMenuChatWidget';
 import { uploadMedia } from '@/ai/flows/upload-media-flow';
 import type { Business } from '@/models/business';
-import Link from 'next/link';
+import type { Module } from '@/models/module';
+import { useSubscription } from '@/hooks/useSubscription';
 import Image from 'next/image';
 
 export default function ChatbotMenuConfigPage() {
   const { user } = useUser();
   const firestore = useFirestore();
   const { toast } = useToast();
+  const { isModuleAuthorized, isLoading: isSubLoading } = useSubscription();
   const [isSaving, setIsSaving] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+
+  // 0. Validación de Módulo Global (Super Admin)
+  const globalModuleRef = useMemoFirebase(
+    () => doc(firestore, 'modules', 'publicMenuChatbot'),
+    [firestore]
+  );
+  const { data: globalModule, isLoading: loadingGlobalModule } = useDoc<Module>(globalModuleRef);
+  const isGlobalActive = globalModule?.status === 'active';
 
   // 1. Suscripción a Configuración Principal (Documento main)
   const configRef = useMemoFirebase(
@@ -79,7 +86,7 @@ export default function ChatbotMenuConfigPage() {
   const { data: savedConfig, isLoading: loadingConfig } = useDoc<PublicMenuChatbotConfig>(configRef);
   const [localConfig, setLocalConfig] = useState<PublicMenuChatbotConfig>(DEFAULT_CHATBOT_CONFIG);
 
-  // 2. Suscripción a Respuestas Automáticas (Subcolección de main)
+  // 2. Suscripción a Respuestas Automáticas
   const responsesRef = useMemoFirebase(
     () => (user ? collection(firestore, 'businesses', user.uid, 'publicMenuChatbot', 'main', 'responses') : null),
     [firestore, user]
@@ -112,7 +119,7 @@ export default function ChatbotMenuConfigPage() {
   }, [savedConfig]);
 
   const handleSaveConfig = async () => {
-    if (!configRef) return;
+    if (!configRef || !isGlobalActive) return;
     setIsSaving(true);
     try {
       await setDocumentNonBlocking(configRef, {
@@ -128,6 +135,7 @@ export default function ChatbotMenuConfigPage() {
   };
 
   const handleUploadImage = async (e: React.ChangeEvent<HTMLInputElement>, field: keyof PublicMenuChatbotConfig) => {
+    if (!isGlobalActive) return;
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -148,6 +156,7 @@ export default function ChatbotMenuConfigPage() {
   };
 
   const handleOpenResponseDialog = (res: PublicMenuAutoResponse | null = null) => {
+    if (!isGlobalActive) return;
     setEditingResponse(res);
     setRespForm(res ? { question: res.question, answer: res.answer, isActive: res.isActive } : { question: '', answer: '', isActive: true });
     setIsResponseModalOpen(true);
@@ -180,7 +189,7 @@ export default function ChatbotMenuConfigPage() {
   };
 
   const handleDeleteResponse = async (id: string) => {
-    if (!responsesRef) return;
+    if (!responsesRef || !isGlobalActive) return;
     try {
       await deleteDoc(doc(responsesRef, id));
       toast({ title: 'Respuesta eliminada' });
@@ -197,27 +206,46 @@ export default function ChatbotMenuConfigPage() {
     );
   }, [rawResponses, searchTerm]);
 
-  if (loadingConfig || loadingResponses) {
+  if (loadingConfig || loadingResponses || loadingGlobalModule || isSubLoading) {
     return (
       <div className="flex flex-col items-center justify-center h-screen gap-4">
         <Loader2 className="h-10 w-10 animate-spin text-primary" />
-        <p className="text-muted-foreground font-medium">Cargando panel del asistente...</p>
+        <p className="text-muted-foreground font-medium">Sincronizando asistente...</p>
       </div>
     );
   }
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
+      
+      {/* AVISO DE MÓDULO DESACTIVADO GLOBALMENTE */}
+      {!isGlobalActive && (
+        <Card className="border-destructive bg-destructive/5 border-2">
+            <CardContent className="p-6 flex flex-col sm:flex-row items-center gap-4 text-center sm:text-left">
+                <div className="p-3 bg-destructive/10 rounded-full text-destructive">
+                    <Lock className="h-8 w-8" />
+                </div>
+                <div className="flex-1 space-y-1">
+                    <h3 className="text-lg font-black text-destructive uppercase">Módulo Desactivado por Administración</h3>
+                    <p className="text-sm text-destructive/80 font-medium">
+                        El Chatbot del Menú Público está temporalmente fuera de servicio para toda la plataforma. 
+                        Puedes consultar tu configuración actual, pero la edición está bloqueada hasta nuevo aviso.
+                    </p>
+                </div>
+            </CardContent>
+        </Card>
+      )}
+
       <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div className="space-y-1">
           <h1 className="text-3xl font-black tracking-tight flex items-center gap-3">
             <Bot className="h-9 w-9 text-primary" />
             Asistente del Menú Público
           </h1>
-          <p className="text-muted-foreground">Personaliza el chatbot que ayuda a tus clientes a navegar tu catálogo.</p>
+          <p className="text-muted-foreground">Configura el comportamiento y diseño del chatbot de tu catálogo.</p>
         </div>
         <div className="flex gap-2">
-            <Button onClick={handleSaveConfig} disabled={isSaving} className="font-bold px-8 shadow-lg">
+            <Button onClick={handleSaveConfig} disabled={isSaving || !isGlobalActive} className="font-bold px-8 shadow-lg">
                 {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
                 Guardar Cambios
             </Button>
@@ -245,6 +273,7 @@ export default function ChatbotMenuConfigPage() {
                       placeholder="Ej: Max, tu asistente" 
                       value={localConfig.assistantName} 
                       onChange={e => setLocalConfig({...localConfig, assistantName: e.target.value})}
+                      disabled={!isGlobalActive}
                     />
                   </div>
                   <div className="space-y-2">
@@ -253,6 +282,7 @@ export default function ChatbotMenuConfigPage() {
                       placeholder="¡Hola! ¿En qué puedo ayudarte?" 
                       value={localConfig.greetingMessage} 
                       onChange={e => setLocalConfig({...localConfig, greetingMessage: e.target.value})}
+                      disabled={!isGlobalActive}
                     />
                   </div>
                 </div>
@@ -263,22 +293,22 @@ export default function ChatbotMenuConfigPage() {
                   <div className="space-y-2">
                     <Label>Color de Cabecera</Label>
                     <div className="flex items-center gap-2">
-                      <Input type="color" value={localConfig.headerColor} onChange={e => setLocalConfig({...localConfig, headerColor: e.target.value})} className="w-12 h-10 p-1 cursor-pointer" />
-                      <Input value={localConfig.headerColor.toUpperCase()} onChange={e => setLocalConfig({...localConfig, headerColor: e.target.value})} className="font-mono text-xs" />
+                      <Input type="color" value={localConfig.headerColor} onChange={e => setLocalConfig({...localConfig, headerColor: e.target.value})} className="w-12 h-10 p-1 cursor-pointer" disabled={!isGlobalActive} />
+                      <Input value={localConfig.headerColor.toUpperCase()} onChange={e => setLocalConfig({...localConfig, headerColor: e.target.value})} className="font-mono text-xs" disabled={!isGlobalActive} />
                     </div>
                   </div>
                   <div className="space-y-2">
                     <Label>Color de Botones</Label>
                     <div className="flex items-center gap-2">
-                      <Input type="color" value={localConfig.buttonColor} onChange={e => setLocalConfig({...localConfig, buttonColor: e.target.value})} className="w-12 h-10 p-1 cursor-pointer" />
-                      <Input value={localConfig.buttonColor.toUpperCase()} onChange={e => setLocalConfig({...localConfig, buttonColor: e.target.value})} className="font-mono text-xs" />
+                      <Input type="color" value={localConfig.buttonColor} onChange={e => setLocalConfig({...localConfig, buttonColor: e.target.value})} className="w-12 h-10 p-1 cursor-pointer" disabled={!isGlobalActive} />
+                      <Input value={localConfig.buttonColor.toUpperCase()} onChange={e => setLocalConfig({...localConfig, buttonColor: e.target.value})} className="font-mono text-xs" disabled={!isGlobalActive} />
                     </div>
                   </div>
                   <div className="space-y-2">
                     <Label>Color de Fondo Chat</Label>
                     <div className="flex items-center gap-2">
-                      <Input type="color" value={localConfig.secondaryColor} onChange={e => setLocalConfig({...localConfig, secondaryColor: e.target.value})} className="w-12 h-10 p-1 cursor-pointer" />
-                      <Input value={localConfig.secondaryColor.toUpperCase()} onChange={e => setLocalConfig({...localConfig, secondaryColor: e.target.value})} className="font-mono text-xs" />
+                      <Input type="color" value={localConfig.secondaryColor} onChange={e => setLocalConfig({...localConfig, secondaryColor: e.target.value})} className="w-12 h-10 p-1 cursor-pointer" disabled={!isGlobalActive} />
+                      <Input value={localConfig.secondaryColor.toUpperCase()} onChange={e => setLocalConfig({...localConfig, secondaryColor: e.target.value})} className="font-mono text-xs" disabled={!isGlobalActive} />
                     </div>
                   </div>
                 </div>
@@ -286,23 +316,27 @@ export default function ChatbotMenuConfigPage() {
             </Card>
 
             <Card>
-              <CardHeader><CardTitle className="text-lg">Recursos Visuales</CardTitle></CardHeader>
+              <CardHeader><CardTitle className="text-lg">Avatar</CardTitle></CardHeader>
               <CardContent className="space-y-6">
-                <div className="space-y-4">
-                  <Label>Avatar del Bot</Label>
-                  <div className="flex flex-col items-center gap-3">
+                <div className="flex flex-col items-center gap-3">
                     <div className="relative w-24 h-24 rounded-full border-4 border-muted overflow-hidden bg-muted flex items-center justify-center group">
                       {localConfig.avatarUrl ? (
                         <>
                           <Image src={localConfig.avatarUrl} alt="Avatar" fill className="object-cover" />
-                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                            <Button variant="ghost" size="icon" className="text-white" onClick={() => document.getElementById('avatar-upload')?.click()}><Pencil className="h-4 w-4" /></Button>
-                          </div>
+                          {isGlobalActive && (
+                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                                <Button variant="ghost" size="icon" className="text-white" onClick={() => document.getElementById('avatar-upload')?.click()}><Pencil className="h-4 w-4" /></Button>
+                            </div>
+                          )}
                         </>
                       ) : <Bot className="h-10 w-10 text-muted-foreground" />}
                     </div>
-                    <input type="file" id="avatar-upload" className="hidden" accept="image/*" onChange={e => handleUploadImage(e, 'avatarUrl')} />
-                  </div>
+                    {isGlobalActive && (
+                        <>
+                            <input type="file" id="avatar-upload" className="hidden" accept="image/*" onChange={e => handleUploadImage(e, 'avatarUrl')} />
+                            <Button variant="outline" size="sm" onClick={() => document.getElementById('avatar-upload')?.click()}>Cambiar Imagen</Button>
+                        </>
+                    )}
                 </div>
               </CardContent>
             </Card>
@@ -314,9 +348,9 @@ export default function ChatbotMenuConfigPage() {
             <CardHeader className="flex flex-row justify-between items-center bg-muted/20">
               <div>
                 <CardTitle className="text-lg">Respuestas Predeterminadas</CardTitle>
-                <CardDescription>Configura respuestas fijas para preguntas frecuentes. Tienen prioridad sobre la IA.</CardDescription>
+                <CardDescription>Tienen prioridad sobre la IA para preguntas exactas.</CardDescription>
               </div>
-              <Button onClick={() => handleOpenResponseDialog()} className="font-bold">
+              <Button onClick={() => handleOpenResponseDialog()} disabled={!isGlobalActive} className="font-bold">
                 <Plus className="mr-2 h-4 w-4" /> Nueva Respuesta
               </Button>
             </CardHeader>
@@ -335,7 +369,7 @@ export default function ChatbotMenuConfigPage() {
                 <Table>
                   <TableHeader className="bg-muted/50">
                     <TableRow>
-                      <TableHead>Pregunta / Trigger</TableHead>
+                      <TableHead>Trigger (Pregunta)</TableHead>
                       <TableHead>Respuesta</TableHead>
                       <TableHead className="text-center">Estado</TableHead>
                       <TableHead className="text-right">Acciones</TableHead>
@@ -350,14 +384,14 @@ export default function ChatbotMenuConfigPage() {
                           <Badge variant={res.isActive ? 'default' : 'secondary'}>{res.isActive ? 'Activo' : 'Inactivo'}</Badge>
                         </TableCell>
                         <TableCell className="text-right space-x-1">
-                          <Button variant="ghost" size="icon" onClick={() => handleOpenResponseDialog(res)}><Pencil className="h-4 w-4" /></Button>
-                          <Button variant="ghost" size="icon" className="text-destructive" onClick={() => handleDeleteResponse(res.id)}><Trash2 className="h-4 w-4" /></Button>
+                          <Button variant="ghost" size="icon" onClick={() => handleOpenResponseDialog(res)} disabled={!isGlobalActive}><Pencil className="h-4 w-4" /></Button>
+                          <Button variant="ghost" size="icon" className="text-destructive" onClick={() => handleDeleteResponse(res.id)} disabled={!isGlobalActive}><Trash2 className="h-4 w-4" /></Button>
                         </TableCell>
                       </TableRow>
                     )) : (
                       <TableRow>
                         <TableCell colSpan={4} className="h-32 text-center text-muted-foreground italic">
-                          No se encontraron respuestas que coincidan.
+                          No se encontraron respuestas.
                         </TableCell>
                       </TableRow>
                     )}
@@ -369,46 +403,45 @@ export default function ChatbotMenuConfigPage() {
         </TabsContent>
 
         <TabsContent value="conocimiento" className="space-y-6 pt-2">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader className="flex flex-row items-center gap-3">
-                <Building2 className="h-5 w-5 text-primary" />
-                <CardTitle className="text-lg">Datos Maestros del Negocio</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="p-4 bg-muted/30 rounded-xl space-y-3">
-                  <div className="grid grid-cols-2 gap-2 text-sm">
-                    <span className="text-muted-foreground">Nombre:</span>
-                    <span className="font-bold">{business?.name}</span>
-                    <span className="text-muted-foreground">Teléfono:</span>
-                    <span className="font-bold">{business?.phone || 'N/A'}</span>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3 p-3 bg-blue-50 border border-blue-100 rounded-xl text-xs text-blue-700">
-                  <Info className="h-4 w-4 shrink-0 mt-0.5" />
-                  <p>Esta información se sincroniza automáticamente desde <strong>Perfil del Negocio</strong>.</p>
-                </div>
-              </CardContent>
-            </Card>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <Card>
+                    <CardHeader className="flex flex-row items-center gap-3">
+                        <Building2 className="h-5 w-5 text-primary" />
+                        <CardTitle className="text-lg">Información del Negocio</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <div className="p-4 bg-muted/30 rounded-xl space-y-2 text-sm">
+                            <p><span className="text-muted-foreground font-bold mr-2 uppercase text-[10px]">Nombre:</span> {business?.name}</p>
+                            <p><span className="text-muted-foreground font-bold mr-2 uppercase text-[10px]">Teléfono:</span> {business?.phone || 'N/A'}</p>
+                            <p><span className="text-muted-foreground font-bold mr-2 uppercase text-[10px]">Categoría:</span> {business?.category || 'General'}</p>
+                        </div>
+                        <div className="flex items-start gap-3 p-3 bg-blue-50 border border-blue-100 rounded-xl text-xs text-blue-700">
+                            <Info className="h-4 w-4 shrink-0 mt-0.5" />
+                            <p>Sincronizado desde el Perfil del Negocio.</p>
+                        </div>
+                    </CardContent>
+                </Card>
 
-            <Card>
-              <CardHeader className="flex flex-row items-center gap-3">
-                <LayoutGrid className="h-5 w-5 text-primary" />
-                <CardTitle className="text-lg">Inventario y Catálogo</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="p-4 bg-primary/5 border border-primary/10 rounded-xl text-center">
-                    <p className="text-2xl font-black text-primary">{catalog?.products?.length || 0}</p>
-                    <p className="text-[10px] uppercase font-bold text-muted-foreground">Productos Activos</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+                <Card>
+                    <CardHeader className="flex flex-row items-center gap-3">
+                        <MessageSquare className="h-5 w-5 text-primary" />
+                        <CardTitle className="text-lg">Catálogo Sincronizado</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <div className="p-4 bg-primary/5 border border-primary/10 rounded-xl text-center">
+                            <p className="text-3xl font-black text-primary">{catalog?.products?.length || 0}</p>
+                            <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest">Productos en Memoria</p>
+                        </div>
+                        <div className="flex items-start gap-3 p-3 bg-green-50 border border-green-100 rounded-xl text-xs text-green-700">
+                          <Info className="h-4 w-4 shrink-0 mt-0.5" />
+                          <p>La IA conoce tus precios y categorías actuales. Cualquier cambio en tu catálogo se refleja inmediatamente en sus respuestas.</p>
+                        </div>
+                    </CardContent>
+                </Card>
+            </div>
         </TabsContent>
 
-        <TabsContent value="preview" className="pt-2 h-[650px] relative">
+        <TabsContent value="preview" className="pt-2 h-[550px] relative">
           <div className="absolute inset-0 bg-slate-100 rounded-2xl flex items-center justify-center overflow-hidden border-4 border-white shadow-inner">
              {user?.uid && <PublicMenuChatWidget businessId={user.uid} isPreview={true} />}
           </div>
@@ -416,16 +449,17 @@ export default function ChatbotMenuConfigPage() {
 
         <TabsContent value="activacion" className="space-y-6 pt-2">
           <Card className="max-w-2xl">
-            <CardHeader><CardTitle>Estatus del Módulo</CardTitle><CardDescription>Controla cuándo y dónde aparece el asistente.</CardDescription></CardHeader>
+            <CardHeader><CardTitle>Activación del Asistente</CardTitle></CardHeader>
             <CardContent className="space-y-6">
               <div className="flex items-center justify-between p-6 bg-primary/5 rounded-2xl border-2 border-primary/20">
                 <div className="space-y-1">
-                  <Label className="text-lg font-black text-primary">Chatbot Público Activo</Label>
-                  <p className="text-sm text-muted-foreground">Al activar, los visitantes del catálogo verán la burbuja de chat.</p>
+                  <Label className="text-lg font-black text-primary">Chatbot Público Visible</Label>
+                  <p className="text-sm text-muted-foreground">Al activar, el botón de chat aparecerá en tu catálogo.</p>
                 </div>
                 <Switch 
                   checked={localConfig.isActive} 
                   onCheckedChange={v => setLocalConfig({...localConfig, isActive: v})} 
+                  disabled={!isGlobalActive}
                   className="scale-125"
                 />
               </div>
@@ -436,6 +470,7 @@ export default function ChatbotMenuConfigPage() {
                   <Select 
                     value={localConfig.position} 
                     onValueChange={(v: any) => setLocalConfig({...localConfig, position: v})}
+                    disabled={!isGlobalActive}
                   >
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
@@ -449,9 +484,9 @@ export default function ChatbotMenuConfigPage() {
                   <Input 
                     type="number" 
                     min={0} 
-                    max={60} 
                     value={localConfig.autoOpenDelay} 
                     onChange={e => setLocalConfig({...localConfig, autoOpenDelay: Number(e.target.value)})} 
+                    disabled={!isGlobalActive}
                   />
                 </div>
               </div>
@@ -464,37 +499,32 @@ export default function ChatbotMenuConfigPage() {
       <Dialog open={isResponseModalOpen} onOpenChange={setIsResponseModalOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>{editingResponse ? 'Editar Respuesta' : 'Nueva Respuesta Automática'}</DialogTitle>
-            <DialogDescription>Define una pregunta exacta y la respuesta que el bot debe dar.</DialogDescription>
+            <DialogTitle>{editingResponse ? 'Editar Respuesta' : 'Nueva Respuesta'}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label>Pregunta del Cliente (Trigger)</Label>
+              <Label>Pregunta exacta (Trigger)</Label>
               <Input 
-                placeholder="¿Hacen domicilios?" 
+                placeholder="¿Tienen envíos gratis?" 
                 value={respForm.question} 
                 onChange={e => setRespForm({...respForm, question: e.target.value})} 
               />
             </div>
             <div className="space-y-2">
-              <Label>Tu Respuesta</Label>
+              <Label>Respuesta del Bot</Label>
               <Textarea 
-                placeholder="¡Claro! Hacemos domicilios en toda la ciudad..." 
+                placeholder="Sí, en compras mayores a..." 
                 value={respForm.answer} 
                 onChange={e => setRespForm({...respForm, answer: e.target.value})} 
                 rows={4}
               />
-            </div>
-            <div className="flex items-center gap-2">
-              <Switch checked={respForm.isActive} onCheckedChange={v => setRespForm({...respForm, isActive: v})} />
-              <Label>Respuesta Activa</Label>
             </div>
           </div>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setIsResponseModalOpen(false)}>Cancelar</Button>
             <Button onClick={handleSaveResponse} disabled={isSaving}>
               {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-              Guardar Respuesta
+              Guardar
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -60,7 +60,7 @@ const DEFAULT_MODULES = [
   { name: 'Chatbot de Soporte WhatsApp', description: 'Asistente IA para atención al cliente integrado con WhatsApp API.', limit: -1, idOverride: 'chatbot-integrado-con-whatsapp-para-soporte-y-ventas' },
   { name: 'Google Analytics', description: 'Integración de métricas avanzadas para la landing page.', limit: -1, idOverride: 'google-analytics' },
   { name: 'Directorio de Negocios', description: 'Módulo para listar el negocio en el directorio público de la plataforma.', limit: -1, idOverride: 'business-directory' },
-  { name: 'Chatbot Menú Público', description: 'Asistente IA que responde dudas en el catálogo público basándose en el menú y promos.', limit: -1, idOverride: 'public-menu-chatbot' },
+  { name: 'Chatbot Menú Público', description: 'Asistente virtual para el menú público que responde preguntas de los visitantes sobre productos, precios, horarios y promociones del negocio.', limit: -1, idOverride: 'publicMenuChatbot' },
 ];
 
 export default function ModulesPage() {
@@ -91,7 +91,7 @@ export default function ModulesPage() {
           name: m.name,
           description: m.description,
           limit: m.limit,
-          status: 'active',
+          status: 'inactive', // Se crean inactivos para control del admin
           createdAt: new Date().toISOString(),
         });
       });
@@ -249,6 +249,7 @@ export default function ModulesPage() {
             </CardHeader>
             <CardContent className="flex-1">
               <p className="text-sm text-muted-foreground">{module.description}</p>
+              <p className="text-[10px] font-mono text-muted-foreground mt-2 uppercase tracking-tighter">ID: {module.id}</p>
             </CardContent>
             <CardFooter className="border-t bg-muted/10 p-4 flex justify-between items-center">
               <div className="flex items-center gap-2">
@@ -256,7 +257,7 @@ export default function ModulesPage() {
                   checked={module.status === 'active'} 
                   onCheckedChange={() => handleToggleStatus(module)} 
                 />
-                <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Estado</span>
+                <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Estado Global</span>
               </div>
               <div className="text-right">
                  <span className="text-[10px] text-muted-foreground uppercase font-bold">Límite base</span>
