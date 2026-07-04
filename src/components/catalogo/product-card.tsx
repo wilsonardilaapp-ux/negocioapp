@@ -5,7 +5,7 @@ import Image from 'next/image';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Star } from 'lucide-react';
 import type { Product } from '@/models/product';
-import { cn } from '@/lib/utils';
+import { cn, stripHtml } from '@/lib/utils';
 
 interface ProductCardProps {
     product: Product;
@@ -66,6 +66,13 @@ export default function ProductCard({ product, children }: ProductCardProps) {
             )}
             <CardContent className="p-4 flex-grow">
                 <CardTitle className="h-[2.8rem] text-base font-semibold leading-snug overflow-hidden [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical] mb-1">{product.name}</CardTitle>
+                
+                {product.description && (
+                    <p className="text-sm text-muted-foreground line-clamp-2 mb-2">
+                        {stripHtml(product.description)}
+                    </p>
+                )}
+
                 <div className="flex items-center gap-1 text-sm text-muted-foreground mb-2">
                     {product.ratingCount > 0 ? (
                         <>

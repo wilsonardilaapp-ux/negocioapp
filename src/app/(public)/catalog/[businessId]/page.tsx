@@ -28,7 +28,7 @@ import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Star, Loader2, PackageSearch, Tag, ShoppingCart, Image as ImageIcon, ChevronLeft, ChevronRight, Search, SortDesc, MapPin } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, stripHtml } from '@/lib/utils';
 import type { Product } from '@/models/product';
 import type { LandingHeaderConfigData, LandingPageData } from '@/models/landing-page';
 import { WhatsAppIcon, FacebookIcon, InstagramIcon, TikTokIcon, YoutubeIcon, XIcon } from '@/components/icons';
@@ -143,6 +143,13 @@ const PublicProductCard = ({ product, onOpenModal, activePromotions }: { product
             )}
             <CardContent className="p-4 flex-grow">
                 <CardTitle className="text-sm font-bold h-10 overflow-hidden text-gray-900 group-hover:text-primary transition-colors leading-tight mb-2">{product.name}</CardTitle>
+                
+                {product.description && (
+                    <p className="text-xs text-muted-foreground line-clamp-2 mb-2">
+                        {stripHtml(product.description)}
+                    </p>
+                )}
+
                  <div className="flex items-center gap-1 text-[11px] text-muted-foreground mb-3">
                     {product.ratingCount > 0 ? (
                         <>
