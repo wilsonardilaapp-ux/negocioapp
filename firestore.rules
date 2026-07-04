@@ -66,6 +66,14 @@ service cloud.firestore {
       allow write: if isSuperAdmin() || isOwner(request.resource.data.businessId || resource.data.businessId);
     }
 
+    // Colecciones Globales de Configuración (Lectura pública para validación de módulos en landing)
+    match /modules/{moduleId} {
+      allow read: if true;
+    }
+    match /systemServices/{serviceId} {
+      allow read: if true;
+    }
+
     // --- PROGRAMA DE SOCIOS (REFERIDOS) ---
 
     match /referrals/{id} {
@@ -141,6 +149,22 @@ service cloud.firestore {
       }
 
       match /productAlerts/{alertId} {
+        allow read, write: if isSuperAdmin() || isBusinessMember(businessId);
+      }
+
+      // --- REGLAS PARA EL CHATBOT DEL MENÚ PÚBLICO ---
+      match /publicMenuChatbot/config {
+        allow read: if true; // Lectura pública necesaria para el widget
+        allow write: if isSuperAdmin() || isBusinessMember(businessId);
+      }
+
+      match /publicMenuChatbot/responses/{responseId} {
+        allow read: if true; // Lectura pública necesaria para las respuestas automáticas
+        allow write: if isSuperAdmin() || isBusinessMember(businessId);
+      }
+
+      match /publicMenuChatbot/conversations/{convId} {
+        allow create: if true; // El público puede iniciar conversaciones
         allow read, write: if isSuperAdmin() || isBusinessMember(businessId);
       }
 
