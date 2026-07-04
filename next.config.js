@@ -13,7 +13,9 @@ const nextConfig = {
         '@firebase/firestore',
         '@firebase/functions',
         '@firebase/storage',
-        '@firebase/util'
+        '@firebase/util',
+        'react-quill',
+        'quill'
     ],
     experimental: {
         serverComponentsExternalPackages: [

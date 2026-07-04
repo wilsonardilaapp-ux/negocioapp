@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useMemo, useState, useEffect } from 'react';
@@ -6,9 +7,9 @@ import { uploadMedia } from '@/ai/flows/upload-media-flow';
 import { useToast } from '@/hooks/use-toast';
 import 'quill/dist/quill.snow.css';
 
-// Importación dinámica robusta para evitar errores de carga de chunks en entornos de red específicos
+// Importación dinámica robusta para evitar errores de carga de chunks
 const QuillEditor = dynamic(
-  () => import('react-quill').then((mod) => mod.default),
+  () => import('react-quill'),
   {
     ssr: false,
     loading: () => <div className="h-[200px] w-full animate-pulse rounded-md bg-muted" />,
