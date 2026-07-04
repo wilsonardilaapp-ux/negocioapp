@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { useUser, useFirestore, useDoc, useMemoFirebase, setDocumentNonBlocking, addDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase';
-import { doc, collection, query, orderBy, serverTimestamp, deleteDoc } from 'firebase/firestore';
+import { useUser, useFirestore, useDoc, useMemoFirebase, setDocumentNonBlocking, addDocumentNonBlocking } from '@/firebase';
+import { doc, collection, query, orderBy, deleteDoc } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
@@ -12,6 +12,13 @@ import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
+import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
+} from '@/components/ui/select';
 import { 
   Dialog, 
   DialogContent, 
@@ -214,10 +221,12 @@ export default function ChatbotMenuConfigPage() {
           </h1>
           <p className="text-muted-foreground">Personaliza el chatbot que ayuda a tus clientes a navegar tu catálogo.</p>
         </div>
-        <Button onClick={handleSaveConfig} disabled={isSaving} className="font-bold px-8 shadow-lg">
-          {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-          Guardar Cambios
-        </Button>
+        <div className="flex gap-2">
+            <Button onClick={handleSaveConfig} disabled={isSaving} className="font-bold px-8 shadow-lg">
+                {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                Guardar Cambios
+            </Button>
+        </div>
       </header>
 
       <Tabs defaultValue="apariencia" className="w-full">
@@ -229,9 +238,6 @@ export default function ChatbotMenuConfigPage() {
           <TabsTrigger value="activacion" className="gap-2 rounded-lg"><Bot className="h-4 w-4" /> Activación</TabsTrigger>
         </TabsList>
 
-        {/* --- TABS CONTENT --- */}
-
-        {/* 1. APARIENCIA */}
         <TabsContent value="apariencia" className="space-y-6 pt-2">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <Card className="lg:col-span-2">
@@ -324,7 +330,6 @@ export default function ChatbotMenuConfigPage() {
           </div>
         </TabsContent>
 
-        {/* 2. RESPUESTAS AUTOMÁTICAS */}
         <TabsContent value="automatizacion" className="space-y-6 pt-2">
           <Card>
             <CardHeader className="flex flex-row justify-between items-center bg-muted/20">
@@ -384,7 +389,6 @@ export default function ChatbotMenuConfigPage() {
           </Card>
         </TabsContent>
 
-        {/* 3. CONOCIMIENTO DEL NEGOCIO */}
         <TabsContent value="conocimiento" className="space-y-6 pt-2">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <Card>
@@ -441,7 +445,6 @@ export default function ChatbotMenuConfigPage() {
           </div>
         </TabsContent>
 
-        {/* 4. VISTA PREVIA */}
         <TabsContent value="preview" className="pt-2 h-[650px] relative">
           <div className="absolute inset-0 bg-slate-100 rounded-2xl flex items-center justify-center overflow-hidden border-4 border-white shadow-inner">
              <div className="text-center max-w-sm px-6">
@@ -449,12 +452,10 @@ export default function ChatbotMenuConfigPage() {
                 <h3 className="text-xl font-bold text-gray-400 uppercase tracking-widest mb-2">Modo Simulador</h3>
                 <p className="text-gray-400 text-sm mb-8">Usa el widget de la derecha para probar respuestas manuales y de IA basadas en tu configuración actual.</p>
              </div>
-             {/* El widget se renderiza aquí mismo */}
              {user?.uid && <PublicMenuChatWidget businessId={user.uid} isPreview={true} />}
           </div>
         </TabsContent>
 
-        {/* 5. ACTIVACIÓN */}
         <TabsContent value="activacion" className="space-y-6 pt-2">
           <Card className="max-w-2xl">
             <CardHeader><CardTitle>Estatus del Módulo</CardTitle><CardDescription>Controla cuándo y dónde aparece el asistente.</CardDescription></CardHeader>
@@ -538,7 +539,7 @@ export default function ChatbotMenuConfigPage() {
           <DialogFooter>
             <Button variant="ghost" onClick={() => setIsResponseModalOpen(false)}>Cancelar</Button>
             <Button onClick={handleSaveResponse} disabled={isSaving}>
-              {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
               Guardar Respuesta
             </Button>
           </DialogFooter>
