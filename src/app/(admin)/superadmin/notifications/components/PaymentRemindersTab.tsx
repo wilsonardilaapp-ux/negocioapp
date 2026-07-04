@@ -1,18 +1,17 @@
-
 'use client';
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { useAllSubscriptions, type ClientWithSubscription } from '../../subscriptions/hooks/useAllSubscriptions';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, AlertCircle, Send, BellRing, PlusCircle, Trash2, CalendarIcon } from 'lucide-react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from '@/components/ui/dialog';
+import { Loader2, BellRing, PlusCircle, Trash2, CalendarIcon } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { useUser, useFirestore, useMemoFirebase, useCollection, useDoc, addDocumentNonBlocking, updateDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase';
-import { doc, collection, collectionGroup, writeBatch, setDoc, orderBy, type Timestamp } from 'firebase/firestore';
+import { useUser, useFirestore, useMemoFirebase, useCollection, useDoc, deleteDocumentNonBlocking } from '@/firebase';
+import { doc, collection, collectionGroup, writeBatch, type Timestamp } from 'firebase/firestore';
 import { sendAdminNotification } from '@/actions/notifications';
 import { format, differenceInDays } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -24,7 +23,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { cn } from '@/lib/utils';
+import { cn, normalizePhoneNumber } from '@/lib/utils';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Calendar } from '@/components/ui/calendar';
 import type { SubscriptionPlan } from '@/models/subscription-plan';
@@ -285,7 +284,7 @@ const ScheduleReminderModal = ({
                                 <AlertDialogTitle>¿Confirmar cancelación?</AlertDialogTitle>
                                 <AlertDialogDescription>
                                   Esta acción eliminará permanentemente la notificación programada. No se puede deshacer.
-                                </AlertDialogDescription>
+                                </AccordionDescription>
                               </AlertDialogHeader>
                               <AlertDialogFooter>
                                 <AlertDialogCancel>Cerrar</AlertDialogCancel>
@@ -450,7 +449,8 @@ El equipo de Zentry`
             toast({ variant: 'destructive', title: 'Número de WhatsApp no encontrado.' });
             return;
         }
-        const whatsappUrl = `https://wa.me/${whatsappNumber.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`;
+        const cleanPhone = normalizePhoneNumber(whatsappNumber);
+        const whatsappUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
         window.open(whatsappUrl, '_blank');
         onClose();
     };
@@ -612,7 +612,8 @@ export default function PaymentRemindersTab() {
                         }
                         if (reminder.channel === 'whatsapp' || reminder.channel === 'both') {
                             if (client.phone) {
-                              const whatsappUrl = `https://wa.me/${client.phone.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`;
+                              const cleanPhone = normalizePhoneNumber(client.phone);
+                              const whatsappUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
                               window.open(whatsappUrl, `_blank_wa_${reminder.id}`);
                             } else {
                               console.warn(`Recordatorio ${reminder.id} para ${client.name} no enviado a WhatsApp por falta de número.`);

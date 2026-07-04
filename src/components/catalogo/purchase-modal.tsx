@@ -15,7 +15,7 @@ import type { PaymentSettings } from '@/models/payment-settings';
 import type { TipoEntrega } from '@/models/order';
 import { useFirestore, addDocumentNonBlocking } from '@/firebase';
 import { collection } from 'firebase/firestore';
-import { cn } from '@/lib/utils';
+import { cn, normalizePhoneNumber } from '@/lib/utils';
 import type { LandingHeaderConfigData } from '@/models/landing-page';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { promotionService } from '@/services/promotion-service';
@@ -178,9 +178,8 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
     
     orderSummary += `${separator}\n💵 *TOTAL: ${formatCurrency(total)}*\n💳 Pago: ${selectedPaymentMethod}`;
 
-    const rawPhone = String(businessInfo?.phone || '3228831634');
-    const cleanPhone = rawPhone.replace(/\D/g, '');
-    window.open(`https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(orderSummary)}`, '_blank');
+    const cleanPhone = normalizePhoneNumber(businessInfo?.phone || '3228831634');
+    window.open(`https://wa.me/${cleanPhone}?text=${encodeURIComponent(orderSummary)}`, '_blank');
     
     onClearCart();
     onOpenChange(false);

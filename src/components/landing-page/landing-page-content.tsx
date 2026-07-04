@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { MessageCircle, Phone, Mail, Clock, MapPin, Youtube, Linkedin, Star, Loader2, Check, Menu } from 'lucide-react';
 import { PublicContactForm } from './public-contact-form';
 import { TikTokIcon, WhatsAppIcon, XIcon, FacebookIcon, InstagramIcon, YoutubeIcon } from '@/components/icons';
-import { cn } from '@/lib/utils';
+import { cn, normalizePhoneNumber } from '@/lib/utils';
 import Image from 'next/image';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
 import Autoplay from "embla-carousel-autoplay";
@@ -426,13 +426,7 @@ export default function LandingPageContent({ data, plans = [], hybridPlans = [],
     </section>
   );
 
-  // Helper para limpiar números de teléfono de forma segura
-  const cleanPhoneString = (val: string | undefined | null) => {
-    if (!val) return '';
-    return String(val).replace(/\D/g, '').trim();
-  };
-
-  const whatsappFloatingNumber = cleanPhoneString(data.header?.socialLinks?.whatsapp || footer.contactInfo.phone || '3228831634');
+  const whatsappFloatingNumber = normalizePhoneNumber(data.header?.socialLinks?.whatsapp || footer.contactInfo.phone || '3228831634');
 
   return (
     <div className="flex flex-col">
@@ -725,9 +719,9 @@ export default function LandingPageContent({ data, plans = [], hybridPlans = [],
         </footer>
       )}
 
-      {/* Botón flotante de WhatsApp con número sanitizado estrictamente */}
+      {/* Botón flotante de WhatsApp con número normalizado */}
       <a 
-        href={`https://api.whatsapp.com/send?phone=${whatsappFloatingNumber}`} 
+        href={`https://wa.me/${whatsappFloatingNumber}`} 
         target="_blank" 
         rel="noopener noreferrer"
         className="fixed bottom-8 right-8 z-50 bg-[#25D366] text-white p-4 rounded-full shadow-2xl hover:scale-110 transition-transform flex items-center justify-center"

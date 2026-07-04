@@ -14,14 +14,13 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Loader2, Save, Wifi, WifiOff, UploadCloud, FileText, Trash2, CheckCircle, AlertTriangle, MessageSquare, BadgePercent, Smile, Frown } from "lucide-react";
 import Image from "next/image";
 import { useToast } from "@/hooks/use-toast";
-import { useUser, useFirestore, useDoc, useCollection, useMemoFirebase, setDocumentNonBlocking, addDocumentNonBlocking, deleteDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase";
-import { doc, collection, query, orderBy, limit, getDoc, setDoc } from 'firebase/firestore';
+import { useUser, useFirestore, useDoc, useCollection, useMemoFirebase, setDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase";
+import { doc, collection, query, orderBy, limit, setDoc } from 'firebase/firestore';
 import type { ChatbotConfig, KnowledgeDocument } from '@/models/chatbot-config';
 import { uploadMedia } from '@/ai/flows/upload-media-flow';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
-import { BarChart, Bar, LineChart, Line, CartesianGrid, XAxis, YAxis } from "recharts";
+import { LineChart, Line, CartesianGrid, XAxis, YAxis } from "recharts";
 import type { ChatConversation } from "@/models/chatbot-config";
-import type { Integration, CloudinaryFields } from "@/models/integration";
 import { extractTextFromPDF } from '@/actions/extract-pdf-text';
 import { useSubscription } from "@/hooks/useSubscription";
 import {
@@ -33,6 +32,7 @@ import {
   DialogTrigger,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { normalizePhoneNumber } from "@/lib/utils";
 
 const initialChatbotConfig: Partial<ChatbotConfig> = {
   whatsApp: {
@@ -461,6 +461,7 @@ export default function ChatbotPage() {
     const { isModuleAuthorized, isLoading: isSubLoading } = useSubscription();
     const [isVerifying, setIsVerifying] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
+    const [countryCode, setCountryCode] = useState('57');
     
     const configDocRef = useMemoFirebase(() => {
         if (!user || !firestore) return null;
@@ -488,6 +489,11 @@ export default function ChatbotPage() {
                 businessId: config.businessId ?? user.uid
             };
             reset(safeConfig);
+            
+            // Intentar extraer el código de país si el número ya está normalizado
+            if (config.whatsApp?.number?.startsWith('57') && config.whatsApp.number.length > 10) {
+              setCountryCode('57');
+            }
         } else if (user) {
             reset({ ...initialChatbotConfig, businessId: user.uid, id: 'main' });
         }
@@ -500,13 +506,27 @@ export default function ChatbotPage() {
         if (!configDocRef || !user || !firestore) return;
         const currentData = getValues();
         
+        // Normalización estricta del número de WhatsApp
+        if (currentData.whatsApp && currentData.whatsApp.number) {
+            const rawNumber = currentData.whatsApp.number;
+            const cleanedDigits = rawNumber.replace(/\D/g, '');
+            
+            // Si tiene 10 dígitos (formato local COL), le pegamos el código seleccionado
+            if (cleanedDigits.length === 10) {
+              currentData.whatsApp.number = countryCode + cleanedDigits;
+            } else {
+              // Si ya tiene más de 10, asumimos que ya incluye algún código y solo limpiamos caracteres
+              currentData.whatsApp.number = cleanedDigits;
+            }
+        }
+        
         setIsSaving(true);
         try {
-            setDocumentNonBlocking(configDocRef, {
+            await setDoc(configDocRef, {
                 ...currentData,
                 id: 'main',
                 businessId: user!.uid
-            });
+            }, { merge: true });
 
             const landingPageDocRef = doc(firestore, 'businesses', user.uid, 'landingPages', 'main');
             const publicChatbotData = {
@@ -515,14 +535,14 @@ export default function ChatbotPage() {
                     avatarUrl: currentData.business?.avatarUrl || ''
                 }
             };
-            setDocumentNonBlocking(landingPageDocRef, publicChatbotData, { merge: true });
-            
-            await new Promise(resolve => setTimeout(resolve, 500));
+            await setDoc(landingPageDocRef, publicChatbotData, { merge: true });
             
             toast({
                 title: "Configuración Guardada",
-                description: "Los cambios en tu asistente han sido guardados.",
+                description: `Los cambios se han guardado. Número normalizado: ${currentData.whatsApp.number}`,
             });
+            
+            reset(currentData);
         } catch (error) {
             console.error('❌ Error al guardar:', error);
             toast({
@@ -548,7 +568,7 @@ export default function ChatbotPage() {
                 businessId: user.uid,
                 whatsApp: {
                     connected: false,
-                    number: '+573001234567',
+                    number: '573228831634',
                     token: 'test-token-123'
                 },
                 business: {
@@ -716,23 +736,43 @@ export default function ChatbotPage() {
                                      {isVerifying ? 'Verificando...' : 'Verificar Conexión'}
                                 </Button>
                             </div>
-                            <Controller
-                                name="whatsApp.number"
-                                control={control}
-                                render={({ field }) => (
-                                    <div className="space-y-2">
-                                        <Label htmlFor="whatsapp-number">Número de WhatsApp</Label>
-                                        <Input
-                                            id="whatsapp-number"
-                                            placeholder="+57 300 123 4567"
-                                            value={field.value || ''}
-                                            onChange={field.onChange}
-                                            onBlur={field.onBlur}
-                                            name={field.name}
-                                        />
-                                    </div>
-                                )}
-                            />
+                            
+                            <div className="space-y-2">
+                                <Label htmlFor="whatsapp-number">Número de WhatsApp</Label>
+                                <div className="flex gap-2">
+                                    <Select value={countryCode} onValueChange={setCountryCode}>
+                                        <SelectTrigger className="w-28">
+                                            <SelectValue placeholder="+57" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="57">🇨🇴 +57</SelectItem>
+                                            <SelectItem value="1">🇺🇸 +1</SelectItem>
+                                            <SelectItem value="52">🇲🇽 +52</SelectItem>
+                                            <SelectItem value="34">🇪🇸 +34</SelectItem>
+                                            <SelectItem value="54">🇦🇷 +54</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                    <Controller
+                                        name="whatsApp.number"
+                                        control={control}
+                                        render={({ field }) => (
+                                            <Input
+                                                id="whatsapp-number"
+                                                placeholder="300 123 4567"
+                                                className="flex-1"
+                                                value={field.value || ''}
+                                                onChange={field.onChange}
+                                                onBlur={field.onBlur}
+                                                name={field.name}
+                                            />
+                                        )}
+                                    />
+                                </div>
+                                <p className="text-[10px] text-muted-foreground mt-1 italic">
+                                    El sistema normalizará el número automáticamente al guardar (código + dígitos).
+                                </p>
+                            </div>
+
                             <Controller
                                 name="whatsApp.token"
                                 control={control}

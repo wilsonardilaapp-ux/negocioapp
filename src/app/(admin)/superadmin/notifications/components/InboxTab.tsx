@@ -34,6 +34,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { normalizePhoneNumber } from '@/lib/utils';
 
 // Main Component
 export default function InboxTab() {
@@ -183,8 +184,8 @@ export default function InboxTab() {
 
             // 4. Integración con WhatsApp si aplica
             if (selectedMessage.whatsapp && selectedMessage.whatsapp.trim() !== '') {
-                const whatsappNumber = selectedMessage.whatsapp.replace(/\D/g, '');
-                const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(replyBody)}`;
+                const cleanPhone = normalizePhoneNumber(selectedMessage.whatsapp);
+                const whatsappUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(replyBody)}`;
                 window.open(whatsappUrl, '_blank');
                 toast({ title: "Respuesta registrada", description: "Notificación enviada al panel y WhatsApp abierto." });
             } else {

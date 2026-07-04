@@ -7,18 +7,13 @@ import { Button } from '@/components/ui/button';
 import { 
     Star, 
     MapPin, 
-    Globe, 
     Phone, 
     Mail, 
     CheckCircle2, 
-    Instagram, 
-    Facebook,
     ArrowRight,
-    Youtube,
-    Twitter,
     MessageSquareQuote
 } from 'lucide-react';
-import { WhatsAppIcon, TikTokIcon, XIcon, FacebookIcon, InstagramIcon } from '@/components/icons';
+import { WhatsAppIcon, TikTokIcon, FacebookIcon, InstagramIcon } from '@/components/icons';
 import Link from 'next/link';
 import Image from 'next/image';
 import { notFound } from 'next/navigation';
@@ -29,7 +24,7 @@ import { BusinessRatingForm } from '@/components/directory/BusinessRatingForm';
 import type { DirectoryRating } from '@/models/directory-rating';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { cn } from "@/lib/utils";
+import { cn, normalizePhoneNumber } from "@/lib/utils";
 import BusinessCatalogQR from '@/components/directory/BusinessCatalogQR';
 
 export const dynamic = 'force-dynamic';
@@ -133,34 +128,23 @@ export default async function BusinessProfilePage({ params }: { params: { id: st
 
     if (!entry) notFound();
 
-    // FIX: Prioridad corregida. Negocio primero, plataforma como fallback.
     const faviconUrl = entry.faviconUrl || entry.logoURL || globalFavicon || null;
 
     const navigation = {
-        enabled: true,
         links: [
-            { id: '1', text: 'Sobre nosotros', url: '#', enabled: true, openInNewTab: false },
-            { id: '2', text: 'Catálogo', url: '#', enabled: true, openInNewTab: false },
-            { id: '3', text: 'Opiniones', url: '#ratings-section', enabled: true, openInNewTab: false },
-            { id: '4', text: 'Contacto', url: '#', enabled: true, openInNewTab: false },
+            { id: '1', text: 'Sobre nosotros', url: '#', enabled: true },
+            { id: '2', text: 'Catálogo', url: '#', enabled: true },
+            { id: '3', text: 'Opiniones', url: '#ratings-section', enabled: true },
+            { id: '4', text: 'Contacto', url: '#', enabled: true },
         ],
         logoUrl: entry.logoURL,
         businessName: entry.name,
-        logoAlt: entry.name,
-        logoWidth: 120,
-        logoAlignment: 'left' as const,
-        backgroundColor: '#FFFFFF',
-        textColor: '#000000',
-        hoverColor: '#4CAF50',
-        fontSize: 16,
-        spacing: 4,
-        useShadow: true,
     };
 
     return (
         <div className="min-h-screen bg-gray-50/30 flex flex-col">
             <FaviconInjector faviconUrl={faviconUrl} title={`${entry.name} | Directorio Markix`} />
-            <Header businessId={entry.id} navigation={navigation} />
+            <Header businessId={entry.id} navigation={navigation as any} />
             
             <main className="flex-grow">
                 <div className="bg-white border-b">
@@ -212,7 +196,7 @@ export default async function BusinessProfilePage({ params }: { params: { id: st
                                 <div className="flex flex-wrap gap-3 pt-4">
                                     {entry.phone && (
                                         <Button asChild className="gap-2 font-bold shadow-lg shadow-green-100 bg-[#25D366] hover:bg-[#128C7E] text-white border-none">
-                                            <a href={`https://wa.me/${entry.phone.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer">
+                                            <a href={`https://wa.me/${normalizePhoneNumber(entry.phone)}`} target="_blank" rel="noopener noreferrer">
                                                 <WhatsAppIcon className="h-5 w-5" /> WhatsApp
                                             </a>
                                         </Button>

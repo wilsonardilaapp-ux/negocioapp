@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -34,7 +33,7 @@ import type { Order } from '@/models/order';
 import type { GlobalPaymentConfig } from '@/models/global-payment-config';
 import { format, isSameMonth, parseISO, startOfMonth, setMonth, setYear } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { cn } from '@/lib/utils';
+import { cn, normalizePhoneNumber } from '@/lib/utils';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 
@@ -286,8 +285,8 @@ Aquí está tu resumen de facturación para el mes de *${currentMonthLabel} ${se
 
 Gracias por tu puntualidad! 🚀`;
 
-    const cleanPhone = res.phone.replace(/\D/g, '');
-    const whatsappUrl = `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(message)}`;
+    const cleanPhone = normalizePhoneNumber(res.phone);
+    const whatsappUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
     window.open(whatsappUrl, '_blank');
   };
 
