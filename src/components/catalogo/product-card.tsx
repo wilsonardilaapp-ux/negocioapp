@@ -1,10 +1,11 @@
-
 "use client";
 
+import { useState } from 'react';
 import Image from 'next/image';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Star } from 'lucide-react';
 import type { Product } from '@/models/product';
+import { cn } from '@/lib/utils';
 
 interface ProductCardProps {
     product: Product;
@@ -20,6 +21,7 @@ const isVideo = (url: string) => {
 
 
 export default function ProductCard({ product, children }: ProductCardProps) {
+    const [imgError, setImgError] = useState(false);
 
     const formatCurrency = (value: number) => {
         return new Intl.NumberFormat('es-CO', {
@@ -29,32 +31,39 @@ export default function ProductCard({ product, children }: ProductCardProps) {
         }).format(value);
     };
 
-    const mediaUrl = product.images?.[0] || 'https://picsum.photos/seed/placeholder/600/400';
-    const isMediaVideo = isVideo(mediaUrl);
+    const firstImage = product.images?.[0];
+    const hasImage = !!(firstImage && firstImage.trim() !== "" && !imgError);
+    const isMediaVideo = isVideo(firstImage || "");
 
     return (
-        <Card className="flex flex-col overflow-hidden transition-shadow hover:shadow-lg">
-            <CardHeader className="p-0">
-                <div className="relative aspect-video w-full">
-                    {isMediaVideo ? (
-                        <video
-                            src={mediaUrl}
-                            autoPlay
-                            loop
-                            muted
-                            className="object-cover w-full h-full"
-                        />
-                    ) : (
-                        <Image
-                            src={mediaUrl}
-                            alt={product.name}
-                            fill
-                            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                            className="object-cover"
-                        />
-                    )}
-                </div>
-            </CardHeader>
+        <Card className={cn(
+            "flex flex-col overflow-hidden transition-shadow hover:shadow-lg",
+            !hasImage && "self-start"
+        )}>
+            {hasImage && (
+                <CardHeader className="p-0">
+                    <div className="relative aspect-video w-full">
+                        {isMediaVideo ? (
+                            <video
+                                src={firstImage}
+                                autoPlay
+                                loop
+                                muted
+                                className="object-cover w-full h-full"
+                            />
+                        ) : (
+                            <Image
+                                src={firstImage!}
+                                alt={product.name}
+                                fill
+                                sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                                className="object-cover"
+                                onError={() => setImgError(true)}
+                            />
+                        )}
+                    </div>
+                </CardHeader>
+            )}
             <CardContent className="p-4 flex-grow">
                 <CardTitle className="h-[2.8rem] text-base font-semibold leading-snug overflow-hidden [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical] mb-1">{product.name}</CardTitle>
                 <div className="flex items-center gap-1 text-sm text-muted-foreground mb-2">

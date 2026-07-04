@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
@@ -85,8 +84,10 @@ const MediaPreview = ({ item, alt, objectFit = 'cover', priority = false }: { it
 };
 
 const PublicProductCard = ({ product, onOpenModal, activePromotions }: { product: Product, onOpenModal: (product: Product) => void, activePromotions: Promotion[] }) => {
-    const mediaUrl = product.images?.[0] || 'https://picsum.photos/seed/placeholder/600/400';
-    const isMediaVideo = isVideo(mediaUrl);
+    const [imgError, setImgError] = useState(false);
+    const firstImage = product.images?.[0];
+    const hasImage = !!(firstImage && firstImage.trim() !== "" && !imgError);
+    const isMediaVideo = isVideo(firstImage || "");
 
     const applicablePromo = useMemo(() => {
         const productName = (product.name || '').toLowerCase().trim();
@@ -113,21 +114,33 @@ const PublicProductCard = ({ product, onOpenModal, activePromotions }: { product
     };
 
     return (
-        <Card className="group flex flex-col overflow-hidden transition-all duration-300 hover:shadow-xl h-full border-gray-100 relative">
-            <CardHeader className="p-0 relative overflow-hidden">
-                {applicablePromo && (
-                    <div className="absolute top-2 left-2 z-10 bg-[#FF4500] text-white text-[12px] font-bold px-2 py-1 rounded-[6px] shadow-md border border-white/20 select-none pointer-events-none" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}>
-                        {getBadgeText(applicablePromo)}
-                    </div>
-                )}
-                <div className="relative aspect-square w-full">
-                    {isMediaVideo ? (
-                        <video src={mediaUrl} autoPlay loop muted className="object-cover w-full h-full transition-transform duration-500 group-hover:scale-105" />
-                    ) : (
-                        <Image src={mediaUrl} alt={product.name} fill sizes="(max-width: 768px) 100vw, 50vw" className="object-cover transition-transform duration-500 group-hover:scale-105" />
+        <Card className={cn(
+            "group flex flex-col overflow-hidden transition-all duration-300 hover:shadow-xl border-gray-100 relative",
+            hasImage ? "h-full" : "h-auto self-start"
+        )}>
+            {hasImage && (
+                <CardHeader className="p-0 relative overflow-hidden">
+                    {applicablePromo && (
+                        <div className="absolute top-2 left-2 z-10 bg-[#FF4500] text-white text-[12px] font-bold px-2 py-1 rounded-[6px] shadow-md border border-white/20 select-none pointer-events-none" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}>
+                            {getBadgeText(applicablePromo)}
+                        </div>
                     )}
-                </div>
-            </CardHeader>
+                    <div className="relative aspect-square w-full">
+                        {isMediaVideo ? (
+                            <video src={firstImage} autoPlay loop muted className="object-cover w-full h-full transition-transform duration-500 group-hover:scale-105" />
+                        ) : (
+                            <Image 
+                                src={firstImage!} 
+                                alt={product.name} 
+                                fill 
+                                sizes="(max-width: 768px) 100vw, 50vw" 
+                                className="object-cover transition-transform duration-500 group-hover:scale-105" 
+                                onError={() => setImgError(true)}
+                            />
+                        )}
+                    </div>
+                </CardHeader>
+            )}
             <CardContent className="p-4 flex-grow">
                 <CardTitle className="text-sm font-bold h-10 overflow-hidden text-gray-900 group-hover:text-primary transition-colors leading-tight mb-2">{product.name}</CardTitle>
                  <div className="flex items-center gap-1 text-[11px] text-muted-foreground mb-3">
