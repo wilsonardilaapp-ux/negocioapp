@@ -10,7 +10,6 @@ import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 import { getAdminFirestore } from '@/firebase/server-init';
 import type { Product } from '@/models/product';
-import { FirestorePermissionError } from '@/firebase/errors';
 import { RateProductInput, RateProductInputSchema } from '@/models/rate-product-input';
 
 
@@ -79,15 +78,9 @@ const rateProductFlow = ai.defineFlow(
       });
 
     } catch (e: any) {
-        // Although this is a server-side flow, we can still emit the error.
-        // The error listener on the client won't pick it up, but it standardizes our error pattern.
-        // The client will receive the failure from the flow's return value.
-        const permissionError = new FirestorePermissionError({
-            path: productRef.path,
-            operation: 'update',
-        });
-        
-        console.error("GENKIT_FLOW_ERROR:", permissionError.message);
+        // Corregido: El patrón de servidor NO usa FirestorePermissionError (que es cliente-only)
+        // Usamos el patrón de registro de errores de src/actions/affiliates.ts
+        console.error("[rateProductFlow] Error:", e.message);
 
         return { success: false, message: e.message || 'Failed to update rating due to a server-side error.' };
     }
