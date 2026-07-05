@@ -17,6 +17,7 @@ import { StarRatingInput } from './star-rating-input';
 
 interface ProductViewModalProps {
   product: Product | null;
+  businessId: string | null;
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
   onAddToCart: (quantity: number) => void;
@@ -25,6 +26,7 @@ interface ProductViewModalProps {
 
 export default function ProductViewModal({ 
     product, 
+    businessId,
     isOpen, 
     onOpenChange, 
     onAddToCart,
@@ -66,11 +68,11 @@ export default function ProductViewModal({
 
   // Verificar si el visitante ya votó por este producto
   useEffect(() => {
-    if (!isOpen || !product || !visitorId || !firestore) return;
+    if (!isOpen || !product || !businessId || !visitorId || !firestore) return;
 
     const checkExistingVote = async () => {
       try {
-        const voteRef = doc(firestore, `businesses/${product.businessId}/products/${product.id}/votes`, visitorId);
+        const voteRef = doc(firestore, `businesses/${businessId}/products/${product.id}/votes`, visitorId);
         const voteSnap = await getDoc(voteRef);
         if (voteSnap.exists()) {
           setHasVoted(true);
@@ -82,15 +84,17 @@ export default function ProductViewModal({
     };
 
     checkExistingVote();
-  }, [isOpen, product, visitorId, firestore]);
+  }, [isOpen, product, businessId, visitorId, firestore]);
 
   const handleVote = async (rating: number) => {
-    if (!product || !visitorId || hasVoted || isVoting || !firestore) return;
+    if (!product || !businessId || !visitorId || hasVoted || isVoting || !firestore) return;
 
     setIsVoting(true);
     try {
       // 1. Registrar el voto en la subcolección para control de duplicados
-      const voteRef = doc(firestore, `businesses/${product.businessId}/products/${product.id}/votes`, visitorId);
+      const voteRef = doc(firestore, `businesses/${businessId}/products/${product.id}/votes`, visitorId);
+      
+      // Intentar escritura inicial - esto fallará si ya existe por regla de seguridad
       await setDoc(voteRef, {
         rating,
         createdAt: serverTimestamp(),
@@ -98,15 +102,18 @@ export default function ProductViewModal({
 
       // 2. Llamar al flujo de IA para actualizar el promedio global del producto
       const result = await rateProduct({
-        businessId: product.businessId,
+        businessId: businessId,
         productId: product.id,
         rating
       });
 
       if (result.success) {
         // Actualización optimista local
-        const newCount = localStats.count + 1;
-        const newRating = ((localStats.rating * localStats.count) + rating) / newCount;
+        const currentRating = Number(localStats.rating) || 0;
+        const currentCount = Number(localStats.count) || 0;
+        
+        const newCount = currentCount + 1;
+        const newRating = ((currentRating * currentCount) + rating) / newCount;
         
         setLocalStats({ rating: newRating, count: newCount });
         setHasVoted(true);
@@ -120,6 +127,7 @@ export default function ProductViewModal({
     } catch (error: any) {
       // Si falla por regla de seguridad (ya existía el doc), tratamos como que ya votó
       if (error.code === 'permission-denied' || error.message?.includes('permissions')) {
+        console.log("Voto duplicado bloqueado por seguridad.");
         setHasVoted(true);
       } else {
         console.error("Error al emitir calificación:", error);
@@ -187,7 +195,7 @@ export default function ProductViewModal({
                       onSelect={handleVote} 
                     />
                     <div className="flex items-center gap-1.5">
-                      <span className="text-sm font-black text-gray-900">{localStats.rating.toFixed(1)}</span>
+                      <span className="text-sm font-black text-gray-900">{Number(localStats.rating).toFixed(1)}</span>
                       <span className="text-xs text-muted-foreground">({localStats.count} opiniones)</span>
                     </div>
                     {isVoting && <Loader2 className="h-4 w-4 animate-spin text-primary" />}

@@ -220,6 +220,7 @@ export default function CatalogPage({ params }: CatalogPageProps) {
 
             <ProductViewModal 
                 product={selectedProduct} 
+                businessId={pageData.resolvedBusinessId}
                 isOpen={!!selectedProduct} 
                 onOpenChange={(open) => !open && setSelectedProduct(null)}
                 onAddToCart={(qty) => {

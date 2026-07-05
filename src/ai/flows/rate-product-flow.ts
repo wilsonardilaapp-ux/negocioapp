@@ -38,19 +38,19 @@ const rateProductFlow = ai.defineFlow(
       return await firestore.runTransaction(async (transaction) => {
         const productDoc = await transaction.get(productRef);
         if (!productDoc.exists) {
-          throw new Error("Product not found!");
+          throw new Error(`Product not found at: ${productRef.path}`);
         }
 
         const productData = productDoc.data() as Product;
-        const currentRating = productData.rating || 0;
-        const currentRatingCount = productData.ratingCount || 0;
+        const currentRating = Number(productData.rating) || 0;
+        const currentRatingCount = Number(productData.ratingCount) || 0;
 
         const newRatingCount = currentRatingCount + 1;
         const newTotalRating = (currentRating * currentRatingCount) + input.rating;
         const newAverage = newTotalRating / newRatingCount;
 
         const ratingUpdates = {
-          rating: newAverage,
+          rating: Number(newAverage.toFixed(2)), // Forzar tipo numérico y limitar decimales
           ratingCount: newRatingCount,
         };
 
@@ -78,10 +78,7 @@ const rateProductFlow = ai.defineFlow(
       });
 
     } catch (e: any) {
-        // Corregido: El patrón de servidor NO usa FirestorePermissionError (que es cliente-only)
-        // Usamos el patrón de registro de errores de src/actions/affiliates.ts
-        console.error("[rateProductFlow] Error:", e.message);
-
+        console.error("[rateProductFlow] Critical Error:", e.message);
         return { success: false, message: e.message || 'Failed to update rating due to a server-side error.' };
     }
   }
