@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -76,6 +77,19 @@ export default function ChatbotMenuConfigPage() {
     [firestore]
   );
   const { data: globalModule, isLoading: loadingGlobalModule } = useDoc<Module>(globalModuleRef);
+  
+  // DIAGNÓSTICO EN CONSOLA
+  useEffect(() => {
+    if (!loadingGlobalModule) {
+      console.group("🔍 DIAGNÓSTICO CHATBOT MENU");
+      console.log("ID Consultado:", PUBLIC_MENU_CHATBOT_MODULE_ID);
+      console.log("Documento Recibido:", globalModule);
+      console.log("Estado Detectado:", globalModule?.status);
+      console.log("¿Es Active?:", globalModule?.status === 'active');
+      console.groupEnd();
+    }
+  }, [globalModule, loadingGlobalModule]);
+
   const isGlobalActive = globalModule?.status === 'active';
 
   // 1. Suscripción a Configuración Principal (Documento main)
