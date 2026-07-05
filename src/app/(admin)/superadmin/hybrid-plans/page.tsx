@@ -14,7 +14,9 @@ import { collection, doc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
 import type { HybridPlan } from '@/models/hybrid-plan';
+import type { Module } from '@/models/module';
 import { useForm, Controller, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { HybridPlanSchema } from '@/models/hybrid-plan';
@@ -175,6 +177,10 @@ function HybridPlanDialog({ isOpen, onClose, plan }: { isOpen: boolean, onClose:
   const { toast } = useToast();
   const [isPending, startTransition] = useTransition();
 
+  // Paso 1 — Traer la lista de módulos
+  const modulesQuery = useMemoFirebase(() => !firestore ? null : collection(firestore, 'modules'), [firestore]);
+  const { data: allModules } = useCollection<Module>(modulesQuery);
+
   const { register, control, handleSubmit, reset, watch, setValue, getValues, formState: { errors, isSubmitting } } = useForm<HybridPlan>({
     resolver: zodResolver(HybridPlanSchema),
     defaultValues: {
@@ -298,12 +304,8 @@ function HybridPlanDialog({ isOpen, onClose, plan }: { isOpen: boolean, onClose:
           onClose();
         })
         .catch(async (serverError) => {
-          const permissionError = new FirestorePermissionError({
-            path: docRef.path,
-            operation: plan?.id ? 'update' : 'create',
-            requestResourceData: dataToSave,
-          } satisfies SecurityRuleContext);
-          errorEmitter.emit('permission-error', permissionError);
+          console.error("Error saving hybrid plan:", serverError);
+          toast({ variant: 'destructive', title: 'Error al guardar' });
         });
     });
   };
@@ -372,21 +374,39 @@ function HybridPlanDialog({ isOpen, onClose, plan }: { isOpen: boolean, onClose:
               </div>
             </TabsContent>
 
+            {/* Paso 2 — Reemplazar el contenido del TabsContent value="modules" */}
             <TabsContent value="modules" className="space-y-4 pt-4">
-               <Label className="font-semibold">Módulos Incluidos (Separados por coma)</Label>
-               <Controller name="includedModuleKeys" control={control} render={({ field }) => (
-                 <Input 
-                   value={Array.isArray(field.value) ? field.value.join(', ') : ''} 
-                   onChange={(e) => {
-                       const val = e.target.value;
-                       field.onChange(val.split(',').map(s => s.trimStart()));
-                   }}
-                   placeholder="ej: catalogo, blog, promotions" 
-                 />
-               )} />
-               <p className="text-[11px] text-muted-foreground font-bold text-primary mt-2">
-                   IDs Técnicos Sugeridos: catalogo, blog, promotions, chatbot-integrado-con-whatsapp-para-soporte-y-ventas.
-               </p>
+               <Label className="font-semibold">Módulos Incluidos</Label>
+               <Controller name="includedModuleKeys" control={control} render={({ field }) => {
+                 const selected: string[] = Array.isArray(field.value) ? field.value : [];
+                 const toggleModule = (moduleId: string, checked: boolean) => {
+                   if (checked) {
+                     field.onChange([...selected, moduleId]);
+                   } else {
+                     field.onChange(selected.filter((id) => id !== moduleId));
+                   }
+                 };
+                 return (
+                   <div className="space-y-2 border rounded-lg p-4 max-h-80 overflow-y-auto">
+                     {(allModules || []).map((mod) => (
+                       <div key={mod.id} className="flex items-center gap-3 py-1.5">
+                         <Checkbox
+                           id={`module-${mod.id}`}
+                           checked={selected.includes(mod.id)}
+                           onCheckedChange={(checked) => toggleModule(mod.id, checked === true)}
+                         />
+                         <label htmlFor={`module-${mod.id}`} className="flex flex-col cursor-pointer">
+                           <span className="text-sm font-medium">{mod.name}</span>
+                           <span className="text-[11px] text-muted-foreground font-mono">{mod.id}</span>
+                         </label>
+                       </div>
+                     ))}
+                     {(!allModules || allModules.length === 0) && (
+                       <p className="text-xs text-muted-foreground">No hay módulos registrados todavía.</p>
+                     )}
+                   </div>
+                 );
+               }} />
             </TabsContent>
 
             <TabsContent value="limits" className="space-y-6 pt-4">
@@ -448,7 +468,7 @@ function HybridPlanDialog({ isOpen, onClose, plan }: { isOpen: boolean, onClose:
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                     <Label className="font-bold">Características del Plan</Label>
-                    <Button type="button" variant="outline" size="sm" onClick={() => append({ value: '', displayOrder: fields.length })}><PlusCircle className="h-4 w-4 mr-2" /> Añadir</Button>
+                    <Button type="button" variant="outline" size="sm" onClick={() => append({ value: '', displayOrder: fields.length })}><PlusCircle className="mr-2 h-4 w-4 mr-2" /> Añadir</Button>
                 </div>
                 <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
                   <SortableContext items={fields.map((f) => f.id)} strategy={verticalListSortingStrategy}>
