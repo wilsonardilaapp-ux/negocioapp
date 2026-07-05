@@ -24,7 +24,7 @@ export default function PublicProductCard({ product, onView, onBuy }: PublicProd
   };
 
   return (
-    <Card className="flex flex-col h-full overflow-hidden hover:shadow-xl transition-all duration-300 border-gray-100 group">
+    <Card className="flex flex-col self-start overflow-hidden hover:shadow-xl transition-all duration-300 border-gray-100 group">
       {product.images?.[0] && (
         <div 
           className="relative aspect-square w-full cursor-pointer overflow-hidden bg-muted"
