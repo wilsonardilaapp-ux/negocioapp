@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Minus, Plus, ShoppingCart, Loader2, CheckCircle2 } from 'lucide-react';
@@ -20,9 +20,16 @@ interface ProductViewModalProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
   onAddToCart: (quantity: number) => void;
+  onRatingUpdated?: (productId: string, newRating: number, newCount: number) => void;
 }
 
-export default function ProductViewModal({ product, isOpen, onOpenChange, onAddToCart }: ProductViewModalProps) {
+export default function ProductViewModal({ 
+    product, 
+    isOpen, 
+    onOpenChange, 
+    onAddToCart,
+    onRatingUpdated 
+}: ProductViewModalProps) {
   const firestore = useFirestore();
   const [quantity, setQuantity] = useState(1);
   const [activeImage, setActiveImage] = useState<string | null>(null);
@@ -82,7 +89,7 @@ export default function ProductViewModal({ product, isOpen, onOpenChange, onAddT
 
     setIsVoting(true);
     try {
-      // 1. Registrar el voto en la subcolección para control de duplicados (regla de Firestore bloquea updates)
+      // 1. Registrar el voto en la subcolección para control de duplicados
       const voteRef = doc(firestore, `businesses/${product.businessId}/products/${product.id}/votes`, visitorId);
       await setDoc(voteRef, {
         rating,
@@ -100,9 +107,15 @@ export default function ProductViewModal({ product, isOpen, onOpenChange, onAddT
         // Actualización optimista local
         const newCount = localStats.count + 1;
         const newRating = ((localStats.rating * localStats.count) + rating) / newCount;
+        
         setLocalStats({ rating: newRating, count: newCount });
         setHasVoted(true);
         setUserVote(rating);
+
+        // Notificar al componente padre para que actualice la lista/tarjeta
+        if (onRatingUpdated) {
+            onRatingUpdated(product.id, newRating, newCount);
+        }
       }
     } catch (error: any) {
       // Si falla por regla de seguridad (ya existía el doc), tratamos como que ya votó

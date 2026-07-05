@@ -149,6 +149,24 @@ export default function CatalogPage({ params }: CatalogPageProps) {
         setIsPurchaseModalOpen(true);
     };
 
+    /**
+     * Sincroniza la valoración actualizada de un producto en el estado local
+     * para que se refleje inmediatamente en la lista sin recargar.
+     */
+    const handleRatingSync = useCallback((productId: string, newRating: number, newCount: number) => {
+        setPageData(prev => {
+            if (!prev.products) return prev;
+            return {
+                ...prev,
+                products: prev.products.map(p => 
+                    p.id === productId 
+                    ? { ...p, rating: newRating, ratingCount: newCount } 
+                    : p
+                )
+            };
+        });
+    }, []);
+
     if (isLoading) {
         return (
             <div className="flex h-screen w-full items-center justify-center bg-gray-50 p-4 text-center">
@@ -208,6 +226,7 @@ export default function CatalogPage({ params }: CatalogPageProps) {
                     handleAddToCart(selectedProduct!, qty);
                     setSelectedProduct(null);
                 }}
+                onRatingUpdated={handleRatingSync}
             />
 
             <PurchaseModal 
