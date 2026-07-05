@@ -39,7 +39,7 @@ export default function ProductViewModal({
   // Estados para la calificación
   const [visitorId, setVisitorId] = useState<string | null>(null);
   const [hasVoted, setHasVoted] = useState(false);
-  const [userVote, setUserVote] = useState(0);
+  const [userVote, setUserVote] = useState<number | null>(0);
   const [isVoting, setIsVoting] = useState(false);
   const [localStats, setLocalStats] = useState({ rating: 0, count: 0 });
 
@@ -69,6 +69,10 @@ export default function ProductViewModal({
   // Verificar si el visitante ya votó por este producto
   useEffect(() => {
     if (!isOpen || !product || !businessId || !visitorId || !firestore) return;
+
+    // Resetear estados antes de verificar el nuevo producto para evitar herencia de datos entre modales
+    setHasVoted(false);
+    setUserVote(null);
 
     const checkExistingVote = async () => {
       try {
@@ -205,9 +209,11 @@ export default function ProductViewModal({
                       <p className="text-[11px] text-green-600 font-bold flex items-center gap-1">
                         <CheckCircle2 className="h-3 w-3" /> ¡Gracias por tu calificación!
                       </p>
-                      <p className="text-[10px] text-muted-foreground italic ml-4">
-                        Tu calificación: {userVote} ⭐
-                      </p>
+                      {userVote !== null && userVote > 0 && (
+                        <p className="text-[10px] text-muted-foreground italic ml-4">
+                          Tu calificación: {userVote} ⭐
+                        </p>
+                      )}
                     </div>
                   )}
                   {!hasVoted && !isVoting && (
