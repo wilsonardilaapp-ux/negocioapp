@@ -1,8 +1,9 @@
+
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useUser, useFirestore, useDoc, useMemoFirebase, setDocumentNonBlocking, addDocumentNonBlocking, useCollection } from '@/firebase';
-import { doc, collection, query, orderBy, deleteDoc } from 'firebase/firestore';
+import { doc, collection, query, orderBy, deleteDoc, writeBatch, serverTimestamp } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
@@ -49,9 +50,12 @@ import {
   Search, 
   Building2,
   Pencil,
-  AlertTriangle,
   Lock,
-  CheckCircle
+  CheckCircle,
+  Upload,
+  Download,
+  AlertTriangle,
+  FileSpreadsheet
 } from 'lucide-react';
 import { PublicMenuChatbotConfig, DEFAULT_CHATBOT_CONFIG, PublicMenuAutoResponse, PUBLIC_MENU_CHATBOT_MODULE_ID } from '@/models/public-menu-chatbot';
 import { PublicMenuChatWidget } from '@/components/public-menu-chatbot/PublicMenuChatWidget';
@@ -60,6 +64,26 @@ import type { Business } from '@/models/business';
 import type { Module } from '@/models/module';
 import { useSubscription } from '@/hooks/useSubscription';
 import Image from 'next/image';
+import * as XLSX from 'xlsx';
+
+/**
+ * Función auxiliar para dividir un array en trozos (chunks)
+ */
+const chunkArray = <T,>(array: T[], size: number): T[][] => {
+  const chunks: T[][] = [];
+  for (let i = 0; i < array.length; i += size) {
+    chunks.push(array.slice(i, i + size));
+  }
+  return chunks;
+};
+
+interface ImportRow {
+  Pregunta?: string;
+  Respuesta?: string;
+  Estado?: string | boolean;
+  error?: string;
+  isValid: boolean;
+}
 
 export default function ChatbotMenuConfigPage() {
   const { user } = useUser();
@@ -69,6 +93,12 @@ export default function ChatbotMenuConfigPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+
+  // Estados para Importación Masiva
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [importRows, setImportRows] = useState<ImportRow[]>([]);
+  const [isImporting, setIsImporting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // 0. Validación de Módulo Global (Super Admin)
   const globalModuleRef = useMemoFirebase(
@@ -110,7 +140,7 @@ export default function ChatbotMenuConfigPage() {
   );
   const { data: catalog } = useDoc<any>(catalogRef);
 
-  // Modal de Respuestas
+  // Modal de Respuestas Manuales
   const [isResponseModalOpen, setIsResponseModalOpen] = useState(false);
   const [editingResponse, setEditingResponse] = useState<PublicMenuAutoResponse | null>(null);
   const [respForm, setRespForm] = useState({ question: '', answer: '', isActive: true });
@@ -155,6 +185,105 @@ export default function ChatbotMenuConfigPage() {
       setIsUploading(false);
     }
   };
+
+  // --- LÓGICA DE IMPORTACIÓN MASIVA ---
+
+  const downloadTemplate = () => {
+    const data = [
+      ["Pregunta", "Respuesta", "Estado"],
+      ["¿Cuáles son los horarios?", "Abrimos de Lunes a Viernes de 8am a 6pm.", "Activo"],
+      ["¿Hacen domicilios?", "Sí, llegamos a toda la ciudad con un recargo de $5000.", "Inactivo"],
+      ["¿Cuál es la especialidad?", "Nuestra hamburguesa de la casa con pan artesanal.", "active"]
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Respuestas");
+    XLSX.writeFile(wb, "Plantilla_Respuestas_Chatbot.xlsx");
+  };
+
+  const handleFileImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const bstr = event.target?.result;
+        const wb = XLSX.read(bstr, { type: 'binary' });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const data = XLSX.utils.sheet_to_json<any>(ws);
+
+        if (data.length === 0) {
+          toast({ variant: 'destructive', title: 'Archivo vacío', description: 'El archivo no contiene filas de datos.' });
+          return;
+        }
+
+        const processed: ImportRow[] = data.map((row: any) => {
+          const q = String(row.Pregunta || row.pregunta || '').trim();
+          const a = String(row.Respuesta || row.respuesta || '').trim();
+          const s = String(row.Estado || row.estado || '').toLowerCase();
+          
+          let isActive = false;
+          if (s === 'activo' || s === 'active' || s === 'true' || s === '1') isActive = true;
+
+          const isValid = q.length > 0 && a.length > 0;
+          
+          return {
+            Pregunta: q,
+            Respuesta: a,
+            Estado: isActive,
+            isValid,
+            error: !isValid ? 'Pregunta y Respuesta son obligatorias' : undefined
+          };
+        });
+
+        setImportRows(processed);
+        setIsImportModalOpen(true);
+      } catch (err) {
+        toast({ variant: 'destructive', title: 'Error al leer archivo', description: 'Asegúrate de que el formato sea correcto (.xlsx o .csv).' });
+      }
+    };
+    reader.readAsBinaryString(file);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const confirmBulkImport = async () => {
+    if (!user || !firestore || !responsesRef) return;
+    const validRows = importRows.filter(r => r.isValid);
+    if (validRows.length === 0) return;
+
+    setIsImporting(true);
+    try {
+      const chunks = chunkArray(validRows, 500);
+      const now = new Date().toISOString();
+
+      for (const chunk of chunks) {
+        const batch = writeBatch(firestore);
+        chunk.forEach(row => {
+          const newDocRef = doc(responsesRef);
+          batch.set(newDocRef, {
+            question: row.Pregunta,
+            answer: row.Respuesta,
+            isActive: row.Estado,
+            createdAt: now,
+            updatedAt: now
+          });
+        });
+        await batch.commit();
+      }
+
+      toast({ title: '¡Importación exitosa!', description: `Se han agregado ${validRows.length} respuestas correctamente.` });
+      setIsImportModalOpen(false);
+      setImportRows([]);
+    } catch (e) {
+      toast({ variant: 'destructive', title: 'Error al importar', description: 'Ocurrió un fallo al escribir en la base de datos.' });
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
+  // --- CRUD MANUAL ---
 
   const handleOpenResponseDialog = (res: PublicMenuAutoResponse | null = null) => {
     if (!isGlobalActive) return;
@@ -346,14 +475,23 @@ export default function ChatbotMenuConfigPage() {
 
         <TabsContent value="automatizacion" className="space-y-6 pt-2">
           <Card>
-            <CardHeader className="flex flex-row justify-between items-center bg-muted/20">
-              <div>
+            <CardHeader className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-muted/20">
+              <div className="space-y-1">
                 <CardTitle className="text-lg">Respuestas Predeterminadas</CardTitle>
-                <CardDescription>Tienen prioridad sobre la IA para preguntas exactas.</CardDescription>
+                <CardDescription>Sincroniza tus respuestas vía Excel/CSV o gestiónalas manualmente.</CardDescription>
               </div>
-              <Button onClick={() => handleOpenResponseDialog()} disabled={!isGlobalActive} className="font-bold">
-                <Plus className="mr-2 h-4 w-4" /> Nueva Respuesta
-              </Button>
+              <div className="flex flex-wrap gap-2">
+                <Button variant="outline" size="sm" onClick={downloadTemplate} className="font-bold border-primary text-primary hover:bg-primary/5">
+                  <Download className="mr-2 h-4 w-4" /> Plantilla
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} disabled={!isGlobalActive} className="font-bold border-primary text-primary hover:bg-primary/5">
+                  <Upload className="mr-2 h-4 w-4" /> Importar
+                </Button>
+                <input type="file" ref={fileInputRef} className="hidden" accept=".xlsx,.csv" onChange={handleFileImport} />
+                <Button onClick={() => handleOpenResponseDialog()} disabled={!isGlobalActive} className="font-bold shadow-md">
+                  <Plus className="mr-2 h-4 w-4" /> Nueva Respuesta
+                </Button>
+              </div>
             </CardHeader>
             <CardContent className="pt-6 space-y-4">
               <div className="relative">
@@ -496,7 +634,7 @@ export default function ChatbotMenuConfigPage() {
         </TabsContent>
       </Tabs>
 
-      {/* DIÁLOGO CRUD RESPUESTAS */}
+      {/* DIÁLOGO CRUD RESPUESTAS MANUALES */}
       <Dialog open={isResponseModalOpen} onOpenChange={setIsResponseModalOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -530,6 +668,81 @@ export default function ChatbotMenuConfigPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* MODAL DE VISTA PREVIA DE IMPORTACIÓN MASIVA */}
+      <Dialog open={isImportModalOpen} onOpenChange={setIsImportModalOpen}>
+        <DialogContent className="sm:max-w-3xl max-h-[90vh] flex flex-col p-0">
+          <DialogHeader className="p-6 pb-0">
+            <DialogTitle className="flex items-center gap-2">
+              <FileSpreadsheet className="h-5 w-5 text-primary" />
+              Vista Previa de Importación
+            </DialogTitle>
+            <DialogDescription>
+              Revisa los datos antes de guardarlos. Se detectaron {importRows.length} filas en total.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-y-auto px-6 py-4">
+            <div className="grid grid-cols-3 gap-4 mb-6">
+              <div className="p-4 bg-muted/50 rounded-xl text-center border">
+                <p className="text-2xl font-black text-primary">{importRows.filter(r => r.isValid).length}</p>
+                <p className="text-[10px] uppercase font-bold text-muted-foreground">Válidas</p>
+              </div>
+              <div className="p-4 bg-red-50 rounded-xl text-center border border-red-100">
+                <p className="text-2xl font-black text-red-600">{importRows.filter(r => !r.isValid).length}</p>
+                <p className="text-[10px] uppercase font-bold text-red-400">Con Error</p>
+              </div>
+              <div className="p-4 bg-blue-50 rounded-xl text-center border border-blue-100">
+                <p className="text-2xl font-black text-blue-600">{importRows.length}</p>
+                <p className="text-[10px] uppercase font-bold text-blue-400">Total Leídas</p>
+              </div>
+            </div>
+
+            <div className="rounded-xl border overflow-hidden">
+              <Table>
+                <TableHeader className="bg-muted/50">
+                  <TableRow>
+                    <TableHead className="w-1/3">Pregunta</TableHead>
+                    <TableHead className="w-1/3">Respuesta</TableHead>
+                    <TableHead className="text-center">Estatus</TableHead>
+                    <TableHead className="text-right">Detalle</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {importRows.map((row, i) => (
+                    <TableRow key={i} className={cn(!row.isValid && "bg-red-50/50")}>
+                      <TableCell className="text-sm font-medium">{row.Pregunta || '-'}</TableCell>
+                      <TableCell className="text-sm truncate max-w-[200px]">{row.Respuesta || '-'}</TableCell>
+                      <TableCell className="text-center">
+                        {row.isValid ? (
+                          <Badge variant={row.Estado ? 'default' : 'secondary'}>{row.Estado ? 'Activo' : 'Inactivo'}</Badge>
+                        ) : <Badge variant="destructive">Error</Badge>}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {!row.isValid && <span className="text-[10px] text-red-600 font-bold uppercase">{row.error}</span>}
+                        {row.isValid && <CheckCircle className="h-4 w-4 text-green-500 ml-auto" />}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </div>
+
+          <DialogFooter className="p-6 bg-muted/20 border-t">
+            <Button variant="ghost" onClick={() => setIsImportModalOpen(false)} disabled={isImporting}>Cancelar</Button>
+            <Button 
+              onClick={confirmBulkImport} 
+              disabled={isImporting || importRows.filter(r => r.isValid).length === 0}
+              className="font-bold px-8"
+            >
+              {isImporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+              Confirmar Importación ({importRows.filter(r => r.isValid).length})
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
+
