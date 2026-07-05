@@ -12,6 +12,7 @@ import { getAdminFirestore } from '@/firebase/server-init';
 import { 
   PublicMenuChatbotInputSchema, 
   PublicMenuChatbotOutputSchema, 
+  PublicMenuChatbotOutput
 } from '@/models/public-menu-chatbot';
 import type { AIProviderFields } from '@/models/integration';
 
@@ -24,7 +25,7 @@ export const publicMenuChatbotFlow = ai.defineFlow(
     inputSchema: PublicMenuChatbotInputSchema,
     outputSchema: PublicMenuChatbotOutputSchema,
   },
-  async (input) => {
+  async (input): Promise<PublicMenuChatbotOutput> => {
     const db = await getAdminFirestore();
     const { businessId, question } = input;
     const lowQuestion = question.toLowerCase().trim();

@@ -1,3 +1,4 @@
+
 'use server';
 /**
  * @fileOverview A flow for rating a product.
@@ -61,7 +62,7 @@ const rateProductFlow = ai.defineFlow(
         const catalogDoc = await transaction.get(catalogRef);
         if (catalogDoc.exists) {
           const catalogData = catalogDoc.data();
-          const products = catalogData.products || [];
+          const products = catalogData?.products || [];
           const productIndex = products.findIndex((p: any) => p.id === input.productId);
           
           if (productIndex !== -1) {
