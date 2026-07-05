@@ -49,8 +49,6 @@ export default function ProductViewModal({
       setQuantity(1);
       setActiveImage(product.images?.[0] || null);
       setLocalStats({ rating: product.rating || 0, count: product.ratingCount || 0 });
-      setHasVoted(false);
-      setUserVote(0);
     }
   }, [product]);
 
@@ -70,7 +68,7 @@ export default function ProductViewModal({
   useEffect(() => {
     if (!isOpen || !product || !businessId || !visitorId || !firestore) return;
 
-    // Resetear estados antes de verificar el nuevo producto para evitar herencia de datos entre modales
+    // Reset de estados para el nuevo producto
     setHasVoted(false);
     setUserVote(null);
 
@@ -98,13 +96,12 @@ export default function ProductViewModal({
       // 1. Registrar el voto en la subcolección para control de duplicados
       const voteRef = doc(firestore, `businesses/${businessId}/products/${product.id}/votes`, visitorId);
       
-      // Intentar escritura inicial - esto fallará si ya existe por regla de seguridad
       await setDoc(voteRef, {
         rating,
         createdAt: serverTimestamp(),
       });
 
-      // 2. Llamar al flujo de IA para actualizar el promedio global del producto
+      // 2. Llamar al flujo de IA para actualizar el promedio global
       const result = await rateProduct({
         businessId: businessId,
         productId: product.id,
@@ -123,15 +120,12 @@ export default function ProductViewModal({
         setHasVoted(true);
         setUserVote(rating);
 
-        // Notificar al componente padre para que actualice la lista/tarjeta
         if (onRatingUpdated) {
             onRatingUpdated(product.id, newRating, newCount);
         }
       }
     } catch (error: any) {
-      // Si falla por regla de seguridad (ya existía el doc), tratamos como que ya votó
       if (error.code === 'permission-denied' || error.message?.includes('permissions')) {
-        console.log("Voto duplicado bloqueado por seguridad.");
         setHasVoted(true);
       } else {
         console.error("Error al emitir calificación:", error);
@@ -160,29 +154,31 @@ export default function ProductViewModal({
         </DialogHeader>
         
         <div className="flex-1 overflow-y-auto">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-0">
+          <div className={cn("grid grid-cols-1 gap-0", product.images?.[0] && "md:grid-cols-2")}>
             {/* Galería */}
-            <div className="bg-gray-100 p-4 space-y-4">
-              <div className="relative aspect-square w-full rounded-2xl overflow-hidden bg-white shadow-inner">
-                {activeImage && <Image src={activeImage} alt={product.name} fill className="object-contain" />}
-              </div>
-              {product.images && product.images.length > 1 && (
-                <div className="flex gap-2 overflow-x-auto pb-2">
-                  {product.images.map((img, i) => (
-                    <button 
-                      key={i} 
-                      onClick={() => setActiveImage(img)}
-                      className={cn(
-                        "relative h-20 w-20 shrink-0 rounded-lg overflow-hidden border-2 transition-all",
-                        activeImage === img ? "border-primary" : "border-transparent opacity-60"
-                      )}
-                    >
-                      <Image src={img} alt={`${product.name} ${i}`} fill className="object-cover" />
-                    </button>
-                  ))}
+            {product.images?.[0] && (
+              <div className="bg-gray-100 p-4 space-y-4">
+                <div className="relative aspect-square w-full rounded-2xl overflow-hidden bg-white shadow-inner">
+                  {activeImage && <Image src={activeImage} alt={product.name} fill className="object-contain" />}
                 </div>
-              )}
-            </div>
+                {product.images.length > 1 && (
+                  <div className="flex gap-2 overflow-x-auto pb-2">
+                    {product.images.map((img, i) => (
+                      <button 
+                        key={i} 
+                        onClick={() => setActiveImage(img)}
+                        className={cn(
+                          "relative h-20 w-20 shrink-0 rounded-lg overflow-hidden border-2 transition-all",
+                          activeImage === img ? "border-primary" : "border-transparent opacity-60"
+                        )}
+                      >
+                        <Image src={img} alt={`${product.name} ${i}`} fill className="object-cover" />
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Información e Interacción */}
             <div className="p-6 md:p-8 space-y-6">
@@ -190,7 +186,7 @@ export default function ProductViewModal({
                 <Badge variant="secondary" className="capitalize">{product.category}</Badge>
                 <h2 className="text-3xl font-black text-gray-900 leading-tight">{product.name}</h2>
                 
-                {/* Sistema de Calificación Interactiva */}
+                {/* Sistema de Calificación */}
                 <div className="flex flex-col gap-1.5 py-2">
                   <div className="flex items-center gap-3">
                     <StarRatingInput 
@@ -215,9 +211,6 @@ export default function ProductViewModal({
                         </p>
                       )}
                     </div>
-                  )}
-                  {!hasVoted && !isVoting && (
-                    <p className="text-[10px] text-muted-foreground italic">Haz clic en una estrella para calificar este producto</p>
                   )}
                 </div>
               </div>
