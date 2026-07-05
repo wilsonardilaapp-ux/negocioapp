@@ -127,6 +127,13 @@ service cloud.firestore {
       match /products/{productId} {
         allow read, list: if true;
         allow write: if isSuperAdmin() || isBusinessMember(businessId);
+
+        // Votos de productos en catálogo público
+        match /votes/{visitorId} {
+          allow read: if true;
+          allow create: if true;
+          allow update, delete: if false;
+        }
       }
 
       match /orders/{orderId} {
