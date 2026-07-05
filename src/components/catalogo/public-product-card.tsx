@@ -4,7 +4,7 @@ import React from 'react';
 import Image from 'next/image';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Star, Eye, ShoppingBag } from 'lucide-react';
+import { Star, Eye } from 'lucide-react';
 import type { Product } from '@/models/product';
 import { stripHtml } from '@/lib/utils';
 
@@ -25,11 +25,11 @@ export default function PublicProductCard({ product, onView, onBuy }: PublicProd
 
   return (
     <Card className="flex flex-col h-full overflow-hidden hover:shadow-xl transition-all duration-300 border-gray-100 group">
-      <div 
-        className="relative aspect-square w-full cursor-pointer overflow-hidden bg-muted"
-        onClick={onView}
-      >
-        {product.images?.[0] ? (
+      {product.images?.[0] && (
+        <div 
+          className="relative aspect-square w-full cursor-pointer overflow-hidden bg-muted"
+          onClick={onView}
+        >
           <Image 
             src={product.images[0]} 
             alt={product.name} 
@@ -37,12 +37,8 @@ export default function PublicProductCard({ product, onView, onBuy }: PublicProd
             sizes="(max-width: 768px) 100vw, 33vw"
             className="object-cover transition-transform duration-500 group-hover:scale-110"
           />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center text-primary/20">
-            <ShoppingBag className="h-12 w-12" />
-          </div>
-        )}
-      </div>
+        </div>
+      )}
       <CardContent className="p-4 flex-grow space-y-2">
         <div className="flex justify-between items-start gap-2">
             <CardTitle className="text-base font-bold line-clamp-2 min-h-[2.5rem]">{product.name}</CardTitle>
