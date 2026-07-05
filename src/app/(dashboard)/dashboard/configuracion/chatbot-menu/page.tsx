@@ -1,9 +1,8 @@
-
 'use client';
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useUser, useFirestore, useDoc, useMemoFirebase, setDocumentNonBlocking, addDocumentNonBlocking, useCollection } from '@/firebase';
-import { doc, collection, query, orderBy, deleteDoc, writeBatch, serverTimestamp } from 'firebase/firestore';
+import { doc, collection, query, orderBy, deleteDoc, writeBatch } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
@@ -54,7 +53,6 @@ import {
   CheckCircle,
   Upload,
   Download,
-  AlertTriangle,
   FileSpreadsheet
 } from 'lucide-react';
 import { PublicMenuChatbotConfig, DEFAULT_CHATBOT_CONFIG, PublicMenuAutoResponse, PUBLIC_MENU_CHATBOT_MODULE_ID } from '@/models/public-menu-chatbot';
@@ -65,6 +63,7 @@ import type { Module } from '@/models/module';
 import { useSubscription } from '@/hooks/useSubscription';
 import Image from 'next/image';
 import * as XLSX from 'xlsx';
+import { cn } from '@/lib/utils';
 
 /**
  * Función auxiliar para dividir un array en trozos (chunks)
@@ -745,4 +744,3 @@ export default function ChatbotMenuConfigPage() {
     </div>
   );
 }
-
