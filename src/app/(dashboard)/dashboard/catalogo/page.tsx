@@ -5,7 +5,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Button } from '../../../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../../../components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../../../components/ui/table';
-import { PlusCircle, ShoppingBag, Edit, Trash2, Printer, FileDown, Info, Frown, Loader2, Upload, FileSpreadsheet, CheckCircle2, AlertTriangle, X } from 'lucide-react';
+import { PlusCircle, ShoppingBag, Edit, Trash2, Printer, FileDown, Info, Frown, Loader2, Upload, FileSpreadsheet, CheckCircle2, AlertTriangle, X, Save } from 'lucide-react';
 import type { Product } from '../../../../models/product';
 import ProductForm from '../../../../components/catalogo/product-form';
 import CatalogHeaderForm from '../../../../components/catalogo/catalog-header-form';
@@ -25,7 +25,7 @@ import {
 } from "../../../../components/ui/alert-dialog";
 import type { LandingHeaderConfigData } from '../../../../models/landing-page';
 import { v4 as uuidv4 } from 'uuid';
-import { useUser, useFirestore, setDocumentNonBlocking, deleteDocumentNonBlocking, useCollection, useMemoFirebase } from '../../../../firebase';
+import { useUser, useFirestore, useMemoFirebase, setDocumentNonBlocking, deleteDocumentNonBlocking, useCollection } from '../../../../firebase';
 import { doc, getDoc, collection, writeBatch } from 'firebase/firestore'; 
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '../../../../components/ui/tooltip';
 import { useToast } from '../../../../hooks/use-toast';
@@ -375,7 +375,6 @@ export default function CatalogoPage() {
         setIsImporting(true);
         try {
             const chunks = chunkArray(rowsToImport, 500);
-            const now = new Date().toISOString();
 
             for (const chunk of chunks) {
                 const batch = writeBatch(firestore);
@@ -403,17 +402,6 @@ export default function CatalogoPage() {
                 description: `Se importaron ${rowsToImport.length} productos.${omittedByPlan > 0 ? ` Se omitieron ${omittedByPlan} por límite de plan.` : ''}` 
             });
             
-            // Forzar actualización del catálogo público tras importación masiva
-            // Obtenemos los productos actuales más los nuevos
-            const updatedProductsQuery = await getDoc(doc(firestore, 'businesses', user.uid, 'publicData', 'catalog'));
-            const currentPublicProducts = updatedProductsQuery.exists() ? (updatedProductsQuery.data().products as Product[]) : [];
-            
-            // Nota: Aquí se asume que el listener local actualizará 'products' en el próximo ciclo
-            // pero para respuesta inmediata disparamos la actualización si tenemos los datos
-            if (products) {
-                 // Sincronización ligera delegada al listener para no recalcular todo aquí
-            }
-
             setIsImportModalOpen(false);
             setImportRows([]);
         } catch (e) {
@@ -679,4 +667,3 @@ export default function CatalogoPage() {
         </div>
     );
 }
-
