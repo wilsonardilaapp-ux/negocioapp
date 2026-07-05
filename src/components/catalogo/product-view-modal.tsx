@@ -182,7 +182,7 @@ export default function ProductViewModal({
                 <div className="flex flex-col gap-1.5 py-2">
                   <div className="flex items-center gap-3">
                     <StarRatingInput 
-                      value={hasVoted ? userVote : localStats.rating} 
+                      value={localStats.rating} 
                       readOnly={hasVoted || isVoting} 
                       onSelect={handleVote} 
                     />
@@ -193,9 +193,14 @@ export default function ProductViewModal({
                     {isVoting && <Loader2 className="h-4 w-4 animate-spin text-primary" />}
                   </div>
                   {hasVoted && (
-                    <p className="text-[11px] text-green-600 font-bold flex items-center gap-1 animate-in fade-in slide-in-from-left-1">
-                      <CheckCircle2 className="h-3 w-3" /> ¡Gracias por tu calificación!
-                    </p>
+                    <div className="space-y-1 animate-in fade-in slide-in-from-left-1">
+                      <p className="text-[11px] text-green-600 font-bold flex items-center gap-1">
+                        <CheckCircle2 className="h-3 w-3" /> ¡Gracias por tu calificación!
+                      </p>
+                      <p className="text-[10px] text-muted-foreground italic ml-4">
+                        Tu calificación: {userVote} ⭐
+                      </p>
+                    </div>
                   )}
                   {!hasVoted && !isVoting && (
                     <p className="text-[10px] text-muted-foreground italic">Haz clic en una estrella para calificar este producto</p>
