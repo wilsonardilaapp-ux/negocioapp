@@ -4,8 +4,9 @@ import { z } from 'zod';
 /**
  * Identificador único y centralizado del módulo en la colección 'modules'.
  * Corresponde al ID real guardado en Firestore.
+ * Verificado en Firebase Console: "chatbot-menu-publico"
  */
-export const PUBLIC_MENU_CHATBOT_MODULE_ID = 'public-menu-chatbot';
+export const PUBLIC_MENU_CHATBOT_MODULE_ID = 'chatbot-menu-publico';
 
 export interface PublicMenuChatbotConfig {
   assistantName: string;

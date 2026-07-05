@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useMemo } from 'react';
 import { useSubscription } from "@/hooks/useSubscription";
 import { useUser } from "@/firebase";
+import { PUBLIC_MENU_CHATBOT_MODULE_ID } from "@/models/public-menu-chatbot";
 import {
   LayoutDashboard,
   FileText,
@@ -54,7 +55,7 @@ const allNavItems = [
   { href: "/dashboard/kardex", icon: Package, label: "Inventario Kardex", moduleId: 'inventario-kardex' },
   { href: "/dashboard/configuracion/factura", icon: FileText, label: "Editor Factura", moduleId: 'catalogo' },
   { href: "/dashboard/configuracion/impresoras", icon: Printer, label: "Impresoras", moduleId: 'catalogo' },
-  { href: "/dashboard/configuracion/chatbot-menu", icon: Bot, label: "Chatbot Menú", moduleId: 'public-menu-chatbot' },
+  { href: "/dashboard/configuracion/chatbot-menu", icon: Bot, label: "Chatbot Menú", moduleId: PUBLIC_MENU_CHATBOT_MODULE_ID },
   { href: "/dashboard/pistola-scanner", icon: ScanLine, label: "Pistola Escáner", moduleId: 'pistola-escaner' },
   { href: "/dashboard/backups", icon: HardDrive, label: "Backups" },
   { href: "/dashboard/subscription", icon: CreditCard, label: "Suscripción" },
