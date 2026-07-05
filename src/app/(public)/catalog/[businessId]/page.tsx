@@ -9,7 +9,7 @@ import CatalogHeader from '@/components/catalogo/catalog-header';
 import PublicProductCard from '@/components/catalogo/public-product-card';
 import ProductViewModal from '@/components/catalogo/product-view-modal';
 import { PurchaseModal } from '@/components/catalogo/purchase-modal';
-import { SuggestionModal } from '@/components/catalogo/suggestion-modal';
+import { SuggestionModal } from '@/components/suggestions/suggestion-modal';
 import { Frown, Loader2, PackageSearch } from 'lucide-react';
 import type { LandingHeaderConfigData } from '@/models/landing-page';
 import type { Product } from '@/models/product';
