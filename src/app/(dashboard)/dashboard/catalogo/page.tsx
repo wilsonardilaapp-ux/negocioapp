@@ -1,16 +1,18 @@
+
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Button } from '../../../../components/ui/button';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../../../../components/ui/card';
-import { PlusCircle, ShoppingBag, Edit, Trash2, Printer, FileDown, Info, Frown, Loader2 } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../../../components/ui/card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../../../components/ui/table';
+import { PlusCircle, ShoppingBag, Edit, Trash2, Printer, FileDown, Info, Frown, Loader2, Upload, FileSpreadsheet, CheckCircle2, AlertTriangle, X } from 'lucide-react';
 import type { Product } from '../../../../models/product';
 import ProductForm from '../../../../components/catalogo/product-form';
 import CatalogHeaderForm from '../../../../components/catalogo/catalog-header-form';
 import CatalogQRGenerator from '../../../../components/catalogo/catalog-qr-generator';
 import ShareCatalog from '../../../../components/catalogo/share-catalog';
 import ProductCard from '../../../../components/catalogo/product-card';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from '../../../../components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger, DialogFooter } from '../../../../components/ui/dialog';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -24,12 +26,14 @@ import {
 import type { LandingHeaderConfigData } from '../../../../models/landing-page';
 import { v4 as uuidv4 } from 'uuid';
 import { useUser, useFirestore, setDocumentNonBlocking, deleteDocumentNonBlocking, useCollection, useMemoFirebase } from '../../../../firebase';
-import { doc, getDoc, collection } from 'firebase/firestore'; 
+import { doc, getDoc, collection, writeBatch } from 'firebase/firestore'; 
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '../../../../components/ui/tooltip';
 import { useToast } from '../../../../hooks/use-toast';
 import { useSubscription } from '../../../../hooks/useSubscription';
 import { LimitBanner } from '../../../../components/dashboard/LimitBanner';
 import type { Business } from '../../../../models/business';
+import * as XLSX from 'xlsx';
+import { cn } from '@/lib/utils';
 
 const initialHeaderConfig: LandingHeaderConfigData = {
     banner: {
@@ -61,6 +65,25 @@ const initialHeaderConfig: LandingHeaderConfigData = {
     ],
 };
 
+interface ImportRow {
+    Nombre?: string;
+    Descripción?: string;
+    Precio?: number | string;
+    Stock?: number | string;
+    Categoría?: string;
+    ImagenURL?: string;
+    error?: string;
+    isValid: boolean;
+}
+
+const chunkArray = <T,>(array: T[], size: number): T[][] => {
+  const chunks: T[][] = [];
+  for (let i = 0; i < array.length; i += size) {
+    chunks.push(array.slice(i, i + size));
+  }
+  return chunks;
+};
+
 export default function CatalogoPage() {
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [editingProduct, setEditingProduct] = useState<Product | null>(null);
@@ -88,6 +111,12 @@ export default function CatalogoPage() {
     [firestore, user]);
     const { data: products, isLoading: areProductsLoading } = useCollection<Product>(productsQuery);
     
+    // --- ESTADOS PARA IMPORTACIÓN ---
+    const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+    const [importRows, setImportRows] = useState<ImportRow[]>([]);
+    const [isImporting, setIsImporting] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
     useEffect(() => {
         if (isUserLoading || !user || !firestore) return;
 
@@ -192,19 +221,16 @@ export default function CatalogoPage() {
         if (!firestore || !user) return;
         
         try {
-            // 1. Guardar en la configuración del catálogo (subcolección)
             const headerConfigDocRef = doc(firestore, 'businesses', user.uid, 'landingConfig', 'header');
             await setDocumentNonBlocking(headerConfigDocRef, config, { merge: true });
 
-            // 2. Sincronización CRÍTICA con la RAÍZ del negocio para el Directorio y Filtros
             const businessRef = doc(firestore, 'businesses', user.uid);
             await setDocumentNonBlocking(businessRef, { 
-                name: config.businessInfo.name, // Sincroniza el nombre real para el Directorio
+                name: config.businessInfo.name,
                 category: config.businessInfo.category || null,
                 subcategory: config.businessInfo.subcategory || null
             }, { merge: true });
 
-            // 3. Actualizar estado local y datos denormalizados
             setHeaderConfig(config);
             updatePublicCatalog(products || [], config);
             
@@ -247,6 +273,155 @@ export default function CatalogoPage() {
         const url = `/catalog/${user?.uid}?${action}=true`;
         window.open(url, '_blank');
     };
+
+    // --- LÓGICA DE IMPORTACIÓN ---
+
+    const downloadTemplate = () => {
+        const data = [
+            ["Nombre", "Descripción", "Precio", "Stock", "Categoría", "ImagenURL"],
+            ["Café Americano", "Delicioso café recién tostado de altura", 5000, 100, "Bebidas Calientes", "https://images.unsplash.com/photo-1541167760496-1628856ab772?q=80&w=400&h=400&auto=format&fit=crop"],
+            ["Té Chai", "Té negro con especias tradicionales y leche", 4500, 50, "Bebidas Calientes", ""],
+            ["Sándwich Premium", "Sándwich artesanal con jamón serrano y queso brie", 12000, 30, "Comidas", "https://images.unsplash.com/photo-1528735602780-2552fd46c7af?q=80&w=400&h=400&auto=format&fit=crop"]
+        ];
+        const ws = XLSX.utils.aoa_to_sheet(data);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Plantilla_Productos");
+        XLSX.writeFile(wb, "Plantilla_Importacion_Productos.xlsx");
+    };
+
+    const validateUrl = (url: string) => {
+        if (!url) return true;
+        try {
+            const newUrl = new URL(url);
+            return newUrl.protocol === 'http:' || newUrl.protocol === 'https:';
+        } catch (_) {
+            return false;
+        }
+    };
+
+    const handleFileImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            try {
+                const bstr = event.target?.result;
+                const wb = XLSX.read(bstr, { type: 'binary' });
+                const wsname = wb.SheetNames[0];
+                const ws = wb.Sheets[wsname];
+                const data = XLSX.utils.sheet_to_json<any>(ws);
+
+                if (data.length === 0) {
+                    toast({ variant: 'destructive', title: 'Archivo vacío', description: 'El archivo no contiene filas de datos.' });
+                    return;
+                }
+
+                const processed: ImportRow[] = data.map((row: any) => {
+                    const name = String(row.Nombre || '').trim();
+                    const desc = String(row.Descripción || '').trim();
+                    const price = parseFloat(String(row.Precio || '0'));
+                    const stock = parseInt(String(row.Stock || '0'), 10);
+                    const cat = String(row.Categoría || '').trim();
+                    const imgUrl = String(row.ImagenURL || '').trim();
+
+                    const errors = [];
+                    if (!name) errors.push("Nombre requerido");
+                    if (!desc) errors.push("Descripción requerida");
+                    if (isNaN(price) || price < 0) errors.push("Precio inválido");
+                    if (isNaN(stock) || stock < 0) errors.push("Stock inválido");
+                    if (!cat) errors.push("Categoría requerida");
+                    if (imgUrl && !validateUrl(imgUrl)) errors.push("ImagenURL no válida");
+
+                    return {
+                        Nombre: name,
+                        Descripción: desc,
+                        Precio: price,
+                        Stock: stock,
+                        Categoría: cat,
+                        ImagenURL: imgUrl,
+                        isValid: errors.length === 0,
+                        error: errors.join(", ")
+                    };
+                });
+
+                setImportRows(processed);
+                setIsImportModalOpen(true);
+            } catch (err) {
+                toast({ variant: 'destructive', title: 'Error al leer archivo', description: 'Asegúrate de que el formato sea correcto (.xlsx o .csv).' });
+            }
+        };
+        reader.readAsBinaryString(file);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+    };
+
+    const confirmBulkImport = async () => {
+        if (!user || !firestore) return;
+        
+        const validRows = importRows.filter(r => r.isValid);
+        if (validRows.length === 0) return;
+
+        // Validar cupos disponibles según el plan
+        const availableSlots = limits.products === -1 ? Infinity : (limits.products - productCount);
+        
+        if (availableSlots <= 0) {
+            toast({ variant: 'destructive', title: 'Límite alcanzado', description: `No tienes cupos disponibles en tu plan ${plan.toUpperCase()}.` });
+            return;
+        }
+
+        const rowsToImport = validRows.slice(0, availableSlots);
+        const omittedByPlan = validRows.length - rowsToImport.length;
+
+        setIsImporting(true);
+        try {
+            const chunks = chunkArray(rowsToImport, 500);
+            const now = new Date().toISOString();
+
+            for (const chunk of chunks) {
+                const batch = writeBatch(firestore);
+                chunk.forEach(row => {
+                    const productRef = doc(collection(firestore, `businesses/${user.uid}/products`));
+                    const newProduct: Product = {
+                        id: productRef.id,
+                        businessId: user.uid,
+                        name: row.Nombre!,
+                        description: row.Descripción!,
+                        price: Number(row.Precio),
+                        stock: Number(row.Stock),
+                        category: row.Categoría!,
+                        images: row.ImagenURL ? [row.ImagenURL] : [],
+                        rating: 0,
+                        ratingCount: 0
+                    };
+                    batch.set(productRef, newProduct);
+                });
+                await batch.commit();
+            }
+
+            toast({ 
+                title: 'Importación finalizada', 
+                description: `Se importaron ${rowsToImport.length} productos.${omittedByPlan > 0 ? ` Se omitieron ${omittedByPlan} por límite de plan.` : ''}` 
+            });
+            
+            // Forzar actualización del catálogo público tras importación masiva
+            // Obtenemos los productos actuales más los nuevos
+            const updatedProductsQuery = await getDoc(doc(firestore, 'businesses', user.uid, 'publicData', 'catalog'));
+            const currentPublicProducts = updatedProductsQuery.exists() ? (updatedProductsQuery.data().products as Product[]) : [];
+            
+            // Nota: Aquí se asume que el listener local actualizará 'products' en el próximo ciclo
+            // pero para respuesta inmediata disparamos la actualización si tenemos los datos
+            if (products) {
+                 // Sincronización ligera delegada al listener para no recalcular todo aquí
+            }
+
+            setIsImportModalOpen(false);
+            setImportRows([]);
+        } catch (e) {
+            toast({ variant: 'destructive', title: 'Error al importar', description: 'Ocurrió un fallo al escribir en la base de datos.' });
+        } finally {
+            setIsImporting(false);
+        }
+    };
     
     if (isLoading) {
         return <div className="flex items-center justify-center h-64"><Loader2 className="h-8 w-8 animate-spin" /> Cargando tu catálogo...</div>
@@ -276,6 +451,8 @@ export default function CatalogoPage() {
         </Button>
     );
 
+    const availableSlots = limits.products === -1 ? Infinity : (limits.products - productCount);
+
     return (
         <div className="flex flex-col gap-6">
             <CatalogHeaderForm data={headerConfig} setData={handleSaveHeader} />
@@ -285,21 +462,29 @@ export default function CatalogoPage() {
             <LimitBanner current={productCount} limit={limits.products} label="productos" plan={plan} />
 
             <Card>
-                <CardHeader className="flex flex-row justify-between items-center">
+                <CardHeader className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                     <div>
                         <CardTitle>Tus Productos</CardTitle>
                         <CardDescription>
                             Añade, edita y gestiona los productos de tu negocio.
                         </CardDescription>
                     </div>
-                     <div className="flex items-center gap-2">
+                     <div className="flex flex-wrap items-center gap-2">
+                        <Button variant="outline" size="sm" onClick={downloadTemplate} className="font-bold border-primary text-primary hover:bg-primary/5">
+                            <FileSpreadsheet className="mr-2 h-4 w-4" /> Plantilla
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} className="font-bold border-primary text-primary hover:bg-primary/5">
+                            <Upload className="mr-2 h-4 w-4" /> Importar
+                        </Button>
+                        <input type="file" ref={fileInputRef} className="hidden" accept=".xlsx,.csv" onChange={handleFileImport} />
+                        
                         <Button variant="outline" onClick={() => handleOpenActionWindow('print')}>
                             <Printer className="mr-2 h-4 w-4" />
                             Imprimir
                         </Button>
                         <Button variant="outline" onClick={() => handleOpenActionWindow('download')}>
                             <FileDown className="mr-2 h-4 w-4" />
-                            Descargar PDF
+                            PDF
                         </Button>
                         <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
                             <DialogTrigger asChild>
@@ -376,6 +561,105 @@ export default function CatalogoPage() {
             
             <ShareCatalog />
 
+            {/* DIÁLOGO DE VISTA PREVIA DE IMPORTACIÓN */}
+            <Dialog open={isImportModalOpen} onOpenChange={setIsImportModalOpen}>
+                <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col p-0">
+                    <DialogHeader className="p-6 pb-2">
+                        <DialogTitle className="flex items-center gap-2">
+                            <FileSpreadsheet className="h-5 w-5 text-primary" />
+                            Vista Previa de Importación de Productos
+                        </DialogTitle>
+                        <DialogDescription>
+                            Revisa los datos antes de guardarlos. Se detectaron {importRows.length} filas en total.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="flex-1 overflow-y-auto px-6 py-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                            <div className="p-4 bg-muted/50 rounded-xl text-center border">
+                                <p className="text-2xl font-black text-primary">{importRows.filter(r => r.isValid).length}</p>
+                                <p className="text-[10px] uppercase font-bold text-muted-foreground">Válidos</p>
+                            </div>
+                            <div className="p-4 bg-red-50 rounded-xl text-center border border-red-100">
+                                <p className="text-2xl font-black text-red-600">{importRows.filter(r => !r.isValid).length}</p>
+                                <p className="text-[10px] uppercase font-bold text-red-400">Con Error</p>
+                            </div>
+                            <div className="p-4 bg-blue-50 rounded-xl text-center border border-blue-100">
+                                <p className="text-2xl font-black text-blue-600">{availableSlots === Infinity ? '∞' : availableSlots}</p>
+                                <p className="text-[10px] uppercase font-bold text-blue-400">Cupos Disponibles</p>
+                            </div>
+                            <div className="p-4 bg-green-50 rounded-xl text-center border border-green-100">
+                                <p className="text-2xl font-black text-green-600">
+                                    {Math.min(importRows.filter(r => r.isValid).length, availableSlots)}
+                                </p>
+                                <p className="text-[10px] uppercase font-bold text-green-400">Se Importarán</p>
+                            </div>
+                        </div>
+
+                        {importRows.filter(r => r.isValid).length > availableSlots && (
+                            <div className="mb-6 p-3 bg-orange-50 border border-orange-200 rounded-lg flex items-start gap-3">
+                                <AlertTriangle className="h-5 w-5 text-orange-600 shrink-0 mt-0.5" />
+                                <p className="text-xs text-orange-800 leading-tight">
+                                    <strong>Atención:</strong> Tienes más productos válidos que cupos en tu plan. Solo se importarán los primeros {availableSlots} productos válidos de la lista.
+                                </p>
+                            </div>
+                        )}
+
+                        <div className="rounded-xl border overflow-hidden">
+                            <Table>
+                                <TableHeader className="bg-muted/50">
+                                    <TableRow>
+                                        <TableHead>Nombre</TableHead>
+                                        <TableHead>Categoría</TableHead>
+                                        <TableHead className="text-right">Precio</TableHead>
+                                        <TableHead className="text-right">Stock</TableHead>
+                                        <TableHead className="text-center">Img</TableHead>
+                                        <TableHead className="text-right">Estado</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {importRows.map((row, i) => {
+                                        const isOverPlanLimit = i >= availableSlots && row.isValid;
+                                        return (
+                                            <TableRow key={i} className={cn(!row.isValid && "bg-red-50/50", isOverPlanLimit && "opacity-40")}>
+                                                <TableCell className="text-sm font-medium">{row.Nombre || '-'}</TableCell>
+                                                <TableCell className="text-sm">{row.Categoría || '-'}</TableCell>
+                                                <TableCell className="text-right text-sm">{typeof row.Precio === 'number' ? row.Precio.toLocaleString('es-CO') : '-'}</TableCell>
+                                                <TableCell className="text-right text-sm">{row.Stock ?? '-'}</TableCell>
+                                                <TableCell className="text-center">
+                                                    {row.ImagenURL ? <CheckCircle2 className="h-4 w-4 text-blue-500 mx-auto" /> : '-'}
+                                                </TableCell>
+                                                <TableCell className="text-right">
+                                                    {!row.isValid ? (
+                                                        <Badge variant="destructive" className="text-[8px]">{row.error}</Badge>
+                                                    ) : isOverPlanLimit ? (
+                                                        <Badge variant="outline" className="text-[8px]">Omitido (Plan)</Badge>
+                                                    ) : (
+                                                        <CheckCircle2 className="h-4 w-4 text-green-500 ml-auto" />
+                                                    )}
+                                                </TableCell>
+                                            </TableRow>
+                                        );
+                                    })}
+                                </TableBody>
+                            </Table>
+                        </div>
+                    </div>
+
+                    <DialogFooter className="p-6 bg-muted/20 border-t">
+                        <Button variant="ghost" onClick={() => setIsImportModalOpen(false)} disabled={isImporting}>Cancelar</Button>
+                        <Button 
+                            onClick={confirmBulkImport} 
+                            disabled={isImporting || importRows.filter(r => r.isValid).length === 0 || availableSlots <= 0}
+                            className="font-bold px-8"
+                        >
+                            {isImporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                            Confirmar Importación ({Math.min(importRows.filter(r => r.isValid).length, availableSlots)})
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
             <AlertDialog open={!!productToDelete} onOpenChange={(open) => !open && setProductToDelete(null)}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
@@ -395,3 +679,4 @@ export default function CatalogoPage() {
         </div>
     );
 }
+
