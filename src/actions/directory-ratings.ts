@@ -83,14 +83,11 @@ export async function submitBusinessRating(data: {
         status = 'published';
     }
 
-    const newRating: Omit<DirectoryRating, 'id'> = {
+    // Construir objeto de forma segura para evitar errores de 'undefined' en el Admin SDK
+    const newRating: any = {
         businessId: data.businessId,
         businessName: data.businessName,
-        userId: data.userId,
         userName: finalUserName,
-        guestName: data.guestName,
-        guestPhone: data.guestPhone,
-        guestEmail: data.guestEmail,
         authType: data.authType,
         rating: data.rating,
         comment: data.comment,
@@ -98,6 +95,12 @@ export async function submitBusinessRating(data: {
         createdAt: now,
         updatedAt: now,
     };
+
+    // Solo añadir campos si tienen valor
+    if (data.userId) newRating.userId = data.userId;
+    if (data.guestName) newRating.guestName = data.guestName;
+    if (data.guestPhone) newRating.guestPhone = data.guestPhone;
+    if (data.guestEmail) newRating.guestEmail = data.guestEmail;
 
     try {
         const docRef = await db.collection('directoryRatings').add(newRating);

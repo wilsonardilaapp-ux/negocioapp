@@ -22,9 +22,6 @@ const ratingSchema = z.object({
   guestName: z.string().optional(),
   guestPhone: z.string().optional(),
   guestEmail: z.string().optional(),
-}).superRefine((data, ctx) => {
-  // Validación condicional: si no hay userId (implícito por el contexto de uso), requerimos datos de invitado
-  // Nota: En el componente manejamos la visibilidad, aquí reforzamos la lógica si los campos están presentes
 });
 
 type RatingFormData = z.infer<typeof ratingSchema>;
@@ -91,9 +88,18 @@ export function BusinessRatingForm({ businessId, businessName }: BusinessRatingF
       setIsSuccess(true);
       setLastStatus(result.status || '');
       reset();
-      toast({ title: '¡Gracias!', description: result.status === 'published' ? 'Tu valoración ha sido publicada.' : 'Tu valoración ha sido recibida y está pendiente de revisión por el administrador.' });
+      toast({ 
+        title: '¡Gracias!', 
+        description: result.status === 'published' 
+          ? 'Tu valoración ha sido publicada.' 
+          : 'Tu valoración ha sido recibida y está pendiente de revisión.' 
+      });
     } else {
-      toast({ variant: 'destructive', title: 'Error', description: 'No se pudo enviar la valoración.' });
+      toast({ 
+        variant: 'destructive', 
+        title: 'Error al enviar', 
+        description: result.error || 'No se pudo procesar tu valoración en este momento.' 
+      });
     }
   };
 
