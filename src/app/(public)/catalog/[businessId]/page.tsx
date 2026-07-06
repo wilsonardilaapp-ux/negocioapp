@@ -1,6 +1,7 @@
+
 'use client';
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, Suspense } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import { useFirebase } from '@/firebase';
 import { doc, getDoc, collectionGroup, query, where, getDocs, limit } from 'firebase/firestore';
@@ -24,7 +25,7 @@ interface CatalogPageProps {
     params: { businessId: string };
 }
 
-export default function CatalogPage({ params }: CatalogPageProps) {
+function CatalogPageContent({ params }: CatalogPageProps) {
     const slug = params.businessId;
     const searchParams = useSearchParams();
     const { firestore, isNetworkEnabled } = useFirebase();
@@ -149,10 +150,6 @@ export default function CatalogPage({ params }: CatalogPageProps) {
         setIsPurchaseModalOpen(true);
     };
 
-    /**
-     * Sincroniza la valoración actualizada de un producto en el estado local
-     * para que se refleje inmediatamente en la lista sin recargar.
-     */
     const handleRatingSync = useCallback((productId: string, newRating: number, newCount: number) => {
         setPageData(prev => {
             if (!prev.products) return prev;
@@ -260,4 +257,16 @@ export default function CatalogPage({ params }: CatalogPageProps) {
             <PublicMenuChatWidget businessId={pageData.resolvedBusinessId!} />
         </div>
     );
+}
+
+export default function CatalogPage(props: CatalogPageProps) {
+  return (
+    <Suspense fallback={
+        <div className="flex h-screen w-full items-center justify-center bg-gray-50 p-4 text-center">
+            <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        </div>
+    }>
+      <CatalogPageContent {...props} />
+    </Suspense>
+  );
 }

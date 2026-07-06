@@ -7,13 +7,6 @@ const nextConfig = {
         'date-fns', 
         'embla-carousel-react', 
         'embla-carousel-autoplay',
-        'firebase',
-        '@firebase/app',
-        '@firebase/auth',
-        '@firebase/firestore',
-        '@firebase/functions',
-        '@firebase/storage',
-        '@firebase/util',
         'react-quill',
         'quill'
     ],
