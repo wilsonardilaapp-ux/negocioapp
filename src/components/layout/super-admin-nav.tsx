@@ -30,6 +30,7 @@ import {
   Star,
   Gift,
   Cookie,
+  Database,
 } from "lucide-react";
 
 import { SidebarMenu, SidebarMenuItem, SidebarMenuButton, useSidebar } from "@/components/ui/sidebar";
@@ -57,6 +58,7 @@ const navItemsList = [
   { href: "/superadmin/modulos", icon: Box, label: "Módulos" },
   { href: "/superadmin/monitoreo", icon: Activity, label: "Monitoreo" },
   { href: "/superadmin/pistola-scanner", icon: ScanLine, label: "Pistola Escáner" },
+  { href: "/superadmin/migrations", icon: Database, label: "Migraciones" },
   { href: "/superadmin/configuracion", icon: Settings, label: "Configuración" },
   { href: "/superadmin/cookies", icon: Cookie, label: "Cookies" },
   { href: "/superadmin/analytics", icon: BarChart, label: "Métricas" },
