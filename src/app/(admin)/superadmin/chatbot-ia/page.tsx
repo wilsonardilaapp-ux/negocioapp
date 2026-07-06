@@ -24,8 +24,8 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Bot, Settings, CheckCircle, XCircle, Loader2 } from 'lucide-react';
 import type { Integration } from '@/models/integration';
-import { AIProviderForm } from '../integraciones/page';
 import { saveIntegrationFields, updateIntegrationStatus } from '@/actions/integrations';
+import { AIProviderForm } from '../integraciones/AIProviderForm';
 
 const AI_INTEGRATION_ID = 'chatbot-integrado-con-whatsapp-para-soporte-y-ventas';
 
