@@ -108,21 +108,20 @@ export default function ProductViewModal({
         rating
       });
 
-      if (result.success) {
-        // Actualización optimista local
-        const currentRating = Number(localStats.rating) || 0;
-        const currentCount = Number(localStats.count) || 0;
-        
-        const newCount = currentCount + 1;
-        const newRating = ((currentRating * currentCount) + rating) / newCount;
-        
-        setLocalStats({ rating: newRating, count: newCount });
+      if (result.success && result.rating !== undefined && result.ratingCount !== undefined) {
+        // Actualización definitiva basada en la respuesta del servidor
+        setLocalStats({ 
+          rating: result.rating, 
+          count: result.ratingCount 
+        });
         setHasVoted(true);
         setUserVote(rating);
 
         if (onRatingUpdated) {
-            onRatingUpdated(product.id, newRating, newCount);
+            onRatingUpdated(product.id, result.rating, result.ratingCount);
         }
+      } else if (!result.success) {
+        throw new Error(result.message);
       }
     } catch (error: any) {
       if (error.code === 'permission-denied' || error.message?.includes('permissions')) {

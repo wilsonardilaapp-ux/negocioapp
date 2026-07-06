@@ -1,4 +1,3 @@
-
 'use server';
 /**
  * @fileOverview A flow for rating a product.
@@ -15,7 +14,7 @@ import { RateProductInput, RateProductInputSchema } from '@/models/rate-product-
 
 
 // This is the wrapper function that will be called from the client.
-export async function rateProduct(input: RateProductInput): Promise<{ success: boolean; message: string }> {
+export async function rateProduct(input: RateProductInput): Promise<{ success: boolean; message: string; rating?: number; ratingCount?: number }> {
   return rateProductFlow(input);
 }
 
@@ -23,19 +22,20 @@ const rateProductFlow = ai.defineFlow(
   {
     name: 'rateProductFlow',
     inputSchema: RateProductInputSchema,
-    outputSchema: z.object({ success: z.boolean(), message: z.string() }),
+    outputSchema: z.object({ 
+      success: z.boolean(), 
+      message: z.string(),
+      rating: z.number().optional(),
+      ratingCount: z.number().optional()
+    }),
   },
   async (input) => {
-    // Genkit flows run in a server environment, so we need to initialize
-    // a server-side firestore client.
     const firestore = await getAdminFirestore();
     
-    // References for atomic update
     const productRef = firestore.collection('businesses').doc(input.businessId).collection('products').doc(input.productId);
     const catalogRef = firestore.collection('businesses').doc(input.businessId).collection('publicData').doc('catalog');
     
     try {
-      // Usar runTransaction para garantizar consistencia entre el producto y el catálogo denormalizado
       return await firestore.runTransaction(async (transaction) => {
         const productDoc = await transaction.get(productRef);
         if (!productDoc.exists) {
@@ -48,10 +48,10 @@ const rateProductFlow = ai.defineFlow(
 
         const newRatingCount = currentRatingCount + 1;
         const newTotalRating = (currentRating * currentRatingCount) + input.rating;
-        const newAverage = newTotalRating / newRatingCount;
+        const newAverage = Number((newTotalRating / newRatingCount).toFixed(2));
 
         const ratingUpdates = {
-          rating: Number(newAverage.toFixed(2)), // Forzar tipo numérico y limitar decimales
+          rating: newAverage,
           ratingCount: newRatingCount,
         };
 
@@ -60,27 +60,49 @@ const rateProductFlow = ai.defineFlow(
 
         // 2. Sincronizar con el catálogo público denormalizado
         const catalogDoc = await transaction.get(catalogRef);
-        if (catalogDoc.exists) {
-          const catalogData = catalogDoc.data();
-          const products = catalogData?.products || [];
-          const productIndex = products.findIndex((p: any) => p.id === input.productId);
-          
-          if (productIndex !== -1) {
-            // Actualizar solo el producto específico dentro del array denormalizado
-            products[productIndex] = {
-              ...products[productIndex],
-              ...ratingUpdates
-            };
-            transaction.update(catalogRef, { products });
-          }
+        
+        if (!catalogDoc.exists) {
+          throw new Error("Critical: Catalog document does not exist. Synchronization failed.");
         }
 
-        return { success: true, message: 'Rating updated and synced successfully in all sources.' };
+        const catalogData = catalogDoc.data();
+        const products = catalogData?.products || [];
+        const productIndex = products.findIndex((p: any) => p.id === input.productId);
+        
+        console.log(`[rateProductFlow] Syncing catalog for product ${input.productId}. Found at index: ${productIndex}`);
+
+        if (productIndex !== -1) {
+          // Actualizar solo el producto específico dentro del array
+          products[productIndex] = {
+            ...products[productIndex],
+            ...ratingUpdates
+          };
+        } else {
+          // BUG FIX: Si no existe en el array, lo agregamos completo con los nuevos ratings
+          console.warn(`[rateProductFlow] Product ${input.productId} missing from catalog array. Adding now.`);
+          products.push({
+            ...productData,
+            id: input.productId,
+            ...ratingUpdates
+          });
+        }
+
+        transaction.update(catalogRef, { products });
+
+        return { 
+          success: true, 
+          message: 'Rating updated and synced successfully in all sources.',
+          rating: newAverage,
+          ratingCount: newRatingCount
+        };
       });
 
     } catch (e: any) {
         console.error("[rateProductFlow] Critical Error:", e.message);
-        return { success: false, message: e.message || 'Failed to update rating due to a server-side error.' };
+        return { 
+          success: false, 
+          message: e.message || 'Failed to update rating due to a server-side error.' 
+        };
     }
   }
 );
