@@ -37,11 +37,20 @@ const rateProductFlow = ai.defineFlow(
     
     try {
       return await firestore.runTransaction(async (transaction) => {
+        // --- PASO 1: TODAS LAS LECTURAS PRIMERO (REGLA DE FIRESTORE) ---
         const productDoc = await transaction.get(productRef);
+        const catalogDoc = await transaction.get(catalogRef);
+
         if (!productDoc.exists) {
-          throw new Error(`Product not found at: ${productRef.path}`);
+          throw new Error(`El producto no existe.`);
         }
 
+        if (!catalogDoc.exists) {
+          // Lanza error explícito si el catálogo no existe en vez de fallar silenciosamente
+          throw new Error("El documento de catálogo denormalizado no existe. Sincronización imposible.");
+        }
+
+        // --- PASO 2: CÁLCULOS ---
         const productData = productDoc.data() as Product;
         const currentRating = Number(productData.rating) || 0;
         const currentRatingCount = Number(productData.ratingCount) || 0;
@@ -55,31 +64,19 @@ const rateProductFlow = ai.defineFlow(
           ratingCount: newRatingCount,
         };
 
-        // 1. Actualizar el documento de producto individual (Fuente de Verdad)
-        transaction.update(productRef, ratingUpdates);
-
-        // 2. Sincronizar con el catálogo público denormalizado
-        const catalogDoc = await transaction.get(catalogRef);
-        
-        if (!catalogDoc.exists) {
-          throw new Error("Critical: Catalog document does not exist. Synchronization failed.");
-        }
-
         const catalogData = catalogDoc.data();
         const products = catalogData?.products || [];
         const productIndex = products.findIndex((p: any) => p.id === input.productId);
         
-        console.log(`[rateProductFlow] Syncing catalog for product ${input.productId}. Found at index: ${productIndex}`);
-
         if (productIndex !== -1) {
-          // Actualizar solo el producto específico dentro del array
+          // Actualizar ítem existente
           products[productIndex] = {
             ...products[productIndex],
             ...ratingUpdates
           };
         } else {
-          // BUG FIX: Si no existe en el array, lo agregamos completo con los nuevos ratings
-          console.warn(`[rateProductFlow] Product ${input.productId} missing from catalog array. Adding now.`);
+          // Si el producto no estaba en el array, lo agregamos completo con el nuevo rating
+          // Esto soluciona desincronizaciones previas
           products.push({
             ...productData,
             id: input.productId,
@@ -87,21 +84,23 @@ const rateProductFlow = ai.defineFlow(
           });
         }
 
+        // --- PASO 3: TODAS LAS ESCRITURAS AL FINAL ---
+        transaction.update(productRef, ratingUpdates);
         transaction.update(catalogRef, { products });
 
         return { 
           success: true, 
-          message: 'Rating updated and synced successfully in all sources.',
+          message: 'Calificación actualizada y sincronizada.',
           rating: newAverage,
           ratingCount: newRatingCount
         };
       });
 
     } catch (e: any) {
-        console.error("[rateProductFlow] Critical Error:", e.message);
+        console.error("[rateProductFlow] Error en transacción:", e.message);
         return { 
           success: false, 
-          message: e.message || 'Failed to update rating due to a server-side error.' 
+          message: e.message || 'Error interno del servidor al procesar la calificación.' 
         };
     }
   }

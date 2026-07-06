@@ -108,8 +108,8 @@ export default function ProductViewModal({
         rating
       });
 
+      // VALIDACIÓN CRÍTICA: Solo mostramos éxito si el servidor confirmó la transacción exitosa
       if (result.success && result.rating !== undefined && result.ratingCount !== undefined) {
-        // Actualización definitiva basada en la respuesta del servidor
         setLocalStats({ 
           rating: result.rating, 
           count: result.ratingCount 
