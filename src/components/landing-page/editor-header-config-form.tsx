@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useRef, useState, useEffect } from 'react';
@@ -191,6 +192,7 @@ export default function EditorHeaderConfigForm({ data, setData }: EditorHeaderCo
 
   useEffect(() => {
     // Logic to initialize fields if they are missing, without creating infinite loop
+    // Note: setData is memoized in parent (EditorLandingForm)
     setData(prev => {
         let changed = false;
         const newData = { ...prev };
@@ -217,7 +219,7 @@ export default function EditorHeaderConfigForm({ data, setData }: EditorHeaderCo
         return changed ? newData : prev;
     });
 
-  }, [business, user, setData]); // Only run when source of truth changes
+  }, [business, user, setData]); // Only run when source of truth changes or stable setData changes
 
   const handleInputChange = (section: keyof LandingHeaderConfigData, field: string, value: any) => {
     setData((prev) => ({

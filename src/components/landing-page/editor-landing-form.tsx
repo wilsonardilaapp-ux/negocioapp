@@ -1,6 +1,7 @@
+
 'use client';
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { v4 as uuidv4 } from 'uuid';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -435,6 +436,16 @@ export default function EditorLandingForm({ data, setData, plans, loadingPlans }
         handleInputChange('form', 'fields', updatedFields);
     };
 
+    // Stable update function for EditorHeaderConfigForm to prevent infinite loops
+    const setHeaderData = useCallback((valOrUpdater: any) => {
+        setData((prev) => ({
+            ...prev,
+            header: typeof valOrUpdater === 'function'
+                ? (valOrUpdater as any)(prev.header)
+                : valOrUpdater
+        }));
+    }, [setData]);
+
     const socialIcons: { [key: string]: React.ReactNode } = {
         tiktok: <TikTokIcon className="h-5 w-5"/>,
         instagram: <InstagramIcon className="h-5 w-5"/>,
@@ -721,12 +732,7 @@ export default function EditorLandingForm({ data, setData, plans, loadingPlans }
             <TabsContent value="carousel">
                  <EditorHeaderConfigForm
                     data={data.header}
-                    setData={(valOrUpdater) => setData(prev => ({
-                        ...prev,
-                        header: typeof valOrUpdater === 'function'
-                            ? (valOrUpdater as any)(prev.header)
-                            : valOrUpdater
-                    }))}
+                    setData={setHeaderData}
                 />
             </TabsContent>
             
