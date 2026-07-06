@@ -8,8 +8,12 @@ export interface DirectoryRating {
   id: string;
   businessId: string;
   businessName: string;
-  userId: string;
-  userName: string;
+  userId?: string; // Opcional para soportar invitados
+  userName: string; // En invitados, mapea a guestName
+  guestName?: string;
+  guestPhone?: string;
+  guestEmail?: string;
+  authType: 'registered' | 'guest';
   rating: number; // Valor de 1 a 5
   comment: string;
   status: RatingStatus;

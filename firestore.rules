@@ -102,8 +102,21 @@ service cloud.firestore {
 
     // --- VALORACIONES DEL DIRECTORIO ---
     match /directoryRatings/{ratingId} {
+      // Lectura pública solo para lo publicado. Admin y Dueño ven todo.
       allow read, list: if resource.data.status == 'published' || isSuperAdmin() || isOwner(resource.data.businessId);
-      allow create: if isAuthenticated();
+      
+      // Creación:
+      // 1. Usuarios registrados (flujo normal)
+      // 2. Invitados: Forzar 'pending' y validar campos de contacto obligatorios. Bloquear campos admin.
+      allow create: if (isAuthenticated() && request.resource.data.authType == 'registered') || (
+        request.resource.data.authType == 'guest' &&
+        request.resource.data.status == 'pending' &&
+        request.resource.data.guestName != "" &&
+        request.resource.data.guestPhone != "" &&
+        !('adminResponse' in request.resource.data) &&
+        !('businessResponse' in request.resource.data)
+      );
+      
       allow update: if isSuperAdmin() || isOwner(resource.data.businessId);
       allow delete: if isSuperAdmin();
     }

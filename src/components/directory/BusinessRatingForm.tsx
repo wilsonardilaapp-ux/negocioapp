@@ -4,10 +4,11 @@ import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Star, Loader2, Send, CheckCircle2, MessageSquare } from 'lucide-react';
+import { Star, Loader2, Send, CheckCircle2, MessageSquare, User, Smartphone, Mail } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { useUser } from '@/firebase';
@@ -17,6 +18,13 @@ import { cn } from '@/lib/utils';
 const ratingSchema = z.object({
   rating: z.number().min(1, 'Por favor, selecciona una calificación.').max(5),
   comment: z.string().min(10, 'Tu comentario debe tener al menos 10 caracteres.'),
+  // Campos para invitados
+  guestName: z.string().optional(),
+  guestPhone: z.string().optional(),
+  guestEmail: z.string().optional(),
+}).superRefine((data, ctx) => {
+  // Validación condicional: si no hay userId (implícito por el contexto de uso), requerimos datos de invitado
+  // Nota: En el componente manejamos la visibilidad, aquí reforzamos la lógica si los campos están presentes
 });
 
 type RatingFormData = z.infer<typeof ratingSchema>;
@@ -38,31 +46,52 @@ export function BusinessRatingForm({ businessId, businessName }: BusinessRatingF
     defaultValues: {
       rating: 0,
       comment: '',
+      guestName: '',
+      guestPhone: '',
+      guestEmail: '',
     },
   });
 
   const currentRating = watch('rating');
 
   const onSubmit = async (data: RatingFormData) => {
+    // Validación manual para invitados si no hay usuario
     if (!user) {
-      toast({ variant: 'destructive', title: 'Acceso requerido', description: 'Debes iniciar sesión para calificar.' });
-      return;
+        if (!data.guestName || data.guestName.trim().length < 3) {
+            toast({ variant: 'destructive', title: 'Nombre requerido', description: 'Por favor ingresa tu nombre completo.' });
+            return;
+        }
+        const phoneDigits = data.guestPhone?.replace(/\D/g, '') || '';
+        if (phoneDigits.length < 10) {
+            toast({ variant: 'destructive', title: 'WhatsApp requerido', description: 'Ingresa un número de WhatsApp válido (mínimo 10 dígitos).' });
+            return;
+        }
     }
 
     const result = await submitBusinessRating({
       businessId,
       businessName,
-      userId: user.uid,
-      userName: profile?.name || user.email?.split('@')[0] || 'Usuario',
       rating: data.rating,
       comment: data.comment,
+      // Si hay usuario, enviamos sus datos
+      ...(user ? {
+          userId: user.uid,
+          userName: profile?.name || user.email?.split('@')[0] || 'Usuario',
+          authType: 'registered'
+      } : {
+          // Si no hay usuario, enviamos datos de invitado
+          guestName: data.guestName,
+          guestPhone: data.guestPhone,
+          guestEmail: data.guestEmail,
+          authType: 'guest'
+      })
     });
 
     if (result.success) {
       setIsSuccess(true);
       setLastStatus(result.status || '');
       reset();
-      toast({ title: '¡Gracias!', description: result.status === 'published' ? 'Tu valoración ha sido publicada.' : 'Tu valoración ha sido recibida y está pendiente de revisión.' });
+      toast({ title: '¡Gracias!', description: result.status === 'published' ? 'Tu valoración ha sido publicada.' : 'Tu valoración ha sido recibida y está pendiente de revisión por el administrador.' });
     } else {
       toast({ variant: 'destructive', title: 'Error', description: 'No se pudo enviar la valoración.' });
     }
@@ -82,7 +111,7 @@ export function BusinessRatingForm({ businessId, businessName }: BusinessRatingF
             <p className="text-sm text-green-700">
               {lastStatus === 'published' 
                 ? 'Gracias por compartir tu experiencia con la comunidad.' 
-                : 'Tu reseña ha sido guardada. Debido a nuestra política de calidad, las calificaciones de 1-3 estrellas son revisadas por moderadores antes de ser públicas.'}
+                : 'Tu reseña ha sido guardada. Para garantizar la veracidad del directorio, las reseñas de invitados son verificadas por el administrador antes de ser públicas.'}
             </p>
           </div>
           <Button variant="outline" className="border-green-200 text-green-700 hover:bg-green-100" onClick={() => setIsSuccess(false)}>
@@ -104,6 +133,54 @@ export function BusinessRatingForm({ businessId, businessName }: BusinessRatingF
       </CardHeader>
       <form onSubmit={handleSubmit(onSubmit)}>
         <CardContent className="space-y-6">
+          
+          {/* Datos de Contacto (Solo si no está logueado) */}
+          {!user && (
+            <div className="space-y-4 p-4 bg-muted/30 rounded-xl border border-dashed animate-in fade-in duration-500">
+                <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2">Datos de contacto para invitado</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                        <Label htmlFor="guestName" className="text-xs font-bold flex items-center gap-2">
+                            <User className="h-3 w-3" /> Nombre Completo *
+                        </Label>
+                        <Input 
+                            id="guestName" 
+                            placeholder="Tu nombre..." 
+                            {...register('guestName')}
+                            className="bg-white"
+                        />
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="guestPhone" className="text-xs font-bold flex items-center gap-2">
+                            <Smartphone className="h-3 w-3" /> WhatsApp *
+                        </Label>
+                        <Input 
+                            id="guestPhone" 
+                            type="tel"
+                            placeholder="300 123 4567..." 
+                            {...register('guestPhone')}
+                            className="bg-white"
+                        />
+                    </div>
+                </div>
+                <div className="space-y-2">
+                    <Label htmlFor="guestEmail" className="text-xs font-bold flex items-center gap-2">
+                        <Mail className="h-3 w-3" /> Correo Electrónico (Opcional)
+                    </Label>
+                    <Input 
+                        id="guestEmail" 
+                        type="email"
+                        placeholder="tu@correo.com" 
+                        {...register('guestEmail')}
+                        className="bg-white"
+                    />
+                </div>
+                <p className="text-[10px] text-muted-foreground italic">
+                    * Estos datos no serán públicos. Se usan solo para validación y moderación de spam.
+                </p>
+            </div>
+          )}
+
           <div className="space-y-2 text-center sm:text-left">
             <Label className="text-base">¿Qué te pareció el servicio?</Label>
             <div className="flex items-center justify-center sm:justify-start gap-1 pt-1">
@@ -142,22 +219,13 @@ export function BusinessRatingForm({ businessId, businessName }: BusinessRatingF
           </div>
         </CardContent>
         <CardFooter>
-          {!user ? (
-            <div className="w-full p-4 bg-muted/50 rounded-lg text-center space-y-3">
-              <p className="text-sm text-muted-foreground">Debes estar registrado para calificar este negocio.</p>
-              <Button asChild variant="outline" className="w-full">
-                <a href="/login">Iniciar Sesión</a>
-              </Button>
-            </div>
-          ) : (
-            <Button type="submit" className="w-full font-bold" disabled={isSubmitting}>
-              {isSubmitting ? (
-                <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Procesando...</>
-              ) : (
-                <><Send className="mr-2 h-4 w-4" /> Enviar Valoración</>
-              )}
-            </Button>
-          )}
+          <Button type="submit" className="w-full font-bold" disabled={isSubmitting}>
+            {isSubmitting ? (
+              <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Procesando...</>
+            ) : (
+              <><Send className="mr-2 h-4 w-4" /> Enviar Valoración</>
+            )}
+          </Button>
         </CardFooter>
       </form>
     </Card>

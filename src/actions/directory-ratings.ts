@@ -1,4 +1,3 @@
-
 'use server';
 
 import { getAdminFirestore } from '@/firebase/server-init';
@@ -58,23 +57,43 @@ export async function updateBusinessAggregates(businessId: string) {
 
 /**
  * Registra una nueva valoración con reglas automáticas de publicación y notifica al negocio.
+ * Soporta usuarios registrados e invitados.
  */
 export async function submitBusinessRating(data: {
     businessId: string;
     businessName: string;
-    userId: string;
-    userName: string;
     rating: number;
     comment: string;
+    userId?: string;
+    userName?: string;
+    guestName?: string;
+    guestPhone?: string;
+    guestEmail?: string;
+    authType: 'registered' | 'guest';
 }) {
     const db = await getAdminFirestore();
     const now = new Date().toISOString();
 
-    // Regla automática: 4-5 estrellas se publican, 1-3 quedan pendientes
-    const status: RatingStatus = data.rating >= 4 ? 'published' : 'pending';
+    let status: RatingStatus = 'pending';
+    let finalUserName = data.userName || data.guestName || 'Invitado';
+
+    // Regla de publicación para registrados: 4-5 estrellas se publican, 1-3 quedan pendientes
+    // Regla para invitados: SIEMPRE quedan pendientes para moderación
+    if (data.authType === 'registered' && data.rating >= 4) {
+        status = 'published';
+    }
 
     const newRating: Omit<DirectoryRating, 'id'> = {
-        ...data,
+        businessId: data.businessId,
+        businessName: data.businessName,
+        userId: data.userId,
+        userName: finalUserName,
+        guestName: data.guestName,
+        guestPhone: data.guestPhone,
+        guestEmail: data.guestEmail,
+        authType: data.authType,
+        rating: data.rating,
+        comment: data.comment,
         status,
         createdAt: now,
         updatedAt: now,
@@ -88,14 +107,14 @@ export async function submitBusinessRating(data: {
         const notificationData: Omit<AdminNotification, 'id'> = {
             fromSuperAdmin: true,
             subject: '⭐ Nueva valoración en el directorio',
-            body: `<p>Has recibido una nueva calificación de <strong>${data.rating} estrellas</strong> de <strong>${data.userName}</strong>.</p><p>Comentario: <em>"${data.comment}"</em></p><p>Estado: ${status === 'published' ? 'Publicada automáticamente.' : 'Pendiente de moderación por el Super Admin.'}</p>`,
+            body: `<p>Has recibido una nueva calificación de <strong>${data.rating} estrellas</strong> de <strong>${finalUserName}</strong>.</p><p>Comentario: <em>"${data.comment}"</em></p><p>Estado: ${status === 'published' ? 'Publicada automáticamente.' : 'Pendiente de moderación por el Super Admin.'}</p>`,
             read: false,
             createdAt: now,
             type: 'general',
         };
         await notificationRef.set(notificationData);
 
-        // Si se publicó automáticamente, actualizamos los indicadores del negocio
+        // Si se publicó automáticamente (solo registrados 4-5*), actualizamos los indicadores del negocio
         if (status === 'published') {
             await updateBusinessAggregates(data.businessId);
         }
