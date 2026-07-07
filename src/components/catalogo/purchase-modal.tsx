@@ -283,9 +283,45 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
 
         <div className="p-6 border-t bg-muted/20">
             <div className="space-y-2 mb-6">
-                <div className="flex justify-between text-sm"><span>Subtotal:</span><span>{formatCurrency(subtotalProducts)}</span></div>
-                {appliedCoupon && <div className="flex justify-between text-sm text-green-600 font-bold"><span>Cupón:</span><span>-{formatCurrency(discountFromCoupon)}</span></div>}
-                <div className="flex justify-between items-center pt-2 border-t font-black text-2xl text-primary"><span>Total:</span><span>{formatCurrency(total)}</span></div>
+                <div className="flex justify-between text-sm">
+                    <span>Subtotal:</span>
+                    <span>{formatCurrency(subtotalProducts)}</span>
+                </div>
+                
+                {appliedCoupon && (
+                    <div className="flex justify-between text-sm text-green-600 font-bold">
+                        <span>Cupón ({appliedCoupon.codigo}):</span>
+                        <span>-{formatCurrency(discountFromCoupon)}</span>
+                    </div>
+                )}
+
+                {packagingTotal > 0 && (
+                    <div className="flex justify-between text-sm">
+                        <span>Empaque:</span>
+                        <span>{formatCurrency(packagingTotal)}</span>
+                    </div>
+                )}
+
+                <div className="flex justify-between text-sm">
+                    <span>Envío:</span>
+                    <span>
+                        {tipoEntrega === 'domicilio' 
+                            ? (deliveryFee > 0 ? formatCurrency(deliveryFee) : 'Gratis')
+                            : 'Gratis (recoger en tienda)'}
+                    </span>
+                </div>
+
+                {vatAmount > 0 && (
+                    <div className="flex justify-between text-sm text-muted-foreground">
+                        <span>IVA ({vatRate}%):</span>
+                        <span>{formatCurrency(vatAmount)}</span>
+                    </div>
+                )}
+
+                <div className="flex justify-between items-center pt-2 border-t font-black text-2xl text-primary">
+                    <span>Total:</span>
+                    <span>{formatCurrency(total)}</span>
+                </div>
             </div>
             <button type="submit" form="purchase-form" className="w-full h-14 bg-primary text-white text-lg font-bold rounded-xl flex items-center justify-center gap-2 hover:bg-primary/90" disabled={isSubmitting}>
                 {isSubmitting ? <Loader2 className="animate-spin" /> : <WhatsAppIcon className="h-4 w-4" />}
