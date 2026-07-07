@@ -10,8 +10,9 @@ import CatalogHeader from '@/components/catalogo/catalog-header';
 import PublicProductCard from '@/components/catalogo/public-product-card';
 import ProductViewModal from '@/components/catalogo/product-view-modal';
 import { PurchaseModal } from '@/components/catalogo/purchase-modal';
+import { CartDrawer } from '@/components/catalogo/cart-drawer';
 import { SuggestionModal } from '@/components/suggestions/suggestion-modal';
-import { Frown, Loader2, PackageSearch } from 'lucide-react';
+import { Frown, Loader2, PackageSearch, CheckCircle2 } from 'lucide-react';
 import type { LandingHeaderConfigData } from '@/models/landing-page';
 import type { Product } from '@/models/product';
 import type { PaymentSettings } from '@/models/payment-settings';
@@ -20,6 +21,7 @@ import type { CartItem } from '@/models/cart';
 import { getSuggestion } from '@/ai/flows/suggestion-flow';
 import { updateSuggestionMetrics } from '@/ai/flows/update-suggestion-metrics-flow';
 import { PublicMenuChatWidget } from '@/components/public-menu-chatbot/PublicMenuChatWidget';
+import { useToast } from '@/hooks/use-toast';
 
 interface CatalogPageProps {
     params: { businessId: string };
@@ -29,6 +31,7 @@ function CatalogPageContent({ params }: CatalogPageProps) {
     const slug = params.businessId;
     const searchParams = useSearchParams();
     const { firestore, isNetworkEnabled } = useFirebase();
+    const { toast } = useToast();
 
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -46,6 +49,7 @@ function CatalogPageContent({ params }: CatalogPageProps) {
 
     const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
     const [cartItems, setCartItems] = useState<CartItem[]>([]);
+    const [isCartOpen, setIsCartOpen] = useState(false);
     const [isPurchaseModalOpen, setIsPurchaseModalOpen] = useState(false);
     
     // Sugerencia
@@ -129,9 +133,20 @@ function CatalogPageContent({ params }: CatalogPageProps) {
             }
         }
         
-        // 2. Si no hay sugerencia o falla, directo al checkout
+        // 2. Si no hay sugerencia o falla, agregar al carrito y mostrar confirmación (UX mejorada)
         handleAddToCart(product, 1);
-        setIsPurchaseModalOpen(true);
+        toast({
+            title: "Producto añadido",
+            description: `${product.name} se agregó a tu carrito.`,
+            action: (
+                <button 
+                    onClick={() => setIsCartOpen(true)}
+                    className="bg-primary text-white text-[10px] font-bold uppercase px-3 py-1 rounded-md"
+                >
+                    Ver Carrito
+                </button>
+            ),
+        });
     };
 
     const acceptSuggestion = () => {
@@ -147,7 +162,7 @@ function CatalogPageContent({ params }: CatalogPageProps) {
         handleAddToCart(activeSuggestion.original, 1);
         handleAddToCart(activeSuggestion.suggestion.suggestedProduct!, 1);
         setActiveSuggestion(null);
-        setIsPurchaseModalOpen(true);
+        setIsCartOpen(true);
     };
 
     const handleRatingSync = useCallback((productId: string, newRating: number, newCount: number) => {
@@ -189,8 +204,8 @@ function CatalogPageContent({ params }: CatalogPageProps) {
             {pageData.headerConfig && (
                 <CatalogHeader 
                     config={pageData.headerConfig} 
-                    cartCount={cartItems.length}
-                    onOpenCart={() => setIsPurchaseModalOpen(true)}
+                    cartCount={cartItems.reduce((sum, item) => sum + item.quantity, 0)}
+                    onOpenCart={() => setIsCartOpen(true)}
                 />
             )}
 
@@ -223,8 +238,21 @@ function CatalogPageContent({ params }: CatalogPageProps) {
                 onAddToCart={(qty) => {
                     handleAddToCart(selectedProduct!, qty);
                     setSelectedProduct(null);
+                    setIsCartOpen(true);
                 }}
                 onRatingUpdated={handleRatingSync}
+            />
+
+            <CartDrawer 
+                isOpen={isCartOpen}
+                onOpenChange={setIsCartOpen}
+                cartItems={cartItems}
+                onRemoveItem={(id) => setCartItems(prev => prev.filter(i => i.id !== id))}
+                onUpdateQuantity={(id, qty) => setCartItems(prev => prev.map(i => i.id === id ? {...i, quantity: qty} : i))}
+                onCheckout={() => {
+                    setIsCartOpen(false);
+                    setIsPurchaseModalOpen(true);
+                }}
             />
 
             <PurchaseModal 
@@ -249,7 +277,7 @@ function CatalogPageContent({ params }: CatalogPageProps) {
                     onDecline={() => {
                         handleAddToCart(activeSuggestion.original, 1);
                         setActiveSuggestion(null);
-                        setIsPurchaseModalOpen(true);
+                        setIsCartOpen(true);
                     }}
                 />
             )}
