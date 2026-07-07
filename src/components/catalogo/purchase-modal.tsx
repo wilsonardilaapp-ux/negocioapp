@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -274,7 +275,6 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
                 {tipoEntrega === 'domicilio' && <div className="space-y-2"><Label>Dirección *</Label><Textarea {...register('address')} /></div>}
             </div>
 
-            {/* SECCIÓN RESTAURADA: MÉTODO DE PAGO */}
             <div className="space-y-4">
                 <h4 className="font-bold text-lg">Método de Pago</h4>
                 <RadioGroup
@@ -328,6 +328,59 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
                         </Label>
                     )}
                 </RadioGroup>
+
+                {/* Bloque de detalles de pago manual */}
+                {selectedPaymentMethod && selectedPaymentMethod !== 'pagoContraEntrega' && (
+                    <div className="p-4 bg-muted/50 rounded-xl border-2 border-dashed border-muted space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                        {(() => {
+                            const methodData = selectedPaymentMethod === 'breB' 
+                                ? paymentSettings?.breB 
+                                : (paymentSettings as any)?.[selectedPaymentMethod];
+                            
+                            if (!methodData) return null;
+
+                            const numberValue = selectedPaymentMethod === 'breB' ? methodData.keyValue : methodData.accountNumber;
+                            const numberLabel = selectedPaymentMethod === 'breB' ? methodData.keyType : 'Número';
+
+                            return (
+                                <>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-1">
+                                            <Label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Titular</Label>
+                                            <p className="text-sm font-bold text-gray-900 truncate">{methodData.holderName || 'No especificado'}</p>
+                                        </div>
+                                        <div className="space-y-1">
+                                            <Label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">{numberLabel || 'Cuenta'}</Label>
+                                            <p className="text-sm font-bold text-gray-900 truncate">{numberValue || 'No especificado'}</p>
+                                        </div>
+                                    </div>
+
+                                    {methodData.qrImageUrl && (
+                                        <div className="flex flex-col items-center gap-2 pt-2 border-t border-muted">
+                                            <div className="relative h-44 w-44 bg-white p-2 rounded-lg border shadow-sm">
+                                                <Image 
+                                                    src={methodData.qrImageUrl} 
+                                                    alt={`QR de Pago ${selectedPaymentMethod}`} 
+                                                    fill 
+                                                    className="object-contain" 
+                                                />
+                                            </div>
+                                            <span className="text-[10px] font-bold text-muted-foreground uppercase">Escanea para pagar</span>
+                                        </div>
+                                    )}
+
+                                    {methodData.instructions && (
+                                        <div className="pt-2 border-t border-muted">
+                                            <p className="text-[11px] text-muted-foreground italic leading-tight">
+                                                {methodData.instructions}
+                                            </p>
+                                        </div>
+                                    )}
+                                </>
+                            );
+                        })()}
+                    </div>
+                )}
             </div>
 
             <div className="space-y-4 pb-6">
