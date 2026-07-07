@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -12,7 +13,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { ShoppingBag, Minus, Plus, Tag, Trash2, Loader2, Ticket, X, CheckCircle, CreditCard, Building, Smartphone, HandCoins, Copy, Check } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { PaymentSettings } from '@/models/payment-settings';
-import type { TipoEntrega } from '@/models/order';
+import type { OrderStatus, TipoEntrega } from '@/models/order';
 import { useFirestore, addDocumentNonBlocking } from '@/firebase';
 import { collection } from 'firebase/firestore';
 import { cn, normalizePhoneNumber } from '@/lib/utils';
@@ -170,7 +171,7 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
             subtotal: itemSubtotal,
             paymentMethod: selectedPaymentMethod,
             orderDate: now,
-            orderStatus: 'Pendiente',
+            orderStatus: 'Pendiente' as OrderStatus,
             tipoEntrega,
             packagingCost: item.packagingCost || 0,
         });
@@ -223,8 +224,8 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
             <div className="border rounded-xl divide-y bg-muted/30 overflow-hidden">
                 {cartItems.map(item => (
                 <div key={item.id} className="flex items-center justify-between p-4 bg-white/50">
-                    <div className="flex items-center flex-1 gap-4">
-                        <div className="relative h-14 w-14 rounded-lg border bg-white overflow-hidden">
+                    <div className="flex items-center flex-1 min-w-0 gap-4">
+                        <div className="relative h-14 w-14 rounded-lg border bg-white overflow-hidden shrink-0">
                             <Image src={item.images?.[0] || ''} alt={item.name} fill sizes="3.5rem" className="object-cover" />
                         </div>
                         <div className="flex-1 min-w-0">
@@ -232,13 +233,14 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
                             <span className="text-sm font-black text-primary">{formatCurrency(item.appliedPromotion?.discountedPrice ?? item.price)}</span>
                         </div>
                     </div>
-                    <div className="flex items-center gap-3">
-                        <div className="flex items-center border rounded-lg bg-white overflow-hidden">
+                    {/* Contenedor derecho con ancho reservado para corregir desalineación */}
+                    <div className="flex items-center gap-3 shrink-0 ml-4 w-[140px] justify-end">
+                        <div className="flex items-center border rounded-lg bg-white overflow-hidden shrink-0">
                             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onUpdateQuantity(item.id, Math.max(0, item.quantity - 1))}><Minus className="h-3 w-3" /></Button>
                             <span className="w-8 text-center text-sm font-bold">{item.quantity}</span>
                             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onUpdateQuantity(item.id, item.quantity + 1)}><Plus className="h-3 w-3" /></Button>
                         </div>
-                        <Button variant="ghost" size="icon" className="text-destructive" onClick={() => onRemoveItem(item.id)}><Trash2 className="h-4 w-4" /></Button>
+                        <Button variant="ghost" size="icon" className="text-destructive shrink-0" onClick={() => onRemoveItem(item.id)}><Trash2 className="h-4 w-4" /></Button>
                     </div>
                 </div>
                 ))}
