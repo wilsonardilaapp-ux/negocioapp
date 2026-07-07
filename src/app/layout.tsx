@@ -3,7 +3,6 @@ import type { Metadata } from 'next';
 import { PT_Sans } from 'next/font/google';
 import './globals.css';
 import { Providers } from './providers';
-import FaviconInjector from '@/components/layout/FaviconInjector';
 
 const ptSans = PT_Sans({
   subsets: ['latin'],
@@ -14,6 +13,9 @@ const ptSans = PT_Sans({
 export const metadata: Metadata = {
   title: 'Markix Platform',
   description: 'Plataforma para la gestión de productos de salud y bienestar.',
+  icons: {
+    icon: '/favicon.ico',
+  },
 };
 
 export default function RootLayout({
@@ -25,7 +27,6 @@ export default function RootLayout({
     <html lang="es" suppressHydrationWarning>
       <body className={`${ptSans.variable} font-body antialiased`}>
         <Providers>
-          <FaviconInjector sourceType="platform" />
           {children}
         </Providers>
       </body>
