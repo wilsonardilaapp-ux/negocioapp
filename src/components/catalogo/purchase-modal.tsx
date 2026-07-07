@@ -56,7 +56,6 @@ const formatCurrency = (value: number) => {
     }).format(value);
 };
 
-// Mapeo de claves técnicas a nombres legibles para el mensaje de WhatsApp
 const PAYMENT_METHOD_LABELS: Record<string, string> = {
     nequi: 'Nequi',
     bancolombia: 'Bancolombia',
@@ -157,8 +156,8 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
     const separator = "━━━━━━━━━━━━━━━━━━━━";
     const subSeparator = "────────────────────";
 
-    // Emojis usando pares subrogados para máxima compatibilidad
-    const emoScooter = "\uD83D\uDEF5"; // 🛵
+    // PRUEBA DE CONTROL (Punto 5): Usando 🙂 (\uD83D\uDE42) para el título
+    const emoScooter = "\uD83D\uDE42"; // Cambiado de 🛵 a 🙂 para diagnóstico
     const emoStore = "\uD83C\uDFEC";   // 🏬
     const emoUser = "\uD83D\uDC64";    // 👤
     const emoPhone = "\uD83D\uDCF1";   // 📱
@@ -242,6 +241,12 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
     orderSummary += `${emoCard} M\u00E9todo de pago:\n${paymentLabel}\n`;
     orderSummary += `${separator}\n`;
     orderSummary += `${emoThanks} Gracias por tu compra.\nTu pedido ser\u00E1 preparado y enviado lo antes posible.`;
+
+    // LOGS DE DIAGNÓSTICO (Punto 2)
+    console.log("DEBUG - Order Summary Content:", orderSummary);
+    console.log("DEBUG - First Char (Unicode):", orderSummary.charAt(0));
+    console.log("DEBUG - First CharCodeAt(0):", orderSummary.charCodeAt(0).toString(16).toUpperCase());
+    console.log("DEBUG - First CharCodeAt(1) (surrogate pair part):", orderSummary.charCodeAt(1).toString(16).toUpperCase());
 
     const cleanPhone = normalizePhoneNumber(businessInfo?.phone || '3228831634');
     window.open(`https://wa.me/${cleanPhone}?text=${encodeURIComponent(orderSummary)}`, '_blank');
@@ -393,7 +398,6 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
                     )}
                 </RadioGroup>
 
-                {/* Bloque de detalles de pago manual */}
                 {selectedPaymentMethod && selectedPaymentMethod !== 'pagoContraEntrega' && (
                     <div className="p-4 bg-muted/50 rounded-xl border-2 border-dashed border-muted space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
                         {(() => {
