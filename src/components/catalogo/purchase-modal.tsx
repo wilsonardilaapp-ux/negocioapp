@@ -201,7 +201,7 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[95vh] overflow-hidden flex flex-col p-0">
+      <DialogContent className="max-w-lg max-h-[95vh] overflow-hidden flex flex-col p-0">
         <DialogHeader className="p-6 pb-2 text-foreground">
           <DialogTitle className="text-2xl flex items-center gap-2">
             <ShoppingBag className="h-6 w-6" />
