@@ -162,7 +162,6 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
     const emoPhone = "\uD83D\uDCF1";   
     const emoPin = "\uD83D\uDCCD";     
     const emoCart = "\uD83D\uDED2";    
-    const emoDollar = "\uD83D\uDCB2";  
     const emoReceipt = "\uD83E\uDDFE"; 
     const emoMoneyBag = "\uD83D\uDCB0"; 
     const emoCard = "\uD83D\uDCB3";    
@@ -194,7 +193,7 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
         const itemUnitPrice = item.appliedPromotion?.discountedPrice ?? item.price;
         const itemSubtotal = itemUnitPrice * item.quantity;
         
-        orderSummary += `- ${item.quantity} × ${item.name}\n  ${emoDollar} ${formatCurrency(itemUnitPrice)}\n`;
+        orderSummary += `- ${item.quantity} \u00D7 ${item.name}\n  ${formatCurrency(itemUnitPrice)}\n`;
 
         addDocumentNonBlocking(ordersCollectionRef, {
             businessId,
@@ -267,7 +266,7 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
       <DialogContent className="max-w-lg max-h-[95vh] overflow-hidden flex flex-col p-0">
         <DialogHeader className="p-6 pb-2 text-foreground">
           <DialogTitle className="text-2xl flex items-center gap-2">
-            <ShoppingBag className="h-6 w-6" />
+            <ShoppingBag className="h-6 v-6" />
             Finalizar Compra
           </DialogTitle>
           <DialogDescription>Revisa tu pedido y completa tus datos.</DialogDescription>
@@ -494,7 +493,7 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
                 </div>
             </div>
             <button type="submit" form="purchase-form" className="w-full h-14 bg-primary text-white text-lg font-bold rounded-xl flex items-center justify-center gap-2 hover:bg-primary/90" disabled={isSubmitting}>
-                {isSubmitting ? <Loader2 className="animate-spin" /> : <WhatsAppIcon className="h-4 w-4" />}
+                {isSubmitting ? <Loader2 className="animate-spin" /> : <WhatsAppIcon className="h-4 v-4" />}
                 Confirmar y Enviar Pedido
             </button>
         </div>
