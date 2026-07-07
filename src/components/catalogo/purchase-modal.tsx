@@ -57,6 +57,15 @@ const formatCurrency = (value: number) => {
     }).format(value);
 };
 
+// Mapeo de claves técnicas a nombres legibles para el mensaje de WhatsApp
+const PAYMENT_METHOD_LABELS: Record<string, string> = {
+    nequi: 'Nequi',
+    bancolombia: 'Bancolombia',
+    daviplata: 'Daviplata',
+    breB: 'Bre-B',
+    pagoContraEntrega: 'Pago contra entrega',
+};
+
 export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, onUpdateQuantity, onClearCart, businessId, businessInfo, paymentSettings }: PurchaseModalProps) {
   const { toast } = useToast();
   const firestore = useFirestore();
@@ -147,8 +156,9 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
 
   const onSubmit = async (data: z.infer<typeof purchaseSchema>) => {
     const separator = "━━━━━━━━━━━━━━━━━━";
-    let orderSummary = `🛵 *PEDIDO A DOMICILIO*\n${separator}\n`;
-    orderSummary += `👤 Cliente: ${data.fullName}\n📞 WhatsApp: ${data.whatsapp}\n🏠 Dir: ${data.address || 'Tienda'}\n${separator}\n`;
+    // Usamos secuencias de escape Unicode para evitar corrupción de emojis en el mensaje de WhatsApp
+    let orderSummary = `\u{1F6F5} *PEDIDO A DOMICILIO*\n${separator}\n`;
+    orderSummary += `\u{1F464} Cliente: ${data.fullName}\n\u{1F4DE} WhatsApp: ${data.whatsapp}\n\u{1F3E0} Dir: ${data.address || 'Tienda'}\n${separator}\n`;
     
     const ordersCollectionRef = collection(firestore, `businesses/${businessId}/orders`);
     const now = new Date().toISOString();
@@ -156,7 +166,7 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
     cartItems.forEach(item => {
         const itemUnitPrice = item.appliedPromotion?.discountedPrice ?? item.price;
         const itemSubtotal = itemUnitPrice * item.quantity;
-        orderSummary += `• ${item.quantity}x ${item.name} - ${formatCurrency(itemSubtotal)}\n`;
+        orderSummary += `\u{2022} ${item.quantity}x ${item.name} - ${formatCurrency(itemSubtotal)}\n`;
 
         addDocumentNonBlocking(ordersCollectionRef, {
             businessId,
@@ -177,7 +187,8 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
         });
     });
     
-    orderSummary += `${separator}\n💵 *TOTAL: ${formatCurrency(total)}*\n💳 Pago: ${selectedPaymentMethod}`;
+    const paymentLabel = PAYMENT_METHOD_LABELS[selectedPaymentMethod] ?? selectedPaymentMethod;
+    orderSummary += `${separator}\n\u{1F4B5} *TOTAL: ${formatCurrency(total)}*\n\u{1F4B3} Pago: ${paymentLabel}`;
 
     const cleanPhone = normalizePhoneNumber(businessInfo?.phone || '3228831634');
     window.open(`https://wa.me/${cleanPhone}?text=${encodeURIComponent(orderSummary)}`, '_blank');
