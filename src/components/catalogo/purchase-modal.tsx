@@ -193,7 +193,6 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
         const itemUnitPrice = item.appliedPromotion?.discountedPrice ?? item.price;
         const itemSubtotal = itemUnitPrice * item.quantity;
         
-        // Alineación de precio del producto a la derecha
         orderSummary += `- ${item.quantity} \u00D7 ${item.name}\n  ${formatCurrency(itemUnitPrice).padStart(12)}\n`;
 
         addDocumentNonBlocking(ordersCollectionRef, {
@@ -239,10 +238,9 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
     orderSummary += `${emoMoneyBag} TOTAL:      ${formatCurrency(total).padStart(12)}\n`;
     orderSummary += `${emoCard} Método de pago:\n${paymentLabel}\n`;
     orderSummary += `${separator}\n`;
-    orderSummary += `${emoThanks} Gracias por tu compra.\nTu pedido será preparado y enviado lo antes posible.\n` + "```"; // Fin de bloque monoespaciado
+    orderSummary += `${emoThanks} Gracias por tu compra.\nTu pedido será preparado y enviado lo antes posible.\n` + "```";
 
     const cleanPhone = normalizePhoneNumber(businessInfo?.phone || '3228831634');
-    // Usamos api.whatsapp.com directamente para evitar corrupción de caracteres en la redirección de wa.me
     window.open(`https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(orderSummary)}`, '_blank');
     
     onClearCart();
@@ -338,6 +336,7 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
                 {tipoEntrega === 'domicilio' && <div className="space-y-2"><Label>Dirección *</Label><Textarea {...register('address')} /></div>}
             </div>
 
+            {/* SECTOR DE MÉTODO DE PAGO RESTAURADO */}
             <div className="space-y-4">
                 <h4 className="font-bold text-lg">Método de Pago</h4>
                 <RadioGroup
@@ -392,6 +391,7 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
                     )}
                 </RadioGroup>
 
+                {/* BLOQUE DE DETALLES DE CUENTA RESTAURADO */}
                 {selectedPaymentMethod && selectedPaymentMethod !== 'pagoContraEntrega' && (
                     <div className="p-4 bg-muted/50 rounded-xl border-2 border-dashed border-muted space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
                         {(() => {
