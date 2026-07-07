@@ -192,7 +192,6 @@ export default function EditorHeaderConfigForm({ data, setData }: EditorHeaderCo
 
   useEffect(() => {
     // Logic to initialize fields if they are missing, without creating infinite loop
-    // Note: setData is memoized in parent (EditorLandingForm)
     setData(prev => {
         let changed = false;
         const newData = { ...prev };
@@ -207,11 +206,12 @@ export default function EditorHeaderConfigForm({ data, setData }: EditorHeaderCo
         }
 
         // Pre-fill business info if not set
-        if (business && !newData.businessInfo.name) {
+        // FIX: Ensure business name is actually truthy to avoid repeating empty string sets
+        if (business && business.name && !newData.businessInfo.name) {
             newData.businessInfo = {
                 ...newData.businessInfo,
                 name: business.name,
-                email: user?.email || '',
+                email: newData.businessInfo.email || user?.email || '',
             };
             changed = true;
         }

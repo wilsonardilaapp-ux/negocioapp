@@ -115,79 +115,18 @@ const MediaUploader = ({
 export default function EditorLandingForm({ data, setData, plans, loadingPlans }: EditorLandingFormProps) {
     const [newKeyword, setNewKeyword] = useState('');
     const { toast } = useToast();
-    const firestore = useFirestore();
-    const { user } = useUser();
-
-    const globalConfigRef = useMemoFirebase(() => !firestore ? null : doc(firestore, 'globalConfig/system'), [firestore]);
-    const { data: globalConfig } = useDoc<GlobalConfig>(globalConfigRef);
-
-    const handleFileUpload = async (file: File): Promise<{ secure_url: string, mediaType: 'image' | 'video' } | null> => {
-        return new Promise((resolve) => {
-            const reader = new FileReader();
-            reader.readAsDataURL(file);
-            reader.onloadend = async () => {
-                const mediaDataUri = reader.result as string;
-                try {
-                    const result = await uploadMedia({ mediaDataUri });
-                    const mediaType = file.type.startsWith('image') ? 'image' : 'video';
-                    toast({ title: "Archivo subido", description: "El medio ha sido cargado a Cloudinary." });
-                    resolve({ secure_url: result.secure_url, mediaType });
-                } catch (error: any) {
-                    toast({ variant: 'destructive', title: "Error al subir", description: error.message });
-                    resolve(null);
-                }
-            };
-            reader.onerror = () => {
-                toast({ variant: 'destructive', title: "Error", description: "No se pudo leer el archivo."});
-                resolve(null);
-            }
-        });
-    };
-
-    const handleLogoUpload = async (file: File) => {
-        const uploadResult = await handleFileUpload(file);
-        if (uploadResult && uploadResult.mediaType === 'image') {
-            handleInputChange('navigation', 'logoUrl', uploadResult.secure_url);
-        } else if (uploadResult) {
-            toast({ variant: 'destructive', title: 'Error de formato', description: 'Solo se pueden subir imágenes como logo.' });
-        }
-    };
     
-    const handleSubSectionMediaUpload = async (sectionId: string, subSectionId: string, file: File) => {
-        const uploadResult = await handleFileUpload(file);
-        if (uploadResult) {
-            const updatedSections = data.sections.map(section => {
-                if (section.id === sectionId) {
-                    const updatedSubSections = section.subsections.map(sub =>
-                        sub.id === subSectionId ? { ...sub, imageUrl: uploadResult.secure_url, mediaType: uploadResult.mediaType } : sub
-                    );
-                    return { ...section, subsections: updatedSubSections };
-                }
-                return section;
-            });
-            setData((prevData) => ({ ...prevData, sections: updatedSections }));
-        }
-    };
+    // Stable update function for EditorHeaderConfigForm to prevent infinite loops
+    const setHeaderData = useCallback((valOrUpdater: any) => {
+        setData((prev) => ({
+            ...prev,
+            header: typeof valOrUpdater === 'function'
+                ? (valOrUpdater as any)(prev.header)
+                : valOrUpdater
+        }));
+    }, [setData]);
 
-    const handlePlanImageUpload = async (planId: string, file: File) => {
-        const uploadResult = await handleFileUpload(file);
-        if (uploadResult && uploadResult.mediaType === 'image') {
-            updatePlan(planId, 'imageUrl', uploadResult.secure_url);
-        } else if (uploadResult) {
-            toast({ variant: 'destructive', title: 'Error de formato', description: 'Solo se pueden subir imágenes para los planes.' });
-        }
-    };
-    
-    const handleTestimonialAvatarUpload = async (id: string, file: File) => {
-        const uploadResult = await handleFileUpload(file);
-         if (uploadResult && uploadResult.mediaType === 'image') {
-            updateTestimonial(id, 'avatarUrl', uploadResult.secure_url);
-        } else if (uploadResult) {
-            toast({ variant: 'destructive', title: 'Error de formato', description: 'Solo se pueden subir imágenes como avatares.' });
-        }
-    };
-
-    const handleInputChange = (section: keyof LandingPageData, field: string, value: any) => {
+    const handleInputChange = useCallback((section: keyof LandingPageData, field: string, value: any) => {
         setData((prevData: LandingPageData) => ({
             ...prevData,
             [section]: {
@@ -195,16 +134,21 @@ export default function EditorLandingForm({ data, setData, plans, loadingPlans }
                 [field]: value
             }
         }));
-    };
+    }, [setData]);
 
-    const handleNavLinkChange = (id: string, field: keyof NavLink, value: any) => {
-        const updatedLinks = data.navigation.links.map(link =>
-            link.id === id ? { ...link, [field]: value } : link
-        );
-        handleInputChange('navigation', 'links', updatedLinks);
-    };
+    const handleNavLinkChange = useCallback((id: string, field: keyof NavLink, value: any) => {
+        setData((prevData) => {
+            const updatedLinks = prevData.navigation.links.map(link =>
+                link.id === id ? { ...link, [field]: value } : link
+            );
+            return {
+                ...prevData,
+                navigation: { ...prevData.navigation, links: updatedLinks }
+            };
+        });
+    }, [setData]);
     
-    const handleFooterChange = (section: keyof LandingPageData['footer'], field: string, value: any) => {
+    const handleFooterChange = useCallback((section: keyof LandingPageData['footer'], field: string, value: any) => {
         setData((prevData) => ({
             ...prevData,
             footer: {
@@ -215,48 +159,68 @@ export default function EditorLandingForm({ data, setData, plans, loadingPlans }
                 }
             }
         }));
-    };
+    }, [setData]);
     
-    const handleFooterLinkChange = (id: string, field: keyof FooterLink, value: any) => {
-        const updatedLinks = data.footer.quickLinks.map(link => 
-            link.id === id ? { ...link, [field]: value } : link
-        );
-        setData((prevData) => ({ ...prevData, footer: { ...prevData.footer, quickLinks: updatedLinks }}));
-    };
+    const handleFooterLinkChange = useCallback((id: string, field: keyof FooterLink, value: any) => {
+        setData((prevData) => {
+            const updatedLinks = prevData.footer.quickLinks.map(link => 
+                link.id === id ? { ...link, [field]: value } : link
+            );
+            return { ...prevData, footer: { ...prevData.footer, quickLinks: updatedLinks }};
+        });
+    }, [setData]);
     
-    const addFooterLink = () => {
+    const addFooterLink = useCallback(() => {
         const newLink: FooterLink = { id: uuidv4(), text: 'Nuevo Enlace', url: '#' };
         setData((prevData) => ({ ...prevData, footer: { ...prevData.footer, quickLinks: [...prevData.footer.quickLinks, newLink] }}));
-    };
+    }, [setData]);
 
-    const removeFooterLink = (id: string) => {
-        const updatedLinks = data.footer.quickLinks.filter(link => link.id !== id);
-        setData((prevData) => ({ ...prevData, footer: { ...prevData.footer, quickLinks: updatedLinks }}));
-    };
+    const removeFooterLink = useCallback((id: string) => {
+        setData((prevData) => {
+            const updatedLinks = prevData.footer.quickLinks.filter(link => link.id !== id);
+            return { ...prevData, footer: { ...prevData.footer, quickLinks: updatedLinks }};
+        });
+    }, [setData]);
     
-
-    const addNavLink = () => {
+    const addNavLink = useCallback(() => {
         const newLink: NavLink = { id: uuidv4(), text: 'Nuevo Enlace', url: '#', openInNewTab: false, enabled: true };
-        handleInputChange('navigation', 'links', [...data.navigation.links, newLink]);
-    };
+        setData((prevData) => ({
+            ...prevData,
+            navigation: { ...prevData.navigation, links: [...prevData.navigation.links, newLink] }
+        }));
+    }, [setData]);
 
-    const removeNavLink = (id: string) => {
-        const updatedLinks = data.navigation.links.filter(link => link.id !== id);
-        handleInputChange('navigation', 'links', updatedLinks);
-    };
+    const removeNavLink = useCallback((id: string) => {
+        setData((prevData) => {
+            const updatedLinks = prevData.navigation.links.filter(link => link.id !== id);
+            return {
+                ...prevData,
+                navigation: { ...prevData.navigation, links: updatedLinks }
+            };
+        });
+    }, [setData]);
     
-    const addKeyword = () => {
-        if (newKeyword && !data.seo.keywords.includes(newKeyword)) {
-          handleInputChange('seo', 'keywords', [...data.seo.keywords, newKeyword]);
+    const addKeyword = useCallback(() => {
+        if (newKeyword) {
+          setData((prevData) => {
+            if (prevData.seo.keywords.includes(newKeyword)) return prevData;
+            return {
+                ...prevData,
+                seo: { ...prevData.seo, keywords: [...prevData.seo.keywords, newKeyword] }
+            };
+          });
           setNewKeyword('');
         }
-    };
+    }, [newKeyword, setData]);
     
-    const removeKeyword = (keywordToRemove: string) => {
-        handleInputChange('seo', 'keywords', data.seo.keywords.filter(keyword => keyword !== keywordToRemove));
-    };
+    const removeKeyword = useCallback((keywordToRemove: string) => {
+        setData((prevData) => ({
+            ...prevData,
+            seo: { ...prevData.seo, keywords: prevData.seo.keywords.filter(keyword => keyword !== keywordToRemove) }
+        }));
+    }, [setData]);
 
-    const addContentSection = () => {
+    const addContentSection = useCallback(() => {
         const newSection: ContentSection = {
             id: uuidv4(),
             title: 'Nuevo Título de Sección',
@@ -267,20 +231,22 @@ export default function EditorLandingForm({ data, setData, plans, loadingPlans }
             textColor: '#000000',
         };
         setData((prevData) => ({ ...prevData, sections: [...prevData.sections, newSection] }));
-    };
+    }, [setData]);
 
-    const updateContentSection = (id: string, field: keyof ContentSection, value: any) => {
-        const updatedSections = data.sections.map(section =>
-            section.id === id ? { ...section, [field]: value } : section
-        );
-        setData((prevData) => ({ ...prevData, sections: updatedSections }));
-    };
+    const updateContentSection = useCallback((id: string, field: keyof ContentSection, value: any) => {
+        setData((prevData) => ({
+            ...prevData,
+            sections: prevData.sections.map(section =>
+                section.id === id ? { ...section, [field]: value } : section
+            )
+        }));
+    }, [setData]);
 
-    const removeContentSection = (id: string) => {
+    const removeContentSection = useCallback((id: string) => {
         setData((prevData) => ({ ...prevData, sections: prevData.sections.filter(section => section.id !== id) }));
-    };
+    }, [setData]);
 
-    const addSubSection = (sectionId: string) => {
+    const addSubSection = useCallback((sectionId: string) => {
         const newSubSection: SubSection = {
             id: uuidv4(),
             title: 'Nueva Característica',
@@ -288,39 +254,45 @@ export default function EditorLandingForm({ data, setData, plans, loadingPlans }
             imageUrl: null,
             mediaType: null,
         };
-        const updatedSections = data.sections.map(section => {
-            if (section.id === sectionId) {
-                return { ...section, subsections: [...section.subsections, newSubSection] };
-            }
-            return section;
+        setData((prevData) => {
+            const updatedSections = prevData.sections.map(section => {
+                if (section.id === sectionId) {
+                    return { ...section, subsections: [...section.subsections, newSubSection] };
+                }
+                return section;
+            });
+            return { ...prevData, sections: updatedSections };
         });
-        setData((prevData) => ({ ...prevData, sections: updatedSections }));
-    };
+    }, [setData]);
 
-    const updateSubSection = (sectionId: string, subSectionId: string, field: keyof Omit<SubSection, 'id'>, value: any) => {
-        const updatedSections = data.sections.map(section => {
-            if (section.id === sectionId) {
-                const updatedSubSections = section.subsections.map(sub => 
-                    sub.id === subSectionId ? { ...sub, [field]: value } : sub
-                );
-                return { ...section, subsections: updatedSubSections };
-            }
-            return section;
+    const updateSubSection = useCallback((sectionId: string, subSectionId: string, field: keyof Omit<SubSection, 'id'>, value: any) => {
+        setData((prevData) => {
+            const updatedSections = prevData.sections.map(section => {
+                if (section.id === sectionId) {
+                    const updatedSubSections = section.subsections.map(sub => 
+                        sub.id === subSectionId ? { ...sub, [field]: value } : sub
+                    );
+                    return { ...section, subsections: updatedSubSections };
+                }
+                return section;
+            });
+            return { ...prevData, sections: updatedSections };
         });
-        setData((prevData) => ({ ...prevData, sections: updatedSections }));
-    };
+    }, [setData]);
 
-    const removeSubSection = (sectionId: string, subSectionId: string) => {
-        const updatedSections = data.sections.map(section => {
-            if (section.id === sectionId) {
-                return { ...section, subsections: section.subsections.filter(sub => sub.id !== subSectionId) };
-            }
-            return section;
+    const removeSubSection = useCallback((sectionId: string, subSectionId: string) => {
+        setData((prevData) => {
+            const updatedSections = prevData.sections.map(section => {
+                if (section.id === sectionId) {
+                    return { ...section, subsections: section.subsections.filter(sub => sub.id !== subSectionId) };
+                }
+                return section;
+            });
+            return { ...prevData, sections: updatedSections };
         });
-        setData((prevData) => ({ ...prevData, sections: updatedSections }));
-    };
+    }, [setData]);
 
-    const addTestimonial = () => {
+    const addTestimonial = useCallback(() => {
         const newTestimonial: TestimonialSection = {
             id: uuidv4(),
             authorName: 'Nombre del Cliente',
@@ -330,23 +302,23 @@ export default function EditorLandingForm({ data, setData, plans, loadingPlans }
             rating: 5,
         };
         setData((prevData) => ({ ...prevData, testimonials: [...prevData.testimonials, newTestimonial] }));
-    };
+    }, [setData]);
 
-    const updateTestimonial = (id: string, field: keyof TestimonialSection, value: any) => {
+    const updateTestimonial = useCallback((id: string, field: keyof TestimonialSection, value: any) => {
         setData(prevData => ({
             ...prevData,
             testimonials: prevData.testimonials.map(testimonial =>
                 testimonial.id === id ? { ...testimonial, [field]: value } : testimonial
             )
         }));
-    };
+    }, [setData]);
 
-    const removeTestimonial = (id: string) => {
+    const removeTestimonial = useCallback((id: string) => {
         setData((prevData) => ({ ...prevData, testimonials: prevData.testimonials.filter(testimonial => testimonial.id !== id) }));
-    };
+    }, [setData]);
 
     // PLAN MANAGEMENT LOGIC
-    const addPlan = () => {
+    const addPlan = useCallback(() => {
         const newPlan: CustomPlan = {
             id: uuidv4(),
             name: 'Nuevo Plan',
@@ -361,20 +333,20 @@ export default function EditorLandingForm({ data, setData, plans, loadingPlans }
             imageUrl: null,
         };
         setData(prev => ({ ...prev, plans: [...(prev.plans || []), newPlan] }));
-    };
+    }, [setData]);
 
-    const updatePlan = (id: string, field: keyof CustomPlan, value: any) => {
+    const updatePlan = useCallback((id: string, field: keyof CustomPlan, value: any) => {
         setData(prev => ({
             ...prev,
             plans: (prev.plans || []).map(p => p.id === id ? { ...p, [field]: value } : p)
         }));
-    };
+    }, [setData]);
 
-    const removePlan = (id: string) => {
+    const removePlan = useCallback((id: string) => {
         setData(prev => ({ ...prev, plans: (prev.plans || []).filter(p => p.id !== id) }));
-    };
+    }, [setData]);
 
-    const addPlanFeature = (planId: string) => {
+    const addPlanFeature = useCallback((planId: string) => {
         setData(prev => ({
             ...prev,
             plans: (prev.plans || []).map(p => {
@@ -384,9 +356,9 @@ export default function EditorLandingForm({ data, setData, plans, loadingPlans }
                 return p;
             })
         }));
-    };
+    }, [setData]);
 
-    const updatePlanFeature = (planId: string, featureId: string, value: string) => {
+    const updatePlanFeature = useCallback((planId: string, featureId: string, value: string) => {
         setData(prev => ({
             ...prev,
             plans: (prev.plans || []).map(p => {
@@ -399,9 +371,9 @@ export default function EditorLandingForm({ data, setData, plans, loadingPlans }
                 return p;
             })
         }));
-    };
+    }, [setData]);
 
-    const removePlanFeature = (planId: string, featureId: string) => {
+    const removePlanFeature = useCallback((planId: string, featureId: string) => {
         setData(prev => ({
             ...prev,
             plans: (prev.plans || []).map(p => {
@@ -411,9 +383,9 @@ export default function EditorLandingForm({ data, setData, plans, loadingPlans }
                 return p;
             })
         }));
-    };
+    }, [setData]);
 
-    const addFormField = () => {
+    const addFormField = useCallback(() => {
         const newField: FormField = {
             id: uuidv4(),
             label: 'Nuevo Campo',
@@ -421,29 +393,23 @@ export default function EditorLandingForm({ data, setData, plans, loadingPlans }
             placeholder: 'Escribe aquí...',
             required: false,
         };
-        handleInputChange('form', 'fields', [...data.form.fields, newField]);
-    };
+        setData(prev => ({ ...prev, form: { ...prev.form, fields: [...prev.form.fields, newField] }}));
+    }, [setData]);
     
-    const updateFormField = (id: string, field: keyof FormField, value: any) => {
-        const updatedFields = data.form.fields.map(f =>
-            f.id === id ? { ...f, [field]: value } : f
-        );
-        handleInputChange('form', 'fields', updatedFields);
-    };
+    const updateFormField = useCallback((id: string, field: keyof FormField, value: any) => {
+        setData(prev => {
+            const updatedFields = prev.form.fields.map(f =>
+                f.id === id ? { ...f, [field]: value } : f
+            );
+            return { ...prev, form: { ...prev.form, fields: updatedFields }};
+        });
+    }, [setData]);
 
-    const removeFormField = (id: string) => {
-        const updatedFields = data.form.fields.filter(f => f.id !== id);
-        handleInputChange('form', 'fields', updatedFields);
-    };
-
-    // Stable update function for EditorHeaderConfigForm to prevent infinite loops
-    const setHeaderData = useCallback((valOrUpdater: any) => {
-        setData((prev) => ({
-            ...prev,
-            header: typeof valOrUpdater === 'function'
-                ? (valOrUpdater as any)(prev.header)
-                : valOrUpdater
-        }));
+    const removeFormField = useCallback((id: string) => {
+        setData(prev => {
+            const updatedFields = prev.form.fields.filter(f => f.id !== id);
+            return { ...prev, form: { ...prev.form, fields: updatedFields }};
+        });
     }, [setData]);
 
     const socialIcons: { [key: string]: React.ReactNode } = {
