@@ -167,7 +167,7 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
     const emoCard = "\uD83D\uDCB3";    
     const emoThanks = "\uD83D\uDE4F";  
 
-    let orderSummary = "";
+    let orderSummary = "```\n"; // Inicio de bloque monoespaciado
 
     if (tipoEntrega === 'domicilio') {
         orderSummary += `${emoScooter} NUEVO PEDIDO A DOMICILIO\n`;
@@ -193,7 +193,8 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
         const itemUnitPrice = item.appliedPromotion?.discountedPrice ?? item.price;
         const itemSubtotal = itemUnitPrice * item.quantity;
         
-        orderSummary += `- ${item.quantity} \u00D7 ${item.name}\n  ${formatCurrency(itemUnitPrice)}\n`;
+        // Alineación de precio del producto a la derecha
+        orderSummary += `- ${item.quantity} \u00D7 ${item.name}\n  ${formatCurrency(itemUnitPrice).padStart(12)}\n`;
 
         addDocumentNonBlocking(ordersCollectionRef, {
             businessId,
@@ -218,29 +219,30 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
     
     orderSummary += `${separator}\n`;
     orderSummary += `${emoReceipt} RESUMEN DE LA COMPRA\n`;
-    orderSummary += `Subtotal:      ${formatCurrency(subtotalProducts)}\n`;
+    orderSummary += `Subtotal:      ${formatCurrency(subtotalProducts).padStart(12)}\n`;
 
     if (appliedCoupon) {
-        orderSummary += `Cupón (${appliedCoupon.codigo}): -${formatCurrency(discountFromCoupon)}\n`;
+        orderSummary += `Cupón:        -${formatCurrency(discountFromCoupon).padStart(12)}\n`;
     }
 
     if (packagingTotal > 0) {
-        orderSummary += `Empaque:       ${formatCurrency(packagingTotal)}\n`;
+        orderSummary += `Empaque:       ${formatCurrency(packagingTotal).padStart(12)}\n`;
     }
 
-    orderSummary += `Envío:         ${tipoEntrega === 'domicilio' ? formatCurrency(deliveryFee) : 'Gratis'}\n`;
+    orderSummary += `Envío:         ${tipoEntrega === 'domicilio' ? formatCurrency(deliveryFee).padStart(12) : 'Gratis'.padStart(12)}\n`;
 
     if (vatAmount > 0) {
-        orderSummary += `IVA (${businessInfo?.vatRate}%):     ${formatCurrency(vatAmount)}\n`;
+        orderSummary += `IVA (${businessInfo?.vatRate}%):     ${formatCurrency(vatAmount).padStart(12)}\n`;
     }
 
     orderSummary += `${subSeparator}\n`;
-    orderSummary += `${emoMoneyBag} TOTAL:      ${formatCurrency(total)}\n`;
+    orderSummary += `${emoMoneyBag} TOTAL:      ${formatCurrency(total).padStart(12)}\n`;
     orderSummary += `${emoCard} Método de pago:\n${paymentLabel}\n`;
     orderSummary += `${separator}\n`;
-    orderSummary += `${emoThanks} Gracias por tu compra.\nTu pedido será preparado y enviado lo antes posible.`;
+    orderSummary += `${emoThanks} Gracias por tu compra.\nTu pedido será preparado y enviado lo antes posible.\n` + "```"; // Fin de bloque monoespaciado
 
     const cleanPhone = normalizePhoneNumber(businessInfo?.phone || '3228831634');
+    // Usamos api.whatsapp.com directamente para evitar corrupción de caracteres en la redirección de wa.me
     window.open(`https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(orderSummary)}`, '_blank');
     
     onClearCart();
