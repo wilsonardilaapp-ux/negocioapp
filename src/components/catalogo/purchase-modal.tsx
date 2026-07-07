@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -155,18 +154,49 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
   };
 
   const onSubmit = async (data: z.infer<typeof purchaseSchema>) => {
-    const separator = "━━━━━━━━━━━━━━━━━━";
-    // Usamos secuencias de escape Unicode para evitar corrupción de emojis en el mensaje de WhatsApp
-    let orderSummary = `\u{1F6F5} *PEDIDO A DOMICILIO*\n${separator}\n`;
-    orderSummary += `\u{1F464} Cliente: ${data.fullName}\n\u{1F4DE} WhatsApp: ${data.whatsapp}\n\u{1F3E0} Dir: ${data.address || 'Tienda'}\n${separator}\n`;
-    
+    const separator = "━━━━━━━━━━━━━━━━━━━━";
+    const subSeparator = "────────────────────";
+
+    // Emojis usando pares subrogados para máxima compatibilidad
+    const emoScooter = "\uD83D\uDEF5"; // 🛵
+    const emoStore = "\uD83C\uDFEC";   // 🏬
+    const emoUser = "\uD83D\uDC64";    // 👤
+    const emoPhone = "\uD83D\uDCF1";   // 📱
+    const emoPin = "\uD83D\uDCCD";     // 📍
+    const emoCart = "\uD83D\uDED2";    // 🛒
+    const emoDollar = "\uD83D\uDCB2";  // 💲
+    const emoReceipt = "\uD83E\uDDFE"; // 🧾
+    const emoMoneyBag = "\uD83D\uDCB0"; // 💰
+    const emoCard = "\uD83D\uDCB3";    // 💳
+    const emoThanks = "\uD83D\uDE4F";  // 🙏
+
+    let orderSummary = "";
+
+    if (tipoEntrega === 'domicilio') {
+        orderSummary += `${emoScooter} NUEVO PEDIDO A DOMICILIO\n`;
+    } else {
+        orderSummary += `${emoStore} NUEVO PEDIDO PARA RECOGER EN TIENDA\n`;
+    }
+
+    orderSummary += `${separator}\n`;
+    orderSummary += `${emoUser} Cliente: ${data.fullName}\n`;
+    orderSummary += `${emoPhone} WhatsApp: ${data.whatsapp}\n`;
+
+    if (tipoEntrega === 'domicilio') {
+        orderSummary += `${emoPin} Direcci\u00F3n: ${data.address || 'No especificada'}\n`;
+    }
+
+    orderSummary += `${separator}\n`;
+    orderSummary += `${emoCart} PRODUCTOS\n`;
+
     const ordersCollectionRef = collection(firestore, `businesses/${businessId}/orders`);
     const now = new Date().toISOString();
 
     cartItems.forEach(item => {
         const itemUnitPrice = item.appliedPromotion?.discountedPrice ?? item.price;
         const itemSubtotal = itemUnitPrice * item.quantity;
-        orderSummary += `\u{2022} ${item.quantity}x ${item.name} - ${formatCurrency(itemSubtotal)}\n`;
+        
+        orderSummary += `- ${item.quantity} \u00D7 ${item.name}\n  ${emoDollar} ${formatCurrency(itemUnitPrice)}\n`;
 
         addDocumentNonBlocking(ordersCollectionRef, {
             businessId,
@@ -186,9 +216,32 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
             packagingCost: item.packagingCost || 0,
         });
     });
-    
+
     const paymentLabel = PAYMENT_METHOD_LABELS[selectedPaymentMethod] ?? selectedPaymentMethod;
-    orderSummary += `${separator}\n\u{1F4B5} *TOTAL: ${formatCurrency(total)}*\n\u{1F4B3} Pago: ${paymentLabel}`;
+    
+    orderSummary += `${separator}\n`;
+    orderSummary += `${emoReceipt} RESUMEN DE LA COMPRA\n`;
+    orderSummary += `Subtotal:      ${formatCurrency(subtotalProducts)}\n`;
+
+    if (appliedCoupon) {
+        orderSummary += `Cup\u00F3n (${appliedCoupon.codigo}): -${formatCurrency(discountFromCoupon)}\n`;
+    }
+
+    if (packagingTotal > 0) {
+        orderSummary += `Empaque:       ${formatCurrency(packagingTotal)}\n`;
+    }
+
+    orderSummary += `Env\u00EDo:         ${tipoEntrega === 'domicilio' ? formatCurrency(deliveryFee) : 'Gratis'}\n`;
+
+    if (vatAmount > 0) {
+        orderSummary += `IVA (${businessInfo?.vatRate}%):     ${formatCurrency(vatAmount)}\n`;
+    }
+
+    orderSummary += `${subSeparator}\n`;
+    orderSummary += `${emoMoneyBag} TOTAL:      ${formatCurrency(total)}\n`;
+    orderSummary += `${emoCard} M\u00E9todo de pago:\n${paymentLabel}\n`;
+    orderSummary += `${separator}\n`;
+    orderSummary += `${emoThanks} Gracias por tu compra.\nTu pedido ser\u00E1 preparado y enviado lo antes posible.`;
 
     const cleanPhone = normalizePhoneNumber(businessInfo?.phone || '3228831634');
     window.open(`https://wa.me/${cleanPhone}?text=${encodeURIComponent(orderSummary)}`, '_blank');
