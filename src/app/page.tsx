@@ -1,65 +1,63 @@
 
-import LandingPageContent from '../components/landing-page/landing-page-content';
-import type { LandingPageData } from '../models/landing-page';
-import { getAdminFirestore } from "../firebase/server-init";
-import type { SubscriptionPlan } from '../models/subscription-plan';
-import { DefaultSubscriptionPlans } from '../models/subscription-plan';
-import type { HybridPlan } from '../models/hybrid-plan';
-import { getLandingData } from '../lib/get-landing-data';
-import FaviconInjector from '@/components/layout/FaviconInjector';
+import LandingPageContent from '@/components/landing-page/landing-page-content';
+import type { LandingPageData } from '@/models/landing-page';
+import { getAdminFirestore } from "@/firebase/server-init";
+import type { SubscriptionPlan } from '@/models/subscription-plan';
+import { DefaultSubscriptionPlans } from '@/models/subscription-plan';
+import type { HybridPlan } from '@/models/hybrid-plan';
+import { getLandingData } from '@/lib/get-landing-data';
+import type { Metadata } from 'next';
 
-// Forzamos comportamiento dinámico total y desactivamos el caché
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-async function getPlans(): Promise<SubscriptionPlan[]> {
+/**
+ * Obtiene los datos del negocio principal de forma segura.
+ */
+async function getMainBusinessData() {
   try {
     const db = await getAdminFirestore();
-    const q = db.collection("plans").orderBy("price", "asc");
-    const snapshot = await q.get();
-    
-    if (snapshot.empty) return [];
-    
-    return snapshot.docs
-      .map(doc => ({ ...doc.data(), id: doc.id } as SubscriptionPlan))
-      .filter(plan => plan.isActive === true);
-  } catch (error) {
-    console.error("Error fetching standard plans:", error);
-    return [];
-  }
-}
+    const configSnap = await db.collection("globalConfig").doc("system").get();
+    const mainBusinessId = configSnap.exists ? configSnap.data()?.mainBusinessId : null;
 
-async function getHybridPlans(): Promise<HybridPlan[]> {
-  try {
-    const db = await getAdminFirestore();
-    const snapshot = await db.collection("hybrid_plans").get();
-    if (snapshot.empty) return [];
-    return snapshot.docs
-      .map(doc => ({ ...doc.data(), id: doc.id } as HybridPlan))
-      .sort((a, b) => (a.basePrice || 0) - (b.basePrice || 0));
-  } catch (error) {
-    console.error("Error fetching hybrid plans:", error);
-    return [];
-  }
-}
-
-async function getMainBusinessData(): Promise<{ id: string | null, data: any | null }> {
-    try {
-        const db = await getAdminFirestore();
-        const configSnap = await db.collection("globalConfig").doc("system").get();
-        const mainBusinessId = configSnap.exists ? configSnap.data()?.mainBusinessId : null;
-
-        if (mainBusinessId) {
-            const bSnap = await db.collection("businesses").doc(mainBusinessId).get();
-            return { 
-                id: mainBusinessId, 
-                data: bSnap.exists ? bSnap.data() : null 
-            };
-        }
-        return { id: null, data: null };
-    } catch (error) {
-        return { id: null, data: null };
+    if (mainBusinessId) {
+      const bSnap = await db.collection("businesses").doc(mainBusinessId).get();
+      return { 
+        id: mainBusinessId, 
+        data: bSnap.exists ? bSnap.data() : null 
+      };
     }
+  } catch (error) {
+    console.error("[getMainBusinessData] Error:", error);
+  }
+  return { id: null, data: null };
+}
+
+/**
+ * Generación de metadatos nativa para evitar errores de hidratación y 404.
+ */
+export async function generateMetadata(): Promise<Metadata> {
+  try {
+    const { data: business } = await getMainBusinessData();
+    const siteTitle = business?.name || "Markix Platform";
+    const faviconUrl = business?.faviconUrl || business?.logoURL || '/favicon.ico';
+
+    return {
+      title: siteTitle,
+      description: business?.description || "Centraliza y automatiza tu negocio con Markix.",
+      icons: {
+        icon: [
+          { url: faviconUrl },
+        ],
+        apple: faviconUrl,
+      }
+    };
+  } catch (e) {
+    return {
+      title: "Markix Platform",
+      description: "Centraliza y automatiza tu negocio con Markix."
+    };
+  }
 }
 
 const fallbackData: LandingPageData = {
@@ -125,36 +123,51 @@ const fallbackData: LandingPageData = {
     copyright: { companyName: 'Markix', additionalText: 'Todos los derechos reservados.' },
     cta: { text: '¡Empieza Ahora!', url: '/register', enabled: true },
     visuals: { backgroundImageUrl: null, opacity: 80, backgroundColor: '#f8f9fa', textColor: '#6c757d', darkMode: false, showBackToTop: true },
-    adminExtras: { systemVersion: '1.2.0', supportLink: '#', documentationLink: '#' },
+    adminExtras: { systemVersion: '1.0.0', supportLink: '#', documentationLink: '#' },
   },
 };
 
+async function getPlans(): Promise<SubscriptionPlan[]> {
+  try {
+    const db = await getAdminFirestore();
+    const snapshot = await db.collection("plans").orderBy("price", "asc").get();
+    if (snapshot.empty) return [];
+    return snapshot.docs
+      .map(doc => ({ ...doc.data(), id: doc.id } as SubscriptionPlan))
+      .filter(plan => plan.isActive === true);
+  } catch (e) { return []; }
+}
+
+async function getHybridPlans(): Promise<HybridPlan[]> {
+  try {
+    const db = await getAdminFirestore();
+    const snapshot = await db.collection("hybrid_plans").get();
+    if (snapshot.empty) return [];
+    return snapshot.docs
+      .map(doc => ({ ...doc.data(), id: doc.id } as HybridPlan))
+      .sort((a, b) => (a.basePrice || 0) - (b.basePrice || 0));
+  } catch (e) { return []; }
+}
+
 export default async function RootPage() {
   try {
-    const results = await Promise.allSettled([
-      getLandingData(), 
-      getPlans(), 
-      getHybridPlans(),
-      getMainBusinessData()
+    const [landingData, plansDataResult, hybridPlansDataResult, mainBusiness] = await Promise.all([
+      getLandingData().catch(() => null), 
+      getPlans().catch(() => []), 
+      getHybridPlans().catch(() => []),
+      getMainBusinessData().catch(() => ({ id: null, data: null }))
     ]);
     
-    const landingData = results[0].status === 'fulfilled' ? (results[0].value || null) : null;
-    let plansData = results[1].status === 'fulfilled' ? (results[1].value || []) : [];
-    const hybridPlansData = results[2].status === 'fulfilled' ? (results[2].value || []) : [];
-    const mainBusiness = results[3].status === 'fulfilled' ? (results[3].value || { id: null, data: null }) : { id: null, data: null };
-    
+    let plansData = plansDataResult;
+    const hybridPlansData = hybridPlansDataResult;
     const dataToRender = landingData || fallbackData;
 
     if (plansData.length === 0 && hybridPlansData.length === 0) {
         plansData = DefaultSubscriptionPlans;
     }
 
-    const faviconUrl = mainBusiness.data?.faviconUrl || mainBusiness.data?.logoURL || null;
-    const siteTitle = mainBusiness.data?.name || "Markix Platform";
-
     return (
       <main className="w-full">
-        <FaviconInjector faviconUrl={faviconUrl} title={siteTitle} />
         <LandingPageContent 
           data={dataToRender} 
           plans={plansData} 
@@ -164,11 +177,11 @@ export default async function RootPage() {
       </main>
     );
   } catch (error) {
-      console.error("Critical error rendering Home:", error);
-      return (
-        <main className="w-full">
-            <LandingPageContent data={fallbackData} plans={DefaultSubscriptionPlans} hybridPlans={[]} />
-        </main>
-      );
+    console.error("Critical error in RootPage:", error);
+    return (
+      <main className="w-full">
+          <LandingPageContent data={fallbackData} plans={DefaultSubscriptionPlans} hybridPlans={[]} />
+      </main>
+    );
   }
 }
