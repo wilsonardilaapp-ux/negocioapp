@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -10,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { ShoppingBag, Minus, Plus, Tag, Trash2, Loader2, Ticket, X, CheckCircle, CreditCard, Building, Smartphone, HandCoins, Copy, Check } from 'lucide-react';
+import { ShoppingBag, Minus, Plus, Tag, Trash2, Loader2, Ticket, X, CheckCircle, CreditCard, Building, Smartphone, Building2, HandCoins, Copy, Check } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { PaymentSettings } from '@/models/payment-settings';
 import type { OrderStatus, TipoEntrega } from '@/models/order';
@@ -233,7 +232,6 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
                             <span className="text-sm font-black text-primary">{formatCurrency(item.appliedPromotion?.discountedPrice ?? item.price)}</span>
                         </div>
                     </div>
-                    {/* Contenedor derecho con ancho reservado para corregir desalineación */}
                     <div className="flex items-center gap-3 shrink-0 ml-4 w-[140px] justify-end">
                         <div className="flex items-center border rounded-lg bg-white overflow-hidden shrink-0">
                             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onUpdateQuantity(item.id, Math.max(0, item.quantity - 1))}><Minus className="h-3 w-3" /></Button>
@@ -275,12 +273,68 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
                 </RadioGroup>
                 {tipoEntrega === 'domicilio' && <div className="space-y-2"><Label>Dirección *</Label><Textarea {...register('address')} /></div>}
             </div>
-          </form>
 
-          <div className="space-y-4 pb-6">
-            <h4 className="font-bold text-lg">Nota Adicional</h4>
-            <Textarea {...register('message')} placeholder="Instrucciones..." />
-          </div>
+            {/* SECCIÓN RESTAURADA: MÉTODO DE PAGO */}
+            <div className="space-y-4">
+                <h4 className="font-bold text-lg">Método de Pago</h4>
+                <RadioGroup
+                    value={selectedPaymentMethod}
+                    onValueChange={setSelectedPaymentMethod}
+                    className="grid grid-cols-1 gap-2"
+                >
+                    {paymentSettings?.nequi?.enabled && (
+                        <Label htmlFor="pay-nequi" className={cn("flex items-center justify-between p-3 border-2 rounded-xl cursor-pointer transition-all", selectedPaymentMethod === 'nequi' ? "border-primary bg-primary/5" : "border-transparent bg-muted/30")}>
+                            <div className="flex items-center gap-3">
+                                <RadioGroupItem value="nequi" id="pay-nequi" />
+                                <Smartphone className="h-4 w-4 text-primary" />
+                                <span className="text-sm font-medium">Nequi</span>
+                            </div>
+                        </Label>
+                    )}
+                    {paymentSettings?.bancolombia?.enabled && (
+                        <Label htmlFor="pay-bancolombia" className={cn("flex items-center justify-between p-3 border-2 rounded-xl cursor-pointer transition-all", selectedPaymentMethod === 'bancolombia' ? "border-primary bg-primary/5" : "border-transparent bg-muted/30")}>
+                            <div className="flex items-center gap-3">
+                                <RadioGroupItem value="bancolombia" id="pay-bancolombia" />
+                                <Building className="h-4 w-4 text-primary" />
+                                <span className="text-sm font-medium">Bancolombia</span>
+                            </div>
+                        </Label>
+                    )}
+                    {paymentSettings?.daviplata?.enabled && (
+                        <Label htmlFor="pay-daviplata" className={cn("flex items-center justify-between p-3 border-2 rounded-xl cursor-pointer transition-all", selectedPaymentMethod === 'daviplata' ? "border-primary bg-primary/5" : "border-transparent bg-muted/30")}>
+                            <div className="flex items-center gap-3">
+                                <RadioGroupItem value="daviplata" id="pay-daviplata" />
+                                <Smartphone className="h-4 w-4 text-primary" />
+                                <span className="text-sm font-medium">Daviplata</span>
+                            </div>
+                        </Label>
+                    )}
+                    {paymentSettings?.breB?.enabled && (
+                        <Label htmlFor="pay-breb" className={cn("flex items-center justify-between p-3 border-2 rounded-xl cursor-pointer transition-all", selectedPaymentMethod === 'breB' ? "border-primary bg-primary/5" : "border-transparent bg-muted/30")}>
+                            <div className="flex items-center gap-3">
+                                <RadioGroupItem value="breB" id="pay-breb" />
+                                <Building2 className="h-4 w-4 text-primary" />
+                                <span className="text-sm font-medium">Bre-B</span>
+                            </div>
+                        </Label>
+                    )}
+                    {paymentSettings?.pagoContraEntrega?.enabled && (
+                        <Label htmlFor="pay-cod" className={cn("flex items-center justify-between p-3 border-2 rounded-xl cursor-pointer transition-all", selectedPaymentMethod === 'pagoContraEntrega' ? "border-primary bg-primary/5" : "border-transparent bg-muted/30")}>
+                            <div className="flex items-center gap-3">
+                                <RadioGroupItem value="pagoContraEntrega" id="pay-cod" />
+                                <HandCoins className="h-4 w-4 text-primary" />
+                                <span className="text-sm font-medium">Pago contra entrega</span>
+                            </div>
+                        </Label>
+                    )}
+                </RadioGroup>
+            </div>
+
+            <div className="space-y-4 pb-6">
+                <h4 className="font-bold text-lg">Nota Adicional</h4>
+                <Textarea {...register('message')} placeholder="Instrucciones..." />
+            </div>
+          </form>
         </div>
 
         <div className="p-6 border-t bg-muted/20">
