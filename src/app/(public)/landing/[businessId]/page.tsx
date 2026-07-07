@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
@@ -12,7 +13,7 @@ import type { LandingPageData } from '@/models/landing-page';
 import type { Module } from '@/models/module';
 import type { Business } from '@/models/business';
 
-export default function BusinessLandingPage() {
+function BusinessLandingContent() {
     const params = useParams();
     const slug = params.businessId as string;
     const { firestore, isNetworkEnabled } = useFirebase();
@@ -132,5 +133,31 @@ export default function BusinessLandingPage() {
                 greeting={pageData.landingData.chatbot?.greeting || '¡Hola! ¿En qué puedo ayudarte?'}
             />
         </div>
+    );
+}
+
+export default function BusinessLandingPage() {
+    const [mounted, setMounted] = useState(false);
+    
+    useEffect(() => {
+        setMounted(true);
+    }, []);
+
+    if (!mounted) {
+        return (
+            <div className="flex h-screen w-full items-center justify-center bg-gray-50 p-4 text-center">
+                <Loader2 className="h-12 w-12 animate-spin text-primary" />
+            </div>
+        );
+    }
+
+    return (
+        <React.Suspense fallback={
+            <div className="flex h-screen w-full items-center justify-center bg-gray-50 p-4 text-center">
+                <Loader2 className="h-12 w-12 animate-spin text-primary" />
+            </div>
+        }>
+            <BusinessLandingContent />
+        </React.Suspense>
     );
 }

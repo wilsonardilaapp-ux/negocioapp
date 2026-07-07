@@ -16,7 +16,14 @@ const nextConfig = {
             '@opentelemetry/instrumentation', 
             'firebase-admin', 
             'cloudinary', 
-            'pdf-parse'
+            'pdf-parse',
+            'firebase',
+            'genkit',
+            '@genkit-ai/google-genai',
+            '@genkit-ai/ai',
+            '@genkit-ai/core',
+            '@genkit-ai/flow',
+            '@genkit-ai/dotprompt'
         ],
         serverActions: {
             bodySizeLimit: '50mb',

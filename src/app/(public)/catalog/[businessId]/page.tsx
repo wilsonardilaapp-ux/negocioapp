@@ -12,7 +12,7 @@ import ProductViewModal from '@/components/catalogo/product-view-modal';
 import { PurchaseModal } from '@/components/catalogo/purchase-modal';
 import { CartDrawer } from '@/components/catalogo/cart-drawer';
 import { SuggestionModal } from '@/components/suggestions/suggestion-modal';
-import { Frown, Loader2, PackageSearch, CheckCircle2 } from 'lucide-react';
+import { Frown, Loader2, PackageSearch } from 'lucide-react';
 import type { LandingHeaderConfigData } from '@/models/landing-page';
 import type { Product } from '@/models/product';
 import type { PaymentSettings } from '@/models/payment-settings';
@@ -52,7 +52,6 @@ function CatalogPageContent({ params }: CatalogPageProps) {
     const [isCartOpen, setIsCartOpen] = useState(false);
     const [isPurchaseModalOpen, setIsPurchaseModalOpen] = useState(false);
     
-    // Sugerencia
     const [activeSuggestion, setActiveSuggestion] = useState<{ original: Product, suggestion: SuggestionOutput } | null>(null);
 
     useEffect(() => {
@@ -64,14 +63,12 @@ function CatalogPageContent({ params }: CatalogPageProps) {
             setIsLoading(true);
             setError(null);
             try {
-                // 1. Resolve slug to businessId
                 const shareConfigQuery = query(collectionGroup(firestore, 'shareConfig'), where('slug', '==', slug), limit(1));
                 const querySnapshot = await getDocs(shareConfigQuery);
                 const customSlugDoc = querySnapshot.docs.find(doc => doc.data().useCustomSlug === true);
                 
                 const businessId = customSlugDoc ? (customSlugDoc.ref.parent.parent?.id ?? slug) : slug;
 
-                // 2. Fetch denormalized catalog
                 const publicCatalogRef = doc(firestore, 'businesses', businessId, 'publicData', 'catalog');
                 const paymentSettingsRef = doc(firestore, 'paymentSettings', businessId);
                 
@@ -102,7 +99,6 @@ function CatalogPageContent({ params }: CatalogPageProps) {
         fetchData();
     }, [slug, firestore, isNetworkEnabled]);
 
-    // Actions
     const handleAddToCart = (product: Product, quantity: number) => {
         setCartItems(prev => {
             const existing = prev.find(item => item.id === product.id);
@@ -114,13 +110,11 @@ function CatalogPageContent({ params }: CatalogPageProps) {
     };
 
     const handleBuyNow = async (product: Product) => {
-        // 1. Ver si hay sugerencia
         if (pageData.resolvedBusinessId) {
             try {
                 const suggestion = await getSuggestion({ businessId: pageData.resolvedBusinessId, productId: product.id });
                 if (suggestion && suggestion.suggestedProduct) {
                     setActiveSuggestion({ original: product, suggestion });
-                    // Notificar vista de sugerencia
                     updateSuggestionMetrics({ 
                         businessId: pageData.resolvedBusinessId, 
                         ruleId: suggestion.ruleId || 'ai-generated', 
@@ -133,7 +127,6 @@ function CatalogPageContent({ params }: CatalogPageProps) {
             }
         }
         
-        // 2. Si no hay sugerencia o falla, agregar al carrito y mostrar confirmación (UX mejorada)
         handleAddToCart(product, 1);
         toast({
             title: "Producto añadido",
@@ -152,7 +145,6 @@ function CatalogPageContent({ params }: CatalogPageProps) {
     const acceptSuggestion = () => {
         if (!activeSuggestion || !pageData.resolvedBusinessId) return;
         
-        // Registrar aceptación
         updateSuggestionMetrics({ 
             businessId: pageData.resolvedBusinessId, 
             ruleId: activeSuggestion.suggestion.ruleId || 'ai-generated', 
@@ -190,111 +182,4 @@ function CatalogPageContent({ params }: CatalogPageProps) {
     if (error) {
         return (
             <div className="flex h-screen w-full flex-col items-center justify-center bg-gray-50 p-4 text-center">
-                <div className="bg-white p-10 rounded-3xl shadow-sm max-w-md border border-gray-100">
-                    <Frown className="text-red-300 w-16 h-16 mx-auto mb-4" />
-                    <h2 className="text-2xl font-bold text-red-800">Catálogo no disponible</h2>
-                    <p className="text-gray-500 leading-relaxed">{error}</p>
-                </div>
-            </div>
-        );
-    }
-
-    return (
-        <div className="bg-muted/40 min-h-screen pb-20">
-            {pageData.headerConfig && (
-                <CatalogHeader 
-                    config={pageData.headerConfig} 
-                    cartCount={cartItems.reduce((sum, item) => sum + item.quantity, 0)}
-                    onOpenCart={() => setIsCartOpen(true)}
-                />
-            )}
-
-            <main className="container mx-auto px-4 py-12">
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                    {pageData.products?.map(product => (
-                        <PublicProductCard 
-                            key={product.id} 
-                            product={product} 
-                            onView={() => setSelectedProduct(product)}
-                            onBuy={() => handleBuyNow(product)}
-                        />
-                    ))}
-                </div>
-
-                {(!pageData.products || pageData.products.length === 0) && (
-                    <div className="flex flex-col items-center justify-center py-20 text-center text-muted-foreground">
-                        <PackageSearch className="h-16 w-16 mb-4 opacity-20" />
-                        <h3 className="text-xl font-semibold">No hay productos disponibles</h3>
-                        <p>El catálogo está vacío actualmente.</p>
-                    </div>
-                )}
-            </main>
-
-            <ProductViewModal 
-                product={selectedProduct} 
-                businessId={pageData.resolvedBusinessId}
-                isOpen={!!selectedProduct} 
-                onOpenChange={(open) => !open && setSelectedProduct(null)}
-                onAddToCart={(qty) => {
-                    handleAddToCart(selectedProduct!, qty);
-                    setSelectedProduct(null);
-                    setIsCartOpen(true);
-                }}
-                onRatingUpdated={handleRatingSync}
-            />
-
-            <CartDrawer 
-                isOpen={isCartOpen}
-                onOpenChange={setIsCartOpen}
-                cartItems={cartItems}
-                onRemoveItem={(id) => setCartItems(prev => prev.filter(i => i.id !== id))}
-                onUpdateQuantity={(id, qty) => setCartItems(prev => prev.map(i => i.id === id ? {...i, quantity: qty} : i))}
-                onCheckout={() => {
-                    setIsCartOpen(false);
-                    setIsPurchaseModalOpen(true);
-                }}
-            />
-
-            <PurchaseModal 
-                isOpen={isPurchaseModalOpen}
-                onOpenChange={setIsPurchaseModalOpen}
-                cartItems={cartItems}
-                onRemoveItem={(id) => setCartItems(prev => prev.filter(i => i.id !== id))}
-                onUpdateQuantity={(id, qty) => setCartItems(prev => prev.map(i => i.id === id ? {...i, quantity: qty} : i))}
-                onClearCart={() => setCartItems([])}
-                businessId={pageData.resolvedBusinessId!}
-                businessInfo={pageData.headerConfig?.businessInfo || null}
-                paymentSettings={pageData.paymentSettings}
-            />
-
-            {activeSuggestion && (
-                <SuggestionModal 
-                    isOpen={!!activeSuggestion}
-                    onOpenChange={(open) => !open && setActiveSuggestion(null)}
-                    originalProduct={activeSuggestion.original}
-                    suggestion={activeSuggestion.suggestion}
-                    onAccept={acceptSuggestion}
-                    onDecline={() => {
-                        handleAddToCart(activeSuggestion.original, 1);
-                        setActiveSuggestion(null);
-                        setIsCartOpen(true);
-                    }}
-                />
-            )}
-
-            <PublicMenuChatWidget businessId={pageData.resolvedBusinessId!} />
-        </div>
-    );
-}
-
-export default function CatalogPage(props: CatalogPageProps) {
-  return (
-    <Suspense fallback={
-        <div className="flex h-screen w-full items-center justify-center bg-gray-50 p-4 text-center">
-            <Loader2 className="h-12 w-12 animate-spin text-primary" />
-        </div>
-    }>
-      <CatalogPageContent {...props} />
-    </Suspense>
-  );
-}
+                <div className="bg-white p-10
