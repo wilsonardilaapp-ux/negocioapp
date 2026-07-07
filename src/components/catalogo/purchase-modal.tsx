@@ -156,8 +156,8 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
     const separator = "━━━━━━━━━━━━━━━━━━━━";
     const subSeparator = "────────────────────";
 
-    // PRUEBA DE CONTROL (Punto 5): Usando 🙂 (\uD83D\uDE42) para el título
-    const emoScooter = "\uD83D\uDE42"; // Cambiado de 🛵 a 🙂 para diagnóstico
+    // PRUEBA DE CONTROL: Usando pares subrogados para compatibilidad total
+    const emoScooter = "\uD83D\uDE42"; // 🙂 (Emoji del plano básico para prueba de control)
     const emoStore = "\uD83C\uDFEC";   // 🏬
     const emoUser = "\uD83D\uDC64";    // 👤
     const emoPhone = "\uD83D\uDCF1";   // 📱
@@ -182,7 +182,7 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
     orderSummary += `${emoPhone} WhatsApp: ${data.whatsapp}\n`;
 
     if (tipoEntrega === 'domicilio') {
-        orderSummary += `${emoPin} Direcci\u00F3n: ${data.address || 'No especificada'}\n`;
+        orderSummary += `${emoPin} Dirección: ${data.address || 'No especificada'}\n`;
     }
 
     orderSummary += `${separator}\n`;
@@ -195,7 +195,7 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
         const itemUnitPrice = item.appliedPromotion?.discountedPrice ?? item.price;
         const itemSubtotal = itemUnitPrice * item.quantity;
         
-        orderSummary += `- ${item.quantity} \u00D7 ${item.name}\n  ${emoDollar} ${formatCurrency(itemUnitPrice)}\n`;
+        orderSummary += `- ${item.quantity} × ${item.name}\n  ${emoDollar} ${formatCurrency(itemUnitPrice)}\n`;
 
         addDocumentNonBlocking(ordersCollectionRef, {
             businessId,
@@ -223,14 +223,14 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
     orderSummary += `Subtotal:      ${formatCurrency(subtotalProducts)}\n`;
 
     if (appliedCoupon) {
-        orderSummary += `Cup\u00F3n (${appliedCoupon.codigo}): -${formatCurrency(discountFromCoupon)}\n`;
+        orderSummary += `Cupón (${appliedCoupon.codigo}): -${formatCurrency(discountFromCoupon)}\n`;
     }
 
     if (packagingTotal > 0) {
         orderSummary += `Empaque:       ${formatCurrency(packagingTotal)}\n`;
     }
 
-    orderSummary += `Env\u00EDo:         ${tipoEntrega === 'domicilio' ? formatCurrency(deliveryFee) : 'Gratis'}\n`;
+    orderSummary += `Envío:         ${tipoEntrega === 'domicilio' ? formatCurrency(deliveryFee) : 'Gratis'}\n`;
 
     if (vatAmount > 0) {
         orderSummary += `IVA (${businessInfo?.vatRate}%):     ${formatCurrency(vatAmount)}\n`;
@@ -238,11 +238,11 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
 
     orderSummary += `${subSeparator}\n`;
     orderSummary += `${emoMoneyBag} TOTAL:      ${formatCurrency(total)}\n`;
-    orderSummary += `${emoCard} M\u00E9todo de pago:\n${paymentLabel}\n`;
+    orderSummary += `${emoCard} Método de pago:\n${paymentLabel}\n`;
     orderSummary += `${separator}\n`;
-    orderSummary += `${emoThanks} Gracias por tu compra.\nTu pedido ser\u00E1 preparado y enviado lo antes posible.`;
+    orderSummary += `${emoThanks} Gracias por tu compra.\nTu pedido será preparado y enviado lo antes posible.`;
 
-    // LOGS DE DIAGNÓSTICO (Punto 2)
+    // LOGS DE DIAGNÓSTICO
     console.log("DEBUG - Order Summary Content:", orderSummary);
     console.log("DEBUG - First Char (Unicode):", orderSummary.charAt(0));
     console.log("DEBUG - First CharCodeAt(0):", orderSummary.charCodeAt(0).toString(16).toUpperCase());
@@ -250,7 +250,9 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
     console.log('DEBUG - Encoded (first 60 chars):', encodeURIComponent(orderSummary).slice(0, 60));
 
     const cleanPhone = normalizePhoneNumber(businessInfo?.phone || '3228831634');
-    window.open(`https://wa.me/${cleanPhone}?text=${encodeURIComponent(orderSummary)}`, '_blank');
+    const finalUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(orderSummary)}`;
+    console.log('DEBUG - Final URL:', finalUrl);
+    window.open(finalUrl, '_blank');
     
     onClearCart();
     onOpenChange(false);
