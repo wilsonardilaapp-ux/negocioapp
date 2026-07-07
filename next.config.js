@@ -17,7 +17,6 @@ const nextConfig = {
             'firebase-admin', 
             'cloudinary', 
             'pdf-parse',
-            'firebase',
             'genkit',
             '@genkit-ai/google-genai',
             '@genkit-ai/ai',

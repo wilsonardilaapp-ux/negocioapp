@@ -10,10 +10,6 @@ const ptSans = PT_Sans({
   variable: '--font-pt-sans',
 });
 
-/**
- * Metadatos base globales. 
- * Los favicon dinámicos son manejados preferentemente vía generateMetadata en las páginas.
- */
 export const metadata: Metadata = {
   title: 'Markix Platform',
   description: 'Centraliza y automatiza tu negocio con Markix.',
@@ -33,7 +29,6 @@ export default function RootLayout({
       <body className={`${ptSans.variable} font-body antialiased`}>
         <Providers>
           {children}
-          <Toaster />
         </Providers>
       </body>
     </html>

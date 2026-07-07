@@ -18,14 +18,15 @@ async function getMainBusinessData() {
   try {
     const db = await getAdminFirestore();
     const configSnap = await db.collection("globalConfig").doc("system").get();
-    const mainBusinessId = configSnap.exists ? configSnap.data()?.mainBusinessId : null;
-
-    if (mainBusinessId) {
-      const bSnap = await db.collection("businesses").doc(mainBusinessId).get();
-      return { 
-        id: mainBusinessId, 
-        data: bSnap.exists ? bSnap.data() : null 
-      };
+    if (configSnap.exists) {
+        const mainBusinessId = configSnap.data()?.mainBusinessId;
+        if (mainBusinessId) {
+            const bSnap = await db.collection("businesses").doc(mainBusinessId).get();
+            return { 
+                id: mainBusinessId, 
+                data: bSnap.exists ? bSnap.data() : null 
+            };
+        }
     }
   } catch (error) {
     console.error("[getMainBusinessData] Error:", error);
@@ -34,7 +35,7 @@ async function getMainBusinessData() {
 }
 
 /**
- * Generación de metadatos nativa para evitar errores de hidratación y 404.
+ * Generación de metadatos nativa para evitar errores de Soft 404.
  */
 export async function generateMetadata(): Promise<Metadata> {
   try {
@@ -46,9 +47,7 @@ export async function generateMetadata(): Promise<Metadata> {
       title: siteTitle,
       description: business?.description || "Centraliza y automatiza tu negocio con Markix.",
       icons: {
-        icon: [
-          { url: faviconUrl },
-        ],
+        icon: [{ url: faviconUrl }],
         apple: faviconUrl,
       }
     };
@@ -150,21 +149,29 @@ async function getHybridPlans(): Promise<HybridPlan[]> {
 }
 
 export default async function RootPage() {
+  let landingData: LandingPageData | null = null;
+  let plansData: SubscriptionPlan[] = [];
+  let hybridPlansData: HybridPlan[] = [];
+  let mainBusiness: { id: string | null; data: any } = { id: null, data: null };
+
   try {
-    const [landingData, plansDataResult, hybridPlansDataResult, mainBusiness] = await Promise.all([
-      getLandingData().catch(() => null), 
-      getPlans().catch(() => []), 
-      getHybridPlans().catch(() => []),
-      getMainBusinessData().catch(() => ({ id: null, data: null }))
+    const results = await Promise.allSettled([
+      getLandingData(),
+      getPlans(),
+      getHybridPlans(),
+      getMainBusinessData()
     ]);
     
-    let plansData = plansDataResult;
-    const hybridPlansData = hybridPlansDataResult;
-    const dataToRender = landingData || fallbackData;
+    if (results[0].status === 'fulfilled') landingData = results[0].value;
+    if (results[1].status === 'fulfilled') plansData = results[1].value;
+    if (results[2].status === 'fulfilled') hybridPlansData = results[2].value;
+    if (results[3].status === 'fulfilled') mainBusiness = results[3].value;
 
     if (plansData.length === 0 && hybridPlansData.length === 0) {
         plansData = DefaultSubscriptionPlans;
     }
+
+    const dataToRender = landingData || fallbackData;
 
     return (
       <main className="w-full">
