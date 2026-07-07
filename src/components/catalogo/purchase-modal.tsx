@@ -247,6 +247,7 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
     console.log("DEBUG - First Char (Unicode):", orderSummary.charAt(0));
     console.log("DEBUG - First CharCodeAt(0):", orderSummary.charCodeAt(0).toString(16).toUpperCase());
     console.log("DEBUG - First CharCodeAt(1) (surrogate pair part):", orderSummary.charCodeAt(1).toString(16).toUpperCase());
+    console.log('DEBUG - Encoded (first 60 chars):', encodeURIComponent(orderSummary).slice(0, 60));
 
     const cleanPhone = normalizePhoneNumber(businessInfo?.phone || '3228831634');
     window.open(`https://wa.me/${cleanPhone}?text=${encodeURIComponent(orderSummary)}`, '_blank');
