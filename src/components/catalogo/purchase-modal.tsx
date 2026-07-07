@@ -156,18 +156,17 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
     const separator = "━━━━━━━━━━━━━━━━━━━━";
     const subSeparator = "────────────────────";
 
-    // PRUEBA DE CONTROL: Usando pares subrogados para compatibilidad total
-    const emoScooter = "\uD83D\uDE42"; // 🙂 (Emoji del plano básico para prueba de control)
-    const emoStore = "\uD83C\uDFEC";   // 🏬
-    const emoUser = "\uD83D\uDC64";    // 👤
-    const emoPhone = "\uD83D\uDCF1";   // 📱
-    const emoPin = "\uD83D\uDCCD";     // 📍
-    const emoCart = "\uD83D\uDED2";    // 🛒
-    const emoDollar = "\uD83D\uDCB2";  // 💲
-    const emoReceipt = "\uD83E\uDDFE"; // 🧾
-    const emoMoneyBag = "\uD83D\uDCB0"; // 💰
-    const emoCard = "\uD83D\uDCB3";    // 💳
-    const emoThanks = "\uD83D\uDE4F";  // 🙏
+    const emoScooter = "\uD83D\uDEF5"; 
+    const emoStore = "\uD83C\uDFEC";   
+    const emoUser = "\uD83D\uDC64";    
+    const emoPhone = "\uD83D\uDCF1";   
+    const emoPin = "\uD83D\uDCCD";     
+    const emoCart = "\uD83D\uDED2";    
+    const emoDollar = "\uD83D\uDCB2";  
+    const emoReceipt = "\uD83E\uDDFE"; 
+    const emoMoneyBag = "\uD83D\uDCB0"; 
+    const emoCard = "\uD83D\uDCB3";    
+    const emoThanks = "\uD83D\uDE4F";  
 
     let orderSummary = "";
 
@@ -242,17 +241,8 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
     orderSummary += `${separator}\n`;
     orderSummary += `${emoThanks} Gracias por tu compra.\nTu pedido será preparado y enviado lo antes posible.`;
 
-    // LOGS DE DIAGNÓSTICO
-    console.log("DEBUG - Order Summary Content:", orderSummary);
-    console.log("DEBUG - First Char (Unicode):", orderSummary.charAt(0));
-    console.log("DEBUG - First CharCodeAt(0):", orderSummary.charCodeAt(0).toString(16).toUpperCase());
-    console.log("DEBUG - First CharCodeAt(1) (surrogate pair part):", orderSummary.charCodeAt(1).toString(16).toUpperCase());
-    console.log('DEBUG - Encoded (first 60 chars):', encodeURIComponent(orderSummary).slice(0, 60));
-
     const cleanPhone = normalizePhoneNumber(businessInfo?.phone || '3228831634');
-    const finalUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(orderSummary)}`;
-    console.log('DEBUG - Final URL:', finalUrl);
-    window.open(finalUrl, '_blank');
+    window.open(`https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(orderSummary)}`, '_blank');
     
     onClearCart();
     onOpenChange(false);
