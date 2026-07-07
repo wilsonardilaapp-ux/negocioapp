@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from "react";
@@ -14,8 +13,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlignCenter, AlignLeft, AlignRight, GripVertical, PlusCircle, Trash2, X, Star, UploadCloud, Loader2, Pencil } from "lucide-react";
 import type { LandingPageData, NavLink, ContentSection, TestimonialSection, FormField, SubSection, FooterLink, CustomPlan } from "@/models/landing-page";
-import type { GlobalConfig } from "@/models/global-config";
-import { Badge } from "../ui/badge";
+import { Badge } from "@/components/ui/badge";
 import RichTextEditor from "../editor/RichTextEditor";
 import { cn } from "@/lib/utils";
 import EditorHeaderConfigForm from "./editor-header-config-form";
@@ -25,6 +23,7 @@ import Image from 'next/image';
 import { TikTokIcon, WhatsAppIcon, XIcon, FacebookIcon, InstagramIcon, YoutubeIcon } from '@/components/icons';
 import { useFirestore, useDoc, useMemoFirebase, useUser } from "@/firebase";
 import { doc } from "firebase/firestore";
+import type { Business } from '@/models/business';
 import type { SubscriptionPlan } from "@/models/subscription-plan";
 
 
@@ -115,8 +114,16 @@ const MediaUploader = ({
 export default function EditorLandingForm({ data, setData, plans, loadingPlans }: EditorLandingFormProps) {
     const [newKeyword, setNewKeyword] = useState('');
     const { toast } = useToast();
+    const { user } = useUser();
+    const firestore = useFirestore();
+
+    const businessDocRef = useMemoFirebase(() => {
+        if (!firestore || !user) return null;
+        return doc(firestore, 'businesses', user.uid);
+    }, [firestore, user]);
+
+    const { data: business } = useDoc<Business>(businessDocRef);
     
-    // Stable update function for EditorHeaderConfigForm to prevent infinite loops
     const setHeaderData = useCallback((valOrUpdater: any) => {
         setData((prev) => ({
             ...prev,
@@ -317,7 +324,6 @@ export default function EditorLandingForm({ data, setData, plans, loadingPlans }
         setData((prevData) => ({ ...prevData, testimonials: prevData.testimonials.filter(testimonial => testimonial.id !== id) }));
     }, [setData]);
 
-    // PLAN MANAGEMENT LOGIC
     const addPlan = useCallback(() => {
         const newPlan: CustomPlan = {
             id: uuidv4(),
@@ -411,6 +417,72 @@ export default function EditorLandingForm({ data, setData, plans, loadingPlans }
             return { ...prev, form: { ...prev.form, fields: updatedFields }};
         });
     }, [setData]);
+
+    // HANDLERS PARA CARGA DE MEDIOS
+    const handleLogoUpload = useCallback(async (file: File) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onloadend = async () => {
+        const mediaDataUri = reader.result as string;
+        try {
+          const result = await uploadMedia({ mediaDataUri });
+          setData(prev => ({
+            ...prev,
+            navigation: { ...prev.navigation, logoUrl: result.secure_url }
+          }));
+          toast({ title: "Logo actualizado" });
+        } catch (error: any) {
+          toast({ variant: 'destructive', title: "Error al subir", description: error.message });
+        }
+      };
+    }, [setData, toast]);
+
+    const handleSubSectionMediaUpload = useCallback(async (sectionId: string, subSectionId: string, file: File) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onloadend = async () => {
+        const mediaDataUri = reader.result as string;
+        try {
+          const result = await uploadMedia({ mediaDataUri });
+          const mediaType = file.type.startsWith('image') ? 'image' : 'video';
+          updateSubSection(sectionId, subSectionId, 'imageUrl', result.secure_url);
+          updateSubSection(sectionId, subSectionId, 'mediaType', mediaType);
+          toast({ title: "Imagen de tarjeta actualizada" });
+        } catch (error: any) {
+          toast({ variant: 'destructive', title: "Error al subir", description: error.message });
+        }
+      };
+    }, [updateSubSection, toast]);
+
+    const handleTestimonialAvatarUpload = useCallback(async (testimonialId: string, file: File) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onloadend = async () => {
+        const mediaDataUri = reader.result as string;
+        try {
+          const result = await uploadMedia({ mediaDataUri });
+          updateTestimonial(testimonialId, 'avatarUrl', result.secure_url);
+          toast({ title: "Avatar de testimonio actualizado" });
+        } catch (error: any) {
+          toast({ variant: 'destructive', title: "Error al subir", description: error.message });
+        }
+      };
+    }, [updateTestimonial, toast]);
+
+    const handlePlanImageUpload = useCallback(async (planId: string, file: File) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onloadend = async () => {
+        const mediaDataUri = reader.result as string;
+        try {
+          const result = await uploadMedia({ mediaDataUri });
+          updatePlan(planId, 'imageUrl', result.secure_url);
+          toast({ title: "Imagen de plan actualizada" });
+        } catch (error: any) {
+          toast({ variant: 'destructive', title: "Error al subir", description: error.message });
+        }
+      };
+    }, [updatePlan, toast]);
 
     const socialIcons: { [key: string]: React.ReactNode } = {
         tiktok: <TikTokIcon className="h-5 w-5"/>,
