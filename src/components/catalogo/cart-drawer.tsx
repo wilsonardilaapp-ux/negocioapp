@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useMemo } from 'react';
@@ -79,7 +78,6 @@ export function CartDrawer({
               <div className="border rounded-xl divide-y bg-muted/20 overflow-hidden">
                 {cartItems.map(item => (
                   <div key={item.id} className="flex items-center justify-between p-4 bg-white/50 animate-in fade-in slide-in-from-right-2 duration-300">
-                    {/* Sección Izquierda: Imagen y Nombre (Flexible) */}
                     <div className="flex items-center flex-1 min-w-0 gap-4">
                       <div className="relative h-14 w-14 rounded-lg border bg-white overflow-hidden shrink-0">
                         <Image 
@@ -92,13 +90,19 @@ export function CartDrawer({
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="font-bold text-sm truncate">{item.name}</p>
-                        <span className="text-sm font-black text-primary">
-                          {formatCurrency(item.appliedPromotion?.discountedPrice ?? item.price)}
-                        </span>
+                        <div className="flex flex-col">
+                          {item.appliedPromotion && (
+                            <span className="line-through text-muted-foreground text-xs leading-none mb-0.5">
+                              {formatCurrency(item.appliedPromotion.originalPrice)}
+                            </span>
+                          )}
+                          <span className="text-sm font-black text-primary">
+                            {formatCurrency(item.appliedPromotion?.discountedPrice ?? item.price)}
+                          </span>
+                        </div>
                       </div>
                     </div>
 
-                    {/* Sección Derecha: Controles y Eliminar (Ancho Fijo Reservado) */}
                     <div className="flex items-center gap-3 shrink-0 ml-4 w-[140px] justify-end">
                       <div className="flex items-center border rounded-lg bg-white overflow-hidden shrink-0">
                         <Button 
