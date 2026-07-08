@@ -14,6 +14,7 @@ import {
   Firestore
 } from 'firebase/firestore';
 import type { Promotion } from '@/models/promotion';
+import type { Product } from '@/models/product';
 
 export type CreatePromotionInput = Omit<Promotion, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'>;
 
@@ -99,6 +100,54 @@ class PromotionService {
       usageCount: increment(1),
       updatedAt: new Date().toISOString(),
     });
+  }
+
+  /**
+   * Calcula el precio final de un producto basándose en un array de promociones activas.
+   * Prioriza la primera promoción válida encontrada que afecte al precio (porcentual o fija).
+   * 
+   * @param product El producto al que se le desea aplicar el descuento.
+   * @param promotions El array de promociones activas cargadas para el negocio.
+   */
+  calculateDiscountedPrice(product: Product, promotions: Promotion[]): { 
+    hasDiscount: boolean; 
+    originalPrice: number; 
+    finalPrice: number; 
+    promotion: Promotion | null; 
+  } {
+    const originalPrice = product.price;
+    
+    // Buscar la primera promoción aplicable que afecte al precio unitario (porcentual o fija)
+    const applicablePromotion = (promotions || []).find(p => {
+      if (!p.isActive) return false;
+      
+      // Comprobar si la promoción aplica al producto específico, categoría o a todo el catálogo
+      const appliesToItem = 
+        p.applicableTo === 'all_catalog' || 
+        (p.applicableTo === 'specific_item' && p.itemId === product.id) ||
+        (p.applicableTo === 'category' && p.categoryName === product.category);
+      
+      // Solo procesamos tipos que afectan el precio directamente aquí
+      return appliesToItem && (p.type === 'percentage' || p.type === 'fixed');
+    }) || null;
+
+    if (!applicablePromotion) {
+      return { hasDiscount: false, originalPrice, finalPrice: originalPrice, promotion: null };
+    }
+
+    let finalPrice = originalPrice;
+    if (applicablePromotion.type === 'percentage') {
+      finalPrice = originalPrice * (1 - (applicablePromotion.discountValue / 100));
+    } else if (applicablePromotion.type === 'fixed') {
+      finalPrice = Math.max(0, originalPrice - applicablePromotion.discountValue);
+    }
+
+    return {
+      hasDiscount: finalPrice < originalPrice,
+      originalPrice,
+      finalPrice: Math.round(finalPrice), // Redondeo para evitar decimales en precios de catálogo
+      promotion: applicablePromotion
+    };
   }
 }
 
