@@ -2,25 +2,26 @@
 
 import React, { useState, useEffect, useMemo, useCallback, Suspense } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
-import { useFirebase } from '@/firebase';
+import { useFirebase } from '../../../firebase';
 import { doc, getDoc, collectionGroup, query, where, getDocs, limit } from 'firebase/firestore';
 
-import CatalogHeader from '@/components/catalogo/catalog-header';
-import PublicProductCard from '@/components/catalogo/public-product-card';
-import ProductViewModal from '@/components/catalogo/product-view-modal';
-import { PurchaseModal } from '@/components/catalogo/purchase-modal';
-import { CartDrawer } from '@/components/catalogo/cart-drawer';
-import { SuggestionModal } from '@/components/suggestions/suggestion-modal';
+import CatalogHeader from '../../../components/catalogo/catalog-header';
+import PublicProductCard from '../../../components/catalogo/public-product-card';
+import ProductViewModal from '../../../components/catalogo/product-view-modal';
+import { PurchaseModal } from '../../../components/catalogo/purchase-modal';
+import { CartDrawer } from '../../../components/catalogo/cart-drawer';
+import { SuggestionModal } from '../../../components/suggestions/suggestion-modal';
 import { Frown, Loader2, PackageSearch } from 'lucide-react';
-import type { LandingHeaderConfigData } from '@/models/landing-page';
-import type { Product } from '@/models/product';
-import type { PaymentSettings } from '@/models/payment-settings';
-import type { SuggestionOutput } from '@/models/suggestion-io';
-import type { CartItem } from '@/models/cart';
-import { getSuggestion } from '@/ai/flows/suggestion-flow';
-import { updateSuggestionMetrics } from '@/ai/flows/update-suggestion-metrics-flow';
-import { PublicMenuChatWidget } from '@/components/public-menu-chatbot/PublicMenuChatWidget';
-import { useToast } from '@/hooks/use-toast';
+import type { LandingHeaderConfigData } from '../../../models/landing-page';
+import type { Product } from '../../../models/product';
+import type { Promotion } from '../../../models/promotion';
+import type { PaymentSettings } from '../../../models/payment-settings';
+import type { SuggestionOutput } from '../../../models/suggestion-io';
+import type { CartItem } from '../../../models/cart';
+import { getSuggestion } from '../../../ai/flows/suggestion-flow';
+import { updateSuggestionMetrics } from '../../../ai/flows/update-suggestion-metrics-flow';
+import { PublicMenuChatWidget } from '../../../components/public-menu-chatbot/PublicMenuChatWidget';
+import { useToast } from '../../../hooks/use-toast';
 
 interface CatalogPageProps {
     params: { businessId: string };
@@ -37,11 +38,13 @@ function CatalogPageContent({ params }: CatalogPageProps) {
     const [pageData, setPageData] = useState<{
         headerConfig: LandingHeaderConfigData | null;
         products: Product[] | null;
+        promotions: Promotion[] | null;
         paymentSettings: PaymentSettings | null;
         resolvedBusinessId: string | null;
     }>({
         headerConfig: null,
         products: null,
+        promotions: null,
         paymentSettings: null,
         resolvedBusinessId: null,
     });
@@ -84,6 +87,7 @@ function CatalogPageContent({ params }: CatalogPageProps) {
                 setPageData({
                     headerConfig: data.headerConfig as LandingHeaderConfigData,
                     products: data.products as Product[],
+                    promotions: (data.promotions as Promotion[]) || [],
                     paymentSettings: paymentSnap.exists() ? (paymentSnap.data() as PaymentSettings) : null,
                     resolvedBusinessId: businessId,
                 });
@@ -206,6 +210,7 @@ function CatalogPageContent({ params }: CatalogPageProps) {
                         <PublicProductCard 
                             key={product.id} 
                             product={product} 
+                            promotions={pageData.promotions || []}
                             onView={() => setSelectedProduct(product)}
                             onBuy={() => handleBuyNow(product)}
                         />

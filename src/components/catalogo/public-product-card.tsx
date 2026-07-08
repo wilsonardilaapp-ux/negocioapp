@@ -2,19 +2,23 @@
 
 import React from 'react';
 import Image from 'next/image';
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '../ui/card';
+import { Button } from '../ui/button';
+import { Badge } from '../ui/badge';
 import { Star, Eye } from 'lucide-react';
-import type { Product } from '@/models/product';
-import { stripHtml } from '@/lib/utils';
+import type { Product } from '../../models/product';
+import type { Promotion } from '../../models/promotion';
+import { promotionService } from '../../services/promotion-service';
+import { stripHtml } from '../../lib/utils';
 
 interface PublicProductCardProps {
   product: Product;
+  promotions?: Promotion[];
   onView: () => void;
   onBuy: () => void;
 }
 
-export default function PublicProductCard({ product, onView, onBuy }: PublicProductCardProps) {
+export default function PublicProductCard({ product, promotions = [], onView, onBuy }: PublicProductCardProps) {
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('es-CO', {
       style: 'currency',
@@ -23,8 +27,21 @@ export default function PublicProductCard({ product, onView, onBuy }: PublicProd
     }).format(value);
   };
 
+  const discountInfo = promotionService.calculateDiscountedPrice(product, promotions);
+
   return (
-    <Card className="flex flex-col self-start overflow-hidden hover:shadow-xl transition-all duration-300 border-gray-100 group">
+    <Card className="flex flex-col self-start overflow-hidden hover:shadow-xl transition-all duration-300 border-gray-100 group relative">
+      {/* Badge de Descuento sobre la imagen */}
+      {discountInfo.hasDiscount && (
+        <div className="absolute top-3 left-3 z-10 animate-in fade-in zoom-in duration-300">
+          <Badge className="bg-red-600 hover:bg-red-700 text-white font-black border-none shadow-md px-3 py-1">
+            {discountInfo.promotion?.type === 'percentage' 
+              ? `-${discountInfo.promotion.discountValue}%` 
+              : 'OFERTA'}
+          </Badge>
+        </div>
+      )}
+
       {product.images?.[0] && (
         <div 
           className="relative aspect-square w-full cursor-pointer overflow-hidden bg-muted"
@@ -53,9 +70,24 @@ export default function PublicProductCard({ product, onView, onBuy }: PublicProd
         <p className="text-sm text-gray-500 line-clamp-2">
             {stripHtml(product.description || '')}
         </p>
-        <p className="text-2xl font-black text-primary pt-2">
-            {formatCurrency(product.price)}
-        </p>
+        
+        {/* Lógica de visualización de precios */}
+        <div className="pt-2">
+          {discountInfo.hasDiscount ? (
+            <div className="flex flex-col">
+              <span className="text-xs text-muted-foreground line-through decoration-red-400/50">
+                {formatCurrency(discountInfo.originalPrice)}
+              </span>
+              <span className="text-2xl font-black text-red-600">
+                {formatCurrency(discountInfo.finalPrice)}
+              </span>
+            </div>
+          ) : (
+            <p className="text-2xl font-black text-primary">
+                {formatCurrency(product.price)}
+            </p>
+          )}
+        </div>
       </CardContent>
       <CardFooter className="p-4 pt-0 gap-2">
         <Button variant="outline" size="sm" className="flex-1" onClick={onView}>
