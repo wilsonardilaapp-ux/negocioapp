@@ -5,9 +5,9 @@ import React, { useMemo, useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { uploadMedia } from '@/ai/flows/upload-media-flow';
 import { useToast } from '@/hooks/use-toast';
-import 'quill/dist/quill.snow.css';
+import 'react-quill/dist/quill.snow.css';
 
-// Importación dinámica robusta para evitar errores de carga de chunks
+// Importación dinámica robusta con manejo de carga
 const QuillEditor = dynamic(
   () => import('react-quill'),
   {
@@ -27,6 +27,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({ value, onChange, placeh
   const [mounted, setMounted] = useState(false);
 
   // Asegurar que el componente solo se renderice en el cliente tras el montaje inicial
+  // Esto previene el ChunkLoadError al dar tiempo al cargador de Next.js a inicializarse
   useEffect(() => {
     setMounted(true);
   }, []);
