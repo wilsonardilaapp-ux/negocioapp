@@ -243,14 +243,19 @@ function PromotionDialog({ isOpen, onClose, promo, companyId }: { isOpen: boolea
     usageLimit: 0,
     title: '',
     description: '',
+    categoryName: '',
+    itemName: '',
+    itemId: '',
   };
 
   const [formData, setFormData] = useState<Partial<Promotion>>(initialDefaults);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
       if (promo) {
         setFormData({
+          ...initialDefaults,
           ...promo,
           validFrom: promo.validFrom ? new Date(promo.validFrom).toISOString().split('T')[0] : initialDefaults.validFrom,
           validUntil: promo.validUntil ? new Date(promo.validUntil).toISOString().split('T')[0] : initialDefaults.validUntil,
@@ -263,6 +268,11 @@ function PromotionDialog({ isOpen, onClose, promo, companyId }: { isOpen: boolea
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!companyId) {
+      toast({ variant: 'destructive', title: 'Error de sesión', description: 'No se pudo identificar tu cuenta.' });
+      return;
+    }
 
     if (!formData.title?.trim() || !formData.description?.trim()) {
         toast({ variant: 'destructive', title: 'Error', description: 'Título y descripción son obligatorios.' });
@@ -277,11 +287,13 @@ function PromotionDialog({ isOpen, onClose, promo, companyId }: { isOpen: boolea
       return;
     }
 
+    setIsSaving(true);
+
     try {
-      // Construir objeto limpio y saneado para Firestore
+      // Construir objeto limpio y saneado para Firestore (Eliminando UNDEFINED)
       const sanitizedData: any = {
-        title: formData.title.trim(),
-        description: formData.description.trim(),
+        title: (formData.title || '').trim(),
+        description: (formData.description || '').trim(),
         type: formData.type || 'percentage',
         applicableTo: formData.applicableTo || 'all_catalog',
         isActive: !!formData.isActive,
@@ -292,34 +304,39 @@ function PromotionDialog({ isOpen, onClose, promo, companyId }: { isOpen: boolea
         discountValue: Number(formData.discountValue) || 0,
         minQuantity: Number(formData.minQuantity) || 0,
         usageLimit: Number(formData.usageLimit) || 0,
+        usageCount: promo?.usageCount || 0,
+        companyId: companyId,
+        categoryName: '',
+        itemName: '',
+        itemId: '',
+        imageUrl: formData.imageUrl || ''
       };
 
       // Manejo de campos condicionales obligatorios
       if (sanitizedData.applicableTo === 'category') {
-        sanitizedData.categoryName = formData.categoryName?.trim() || 'General';
+        sanitizedData.categoryName = (formData.categoryName || 'General').trim();
       } else if (sanitizedData.applicableTo === 'specific_item') {
-        sanitizedData.itemName = formData.itemName?.trim() || 'Producto';
-        sanitizedData.itemId = formData.itemId || '';
+        sanitizedData.itemName = (formData.itemName || 'Producto').trim();
+        sanitizedData.itemId = (formData.itemId || '').trim();
       }
 
       if (promo) {
         await promotionService.updatePromotion(promo.id, sanitizedData);
       } else {
-        await promotionService.createPromotion({
-          ...sanitizedData as CreatePromotionInput,
-          companyId,
-        });
+        await promotionService.createPromotion(sanitizedData);
       }
       toast({ title: 'Éxito', description: 'Promoción guardada correctamente.' });
       onClose();
     } catch (error: any) {
       console.error("Error saving promo:", error);
       toast({ variant: 'destructive', title: 'Error al guardar', description: error.message || 'No se pudo guardar la promoción.' });
+    } finally {
+      setIsSaving(false);
     }
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={(open) => !isSaving && onClose()}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{promo ? 'Editar' : 'Nueva'} Promoción</DialogTitle>
@@ -418,7 +435,8 @@ function PromotionDialog({ isOpen, onClose, promo, companyId }: { isOpen: boolea
           </div>
 
           <DialogFooter>
-            <Button type="submit" className="w-full">
+            <Button type="submit" className="w-full" disabled={isSaving}>
+               {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                {promo ? 'Guardar Cambios' : 'Crear Promoción'}
             </Button>
           </DialogFooter>
