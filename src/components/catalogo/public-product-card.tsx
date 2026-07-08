@@ -13,7 +13,7 @@ import { stripHtml } from '../../lib/utils';
 
 interface PublicProductCardProps {
   product: Product;
-  promotions?: Promotion[];
+  promotions: Promotion[];
   onView: () => void;
   onBuy: () => void;
 }
