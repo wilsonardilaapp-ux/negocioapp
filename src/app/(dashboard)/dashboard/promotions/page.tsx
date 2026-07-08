@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -45,6 +44,7 @@ export default function PromotionsPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingPromo, setEditingPromo] = useState<Promotion | null>(null);
 
+  // Corregido: Usar arePromosLoading en lugar de isCouponsLoading para evitar ReferenceError
   const isLoading = arePromosLoading || isSubLoading;
 
   const handleToggleActive = async (id: string, current: boolean) => {
@@ -218,9 +218,10 @@ export default function PromotionsPage() {
         </TabsContent>
       </Tabs>
 
+      {/* Corregido: Pasar la prop onClose correctamente para evitar TypeError */}
       <PromotionDialog 
         isOpen={isDialogOpen} 
-        onOpenChange={(open) => setIsDialogOpen(open)} 
+        onClose={() => setIsDialogOpen(false)} 
         promo={editingPromo} 
       />
     </div>
@@ -271,7 +272,6 @@ function PromotionDialog({ isOpen, onClose, promo }: { isOpen: boolean, onClose:
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Obtener UID síncronamente para evitar desincronización en reglas
     const currentUid = user?.uid;
 
     if (!currentUid) {
@@ -326,7 +326,7 @@ function PromotionDialog({ isOpen, onClose, promo }: { isOpen: boolean, onClose:
       onClose();
     } catch (error: any) {
       console.error("Error saving promo:", error);
-      toast({ variant: 'destructive', title: 'Error al guardar', description: error.message || 'No tienes permisos suficientes o los datos son inválidos.' });
+      toast({ variant: 'destructive', title: 'Error al guardar', description: error.message || 'No se pudo procesar la solicitud.' });
     } finally {
       setIsSaving(false);
     }
@@ -342,7 +342,13 @@ function PromotionDialog({ isOpen, onClose, promo }: { isOpen: boolean, onClose:
         <form onSubmit={handleSubmit} className="space-y-4 py-4">
           <div className="grid gap-2">
             <Label>Título *</Label>
-            <Input required value={formData.title || ''} onChange={e => setFormData({ ...formData, title: e.target.value })} placeholder="Ej: Descuento de Verano" />
+            <input 
+               className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+               required 
+               value={formData.title || ''} 
+               onChange={e => setFormData({ ...formData, title: e.target.value })} 
+               placeholder="Ej: Descuento de Verano" 
+            />
           </div>
           <div className="grid gap-2">
             <Label>Descripción *</Label>
@@ -393,7 +399,11 @@ function PromotionDialog({ isOpen, onClose, promo }: { isOpen: boolean, onClose:
             {formData.applicableTo === 'specific_item' && (
               <div className="grid gap-2">
                 <Label>Nombre del producto/servicio</Label>
-                <Input value={formData.itemName || ''} onChange={e => setFormData({ ...formData, itemName: e.target.value })} />
+                <input 
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  value={formData.itemName || ''} 
+                  onChange={e => setFormData({ ...formData, itemName: e.target.value })} 
+                />
               </div>
             )}
           </div>
