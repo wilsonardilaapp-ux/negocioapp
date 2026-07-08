@@ -189,11 +189,22 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
     const ordersCollectionRef = collection(firestore, `businesses/${businessId}/orders`);
     const now = new Date().toISOString();
 
+    let totalPromoSavings = 0;
+
     cartItems.forEach(item => {
         const itemUnitPrice = item.appliedPromotion?.discountedPrice ?? item.price;
         const itemSubtotal = itemUnitPrice * item.quantity;
         
-        orderSummary += `- ${item.quantity} \u00D7 ${item.name}\n  ${formatCurrency(itemUnitPrice).padStart(12)}\n`;
+        let itemPriceText = formatCurrency(itemUnitPrice);
+        if (item.appliedPromotion) {
+            const orig = item.appliedPromotion.originalPrice;
+            const disc = item.appliedPromotion.discountedPrice;
+            const perc = Math.round((1 - disc / orig) * 100);
+            itemPriceText = `~${formatCurrency(orig)}~ ${formatCurrency(disc)} (-${perc}%)`;
+            totalPromoSavings += (orig - disc) * item.quantity;
+        }
+
+        orderSummary += `- ${item.quantity} \u00D7 ${item.name}\n  ${itemPriceText.padStart(12)}\n`;
 
         addDocumentNonBlocking(ordersCollectionRef, {
             businessId,
@@ -222,6 +233,10 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
 
     if (appliedCoupon) {
         orderSummary += `Cupón:        -${formatCurrency(discountFromCoupon).padStart(12)}\n`;
+    }
+
+    if (totalPromoSavings > 0) {
+        orderSummary += `🎉 Ahorraste:   ${formatCurrency(totalPromoSavings).padStart(12)}\n`;
     }
 
     if (packagingTotal > 0) {
@@ -336,7 +351,7 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
                 {tipoEntrega === 'domicilio' && <div className="space-y-2"><Label>Dirección *</Label><Textarea {...register('address')} /></div>}
             </div>
 
-            {/* SECTOR DE MÉTODO DE PAGO RESTAURADO */}
+            {/* SECTOR DE MÉTODO DE PAGO */}
             <div className="space-y-4">
                 <h4 className="font-bold text-lg">Método de Pago</h4>
                 <RadioGroup
@@ -391,7 +406,7 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
                     )}
                 </RadioGroup>
 
-                {/* BLOQUE DE DETALLES DE CUENTA RESTAURADO */}
+                {/* BLOQUE DE DETALLES DE CUENTA */}
                 {selectedPaymentMethod && selectedPaymentMethod !== 'pagoContraEntrega' && (
                     <div className="p-4 bg-muted/50 rounded-xl border-2 border-dashed border-muted space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
                         {(() => {
