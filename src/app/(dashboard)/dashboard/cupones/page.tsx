@@ -1,7 +1,8 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useUser, useFirestore } from '@/firebase';
+import { useUser, useFirestore, useFirebase } from '@/firebase';
 import { useCoupons } from '@/hooks/use-coupons';
 import { couponService } from '@/services/coupon-service';
 import { 
@@ -31,14 +32,15 @@ import { es } from 'date-fns/locale';
 import type { Coupon, CouponType, UsageLimitType } from '@/models/coupon';
 import { cn } from '@/lib/utils';
 import { useSubscription } from '@/hooks/useSubscription';
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import Link from 'next/link';
 import { LimitBanner } from '@/components/dashboard/LimitBanner';
+import { doc, collection, setDoc, addDoc, serverTimestamp } from 'firebase/firestore';
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError, type SecurityRuleContext } from '@/firebase/errors';
 
 const formatCurrency = (value: number) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(value);
 
 export default function CuponesPage() {
-  const { user } = useUser();
+  const { user, isUserLoading } = useUser();
   const { coupons, isLoading: isCouponsLoading } = useCoupons();
   const { limits, plan, couponsCount, isModuleAuthorized, isLoading: isSubLoading } = useSubscription();
   const { toast } = useToast();
@@ -46,7 +48,7 @@ export default function CuponesPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingCoupon, setEditingCoupon] = useState<Coupon | null>(null);
 
-  const isLoading = isCouponsLoading || isSubLoading;
+  const isLoading = isCouponsLoading || isSubLoading || isUserLoading;
 
   const handleToggleActive = async (id: string, current: boolean) => {
     try {
@@ -70,7 +72,6 @@ export default function CuponesPage() {
     return <div className="flex items-center justify-center h-64"><Loader2 className="animate-spin h-8 w-8 text-primary" /></div>;
   }
 
-  // Guarda de autorización unificada con el sidebar
   if (!isModuleAuthorized('promotions')) {
     return (
       <Card>
@@ -221,7 +222,10 @@ export default function CuponesPage() {
 
       <CouponDialog 
         isOpen={isDialogOpen} 
-        onClose={() => setIsDialogOpen(false)} 
+        onOpenChange={(open) => {
+            if (!open) setEditingCoupon(null);
+            setIsDialogOpen(open);
+        }} 
         coupon={editingCoupon} 
         businessId={user?.uid!}
         canCreate={!couponLimitReached}
@@ -232,18 +236,19 @@ export default function CuponesPage() {
 
 function CouponDialog({ 
   isOpen, 
-  onClose, 
+  onOpenChange, 
   coupon, 
   businessId,
   canCreate 
 }: { 
   isOpen: boolean, 
-  onClose: () => void, 
+  onOpenChange: (open: boolean) => void, 
   coupon: Coupon | null, 
   businessId: string,
   canCreate: boolean
 }) {
   const { toast } = useToast();
+  const { firestore } = useFirebase();
   
   const initialDefaults = {
     codigo: '',
@@ -257,6 +262,7 @@ function CouponDialog({
   };
 
   const [formData, setFormData] = useState<Partial<Coupon>>(initialDefaults);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -284,27 +290,69 @@ function CouponDialog({
         return;
     }
 
+    setIsSaving(true);
+
     try {
       const dataToSave = {
-        ...formData,
-        codigo: formData.codigo.toUpperCase().trim(),
         businessId,
+        codigo: formData.codigo.toUpperCase().trim(),
+        tipo: formData.tipo || 'porcentaje',
+        valor: Number(formData.valor) || 0,
+        fechaVencimiento: formData.fechaVencimiento || initialDefaults.fechaVencimiento,
+        limiteUsos: Number(formData.limiteUsos) || 0,
+        usoPorCliente: formData.usoPorCliente || 'ilimitado',
+        montoMinimo: Number(formData.montoMinimo) || 0,
+        activo: formData.activo ?? true,
+        updatedAt: new Date().toISOString(),
       };
 
       if (coupon) {
-        await couponService.updateCoupon(coupon.id, dataToSave);
+        const docRef = doc(firestore, 'cupones', coupon.id);
+        setDoc(docRef, dataToSave, { merge: true })
+            .then(() => {
+                toast({ title: '¡Éxito!', description: 'El cupón ha sido actualizado.' });
+                onOpenChange(false);
+            })
+            .catch(async (error) => {
+                const permissionError = new FirestorePermissionError({
+                    path: docRef.path,
+                    operation: 'update',
+                    requestResourceData: dataToSave,
+                } satisfies SecurityRuleContext);
+                errorEmitter.emit('permission-error', permissionError);
+            })
+            .finally(() => setIsSaving(false));
       } else {
-        await couponService.createCoupon(dataToSave as any);
+        const couponsCol = collection(firestore, 'cupones');
+        const finalNewData = {
+            ...dataToSave,
+            usosActuales: 0,
+            createdAt: new Date().toISOString(),
+        };
+
+        addDoc(couponsCol, finalNewData)
+            .then(() => {
+                toast({ title: '¡Éxito!', description: 'El cupón ha sido creado.' });
+                onOpenChange(false);
+            })
+            .catch(async (error) => {
+                const permissionError = new FirestorePermissionError({
+                    path: 'cupones',
+                    operation: 'create',
+                    requestResourceData: finalNewData,
+                } satisfies SecurityRuleContext);
+                errorEmitter.emit('permission-error', permissionError);
+            })
+            .finally(() => setIsSaving(false));
       }
-      toast({ title: '¡Éxito!', description: 'El cupón ha sido guardado.' });
-      onClose();
     } catch (error: any) {
-      toast({ variant: 'destructive', title: 'Error', description: 'No se pudo guardar el cupón.' });
+      toast({ variant: 'destructive', title: 'Error inesperado', description: 'Ocurrió un error al procesar el cupón.' });
+      setIsSaving(false);
     }
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>{coupon ? 'Editar' : 'Nuevo'} Cupón de Descuento</DialogTitle>
@@ -319,13 +367,18 @@ function CouponDialog({
               onChange={e => setFormData({ ...formData, codigo: e.target.value.toUpperCase() })} 
               placeholder="EJ: VERANO2024"
               className="font-bold tracking-widest"
+              disabled={isSaving}
             />
           </div>
           
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Tipo</Label>
-              <Select value={formData.tipo} onValueChange={(v: CouponType) => setFormData({ ...formData, tipo: v })}>
+              <Select 
+                value={formData.tipo} 
+                onValueChange={(v: CouponType) => setFormData({ ...formData, tipo: v })}
+                disabled={isSaving}
+              >
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="porcentaje">Porcentaje (%)</SelectItem>
@@ -335,29 +388,56 @@ function CouponDialog({
             </div>
             <div className="space-y-2">
               <Label>{formData.tipo === 'porcentaje' ? 'Valor (%)' : 'Valor ($)'}</Label>
-              <Input type="number" required value={formData.valor} onChange={e => setFormData({ ...formData, valor: Number(e.target.value) })} />
+              <Input 
+                type="number" 
+                required 
+                value={formData.valor} 
+                onChange={e => setFormData({ ...formData, valor: Number(e.target.value) })} 
+                disabled={isSaving}
+              />
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Fecha de Vencimiento</Label>
-              <Input type="date" required value={formData.fechaVencimiento} onChange={e => setFormData({ ...formData, fechaVencimiento: e.target.value })} />
+              <Input 
+                type="date" 
+                required 
+                value={formData.fechaVencimiento} 
+                onChange={e => setFormData({ ...formData, fechaVencimiento: e.target.value })} 
+                disabled={isSaving}
+              />
             </div>
             <div className="space-y-2">
               <Label>Monto Mínimo Compra</Label>
-              <Input type="number" value={formData.montoMinimo} onChange={e => setFormData({ ...formData, montoMinimo: Number(e.target.value) })} />
+              <Input 
+                type="number" 
+                value={formData.montoMinimo} 
+                onChange={e => setFormData({ ...formData, montoMinimo: Number(e.target.value) })} 
+                disabled={isSaving}
+              />
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Límite Usos Totales</Label>
-              <Input type="number" placeholder="0 = Ilimitado" value={formData.limiteUsos} onChange={e => setFormData({ ...formData, limiteUsos: Number(e.target.value) })} />
+              <Input 
+                type="number" 
+                placeholder="0 = Ilimitado" 
+                value={formData.limiteUsos} 
+                onChange={e => setFormData({ ...formData, limiteUsos: Number(e.target.value) })} 
+                disabled={isSaving}
+              />
             </div>
             <div className="space-y-2">
               <Label>Uso por Cliente</Label>
-              <Select value={formData.usoPorCliente} onValueChange={(v: UsageLimitType) => setFormData({ ...formData, usoPorCliente: v })}>
+              <Select 
+                value={formData.usoPorCliente} 
+                onValueChange={(v: UsageLimitType) => setFormData({ ...formData, usoPorCliente: v })}
+                disabled={isSaving}
+              >
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="unaVez">Una sola vez</SelectItem>
@@ -368,12 +448,17 @@ function CouponDialog({
           </div>
 
           <div className="flex items-center gap-2 pt-2">
-            <Switch checked={formData.activo} onCheckedChange={v => setFormData({ ...formData, activo: v })} />
+            <Switch 
+                checked={formData.activo} 
+                onCheckedChange={v => setFormData({ ...formData, activo: v })} 
+                disabled={isSaving}
+            />
             <Label>Cupón Activo</Label>
           </div>
 
           <DialogFooter className="pt-4">
-            <Button type="submit" className="w-full" disabled={!coupon && !canCreate}>
+            <Button type="submit" className="w-full font-bold" disabled={isSaving || (!coupon && !canCreate)}>
+              {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {coupon ? 'Guardar Cambios' : 'Crear Cupón'}
             </Button>
           </DialogFooter>
@@ -382,3 +467,4 @@ function CouponDialog({
     </Dialog>
   );
 }
+
