@@ -253,7 +253,13 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
     orderSummary += `${emoMoneyBag} TOTAL:      ${formatCurrency(total).padStart(12)}\n`;
     orderSummary += `${emoCard} Método de pago:\n${paymentLabel}\n`;
     orderSummary += `${separator}\n`;
-    orderSummary += `${emoThanks} Gracias por tu compra.\nTu pedido será preparado y enviado lo antes posible.\n` + "```";
+
+    // Mensaje de cierre condicional según el tipo de entrega
+    const finalStatusMsg = tipoEntrega === 'domicilio' 
+        ? "Tu pedido será preparado y enviado lo antes posible." 
+        : "Tu pedido estará listo para recoger en tienda muy pronto.";
+
+    orderSummary += `${emoThanks} Gracias por tu compra.\n${finalStatusMsg}\n` + "```";
 
     const cleanPhone = normalizePhoneNumber(businessInfo?.phone || '3228831634');
     window.open(`https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(orderSummary)}`, '_blank');
