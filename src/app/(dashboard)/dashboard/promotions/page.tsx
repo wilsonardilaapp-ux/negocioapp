@@ -39,10 +39,12 @@ export default function PromotionsPage() {
   const { user } = useUser();
   const { promotions, isLoading: arePromosLoading } = usePromotions();
   const { toast } = useToast();
-  const { limits, plan, promotionsCount, isModuleAuthorized, isLoading: isSubscriptionLoading } = useSubscription();
+  const { limits, plan, promotionsCount, isModuleAuthorized, isLoading: isSubLoading } = useSubscription();
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingPromo, setEditingPromo] = useState<Promotion | null>(null);
+
+  const isLoading = isSubscriptionLoading || arePromosLoading;
 
   const handleToggleActive = async (id: string, current: boolean) => {
     try {
@@ -84,13 +86,10 @@ export default function PromotionsPage() {
     return colors[type];
   };
 
-  const isLoading = isSubscriptionLoading || arePromosLoading;
-
   if (isLoading) {
     return <div className="flex items-center justify-center h-64"><Loader2 className="animate-spin h-8 w-8 text-primary" /></div>;
   }
 
-  // Sincronización con el sidebar: Usamos isModuleAuthorized('promotions')
   if (!isModuleAuthorized('promotions')) {
     return (
         <Card>
@@ -246,11 +245,19 @@ function PromotionDialog({ isOpen, onClose, promo, companyId }: { isOpen: boolea
     description: '',
   };
 
-  const [formData, setFormData] = useState<Partial<Promotion>>(promo || initialDefaults);
+  const [formData, setFormData] = useState<Partial<Promotion>>(initialDefaults);
 
   useEffect(() => {
     if (isOpen) {
-      setFormData(promo || initialDefaults);
+      if (promo) {
+        setFormData({
+          ...promo,
+          validFrom: promo.validFrom ? new Date(promo.validFrom).toISOString().split('T')[0] : initialDefaults.validFrom,
+          validUntil: promo.validUntil ? new Date(promo.validUntil).toISOString().split('T')[0] : initialDefaults.validUntil,
+        });
+      } else {
+        setFormData({ ...initialDefaults });
+      }
     }
   }, [isOpen, promo]);
 
@@ -262,25 +269,52 @@ function PromotionDialog({ isOpen, onClose, promo, companyId }: { isOpen: boolea
         return;
     }
 
-    if (formData.validUntil! < formData.validFrom!) {
+    const from = formData.validFrom || initialDefaults.validFrom;
+    const until = formData.validUntil || initialDefaults.validUntil;
+
+    if (until < from) {
       toast({ variant: 'destructive', title: 'Error', description: 'La fecha de fin debe ser posterior al inicio.' });
       return;
     }
 
     try {
+      // Construir objeto limpio y saneado para Firestore
+      const sanitizedData: any = {
+        title: formData.title.trim(),
+        description: formData.description.trim(),
+        type: formData.type || 'percentage',
+        applicableTo: formData.applicableTo || 'all_catalog',
+        isActive: !!formData.isActive,
+        showInCatalog: !!formData.showInCatalog,
+        showInCheckout: !!formData.showInCheckout,
+        validFrom: from,
+        validUntil: until,
+        discountValue: Number(formData.discountValue) || 0,
+        minQuantity: Number(formData.minQuantity) || 0,
+        usageLimit: Number(formData.usageLimit) || 0,
+      };
+
+      // Manejo de campos condicionales obligatorios
+      if (sanitizedData.applicableTo === 'category') {
+        sanitizedData.categoryName = formData.categoryName?.trim() || 'General';
+      } else if (sanitizedData.applicableTo === 'specific_item') {
+        sanitizedData.itemName = formData.itemName?.trim() || 'Producto';
+        sanitizedData.itemId = formData.itemId || '';
+      }
+
       if (promo) {
-        await promotionService.updatePromotion(promo.id, formData);
+        await promotionService.updatePromotion(promo.id, sanitizedData);
       } else {
         await promotionService.createPromotion({
-          ...formData as CreatePromotionInput,
+          ...sanitizedData as CreatePromotionInput,
           companyId,
         });
       }
       toast({ title: 'Éxito', description: 'Promoción guardada correctamente.' });
       onClose();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error saving promo:", error);
-      toast({ variant: 'destructive', title: 'Error', description: 'No se pudo guardar la promoción. Verifica tu conexión o permisos.' });
+      toast({ variant: 'destructive', title: 'Error al guardar', description: error.message || 'No se pudo guardar la promoción.' });
     }
   };
 
@@ -318,7 +352,7 @@ function PromotionDialog({ isOpen, onClose, promo, companyId }: { isOpen: boolea
             {(formData.type === 'percentage' || formData.type === 'fixed' || formData.type === 'bundle') && (
               <div className="grid gap-2">
                 <Label>{formData.type === 'percentage' ? 'Valor %' : 'Valor del descuento/paquete'}</Label>
-                <Input type="number" value={formData.discountValue} onChange={e => setFormData({ ...formData, discountValue: Number(e.target.value) })} />
+                <Input type="number" value={formData.discountValue} onChange={e => setFormData({ ...formData, discountValue: Number(e.target.value) || 0 })} />
               </div>
             )}
           </div>
@@ -364,11 +398,11 @@ function PromotionDialog({ isOpen, onClose, promo, companyId }: { isOpen: boolea
           <div className="grid grid-cols-2 gap-4">
             <div className="grid gap-2">
               <Label>Cantidad mínima</Label>
-              <Input type="number" value={formData.minQuantity} onChange={e => setFormData({ ...formData, minQuantity: Number(e.target.value) })} />
+              <Input type="number" value={formData.minQuantity || 0} onChange={e => setFormData({ ...formData, minQuantity: Number(e.target.value) || 0 })} />
             </div>
             <div className="grid gap-2">
               <Label>Límite de usos (0 = ∞)</Label>
-              <Input type="number" value={formData.usageLimit} onChange={e => setFormData({ ...formData, usageLimit: Number(e.target.value) })} />
+              <Input type="number" placeholder="0 = Ilimitado" value={formData.usageLimit || 0} onChange={e => setFormData({ ...formData, usageLimit: Number(e.target.value) || 0 })} />
             </div>
           </div>
 
@@ -384,7 +418,9 @@ function PromotionDialog({ isOpen, onClose, promo, companyId }: { isOpen: boolea
           </div>
 
           <DialogFooter>
-            <Button type="submit" className="w-full">Guardar Promoción</Button>
+            <Button type="submit" className="w-full">
+               {promo ? 'Guardar Cambios' : 'Crear Promoción'}
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>
