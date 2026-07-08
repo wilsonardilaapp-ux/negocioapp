@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -44,7 +45,6 @@ export default function PromotionsPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingPromo, setEditingPromo] = useState<Promotion | null>(null);
 
-  // Corregido: Usar arePromosLoading en lugar de isCouponsLoading para evitar ReferenceError
   const isLoading = arePromosLoading || isSubLoading;
 
   const handleToggleActive = async (id: string, current: boolean) => {
@@ -218,7 +218,6 @@ export default function PromotionsPage() {
         </TabsContent>
       </Tabs>
 
-      {/* Corregido: Pasar la prop onClose correctamente para evitar TypeError */}
       <PromotionDialog 
         isOpen={isDialogOpen} 
         onClose={() => setIsDialogOpen(false)} 
@@ -295,7 +294,6 @@ function PromotionDialog({ isOpen, onClose, promo }: { isOpen: boolean, onClose:
     setIsSaving(true);
 
     try {
-      // Sanitización estricta para evitar undefined en Firestore
       const sanitizedData: any = {
         title: (formData.title || '').trim(),
         description: (formData.description || '').trim(),

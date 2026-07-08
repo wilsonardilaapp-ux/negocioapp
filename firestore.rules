@@ -60,8 +60,9 @@ service cloud.firestore {
 
     match /promotions/{promoId} {
       allow read, list: if true;
-      // Corregido: Usar request.resource.data para validar el propietario tanto en create como en update
-      allow write: if isSuperAdmin() || isOwner(request.resource.data.companyId);
+      // Corregido: Separar create/update de delete para usar resource/request.resource adecuadamente
+      allow create, update: if isSuperAdmin() || isOwner(request.resource.data.companyId);
+      allow delete: if isSuperAdmin() || isOwner(resource.data.companyId);
     }
 
     match /cupones/{couponId} {
