@@ -44,7 +44,8 @@ export default function PromotionsPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingPromo, setEditingPromo] = useState<Promotion | null>(null);
 
-  const isLoading = isSubscriptionLoading || arePromosLoading;
+  // FIX: Se cambió isSubscriptionLoading por isSubLoading (el nombre correcto de la variable desestructurada arriba)
+  const isLoading = isSubLoading || arePromosLoading;
 
   const handleToggleActive = async (id: string, current: boolean) => {
     try {
@@ -192,11 +193,11 @@ export default function PromotionsPage() {
                           <AlertDialogContent>
                             <AlertDialogHeader>
                               <AlertDialogTitle>¿Confirmar eliminación?</AlertDialogTitle>
-                              <AlertDialogDescription>Esta acción no se puede deshacer.</AlertDialogDescription>
+                              <AlertDialogDescription>Esta acción eliminará permanentemente la promoción "{promo.title}".</AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
                               <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                              <AlertDialogAction onClick={() => handleDelete(promo.id)} className="bg-destructive text-white">Eliminar</AlertDialogAction>
+                              <AlertDialogAction onClick={() => handleDelete(promo.id)} className="bg-destructive text-white hover:bg-destructive/90">Eliminar</AlertDialogAction>
                             </AlertDialogFooter>
                           </AlertDialogContent>
                         </AlertDialog>
@@ -292,6 +293,7 @@ function PromotionDialog({ isOpen, onClose, promo, companyId }: { isOpen: boolea
 
     try {
       // Sanitización profunda de datos para evitar valores undefined en Firestore
+      // Se asegura que cada campo tenga un valor válido (string vacío o número)
       const sanitizedData: any = {
         title: (formData.title || '').trim(),
         description: (formData.description || '').trim(),
@@ -428,8 +430,8 @@ function PromotionDialog({ isOpen, onClose, promo, companyId }: { isOpen: boolea
           </div>
 
           <DialogFooter>
-            <Button type="submit" className="w-full" disabled={isSaving}>
-               {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            <Button type="submit" className="w-full h-12 font-bold" disabled={isSaving}>
+               {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                {promo ? 'Guardar Cambios' : 'Crear Promoción'}
             </Button>
           </DialogFooter>
