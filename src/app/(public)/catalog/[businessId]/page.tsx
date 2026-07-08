@@ -22,6 +22,7 @@ import { getSuggestion } from '@/ai/flows/suggestion-flow';
 import { updateSuggestionMetrics } from '@/ai/flows/update-suggestion-metrics-flow';
 import { PublicMenuChatWidget } from '@/components/public-menu-chatbot/PublicMenuChatWidget';
 import { useToast } from '@/hooks/use-toast';
+import { promotionService } from '@/services/promotion-service';
 
 interface CatalogPageProps {
     params: { businessId: string };
@@ -103,12 +104,34 @@ function CatalogPageContent({ params }: CatalogPageProps) {
     }, [slug, firestore, isNetworkEnabled]);
 
     const handleAddToCart = (product: Product, quantity: number) => {
+        // 1. Calcular si el producto tiene una promoción aplicable
+        const discountInfo = promotionService.calculateDiscountedPrice(product, pageData.promotions || []);
+        
+        let appliedPromotion = undefined;
+        if (discountInfo.hasDiscount && discountInfo.promotion) {
+            appliedPromotion = {
+                type: discountInfo.promotion.type as 'percentage' | 'fixed',
+                originalPrice: discountInfo.originalPrice,
+                discountedPrice: discountInfo.finalPrice,
+                promotionId: discountInfo.promotion.id
+            };
+        }
+
         setCartItems(prev => {
             const existing = prev.find(item => item.id === product.id);
             if (existing) {
-                return prev.map(item => item.id === product.id ? { ...item, quantity: item.quantity + quantity } : item);
+                return prev.map(item => 
+                    item.id === product.id 
+                        ? { 
+                            ...item, 
+                            quantity: item.quantity + quantity,
+                            // Conservamos la promoción ya asignada o la nueva calculada
+                            appliedPromotion: item.appliedPromotion || appliedPromotion 
+                        } 
+                        : item
+                );
             }
-            return [...prev, { ...product, quantity }];
+            return [...prev, { ...product, quantity, appliedPromotion }];
         });
     };
 
