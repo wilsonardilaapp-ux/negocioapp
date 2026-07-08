@@ -2,26 +2,26 @@
 
 import React, { useState, useEffect, useMemo, useCallback, Suspense } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
-import { useFirebase } from '../../../firebase';
+import { useFirebase } from '@/firebase';
 import { doc, getDoc, collectionGroup, query, where, getDocs, limit } from 'firebase/firestore';
 
-import CatalogHeader from '../../../components/catalogo/catalog-header';
-import PublicProductCard from '../../../components/catalogo/public-product-card';
-import ProductViewModal from '../../../components/catalogo/product-view-modal';
-import { PurchaseModal } from '../../../components/catalogo/purchase-modal';
-import { CartDrawer } from '../../../components/catalogo/cart-drawer';
-import { SuggestionModal } from '../../../components/suggestions/suggestion-modal';
+import CatalogHeader from '@/components/catalogo/catalog-header';
+import PublicProductCard from '@/components/catalogo/public-product-card';
+import ProductViewModal from '@/components/catalogo/product-view-modal';
+import { PurchaseModal } from '@/components/catalogo/purchase-modal';
+import { CartDrawer } from '@/components/catalogo/cart-drawer';
+import { SuggestionModal } from '@/components/suggestions/suggestion-modal';
 import { Frown, Loader2, PackageSearch } from 'lucide-react';
-import type { LandingHeaderConfigData } from '../../../models/landing-page';
-import type { Product } from '../../../models/product';
-import type { Promotion } from '../../../models/promotion';
-import type { PaymentSettings } from '../../../models/payment-settings';
-import type { SuggestionOutput } from '../../../models/suggestion-io';
-import type { CartItem } from '../../../models/cart';
-import { getSuggestion } from '../../../ai/flows/suggestion-flow';
-import { updateSuggestionMetrics } from '../../../ai/flows/update-suggestion-metrics-flow';
-import { PublicMenuChatWidget } from '../../../components/public-menu-chatbot/PublicMenuChatWidget';
-import { useToast } from '../../../hooks/use-toast';
+import type { LandingHeaderConfigData } from '@/models/landing-page';
+import type { Product } from '@/models/product';
+import type { Promotion } from '@/models/promotion';
+import type { PaymentSettings } from '@/models/payment-settings';
+import type { SuggestionOutput } from '@/models/suggestion-io';
+import type { CartItem } from '@/models/cart';
+import { getSuggestion } from '@/ai/flows/suggestion-flow';
+import { updateSuggestionMetrics } from '@/ai/flows/update-suggestion-metrics-flow';
+import { PublicMenuChatWidget } from '@/components/public-menu-chatbot/PublicMenuChatWidget';
+import { useToast } from '@/hooks/use-toast';
 
 interface CatalogPageProps {
     params: { businessId: string };
@@ -29,7 +29,6 @@ interface CatalogPageProps {
 
 function CatalogPageContent({ params }: CatalogPageProps) {
     const slug = params.businessId;
-    const searchParams = useSearchParams();
     const { firestore, isNetworkEnabled } = useFirebase();
     const { toast } = useToast();
 
@@ -65,6 +64,7 @@ function CatalogPageContent({ params }: CatalogPageProps) {
             setIsLoading(true);
             setError(null);
             try {
+                // Resolver el businessId (soporte para alias personalizados)
                 const shareConfigQuery = query(collectionGroup(firestore, 'shareConfig'), where('slug', '==', slug), limit(1));
                 const querySnapshot = await getDocs(shareConfigQuery);
                 const customSlugDoc = querySnapshot.docs.find(doc => doc.data().useCustomSlug === true);
@@ -137,7 +137,7 @@ function CatalogPageContent({ params }: CatalogPageProps) {
             action: (
                 <button 
                     onClick={() => setIsCartOpen(true)}
-                    className="bg-primary text-white text-[10px] font-bold uppercase px-3 py-1 rounded-md"
+                    className="bg-primary text-white text-[10px] font-bold uppercase px-3 py-1 rounded-full"
                 >
                     Ver Carrito
                 </button>
