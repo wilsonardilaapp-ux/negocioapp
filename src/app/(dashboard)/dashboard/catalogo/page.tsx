@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
@@ -33,6 +32,7 @@ import { useToast } from '../../../../hooks/use-toast';
 import { useSubscription } from '../../../../hooks/useSubscription';
 import { LimitBanner } from '../../../../components/dashboard/LimitBanner';
 import type { Business } from '../../../../models/business';
+import { promotionService } from '../../../../services/promotion-service';
 import * as XLSX from 'xlsx';
 import { cn } from '@/lib/utils';
 
@@ -181,10 +181,25 @@ export default function CatalogoPage() {
         }
     }, [canCreate, limits.products]);
     
-    const updatePublicCatalog = useCallback((productsToSave: Product[], configToSave: LandingHeaderConfigData) => {
+    const updatePublicCatalog = useCallback(async (productsToSave: Product[], configToSave: LandingHeaderConfigData) => {
         if (!firestore || !user) return;
-        const publicCatalogRef = doc(firestore, 'businesses', user.uid, 'publicData', 'catalog');
-        setDocumentNonBlocking(publicCatalogRef, { products: productsToSave, headerConfig: configToSave }, { merge: true });
+        
+        try {
+            // Obtener promociones activas que deben mostrarse en el catálogo
+            const activePromos = await promotionService.getActivePromotions(user.uid);
+            
+            const publicCatalogRef = doc(firestore, 'businesses', user.uid, 'publicData', 'catalog');
+            await setDocumentNonBlocking(publicCatalogRef, { 
+                products: productsToSave, 
+                headerConfig: configToSave,
+                promotions: activePromos 
+            }, { merge: true });
+        } catch (error) {
+            console.error("Error al actualizar catálogo público con promociones:", error);
+            // Fallback: actualizar solo productos y config si fallan las promociones
+            const publicCatalogRef = doc(firestore, 'businesses', user.uid, 'publicData', 'catalog');
+            await setDocumentNonBlocking(publicCatalogRef, { products: productsToSave, headerConfig: configToSave }, { merge: true });
+        }
     }, [firestore, user]);
     
     const handleSaveProduct = async (productData: Omit<Product, 'id' | 'businessId'>) => {
