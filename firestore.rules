@@ -60,7 +60,8 @@ service cloud.firestore {
 
     match /promotions/{promoId} {
       allow read, list: if true;
-      allow write: if isSuperAdmin() || isOwner(request.resource.data.companyId || resource.data.companyId);
+      // Corregido: Usar request.resource.data para validar el propietario tanto en create como en update
+      allow write: if isSuperAdmin() || isOwner(request.resource.data.companyId);
     }
 
     match /cupones/{couponId} {
@@ -102,12 +103,8 @@ service cloud.firestore {
 
     // --- VALORACIONES DEL DIRECTORIO ---
     match /directoryRatings/{ratingId} {
-      // Lectura pública solo para lo publicado. Admin y Dueño ven todo.
       allow read, list: if resource.data.status == 'published' || isSuperAdmin() || isOwner(resource.data.businessId);
       
-      // Creación:
-      // 1. Usuarios registrados (flujo normal)
-      // 2. Invitados: Forzar 'pending' y validar campos de contacto obligatorios. Bloquear campos admin.
       allow create: if (isAuthenticated() && request.resource.data.authType == 'registered') || (
         request.resource.data.authType == 'guest' &&
         request.resource.data.status == 'pending' &&
@@ -141,7 +138,6 @@ service cloud.firestore {
         allow read, list: if true;
         allow write: if isSuperAdmin() || isBusinessMember(businessId);
 
-        // Votos de productos en catálogo público
         match /votes/{visitorId} {
           allow read: if true;
           allow create: if true;
@@ -163,7 +159,6 @@ service cloud.firestore {
         allow read, write: if isSuperAdmin() || isBusinessMember(businessId);
       }
 
-      // --- ESTRUCTURA REPARADA PARA CHATBOT DEL MENÚ PÚBLICO ---
       match /publicMenuChatbot/main {
         allow read: if true;
         allow write: if isSuperAdmin() || isBusinessMember(businessId);

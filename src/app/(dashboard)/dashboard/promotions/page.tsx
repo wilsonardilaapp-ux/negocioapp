@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -44,7 +45,7 @@ export default function PromotionsPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingPromo, setEditingPromo] = useState<Promotion | null>(null);
 
-  const isLoading = isSubLoading || arePromosLoading;
+  const isLoading = arePromosLoading || isSubLoading;
 
   const handleToggleActive = async (id: string, current: boolean) => {
     try {
@@ -219,7 +220,7 @@ export default function PromotionsPage() {
 
       <PromotionDialog 
         isOpen={isDialogOpen} 
-        onClose={() => setIsDialogOpen(false)} 
+        onOpenChange={(open) => setIsDialogOpen(open)} 
         promo={editingPromo} 
       />
     </div>
@@ -270,7 +271,10 @@ function PromotionDialog({ isOpen, onClose, promo }: { isOpen: boolean, onClose:
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!user?.uid) {
+    // Obtener UID síncronamente para evitar desincronización en reglas
+    const currentUid = user?.uid;
+
+    if (!currentUid) {
       toast({ variant: 'destructive', title: 'Error de sesión', description: 'Debes estar autenticado para realizar esta acción.' });
       return;
     }
@@ -291,6 +295,7 @@ function PromotionDialog({ isOpen, onClose, promo }: { isOpen: boolean, onClose:
     setIsSaving(true);
 
     try {
+      // Sanitización estricta para evitar undefined en Firestore
       const sanitizedData: any = {
         title: (formData.title || '').trim(),
         description: (formData.description || '').trim(),
@@ -305,7 +310,7 @@ function PromotionDialog({ isOpen, onClose, promo }: { isOpen: boolean, onClose:
         minQuantity: Number(formData.minQuantity) || 0,
         usageLimit: Number(formData.usageLimit) || 0,
         usageCount: promo?.usageCount ? Number(promo.usageCount) : 0,
-        companyId: user.uid,
+        companyId: currentUid,
         imageUrl: (formData.imageUrl || '').trim(),
         categoryName: (formData.applicableTo === 'category' ? (formData.categoryName || '') : '').trim(),
         itemName: (formData.applicableTo === 'specific_item' ? (formData.itemName || '') : '').trim(),
@@ -321,7 +326,7 @@ function PromotionDialog({ isOpen, onClose, promo }: { isOpen: boolean, onClose:
       onClose();
     } catch (error: any) {
       console.error("Error saving promo:", error);
-      toast({ variant: 'destructive', title: 'Error de permisos o validación', description: error.message || 'No tienes permisos suficientes o los datos son inválidos.' });
+      toast({ variant: 'destructive', title: 'Error al guardar', description: error.message || 'No tienes permisos suficientes o los datos son inválidos.' });
     } finally {
       setIsSaving(false);
     }
