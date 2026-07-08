@@ -246,6 +246,7 @@ function PromotionDialog({ isOpen, onClose, promo, companyId }: { isOpen: boolea
     categoryName: '',
     itemName: '',
     itemId: '',
+    imageUrl: '',
   };
 
   const [formData, setFormData] = useState<Partial<Promotion>>(initialDefaults);
@@ -290,42 +291,34 @@ function PromotionDialog({ isOpen, onClose, promo, companyId }: { isOpen: boolea
     setIsSaving(true);
 
     try {
-      // Construir objeto limpio y saneado para Firestore (Eliminando UNDEFINED)
+      // Sanitización profunda de datos para evitar valores undefined en Firestore
       const sanitizedData: any = {
         title: (formData.title || '').trim(),
         description: (formData.description || '').trim(),
         type: formData.type || 'percentage',
         applicableTo: formData.applicableTo || 'all_catalog',
-        isActive: !!formData.isActive,
-        showInCatalog: !!formData.showInCatalog,
-        showInCheckout: !!formData.showInCheckout,
+        isActive: formData.isActive === undefined ? true : !!formData.isActive,
+        showInCatalog: formData.showInCatalog === undefined ? true : !!formData.showInCatalog,
+        showInCheckout: formData.showInCheckout === undefined ? true : !!formData.showInCheckout,
         validFrom: from,
         validUntil: until,
         discountValue: Number(formData.discountValue) || 0,
         minQuantity: Number(formData.minQuantity) || 0,
         usageLimit: Number(formData.usageLimit) || 0,
-        usageCount: promo?.usageCount || 0,
-        companyId: companyId,
-        categoryName: '',
-        itemName: '',
-        itemId: '',
-        imageUrl: formData.imageUrl || ''
+        usageCount: Number(promo?.usageCount) || 0,
+        companyId: String(companyId),
+        imageUrl: String(formData.imageUrl || ''),
+        categoryName: (formData.applicableTo === 'category' ? (formData.categoryName || '') : '').trim(),
+        itemName: (formData.applicableTo === 'specific_item' ? (formData.itemName || '') : '').trim(),
+        itemId: (formData.applicableTo === 'specific_item' ? (formData.itemId || '') : '').trim(),
       };
-
-      // Manejo de campos condicionales obligatorios
-      if (sanitizedData.applicableTo === 'category') {
-        sanitizedData.categoryName = (formData.categoryName || 'General').trim();
-      } else if (sanitizedData.applicableTo === 'specific_item') {
-        sanitizedData.itemName = (formData.itemName || 'Producto').trim();
-        sanitizedData.itemId = (formData.itemId || '').trim();
-      }
 
       if (promo) {
         await promotionService.updatePromotion(promo.id, sanitizedData);
       } else {
         await promotionService.createPromotion(sanitizedData);
       }
-      toast({ title: 'Éxito', description: 'Promoción guardada correctamente.' });
+      toast({ title: '¡Éxito!', description: 'La promoción ha sido guardada correctamente.' });
       onClose();
     } catch (error: any) {
       console.error("Error saving promo:", error);
