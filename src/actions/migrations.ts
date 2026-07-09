@@ -144,7 +144,7 @@ export async function syncHybridPlanKeys() {
 
       const updatedFeatures = data.features.map((f: any) => {
         const text = (f.value || "").toLowerCase();
-        let key = f.groupKey;
+        let key = f.groupKey || null; // Usar null en lugar de undefined para Firestore
 
         // Lógica de match según el significado
         if (text.includes('producto')) key = 'productos';
