@@ -87,7 +87,7 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ config, order,
   };
 
   const paperWidthClasses = {
-    '58mm': 'w-[58mm]',
+    '58mm': 'w-[48mm]', // Usamos 48mm que es el área real imprimible de las impresoras de 58mm
     '80mm': 'w-[80mm]',
     'A4': 'w-[210mm]',
   };
@@ -98,8 +98,8 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ config, order,
     </div>
   );
 
-  // Replicating text formatting logic for live preview
-  const LINE_CHARS = config.style.paperSize === '80mm' ? 42 : 32;
+  // Ajuste proporcional de caracteres para evitar recortes en el área de 48mm
+  const LINE_CHARS = config.style.paperSize === '80mm' ? 42 : 30; // Reducido de 32 a 30 para margen de seguridad
   const CANT_W = 3;
   const PRICE_W = 9;
   const PROD_W = LINE_CHARS - CANT_W - PRICE_W - 2;
