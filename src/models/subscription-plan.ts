@@ -22,7 +22,8 @@ export const SubscriptionPlanSchema = z.object({
   includedModuleKeys: z.array(z.string()).optional().describe("Lista de IDs de módulos incluidos por defecto en este plan."),
   features: z.array(z.object({ 
     value: z.string().min(1, 'La característica no puede estar vacía.'),
-    displayOrder: z.number().optional()
+    displayOrder: z.number().optional(),
+    groupKey: z.string().optional()
   })).describe("Lista de características clave para la página de precios."),
   limits: PlanLimitsSchema,
   extraLimits: z.array(z.object({ 
@@ -46,12 +47,12 @@ export const DefaultSubscriptionPlans: SubscriptionPlan[] = [
     isActive: true,
     includedModuleKeys: ['catalogo', 'blog'],
     features: [
-      { value: '10 productos en catálogo', displayOrder: 0 },
-      { value: '5 posts de blog', displayOrder: 1 },
-      { value: '1 Landing Page', displayOrder: 2 },
-      { value: 'Soporte base', displayOrder: 3 },
-      { value: 'Pedidos por mes : 21', displayOrder: 4 },
-      { value: 'Sugerencias: 2', displayOrder: 5 },
+      { value: '10 productos en catálogo', displayOrder: 0, groupKey: 'productos' },
+      { value: '5 posts de blog', displayOrder: 1, groupKey: 'posts_blog' },
+      { value: '1 Landing Page', displayOrder: 2, groupKey: 'landing_pages' },
+      { value: 'Soporte base', displayOrder: 3, groupKey: 'soporte' },
+      { value: '21 pedidos / mes', displayOrder: 4, groupKey: 'pedidos' },
+      { value: '2 sugerencias', displayOrder: 5, groupKey: 'sugerencias' },
     ],
     limits: {
       products: 10,
@@ -76,11 +77,12 @@ export const DefaultSubscriptionPlans: SubscriptionPlan[] = [
     isActive: true,
     includedModuleKeys: ['catalogo', 'blog', 'promotions', 'chatbot-integrado-con-whatsapp-para-soporte-y-ventas', 'google-analytics'],
     features: [
-      { value: 'Productos ilimitados', displayOrder: 0 },
-      { value: 'Posts de blog ilimitados', displayOrder: 1 },
-      { value: 'Landing Pages ilimitadas', displayOrder: 2 },
-      { value: 'Soporte prioritario', displayOrder: 3 },
-      { value: 'Módulo de Sugerencias IA', displayOrder: 4 },
+      { value: 'Productos ilimitados', displayOrder: 0, groupKey: 'productos' },
+      { value: 'Posts de blog ilimitados', displayOrder: 1, groupKey: 'posts_blog' },
+      { value: 'Landing Pages ilimitadas', displayOrder: 2, groupKey: 'landing_pages' },
+      { value: 'Soporte prioritario', displayOrder: 3, groupKey: 'soporte' },
+      { value: 'Módulo de Sugerencias IA', displayOrder: 4, groupKey: 'sugerencias' },
+      { value: 'Pedidos ilimitados', displayOrder: 5, groupKey: 'pedidos' },
     ],
     limits: {
       products: -1,
@@ -106,10 +108,10 @@ export const DefaultSubscriptionPlans: SubscriptionPlan[] = [
     includedModuleKeys: ['catalogo', 'blog', 'promotions', 'chatbot-integrado-con-whatsapp-para-soporte-y-ventas', 'motor-de-sugerencias-inteligentes', 'google-analytics', 'cloudinary', 'pistola-escaner', 'contabilidad', 'inventario-kardex'],
     features: [
       { value: 'Todo lo del plan PRO', displayOrder: 0 },
-      { value: 'Acceso a la API', displayOrder: 1 },
-      { value: 'Soporte dedicado 24/7', displayOrder: 2 },
-      { value: 'Onboarding personalizado', displayOrder: 3 },
-      { value: 'Multi-usuario (próximamente)', displayOrder: 4 },
+      { value: 'Acceso a la API', displayOrder: 1, groupKey: 'api' },
+      { value: 'Soporte dedicado 24/7', displayOrder: 2, groupKey: 'soporte' },
+      { value: 'Onboarding personalizado', displayOrder: 3, groupKey: 'onboarding' },
+      { value: 'Multi-usuario (próximamente)', displayOrder: 4, groupKey: 'usuarios' },
     ],
     limits: {
       products: -1,

@@ -20,8 +20,6 @@ import type { Module } from '@/models/module';
 import { useForm, Controller, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { HybridPlanSchema } from '@/models/hybrid-plan';
-import { errorEmitter } from '@/firebase/error-emitter';
-import { FirestorePermissionError, type SecurityRuleContext } from '@/firebase/errors';
 import { cn } from "@/lib/utils";
 
 // DND Kit Imports
@@ -159,12 +157,21 @@ function SortableFeatureItem({ id, index, register, remove }: { id: string, inde
   };
 
   return (
-    <div ref={setNodeRef} style={style} className="flex gap-2 items-center bg-background rounded-md">
-      <div {...attributes} {...listeners} className="cursor-grab p-1 hover:bg-muted rounded">
+    <div ref={setNodeRef} style={style} className="flex gap-2 items-start bg-background p-2 rounded-md border shadow-sm">
+      <div {...attributes} {...listeners} className="cursor-grab p-1 hover:bg-muted rounded mt-2">
         <GripVertical className="h-4 w-4 text-muted-foreground" />
       </div>
-      <Input {...register(`features.${index}.value`)} placeholder="Ej: Reportes avanzados" />
-      <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)}>
+      <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-2">
+        <div className="space-y-1">
+            <Label className="text-[10px] uppercase font-bold text-muted-foreground">Valor del beneficio</Label>
+            <Input {...register(`features.${index}.value` as const)} placeholder={`Ej: 50 productos`} />
+        </div>
+        <div className="space-y-1">
+            <Label className="text-[10px] uppercase font-bold text-muted-foreground">Concepto (groupKey)</Label>
+            <Input {...register(`features.${index}.groupKey` as const)} placeholder={`Ej: productos`} />
+        </div>
+      </div>
+      <Button type="button" variant="ghost" size="icon" className="mt-6" onClick={() => remove(index)}>
         <Trash2 className="h-4 w-4 text-destructive" />
       </Button>
     </div>
@@ -177,7 +184,6 @@ function HybridPlanDialog({ isOpen, onClose, plan }: { isOpen: boolean, onClose:
   const { toast } = useToast();
   const [isPending, startTransition] = useTransition();
 
-  // Paso 1 — Traer la lista de módulos
   const modulesQuery = useMemoFirebase(() => !firestore ? null : collection(firestore, 'modules'), [firestore]);
   const { data: allModules } = useCollection<Module>(modulesQuery);
 
@@ -195,7 +201,7 @@ function HybridPlanDialog({ isOpen, onClose, plan }: { isOpen: boolean, onClose:
       isPublic: true,
       isMostPopular: false,
       includedModuleKeys: [],
-      features: [{ value: '', displayOrder: 0 }],
+      features: [{ value: '', displayOrder: 0, groupKey: '' }],
       extraLimits: [],
       icon: 'Package',
       themeColor: '#4CAF50',
@@ -243,7 +249,7 @@ function HybridPlanDialog({ isOpen, onClose, plan }: { isOpen: boolean, onClose:
           isPublic: true,
           isMostPopular: false,
           includedModuleKeys: [],
-          features: [{ value: '', displayOrder: 0 }],
+          features: [{ value: '', displayOrder: 0, groupKey: '' }],
           extraLimits: [],
           icon: 'Package',
           themeColor: '#4CAF50',
@@ -283,7 +289,6 @@ function HybridPlanDialog({ isOpen, onClose, plan }: { isOpen: boolean, onClose:
         displayOrder: index
     }));
     
-    // Normalización técnica agresiva al guardar
     dataToSave.includedModuleKeys = (data.includedModuleKeys || [])
         .map(k => k.toLowerCase().trim())
         .filter(k => k.length > 0);
@@ -374,7 +379,6 @@ function HybridPlanDialog({ isOpen, onClose, plan }: { isOpen: boolean, onClose:
               </div>
             </TabsContent>
 
-            {/* Paso 2 — Reemplazar el contenido del TabsContent value="modules" */}
             <TabsContent value="modules" className="space-y-4 pt-4">
                <Label className="font-semibold">Módulos Incluidos</Label>
                <Controller name="includedModuleKeys" control={control} render={({ field }) => {
@@ -401,9 +405,6 @@ function HybridPlanDialog({ isOpen, onClose, plan }: { isOpen: boolean, onClose:
                          </label>
                        </div>
                      ))}
-                     {(!allModules || allModules.length === 0) && (
-                       <p className="text-xs text-muted-foreground">No hay módulos registrados todavía.</p>
-                     )}
                    </div>
                  );
                }} />
@@ -468,7 +469,7 @@ function HybridPlanDialog({ isOpen, onClose, plan }: { isOpen: boolean, onClose:
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                     <Label className="font-bold">Características del Plan</Label>
-                    <Button type="button" variant="outline" size="sm" onClick={() => append({ value: '', displayOrder: fields.length })}><PlusCircle className="mr-2 h-4 w-4 mr-2" /> Añadir</Button>
+                    <Button type="button" variant="outline" size="sm" onClick={() => append({ value: '', displayOrder: fields.length, groupKey: '' })}><PlusCircle className="mr-2 h-4 w-4 mr-2" /> Añadir</Button>
                 </div>
                 <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
                   <SortableContext items={fields.map((f) => f.id)} strategy={verticalListSortingStrategy}>

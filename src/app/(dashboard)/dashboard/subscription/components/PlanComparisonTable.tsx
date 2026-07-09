@@ -23,7 +23,6 @@ const formatCurrency = (value: number | undefined | null) => {
     return `$${safeValue.toLocaleString('es-CO')}`;
 };
 
-// Helper robusto para obtener el precio de cualquier tipo de plan
 const getPlanPrice = (plan: SubscriptionPlan | HybridPlan): number => {
     if ('basePrice' in plan) return plan.basePrice;
     if ('price' in plan) return plan.price;
@@ -47,34 +46,46 @@ export default function PlanComparisonTable({ currentPlan, allPlans, onSelectPla
             },
         ];
 
-        const allFeatureStrings = new Set<string>();
+        // 1. Recopilar todos los conceptos (groupKeys) y sus valores por plan
+        const groups: Record<string, { label: string, planValues: Record<string, string> }> = {};
+        
         allPlans.forEach(plan => {
             if (plan.isActive === true && plan.features) {
-                plan.features.forEach(feature => {
-                    const featureText = (typeof feature === 'string' ? feature : feature?.value) || '';
-                    if (featureText) {
-                        allFeatureStrings.add(featureText);
+                plan.features.forEach(f => {
+                    const featureObj = typeof f === 'string' ? { value: f, groupKey: undefined } : f;
+                    const key = featureObj.groupKey || featureObj.value;
+                    
+                    if (!groups[key]) {
+                        groups[key] = {
+                            label: featureObj.groupKey ? featureObj.groupKey : featureObj.value,
+                            planValues: {}
+                        };
                     }
+                    groups[key].planValues[plan.id!] = featureObj.value;
                 });
             }
         });
 
-        const dynamicFeatureRows = Array.from(allFeatureStrings).map(featureName => ({
-            feature: featureName,
+        // 2. Utilidad para embellecer los nombres de las claves técnicas
+        const prettify = (str: string) => str.charAt(0).toUpperCase() + str.slice(1).replace(/_/g, ' ');
+
+        const dynamicFeatureRows = Object.entries(groups).map(([key, group]) => ({
+            feature: group.label === key ? prettify(group.label) : group.label,
             getValue: (plan: SubscriptionPlan | HybridPlan) => {
-                const hasFeature = plan.features?.some(f => {
-                    const featureText = (typeof f === 'string' ? f : f?.value) || '';
-                    return featureText === featureName;
-                });
-                return (
+                const val = group.planValues[plan.id!];
+                if (!val) return (
                     <div className="flex justify-center">
-                        {hasFeature ? (
-                            <Check className="h-5 w-5 text-green-500" />
-                        ) : (
-                            <X className="h-5 w-5 text-muted-foreground/30" />
-                        )}
+                        <X className="h-5 w-5 text-muted-foreground/30" />
                     </div>
                 );
+                
+                // Si el valor es una simple confirmación de inclusión, mostrar Check
+                const lower = val.toLowerCase();
+                if (['incluido', 'sí', 'yes', 'true'].includes(lower)) {
+                    return <div className="flex justify-center"><Check className="h-5 w-5 text-green-500" /></div>;
+                }
+
+                return <div className="text-center text-xs font-medium text-gray-700">{val}</div>;
             }
         }));
 
@@ -122,17 +133,17 @@ export default function PlanComparisonTable({ currentPlan, allPlans, onSelectPla
         <CardTitle>Compara Nuestros Planes</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="border rounded-lg overflow-x-auto">
+        <div className="border rounded-lg overflow-x-auto shadow-sm">
         <Table>
           <TableHeader>
-            <TableRow>
-              <TableHead className="w-[200px] bg-background sticky left-0 z-10">Característica</TableHead>
+            <TableRow className="bg-muted/50">
+              <TableHead className="w-[200px] bg-muted/50 sticky left-0 z-10 border-r font-bold">Característica</TableHead>
               {sortedPlans.map(plan => (
                   <TableHead key={plan.id} className={cn("text-center min-w-[150px]", (currentPlan === plan.id || currentPlan === plan.name) && "bg-primary/5")}>
                     <div className="flex flex-col items-center gap-1 py-2">
-                        <span className="font-bold">{plan.name}</span>
+                        <span className="font-bold text-gray-900">{plan.name}</span>
                         {(plan as any).isMostPopular && (
-                            <Badge variant="default" className="text-[10px] h-5 bg-green-600">Recomendado</Badge>
+                            <Badge variant="default" className="text-[10px] h-5 bg-green-600 border-none">Recomendado</Badge>
                         )}
                         {'commissionType' in plan && (
                              <Badge variant="outline" className="text-[10px] h-5 border-orange-200 text-orange-700 bg-orange-50">Híbrido</Badge>
@@ -144,7 +155,7 @@ export default function PlanComparisonTable({ currentPlan, allPlans, onSelectPla
           </TableHeader>
           <TableBody>
             {featureRows.map(({ feature, getValue }) => (
-              <TableRow key={feature}>
+              <TableRow key={feature} className="hover:bg-muted/30 transition-colors">
                 <TableCell className="font-medium bg-background sticky left-0 z-10 border-r">{feature}</TableCell>
                 {sortedPlans.map(plan => (
                     <TableCell key={`${feature}-${plan.id}`} className={cn("text-center font-medium", (currentPlan === plan.id || currentPlan === plan.name) && "bg-primary/5")}>
@@ -153,7 +164,7 @@ export default function PlanComparisonTable({ currentPlan, allPlans, onSelectPla
                 ))}
               </TableRow>
             ))}
-             <TableRow>
+             <TableRow className="hover:bg-transparent">
                 <TableCell className="bg-background sticky left-0 z-10 border-r"></TableCell>
                 {sortedPlans.map(plan => (
                      <TableCell key={`button-${plan.id}`} className={cn("text-center p-4", (currentPlan === plan.id || currentPlan === plan.name) && "bg-primary/5")}>

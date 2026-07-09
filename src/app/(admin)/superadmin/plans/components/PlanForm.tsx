@@ -57,12 +57,21 @@ function SortableFeatureItem({ id, index, register, remove }: { id: string, inde
   };
 
   return (
-    <div ref={setNodeRef} style={style} className="flex gap-2 items-center bg-background rounded-md">
-      <div {...attributes} {...listeners} className="cursor-grab p-1 hover:bg-muted rounded">
+    <div ref={setNodeRef} style={style} className="flex gap-2 items-start bg-background p-2 rounded-md border shadow-sm">
+      <div {...attributes} {...listeners} className="cursor-grab p-1 hover:bg-muted rounded mt-2">
         <GripVertical className="h-4 w-4 text-muted-foreground" />
       </div>
-      <Input {...register(`features.${index}.value` as const)} placeholder={`Característica ${index + 1}`} />
-      <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)}>
+      <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-2">
+        <div className="space-y-1">
+            <Label className="text-[10px] uppercase font-bold text-muted-foreground">Valor del beneficio</Label>
+            <Input {...register(`features.${index}.value` as const)} placeholder={`Ej: 10 productos`} />
+        </div>
+        <div className="space-y-1">
+            <Label className="text-[10px] uppercase font-bold text-muted-foreground">Concepto (groupKey)</Label>
+            <Input {...register(`features.${index}.groupKey` as const)} placeholder={`Ej: productos`} />
+        </div>
+      </div>
+      <Button type="button" variant="ghost" size="icon" className="mt-6" onClick={() => remove(index)}>
         <Trash2 className="h-4 w-4 text-destructive" />
       </Button>
     </div>
@@ -99,7 +108,7 @@ export default function PlanForm({ existingPlan, onClose }: PlanFormProps) {
         if (existingPlan) {
             // Handle legacy string[] format for features
             const featuresAsObjects = ((existingPlan.features || []) as any[]).map((f, i) => 
-                typeof f === 'string' ? { value: f, displayOrder: i } : { ...f, displayOrder: f.displayOrder ?? i }
+                typeof f === 'string' ? { value: f, displayOrder: i, groupKey: undefined } : { ...f, displayOrder: f.displayOrder ?? i }
             );
 
             // Al cargar, ordenar características por displayOrder ascendente
@@ -127,7 +136,7 @@ export default function PlanForm({ existingPlan, onClose }: PlanFormProps) {
                 stripePriceId: '',
                 isMostPopular: false,
                 isActive: true,
-                features: [{ value: '', displayOrder: 0 }],
+                features: [{ value: '', displayOrder: 0, groupKey: '' }],
                 extraLimits: [],
                 limits: {
                     products: 0,
@@ -306,7 +315,7 @@ export default function PlanForm({ existingPlan, onClose }: PlanFormProps) {
 
                 {errors.features && <p className="text-sm text-destructive mt-1 font-semibold">Todas las características deben tener contenido.</p>}
                 
-                <Button type="button" variant="outline" size="sm" onClick={() => append({ value: '', displayOrder: fields.length })} className="font-bold">
+                <Button type="button" variant="outline" size="sm" onClick={() => append({ value: '', displayOrder: fields.length, groupKey: '' })} className="font-bold">
                     <PlusCircle className="mr-2 h-4 w-4" />
                     Añadir Característica
                 </Button>

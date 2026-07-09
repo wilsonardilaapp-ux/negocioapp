@@ -1,4 +1,3 @@
-
 import { z } from 'zod';
 
 export const HybridPlanSchema = z.object({
@@ -16,7 +15,8 @@ export const HybridPlanSchema = z.object({
   includedModuleKeys: z.array(z.string()),
   features: z.array(z.object({ 
     value: z.string(),
-    displayOrder: z.number().optional()
+    displayOrder: z.number().optional(),
+    groupKey: z.string().optional()
   })),
   limits: z.object({
     products: z.number(),
