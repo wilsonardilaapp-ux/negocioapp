@@ -32,9 +32,9 @@ export default function PlansPage() {
     };
 
     /**
-     * Restaura los planes por defecto de forma QUIRÚRGICA.
-     * Solo actualiza los beneficios (features) y límites.
-     * Preserva nombre, precio, descripción y configuraciones de Hotmart.
+     * Restaura los beneficios de los planes de forma 100% CONSERVADORA.
+     * Inyecta únicamente los nuevos 'groupKey' en el array de features.
+     * BLINDAJE TOTAL: Preserva name, price, description, limits, includedModuleKeys y configuraciones de pago.
      */
     const handleCreateDefaultPlans = async () => {
         if (!firestore) return;
@@ -42,14 +42,14 @@ export default function PlansPage() {
         try {
             const batch = writeBatch(firestore);
             
-            // 1. Obtener datos actuales para realizar el blindaje
+            // 1. Obtener datos actuales de todos los planes para el blindaje absoluto
             const existingPlansSnap = await getDocs(collection(firestore, 'plans'));
             const existingData = new Map<string, any>();
             existingPlansSnap.forEach(doc => {
                 existingData.set(doc.id, doc.data());
             });
 
-            // 2. Preparar el batch con blindaje extendido
+            // 2. Preparar el batch con blindaje extendido (Surgical Mode)
             DefaultSubscriptionPlans.forEach(plan => {
                 const planRef = doc(firestore, 'plans', plan.id);
                 const current = existingData.get(plan.id);
@@ -57,32 +57,39 @@ export default function PlansPage() {
                 // Iniciamos con el objeto por defecto (que trae los nuevos features/groupKey)
                 const restorePayload: any = { ...plan };
                 
-                // BLINDAJE QUIRÚRGICO: Si el plan ya existe, preservamos sus valores comerciales
+                // BLINDAJE 100% CONSERVADOR: Si el plan ya existe, rescatamos TODO lo comercial/técnico
                 if (current) {
-                    // Preservamos Identidad y Precio
+                    // Preservamos Identidad, Precio y Descripción
                     if (current.name) restorePayload.name = current.name;
                     if (current.price !== undefined) restorePayload.price = current.price;
                     if (current.description) restorePayload.description = current.description;
+                    
+                    // Preservamos Límites Técnicos y Módulos Habilitados
+                    if (current.limits) restorePayload.limits = current.limits;
+                    if (current.includedModuleKeys) restorePayload.includedModuleKeys = current.includedModuleKeys;
                     
                     // Preservamos Configuración de Hotmart
                     if (current.hotmartEnabled !== undefined) restorePayload.hotmartEnabled = current.hotmartEnabled;
                     if (current.hotmartUrl !== undefined) restorePayload.hotmartUrl = current.hotmartUrl;
                     
-                    // Preservamos ID de Stripe si ya estaba configurado
+                    // Preservamos ID de Stripe real
                     if (current.stripePriceId && !current.stripePriceId.includes('placeholder')) {
                         restorePayload.stripePriceId = current.stripePriceId;
                     }
+                    
+                    // Preservamos cualquier límite extra manual
+                    if (current.extraLimits) restorePayload.extraLimits = current.extraLimits;
                 }
                 
-                // Solo se actualizarán realmente: features (con groupKey), limits e includedModuleKeys
+                // Solo se actualizará realmente: el array 'features' para habilitar la tabla comparativa agrupada
                 batch.set(planRef, restorePayload, { merge: true });
             });
 
             await batch.commit();
             
             toast({
-                title: 'Actualización Quirúrgica Exitosa',
-                description: 'Se han actualizado los beneficios y límites sin afectar tus precios ni nombres personalizados.',
+                title: 'Restauración 100% Conservadora',
+                description: 'Se han actualizado los beneficios técnicos. Tus precios, límites y módulos actuales no han sido tocados.',
             });
         } catch (error: any) {
             console.error("Error restaurando planes:", error);
