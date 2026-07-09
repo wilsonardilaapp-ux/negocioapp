@@ -126,6 +126,7 @@ export async function repairProductRatings(businessId: string): Promise<{ succes
 
 /**
  * Mapeo automático de groupKeys para Planes Híbridos basado en el significado del texto.
+ * También limpia notas internas accidentales en las descripciones.
  */
 export async function syncHybridPlanKeys() {
   const db = await getAdminFirestore();
@@ -143,21 +144,27 @@ export async function syncHybridPlanKeys() {
       if (!data.features || !Array.isArray(data.features)) return;
 
       const updatedFeatures = data.features.map((f: any) => {
-        const text = (f.value || "").toLowerCase();
+        let textValue = f.value || "";
+        
+        // --- LIMPIEZA QUIRÚRGICA DE TEXTO ---
+        // Eliminamos "(Debe super al plan basico)" preservando el resto
+        const cleanTextValue = textValue.replace(/\(Debe super al plan basico\)/g, '').trim();
+
+        const textForMatch = cleanTextValue.toLowerCase();
         let key = f.groupKey || null; // Usar null en lugar de undefined para Firestore
 
         // Lógica de match según el significado
-        if (text.includes('producto')) key = 'productos';
-        else if (text.includes('blog') || text.includes('artículo')) key = 'posts_blog';
-        else if (text.includes('landing')) key = 'landing_pages';
-        else if (text.includes('soporte') || text.includes('asistencia')) key = 'soporte';
-        else if (text.includes('pedido') || text.includes('orden') || text.includes('comisión')) key = 'pedidos';
-        else if (text.includes('sugerencia') || text.includes('ia') || text.includes('inteligente')) key = 'sugerencias';
-        else if (text.includes('api')) key = 'api';
-        else if (text.includes('onboarding') || text.includes('acompañamiento')) key = 'onboarding';
-        else if (text.includes('usuario') || text.includes('staff')) key = 'usuarios';
+        if (textForMatch.includes('producto')) key = 'productos';
+        else if (textForMatch.includes('blog') || textForMatch.includes('artículo')) key = 'posts_blog';
+        else if (textForMatch.includes('landing')) key = 'landing_pages';
+        else if (textForMatch.includes('soporte') || textForMatch.includes('asistencia')) key = 'soporte';
+        else if (textForMatch.includes('pedido') || textForMatch.includes('orden') || textForMatch.includes('comisión')) key = 'pedidos';
+        else if (textForMatch.includes('sugerencia') || textForMatch.includes('ia') || textForMatch.includes('inteligente')) key = 'sugerencias';
+        else if (textForMatch.includes('api')) key = 'api';
+        else if (textForMatch.includes('onboarding') || textForMatch.includes('acompañamiento')) key = 'onboarding';
+        else if (textForMatch.includes('usuario') || textForMatch.includes('staff')) key = 'usuarios';
 
-        return { ...f, groupKey: key };
+        return { ...f, value: cleanTextValue, groupKey: key };
       });
 
       // BLINDAJE: Solo actualizamos el array features
@@ -167,7 +174,7 @@ export async function syncHybridPlanKeys() {
 
     await batch.commit();
     revalidatePath('/superadmin/hybrid-plans');
-    return { success: true, message: `Se han actualizado las claves de ${updatedCount} planes híbridos.` };
+    return { success: true, message: `Se han actualizado las descripciones y claves de ${updatedCount} planes híbridos.` };
 
   } catch (error: any) {
     console.error("[syncHybridPlanKeys] Error:", error);
