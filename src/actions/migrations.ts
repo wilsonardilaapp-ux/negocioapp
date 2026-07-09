@@ -171,7 +171,7 @@ export async function syncHybridPlanKeys() {
       const updatedFeatures = features.map((f: any) => {
         let textValue = f.value || "";
         
-        // Limpieza de notas internas
+        // Limpieza de notas internas solicitada por el usuario
         const cleanTextValue = textValue.replace(/\(Debe super al plan basico\)/g, '').trim();
         
         // Normalización para comparación (sin acentos, minúsculas)
@@ -180,9 +180,9 @@ export async function syncHybridPlanKeys() {
           .normalize("NFD")
           .replace(/[\u0300-\u036f]/g, "");
 
-        let key = null;
+        let key = f.groupKey || null;
 
-        // 1. Lógica de exclusión explícita de encabezados (separadores visuales)
+        // 1. Lógica de exclusión explícita de encabezados y descripciones narrativas
         const headerExclusions = [
           "ventas y catalogo",
           "marketing y posicionamiento",
@@ -191,7 +191,10 @@ export async function syncHybridPlanKeys() {
           "herramientas de gestion"
         ];
         
-        if (headerExclusions.includes(textForMatch)) {
+        const isNarrative = textForMatch.startsWith("este plan");
+        const isHeader = headerExclusions.includes(textForMatch);
+
+        if (isHeader || isNarrative) {
           key = null;
         } else {
           // 2. Lógica de match por jerarquía de prioridad con filtros estrictos
@@ -200,19 +203,19 @@ export async function syncHybridPlanKeys() {
           if (textForMatch.includes('chatbot')) {
             key = 'chatbot';
           }
-          // Pedidos (Solo si es un beneficio corto, evita descripciones largas)
-          else if ((textForMatch.includes('pedido') || textForMatch.includes('orden')) && cleanTextValue.length <= 40) {
+          // Pedidos/Órdenes (Match si no es narrativa)
+          else if (textForMatch.includes('pedido') || textForMatch.includes('orden')) {
             key = 'pedidos';
           }
           // Comisión (Solo si incluye el símbolo "%" para evitar colisión con encabezados de "Ventas")
           else if ((textForMatch.includes('comision') || textForMatch.includes('venta')) && textForMatch.includes('%')) {
             key = 'comision';
           }
-          // Productos (Solo si es un beneficio corto)
-          else if (textForMatch.includes('producto') && cleanTextValue.length <= 40) {
+          // Productos (Match si no es narrativa)
+          else if (textForMatch.includes('producto')) {
             key = 'productos';
           }
-          // Otros beneficios (sin restricciones de longitud solicitadas pero específicos)
+          // Otros beneficios específicos
           else if (textForMatch.includes('blog') || textForMatch.includes('articulo')) key = 'posts_blog';
           else if (textForMatch.includes('landing')) key = 'landing_pages';
           else if (textForMatch.includes('soporte') || textForMatch.includes('asistencia')) key = 'soporte';
@@ -235,7 +238,7 @@ export async function syncHybridPlanKeys() {
 
     await batch.commit();
     revalidatePath('/superadmin/hybrid-plans');
-    return { success: true, message: `Se han sincronizado correctamente los beneficios en ${updatedCount} planes con filtros de seguridad.` };
+    return { success: true, message: `Se han sincronizado correctamente los beneficios en ${updatedCount} planes con filtros inteligentes.` };
 
   } catch (error: any) {
     console.error("[syncHybridPlanKeys] Error:", error);
