@@ -163,6 +163,7 @@ export async function syncHybridPlanKeys() {
         else if (textForMatch.includes('api')) key = 'api';
         else if (textForMatch.includes('onboarding') || textForMatch.includes('acompañamiento')) key = 'onboarding';
         else if (textForMatch.includes('usuario') || textForMatch.includes('staff')) key = 'usuarios';
+        else if (textForMatch.includes('chatbot')) key = 'chatbot';
 
         return { ...f, value: cleanTextValue, groupKey: key };
       });
