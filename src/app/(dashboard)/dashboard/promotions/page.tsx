@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useUser, useFirestore } from '@/firebase';
+import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { usePromotions } from '@/hooks/use-promotions';
 import { promotionService } from '@/services/promotion-service';
 import { 
@@ -34,6 +34,8 @@ import type { Promotion } from '@/models/promotion';
 import { useSubscription } from '@/hooks/useSubscription';
 import { LimitBanner } from '@/components/dashboard/LimitBanner';
 import { cn } from "@/lib/utils";
+import { collection } from 'firebase/firestore';
+import type { Product } from '@/models/product';
 
 export default function PromotionsPage() {
   const { user } = useUser();
@@ -236,8 +238,15 @@ export default function PromotionsPage() {
 
 function PromotionDialog({ isOpen, onClose, promo }: { isOpen: boolean, onClose: () => void, promo: Promotion | null }) {
   const { user } = useUser();
+  const firestore = useFirestore();
   const { toast } = useToast();
   
+  // Suministro de productos reales para el selector quirúrgico
+  const productsQuery = useMemoFirebase(() => 
+    user?.uid ? collection(firestore, 'businesses', user.uid, 'products') : null, 
+  [firestore, user?.uid]);
+  const { data: products, isLoading: areProductsLoading } = useCollection<Product>(productsQuery);
+
   const initialDefaults = {
     type: 'percentage' as const,
     applicableTo: 'all_catalog' as const,
@@ -407,12 +416,35 @@ function PromotionDialog({ isOpen, onClose, promo }: { isOpen: boolean, onClose:
             )}
             {formData.applicableTo === 'specific_item' && (
               <div className="grid gap-2">
-                <Label>Nombre del producto/servicio</Label>
-                <input 
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                  value={formData.itemName || ''} 
-                  onChange={e => setFormData({ ...formData, itemName: e.target.value })} 
-                />
+                <Label>Seleccionar Producto / Servicio *</Label>
+                <Select 
+                  value={formData.itemId || ''} 
+                  onValueChange={(val) => {
+                    const selectedProd = (products || []).find(p => p.id === val);
+                    setFormData({ 
+                      ...formData, 
+                      itemId: val, 
+                      itemName: selectedProd?.name || '' 
+                    });
+                  }}
+                  disabled={isSaving || areProductsLoading}
+                >
+                  <SelectTrigger className="bg-background">
+                    <SelectValue placeholder={areProductsLoading ? "Cargando productos..." : "Selecciona un producto"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {products?.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.name}
+                      </SelectItem>
+                    ))}
+                    {(!products || products.length === 0) && !areProductsLoading && (
+                      <div className="p-4 text-center text-xs text-muted-foreground">
+                        No hay productos en el catálogo
+                      </div>
+                    )}
+                  </SelectContent>
+                </Select>
               </div>
             )}
           </div>
