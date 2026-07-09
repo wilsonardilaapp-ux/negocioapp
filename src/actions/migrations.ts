@@ -127,7 +127,6 @@ export async function repairProductRatings(businessId: string): Promise<{ succes
 /**
  * Mapeo automático de groupKeys para Planes Híbridos basado en el significado del texto.
  * También limpia notas internas accidentales en las descripciones.
- * Prioridad de matching corregida para Chatbot y Comisión.
  */
 export async function syncHybridPlanKeys() {
   const db = await getAdminFirestore();
@@ -154,7 +153,6 @@ export async function syncHybridPlanKeys() {
 
       if (commissionConfig[planName]) {
         const benefitText = commissionConfig[planName];
-        // Evitar duplicados revisando si ya existe un beneficio con el groupKey 'comision'
         const exists = features.some((f: any) => 
           f.groupKey === 'comision' || 
           (f.value && f.value.toLowerCase().includes("comisión por venta"))
@@ -172,25 +170,28 @@ export async function syncHybridPlanKeys() {
       // --- PASO 2: MAPEO DE CLAVES Y LIMPIEZA ---
       const updatedFeatures = features.map((f: any) => {
         let textValue = f.value || "";
-        
-        // Limpieza quirúrgica de texto (notas internas)
         const cleanTextValue = textValue.replace(/\(Debe super al plan basico\)/g, '').trim();
-
         const textForMatch = cleanTextValue.toLowerCase();
         let key = f.groupKey || null;
 
-        // Lógica de match por jerarquía de prioridad
+        // Lógica de match por jerarquía de prioridad corregida
         // 1. Chatbot (Prioridad máxima)
-        if (textForMatch.includes('chatbot')) key = 'chatbot';
-        // 2. Comisión (Nuevo: separado de pedidos)
-        else if (textForMatch.includes('comisión') || textForMatch.includes('venta')) key = 'comision';
-        // 3. Otros beneficios específicos
+        if (textForMatch.includes('chatbot')) {
+          key = 'chatbot';
+        }
+        // 2. Pedidos (Prioridad alta para evitar colisión con comisión)
+        else if (textForMatch.includes('pedido') || textForMatch.includes('orden')) {
+          key = 'pedidos';
+        }
+        // 3. Comisión (Detecta el término específico)
+        else if (textForMatch.includes('comisión') || textForMatch.includes('venta')) {
+          key = 'comision';
+        }
+        // 4. Otros beneficios específicos
         else if (textForMatch.includes('producto')) key = 'productos';
         else if (textForMatch.includes('blog') || textForMatch.includes('artículo')) key = 'posts_blog';
         else if (textForMatch.includes('landing')) key = 'landing_pages';
         else if (textForMatch.includes('soporte') || textForMatch.includes('asistencia')) key = 'soporte';
-        else if (textForMatch.includes('pedido') || textForMatch.includes('orden')) key = 'pedidos';
-        // 4. Sugerencias (Incluye 'IA' e 'inteligente')
         else if (textForMatch.includes('sugerencia') || textForMatch.includes('ia') || textForMatch.includes('inteligente')) key = 'sugerencias';
         else if (textForMatch.includes('api')) key = 'api';
         else if (textForMatch.includes('onboarding') || textForMatch.includes('acompañamiento')) key = 'onboarding';
@@ -209,7 +210,7 @@ export async function syncHybridPlanKeys() {
 
     await batch.commit();
     revalidatePath('/superadmin/hybrid-plans');
-    return { success: true, message: `Se han actualizado ${updatedCount} planes híbridos con los nuevos beneficios y claves de comisión.` };
+    return { success: true, message: `Se han sincronizado correctamente los beneficios en ${updatedCount} planes.` };
 
   } catch (error: any) {
     console.error("[syncHybridPlanKeys] Error:", error);
