@@ -32,8 +32,9 @@ export default function PlansPage() {
     };
 
     /**
-     * Restaura los planes por defecto asegurando que no se pierdan
-     * los enlaces de Hotmart ya configurados (Blindaje).
+     * Restaura los planes por defecto de forma QUIRÚRGICA.
+     * Solo actualiza los beneficios (features) y límites.
+     * Preserva nombre, precio, descripción y configuraciones de Hotmart.
      */
     const handleCreateDefaultPlans = async () => {
         if (!firestore) return;
@@ -41,37 +42,47 @@ export default function PlansPage() {
         try {
             const batch = writeBatch(firestore);
             
-            // 1. Obtener datos actuales para preservar campos de Hotmart
+            // 1. Obtener datos actuales para realizar el blindaje
             const existingPlansSnap = await getDocs(collection(firestore, 'plans'));
             const existingData = new Map<string, any>();
             existingPlansSnap.forEach(doc => {
                 existingData.set(doc.id, doc.data());
             });
 
-            // 2. Preparar el batch con merge manual para los campos protegidos
+            // 2. Preparar el batch con blindaje extendido
             DefaultSubscriptionPlans.forEach(plan => {
                 const planRef = doc(firestore, 'plans', plan.id);
                 const current = existingData.get(plan.id);
                 
-                // Construimos el payload de restauración
+                // Iniciamos con el objeto por defecto (que trae los nuevos features/groupKey)
                 const restorePayload: any = { ...plan };
                 
-                // BLINDAJE: Si ya existe configuración de Hotmart, la preservamos
-                if (current?.hotmartEnabled !== undefined) {
-                    restorePayload.hotmartEnabled = current.hotmartEnabled;
-                }
-                if (current?.hotmartUrl !== undefined) {
-                    restorePayload.hotmartUrl = current.hotmartUrl;
+                // BLINDAJE QUIRÚRGICO: Si el plan ya existe, preservamos sus valores comerciales
+                if (current) {
+                    // Preservamos Identidad y Precio
+                    if (current.name) restorePayload.name = current.name;
+                    if (current.price !== undefined) restorePayload.price = current.price;
+                    if (current.description) restorePayload.description = current.description;
+                    
+                    // Preservamos Configuración de Hotmart
+                    if (current.hotmartEnabled !== undefined) restorePayload.hotmartEnabled = current.hotmartEnabled;
+                    if (current.hotmartUrl !== undefined) restorePayload.hotmartUrl = current.hotmartUrl;
+                    
+                    // Preservamos ID de Stripe si ya estaba configurado
+                    if (current.stripePriceId && !current.stripePriceId.includes('placeholder')) {
+                        restorePayload.stripePriceId = current.stripePriceId;
+                    }
                 }
                 
+                // Solo se actualizarán realmente: features (con groupKey), limits e includedModuleKeys
                 batch.set(planRef, restorePayload, { merge: true });
             });
 
             await batch.commit();
             
             toast({
-                title: 'Planes por Defecto Restaurados',
-                description: 'Los planes se han actualizado manteniendo tu configuración de Hotmart.',
+                title: 'Actualización Quirúrgica Exitosa',
+                description: 'Se han actualizado los beneficios y límites sin afectar tus precios ni nombres personalizados.',
             });
         } catch (error: any) {
             console.error("Error restaurando planes:", error);
@@ -96,7 +107,7 @@ export default function PlansPage() {
                     <div className="flex items-center gap-2">
                         <Button variant="outline" onClick={handleCreateDefaultPlans}>
                             <RefreshCw className="mr-2 h-4 w-4" />
-                            Restaurar Planes
+                            Actualizar Beneficios
                         </Button>
                          <Button onClick={() => handleOpenDialog(null)}>
                             <PlusCircle className="mr-2 h-4 w-4" />
