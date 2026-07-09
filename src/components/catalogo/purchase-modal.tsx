@@ -12,7 +12,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { ShoppingBag, Minus, Plus, Tag, Trash2, Loader2, Ticket, X, CheckCircle, CreditCard, Building, Smartphone, Building2, HandCoins, Copy, Check } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { PaymentSettings } from '@/models/payment-settings';
-import type { OrderStatus, TipoEntrega } from '@/models/order';
+import type { Order, OrderItem, OrderStatus, TipoEntrega } from '@/models/order';
 import { useFirestore, addDocumentNonBlocking } from '@/firebase';
 import { collection } from 'firebase/firestore';
 import { cn, normalizePhoneNumber } from '@/lib/utils';
@@ -220,7 +220,8 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
 
     let totalPromoSavings = 0;
 
-    cartItems.forEach(item => {
+    // 1. Mapear cartItems a OrderItem[] para el guardado único
+    const orderItems: OrderItem[] = cartItems.map(item => {
         const itemUnitPrice = item.appliedPromotion?.discountedPrice ?? item.price;
         const itemSubtotal = itemUnitPrice * item.quantity;
         
@@ -235,23 +236,35 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
 
         orderSummary += `- ${item.quantity} \u00D7 ${item.name}\n  ${itemPriceText.padStart(12)}\n`;
 
-        addDocumentNonBlocking(ordersCollectionRef, {
-            businessId,
-            customerName: data.fullName,
-            customerEmail: data.email,
-            customerPhone: data.whatsapp,
-            customerAddress: data.address || 'Recogida',
-            productId: item.id,
-            productName: item.name,
-            quantity: item.quantity,
-            unitPrice: itemUnitPrice,
-            subtotal: itemSubtotal,
-            paymentMethod: selectedPaymentMethod,
-            orderDate: now,
-            orderStatus: 'Pendiente' as OrderStatus,
-            tipoEntrega,
-            packagingCost: item.packagingCost || 0,
-        });
+        return {
+          productId: item.id,
+          productName: item.name,
+          quantity: item.quantity,
+          unitPrice: itemUnitPrice,
+          subtotal: itemSubtotal,
+          appliedPromotion: item.appliedPromotion,
+        };
+    });
+
+    // 2. Guardar UN solo documento por pedido con todos los ítems y totales
+    await addDocumentNonBlocking(ordersCollectionRef, {
+        businessId,
+        customerName: data.fullName,
+        customerEmail: data.email,
+        customerPhone: data.whatsapp,
+        customerAddress: tipoEntrega === 'domicilio' ? (data.address || '') : 'Recogida en tienda',
+        items: orderItems,
+        subtotal: subtotalProducts,
+        discountAmount: finalDiscountAmount,
+        discountLabel: discountLabel,
+        packagingCost: packagingTotal,
+        deliveryFee: deliveryFee,
+        vatAmount: vatAmount,
+        total: total,
+        paymentMethod: selectedPaymentMethod,
+        orderDate: now,
+        orderStatus: 'Pendiente' as OrderStatus,
+        tipoEntrega,
     });
 
     const paymentLabel = PAYMENT_METHOD_LABELS[selectedPaymentMethod] ?? selectedPaymentMethod;
