@@ -70,7 +70,9 @@ export default function PedidosPage() {
         order.customerName
           .toLowerCase()
           .includes(searchTerm.toLowerCase()) ||
-        order.productName.toLowerCase().includes(searchTerm.toLowerCase())
+        // Búsqueda resiliente en items (nuevo formato) o productName (viejo formato)
+        (order.items?.some(i => i.productName.toLowerCase().includes(searchTerm.toLowerCase()))) ||
+        ((order as any).productName?.toLowerCase().includes(searchTerm.toLowerCase()))
     );
   }, [orders, searchTerm]);
   
@@ -194,18 +196,25 @@ export default function PedidosPage() {
     const doc = new jsPDF();
 
     doc.autoTable({
-      head: [['Cliente', 'Producto', 'Cantidad', 'Total', 'Estado', 'Fecha']],
-      body: filteredOrders.map((order) => [
-        order.customerName,
-        order.productName,
-        order.quantity,
-        new Intl.NumberFormat('es-CO', {
-          style: 'currency',
-          currency: 'COP',
-        }).format(order.subtotal),
-        order.orderStatus,
-        new Date(order.orderDate).toLocaleDateString(),
-      ]),
+      head: [['Cliente', 'Pedido', 'Cantidad', 'Total', 'Estado', 'Fecha']],
+      body: filteredOrders.map((order) => {
+          const isNew = order.items && Array.isArray(order.items);
+          const productText = isNew 
+            ? (order.items!.length > 1 ? `${order.items![0].productName} y ${order.items!.length - 1} más` : order.items![0].productName)
+            : (order as any).productName;
+          
+          const qty = isNew ? order.items!.reduce((s, i) => s + i.quantity, 0) : (order as any).quantity;
+          const total = order.total || order.subtotal;
+
+          return [
+            order.customerName,
+            productText,
+            qty,
+            new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP' }).format(total),
+            order.orderStatus,
+            new Date(order.orderDate).toLocaleDateString(),
+          ];
+      }),
     });
 
     doc.save('pedidos.pdf');
@@ -219,7 +228,7 @@ export default function PedidosPage() {
         <CardHeader>
           <CardTitle>Gestión de Pedidos</CardTitle>
           <CardDescription>
-            Revisa y administra los pedidos de tus clientes.
+            Revisa y administra los pedidos de tus clientes. Los pedidos ahora agrupan múltiples productos.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -240,7 +249,7 @@ export default function PedidosPage() {
             <div>
               <CardTitle>Listado de Pedidos</CardTitle>
               <CardDescription>
-                Aquí puedes ver todos los pedidos recibidos.
+                Visualiza tus ventas y actualiza estados de despacho.
               </CardDescription>
             </div>
             <div className="flex gap-2">
@@ -250,7 +259,7 @@ export default function PedidosPage() {
               </Button>
               <Button onClick={handleDownloadPDF}>
                 <FileDown className="mr-2 h-4 w-4" />
-                Descargar PDF
+                Exportar PDF
               </Button>
             </div>
           </div>
