@@ -34,7 +34,7 @@ export default function PlansPage() {
     /**
      * Restaura los beneficios de los planes de forma 100% CONSERVADORA.
      * Inyecta únicamente los nuevos 'groupKey' en el array de features.
-     * BLINDAJE TOTAL: Preserva name, price, description, limits, includedModuleKeys y configuraciones de pago.
+     * BLINDAJE TOTAL: Preserva name, price, description, limits, includedModuleKeys, isActive y configuraciones de pago.
      */
     const handleCreateDefaultPlans = async () => {
         if (!firestore) return;
@@ -64,6 +64,9 @@ export default function PlansPage() {
                     if (current.price !== undefined) restorePayload.price = current.price;
                     if (current.description) restorePayload.description = current.description;
                     
+                    // Preservamos Estado (Activo/Inactivo)
+                    if (current.isActive !== undefined) restorePayload.isActive = current.isActive;
+                    
                     // Preservamos Límites Técnicos y Módulos Habilitados
                     if (current.limits) restorePayload.limits = current.limits;
                     if (current.includedModuleKeys) restorePayload.includedModuleKeys = current.includedModuleKeys;
@@ -88,15 +91,15 @@ export default function PlansPage() {
             await batch.commit();
             
             toast({
-                title: 'Restauración 100% Conservadora',
-                description: 'Se han actualizado los beneficios técnicos. Tus precios, límites y módulos actuales no han sido tocados.',
+                title: 'Actualización 100% Conservadora',
+                description: 'Se han inyectado los nuevos groupKey. Tus precios, límites y estados (Activo/Inactivo) permanecen intactos.',
             });
         } catch (error: any) {
             console.error("Error restaurando planes:", error);
             toast({
                 variant: 'destructive',
-                title: 'Error de Restauración',
-                description: error.message || 'No se pudieron sincronizar los planes.'
+                title: 'Error de Actualización',
+                description: error.message || 'No se pudieron sincronizar los beneficios.'
             });
         }
     };
