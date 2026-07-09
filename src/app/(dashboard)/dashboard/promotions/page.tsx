@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -50,6 +49,10 @@ export default function PromotionsPage() {
   const handleToggleActive = async (id: string, current: boolean) => {
     try {
       await promotionService.toggleActive(id, !current);
+      // Sincronizar catálogo inmediatamente
+      if (user?.uid) {
+        await promotionService.syncPublicCatalog(user.uid);
+      }
       toast({ title: 'Estado actualizado' });
     } catch (error) {
       toast({ variant: 'destructive', title: 'Error al actualizar' });
@@ -59,6 +62,10 @@ export default function PromotionsPage() {
   const handleDelete = async (id: string) => {
     try {
       await promotionService.deletePromotion(id);
+      // Sincronizar catálogo inmediatamente
+      if (user?.uid) {
+        await promotionService.syncPublicCatalog(user.uid);
+      }
       toast({ title: 'Promoción eliminada' });
     } catch (error) {
       toast({ variant: 'destructive', title: 'Error al eliminar' });
@@ -320,6 +327,10 @@ function PromotionDialog({ isOpen, onClose, promo }: { isOpen: boolean, onClose:
       } else {
         await promotionService.createPromotion(sanitizedData);
       }
+
+      // Sincronizar catálogo después de crear/editar exitosamente
+      await promotionService.syncPublicCatalog(currentUid);
+
       toast({ title: '¡Éxito!', description: 'La promoción ha sido guardada correctamente.' });
       onClose();
     } catch (error: any) {

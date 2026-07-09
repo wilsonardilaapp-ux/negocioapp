@@ -11,7 +11,8 @@ import {
   doc, 
   increment,
   getFirestore,
-  Firestore
+  Firestore,
+  setDoc
 } from 'firebase/firestore';
 import type { Promotion } from '@/models/promotion';
 import type { Product } from '@/models/product';
@@ -95,11 +96,30 @@ class PromotionService {
 
   async incrementUsage(id: string): Promise<void> {
     const db = this.getDb();
-    const ref = doc(db, 'promotions', id);
+    const ref = doc(db, 'cupones', id);
     await updateDoc(ref, {
-      usageCount: increment(1),
-      updatedAt: new Date().toISOString(),
+      usosActuales: increment(1),
+      updatedAt: new Date().toISOString()
     });
+  }
+
+  /**
+   * Sincroniza las promociones activas con el catálogo público denormalizado.
+   * Utiliza setDoc con merge para no afectar otros campos como productos o encabezado.
+   */
+  async syncPublicCatalog(companyId: string): Promise<void> {
+    try {
+      const activePromos = await this.getActivePromotions(companyId);
+      const db = this.getDb();
+      const publicCatalogRef = doc(db, 'businesses', companyId, 'publicData', 'catalog');
+      
+      await setDoc(publicCatalogRef, { 
+        promotions: activePromos,
+        lastPromoSyncAt: new Date().toISOString()
+      }, { merge: true });
+    } catch (error) {
+      console.error("[PromotionService] Error al sincronizar catálogo público:", error);
+    }
   }
 
   /**
