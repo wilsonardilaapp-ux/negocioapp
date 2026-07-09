@@ -43,7 +43,7 @@ const PrintInvoicePage = () => {
         if (!isOrderLoading && !isSettingsLoading && !isBusinessLoading && order && settings) {
             setTimeout(() => {
                 window.print();
-            }, 500); // Delay to ensure styles and images are loaded
+            }, 800); // Delay to ensure styles and images are loaded
         }
     }, [isOrderLoading, isSettingsLoading, isBusinessLoading, order, settings]);
 
@@ -51,19 +51,29 @@ const PrintInvoicePage = () => {
     const adaptedOrder = useMemo((): OrderType | null => {
         if (!order || !business) return null;
 
-        const deliveryFee = business.deliveryFee ?? 0;
-        const packagingFee = business.packagingFee ?? 0;
+        // Detección de formato nuevo (agrupado) vs viejo (legacy)
+        const isNewFormat = order.items && Array.isArray(order.items);
         
-        // The current order model only has one item.
-        const items = [{
-            name: order.productName,
-            quantity: order.quantity,
-            price: order.unitPrice,
-        }];
+        const items = isNewFormat 
+            ? order.items.map(item => ({
+                name: item.productName,
+                quantity: item.quantity,
+                price: item.unitPrice,
+            }))
+            : [{
+                name: (order as any).productName || 'Producto',
+                quantity: (order as any).quantity || 1,
+                price: (order as any).unitPrice || (order as any).price || 0,
+            }];
 
-        // Subtotal in the order model might be just for the item, let's recalculate for clarity.
-        const itemsSubtotal = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-        const total = itemsSubtotal + deliveryFee + packagingFee;
+        // Totales financieros resilientes
+        const itemsSubtotal = isNewFormat ? order.subtotal : items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+        const deliveryFee = order.deliveryFee ?? business.deliveryFee ?? 0;
+        const packagingFee = order.packagingCost ?? business.packagingFee ?? 0;
+        const discount = order.discountAmount ?? 0;
+        
+        // El total final
+        const total = order.total || (itemsSubtotal + deliveryFee + packagingFee - discount);
 
         return {
             invoiceNumber: order.id.slice(-8).toUpperCase(),
@@ -74,7 +84,7 @@ const PrintInvoicePage = () => {
                 phone: order.customerPhone,
             },
             paymentMethod: order.paymentMethod,
-            estimatedDelivery: 'N/A', // Not available
+            estimatedDelivery: 'N/A', 
             items: items,
             deliveryFee: deliveryFee,
             packaging: packagingFee,

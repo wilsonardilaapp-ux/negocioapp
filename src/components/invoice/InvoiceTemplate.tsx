@@ -104,16 +104,16 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ config, order,
   const PRICE_W = 9;
   const PROD_W = LINE_CHARS - CANT_W - PRICE_W - 2;
 
-  const rpad = (s: string, n: number): string => s.substring(0, n).padEnd(n, ' ');
-  const lpad = (s: string, n: number): string => s.substring(0, n).padStart(n, ' ');
+  const rpad = (s: string, n: number): string => (s || '').substring(0, n).padEnd(n, ' ');
+  const lpad = (s: string, n: number): string => (s || '').substring(0, n).padStart(n, ' ');
 
   const itemsHeader = rpad('Can', CANT_W) + ' ' + rpad('Producto', PROD_W) + ' ' + lpad('Total', PRICE_W);
   const itemsSeparator = '-'.repeat(LINE_CHARS);
 
-  const itemsRows = order.items.map(item => {
+  const itemsRows = (order.items || []).map(item => {
     const price = (item.quantity * item.price).toLocaleString('es-CO');
     const qty = String(item.quantity);
-    const name = item.name;
+    const name = item.name || 'Producto';
     const lineArr: string[] = [];
     
     lineArr.push(rpad(qty, CANT_W) + ' ' + rpad(name.substring(0, PROD_W), PROD_W) + ' ' + lpad(price, PRICE_W));
