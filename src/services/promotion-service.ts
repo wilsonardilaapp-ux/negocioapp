@@ -142,10 +142,11 @@ class PromotionService {
       if (!p.isActive) return false;
       
       // Comprobar si la promoción aplica al producto específico, categoría o a todo el catálogo
+      // COMPARACIÓN SEGURA: Normalizamos a minúsculas y eliminamos espacios extremos
       const appliesToItem = 
         p.applicableTo === 'all_catalog' || 
         (p.applicableTo === 'specific_item' && p.itemId === product.id) ||
-        (p.applicableTo === 'category' && p.categoryName === product.category);
+        (p.applicableTo === 'category' && (p.categoryName || "").trim().toLowerCase() === (product.category || "").trim().toLowerCase());
       
       // Solo procesamos tipos que afectan el precio directamente aquí
       return appliesToItem && (p.type === 'percentage' || p.type === 'fixed');
