@@ -1,41 +1,44 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { usePromotions } from '@/hooks/use-promotions';
-import { promotionService } from '@/services/promotion-service';
+import { useState, useEffect, useMemo } from 'react';
+import { useUser, useFirestore, useCollection, useMemoFirebase } from '../../../../firebase';
+import { usePromotions } from '../../../../hooks/use-promotions';
+import { promotionService } from '../../../../services/promotion-service';
 import { 
   Card, CardContent, CardDescription, CardHeader, CardTitle 
-} from '@/components/ui/card';
+} from '../../../../components/ui/card';
 import { 
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow 
-} from '@/components/ui/table';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Switch } from '@/components/ui/switch';
+} from '../../../../components/ui/table';
+import { Button } from '../../../../components/ui/button';
+import { Badge } from '../../../../components/ui/badge';
+import { Switch } from '../../../../components/ui/switch';
 import { 
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle 
-} from '@/components/ui/dialog';
+} from '../../../../components/ui/dialog';
 import { 
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger 
-} from '@/components/ui/alert-dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
+} from '../../../../components/ui/alert-dialog';
+import { Input } from '../../../../components/ui/input';
+import { Label } from '../../../../components/ui/label';
+import { Textarea } from '../../../../components/ui/textarea';
 import { 
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue 
-} from '@/components/ui/select';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useToast } from '@/hooks/use-toast';
+} from '../../../../components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../../../components/ui/tabs';
+import { useToast } from '../../../../hooks/use-toast';
 import { PlusCircle, Edit, Trash2, Loader2, Tag, Frown, Info } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import type { Promotion } from '@/models/promotion';
-import { useSubscription } from '@/hooks/useSubscription';
-import { LimitBanner } from '@/components/dashboard/LimitBanner';
-import { cn } from "@/lib/utils";
-import { collection } from 'firebase/firestore';
-import type { Product } from '@/models/product';
+import type { Promotion } from '../../../../models/promotion';
+import { useSubscription } from '../../../../hooks/useSubscription';
+import { LimitBanner } from '../../../../components/dashboard/LimitBanner';
+import { cn } from "../../../../lib/utils";
+import { collection, doc, setDoc, addDoc } from 'firebase/firestore';
+import type { Product } from '../../../../models/product';
+import RichTextEditor from '../../../../components/editor/RichTextEditor';
+import { errorEmitter } from '../../../../firebase/error-emitter';
+import { FirestorePermissionError, type SecurityRuleContext } from '../../../../firebase/errors';
 
 export default function PromotionsPage() {
   const { user } = useUser();
@@ -51,7 +54,6 @@ export default function PromotionsPage() {
   const handleToggleActive = async (id: string, current: boolean) => {
     try {
       await promotionService.toggleActive(id, !current);
-      // Sincronizar catálogo inmediatamente
       if (user?.uid) {
         await promotionService.syncPublicCatalog(user.uid);
       }
@@ -64,7 +66,6 @@ export default function PromotionsPage() {
   const handleDelete = async (id: string) => {
     try {
       await promotionService.deletePromotion(id);
-      // Sincronizar catálogo inmediatamente
       if (user?.uid) {
         await promotionService.syncPublicCatalog(user.uid);
       }
@@ -241,11 +242,15 @@ function PromotionDialog({ isOpen, onClose, promo }: { isOpen: boolean, onClose:
   const firestore = useFirestore();
   const { toast } = useToast();
   
-  // Suministro de productos reales para el selector quirúrgico
   const productsQuery = useMemoFirebase(() => 
     user?.uid ? collection(firestore, 'businesses', user.uid, 'products') : null, 
   [firestore, user?.uid]);
   const { data: products, isLoading: areProductsLoading } = useCollection<Product>(productsQuery);
+
+  const categories = useMemo(() => {
+    if (!products) return [];
+    return Array.from(new Set(products.map(p => p.category).filter(c => c && c.trim() !== ""))).sort();
+  }, [products]);
 
   const initialDefaults = {
     type: 'percentage' as const,
@@ -286,29 +291,15 @@ function PromotionDialog({ isOpen, onClose, promo }: { isOpen: boolean, onClose:
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
     const currentUid = user?.uid;
-
-    if (!currentUid) {
-      toast({ variant: 'destructive', title: 'Error de sesión', description: 'Debes estar autenticado para realizar esta acción.' });
-      return;
-    }
+    if (!currentUid) return;
 
     if (!formData.title?.trim() || !formData.description?.trim()) {
         toast({ variant: 'destructive', title: 'Error', description: 'Título y descripción son obligatorios.' });
         return;
     }
 
-    const from = formData.validFrom || initialDefaults.validFrom;
-    const until = formData.validUntil || initialDefaults.validUntil;
-
-    if (until < from) {
-      toast({ variant: 'destructive', title: 'Error', description: 'La fecha de fin debe ser posterior al inicio.' });
-      return;
-    }
-
     setIsSaving(true);
-
     try {
       const sanitizedData: any = {
         title: (formData.title || '').trim(),
@@ -318,8 +309,8 @@ function PromotionDialog({ isOpen, onClose, promo }: { isOpen: boolean, onClose:
         isActive: formData.isActive === undefined ? true : !!formData.isActive,
         showInCatalog: formData.showInCatalog === undefined ? true : !!formData.showInCatalog,
         showInCheckout: formData.showInCheckout === undefined ? true : !!formData.showInCheckout,
-        validFrom: from,
-        validUntil: until,
+        validFrom: formData.validFrom || initialDefaults.validFrom,
+        validUntil: formData.validUntil || initialDefaults.validUntil,
         discountValue: Number(formData.discountValue) || 0,
         minQuantity: Number(formData.minQuantity) || 0,
         usageLimit: Number(formData.usageLimit) || 0,
@@ -337,13 +328,10 @@ function PromotionDialog({ isOpen, onClose, promo }: { isOpen: boolean, onClose:
         await promotionService.createPromotion(sanitizedData);
       }
 
-      // Sincronizar catálogo después de crear/editar exitosamente
       await promotionService.syncPublicCatalog(currentUid);
-
       toast({ title: '¡Éxito!', description: 'La promoción ha sido guardada correctamente.' });
       onClose();
     } catch (error: any) {
-      console.error("Error saving promo:", error);
       toast({ variant: 'destructive', title: 'Error al guardar', description: error.message || 'No se pudo procesar la solicitud.' });
     } finally {
       setIsSaving(false);
@@ -360,13 +348,7 @@ function PromotionDialog({ isOpen, onClose, promo }: { isOpen: boolean, onClose:
         <form onSubmit={handleSubmit} className="space-y-4 py-4">
           <div className="grid gap-2">
             <Label>Título *</Label>
-            <input 
-               className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-               required 
-               value={formData.title || ''} 
-               onChange={e => setFormData({ ...formData, title: e.target.value })} 
-               placeholder="Ej: Descuento de Verano" 
-            />
+            <Input required value={formData.title || ''} onChange={e => setFormData({ ...formData, title: e.target.value })} placeholder="Ej: Descuento de Verano" />
           </div>
           <div className="grid gap-2">
             <Label>Descripción *</Label>
@@ -410,8 +392,29 @@ function PromotionDialog({ isOpen, onClose, promo }: { isOpen: boolean, onClose:
             </div>
             {formData.applicableTo === 'category' && (
               <div className="grid gap-2">
-                <Label>Nombre de categoría</Label>
-                <Input value={formData.categoryName || ''} onChange={e => setFormData({ ...formData, categoryName: e.target.value })} />
+                <Label>Seleccionar Categoría *</Label>
+                <Select 
+                  value={formData.categoryName || ''} 
+                  onValueChange={(val) => setFormData({ ...formData, categoryName: val })}
+                  disabled={isSaving || areProductsLoading}
+                >
+                  <SelectTrigger className="bg-background">
+                    <SelectValue placeholder={areProductsLoading ? "Cargando categorías..." : "Selecciona una categoría"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categories.length > 0 ? (
+                      categories.map((cat) => (
+                        <SelectItem key={cat} value={cat}>
+                          {cat}
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <div className="p-4 text-center text-xs text-muted-foreground">
+                        {areProductsLoading ? "Cargando..." : "No se encontraron categorías en tus productos"}
+                      </div>
+                    )}
+                  </SelectContent>
+                </Select>
               </div>
             )}
             {formData.applicableTo === 'specific_item' && (
@@ -421,11 +424,7 @@ function PromotionDialog({ isOpen, onClose, promo }: { isOpen: boolean, onClose:
                   value={formData.itemId || ''} 
                   onValueChange={(val) => {
                     const selectedProd = (products || []).find(p => p.id === val);
-                    setFormData({ 
-                      ...formData, 
-                      itemId: val, 
-                      itemName: selectedProd?.name || '' 
-                    });
+                    setFormData({ ...formData, itemId: val, itemName: selectedProd?.name || '' });
                   }}
                   disabled={isSaving || areProductsLoading}
                 >
@@ -434,15 +433,8 @@ function PromotionDialog({ isOpen, onClose, promo }: { isOpen: boolean, onClose:
                   </SelectTrigger>
                   <SelectContent>
                     {products?.map((p) => (
-                      <SelectItem key={p.id} value={p.id}>
-                        {p.name}
-                      </SelectItem>
+                      <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
                     ))}
-                    {(!products || products.length === 0) && !areProductsLoading && (
-                      <div className="p-4 text-center text-xs text-muted-foreground">
-                        No hay productos en el catálogo
-                      </div>
-                    )}
                   </SelectContent>
                 </Select>
               </div>
