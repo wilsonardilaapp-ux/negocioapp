@@ -90,7 +90,19 @@ export default function DashboardPage() {
         if (!orders) return [];
         const productSales: { [key: string]: number } = {};
         orders.forEach(order => {
-            productSales[order.productName] = (productSales[order.productName] || 0) + order.quantity;
+            // Manejo dinámico para pedidos agrupados (nuevo formato) o individuales (legacy)
+            if (order.items && Array.isArray(order.items)) {
+                order.items.forEach(item => {
+                    const name = item.productName;
+                    productSales[name] = (productSales[name] || 0) + item.quantity;
+                });
+            } else {
+                // Fallback para pedidos con formato antiguo
+                const legacyOrder = order as any;
+                const name = legacyOrder.productName || 'N/A';
+                const quantity = legacyOrder.quantity || 0;
+                productSales[name] = (productSales[name] || 0) + quantity;
+            }
         });
         return Object.entries(productSales).map(([name, quantity]) => ({ name, quantity }));
     }, [orders]);
@@ -221,5 +233,3 @@ export default function DashboardPage() {
         </div>
     );
 }
-
-    
