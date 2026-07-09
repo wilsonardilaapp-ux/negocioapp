@@ -19,6 +19,14 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu"
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog"
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -316,16 +324,14 @@ export const columns = ({ handleDeleteOrder, handleUpdateStatus, selectedOrders,
             const firstItem = order.items[0].productName;
             const extraCount = order.items.length - 1;
             return (
-                <div className="flex flex-col">
-                    <span className="font-medium truncate max-w-[150px]">{firstItem}</span>
-                    {extraCount > 0 && (
-                        <span className="text-[10px] text-muted-foreground font-bold italic">y {extraCount} {extraCount === 1 ? 'producto más' : 'productos más'}</span>
-                    )}
-                </div>
+                <span className="font-medium truncate max-w-[200px] block">
+                    {firstItem}
+                    {extraCount > 0 ? ` y ${extraCount} más` : ''}
+                </span>
             );
         }
         // Fallback para formato viejo
-        return <span className="truncate max-w-[150px]">{(order as any).productName || 'N/A'}</span>;
+        return <span className="font-medium">{(order as any).productName || 'N/A'}</span>;
       }
     },
     {
@@ -334,9 +340,10 @@ export const columns = ({ handleDeleteOrder, handleUpdateStatus, selectedOrders,
       cell: ({ row }) => {
         const order = row.original;
         if (order.items && Array.isArray(order.items)) {
-            return order.items.reduce((sum, item) => sum + item.quantity, 0);
+            const total = order.items.reduce((sum, item) => sum + item.quantity, 0);
+            return <span>{total}</span>;
         }
-        return (order as any).quantity || 0;
+        return <span>{(order as any).quantity || 0}</span>;
       }
     },
     {
