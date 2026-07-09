@@ -112,7 +112,16 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
       }, 0);
   }, [cartItems]);
 
-  const discountFromCoupon = useMemo(() => {
+  const applicableGlobalPromo = useMemo(() => {
+    return activePromos.find(p => 
+        p.applicableTo === 'order' && 
+        p.minQuantity !== undefined && 
+        totalQuantity >= p.minQuantity
+    ) ?? null;
+  }, [activePromos, totalQuantity]);
+
+  // Cálculos de descuento
+  const couponDiscountAmount = useMemo(() => {
     if (!appliedCoupon) return 0;
     if (appliedCoupon.tipo === 'porcentaje') {
         return subtotalProducts * (appliedCoupon.valor / 100);
@@ -120,18 +129,38 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
     return Math.min(appliedCoupon.valor, subtotalProducts);
   }, [appliedCoupon, subtotalProducts]);
 
-  const subtotalAfterCoupon = subtotalProducts - discountFromCoupon;
-  const subtotalBeforeVat = subtotalAfterCoupon + packagingTotal;
+  const orderDiscountAmount = useMemo(() => {
+    if (!applicableGlobalPromo) return 0;
+    if (applicableGlobalPromo.type === 'percentage') {
+        return subtotalProducts * (applicableGlobalPromo.discountValue / 100);
+    }
+    if (applicableGlobalPromo.type === 'fixed') {
+        return Math.min(applicableGlobalPromo.discountValue, subtotalProducts);
+    }
+    return 0;
+  }, [applicableGlobalPromo, subtotalProducts]);
+
+  // Selección del mejor descuento
+  const { finalDiscountAmount, discountLabel } = useMemo(() => {
+    if (couponDiscountAmount >= orderDiscountAmount && couponDiscountAmount > 0) {
+      return { 
+        finalDiscountAmount: couponDiscountAmount, 
+        discountLabel: `Cupón (${appliedCoupon?.codigo})` 
+      };
+    } else if (orderDiscountAmount > couponDiscountAmount) {
+      return { 
+        finalDiscountAmount: orderDiscountAmount, 
+        discountLabel: 'Descuento por cantidad' 
+      };
+    }
+    return { finalDiscountAmount: 0, discountLabel: '' };
+  }, [couponDiscountAmount, orderDiscountAmount, appliedCoupon]);
+
+  const subtotalBeforeVat = subtotalProducts - finalDiscountAmount + packagingTotal;
   const vatRate = businessInfo?.vatRate ?? 0;
   const vatAmount = subtotalBeforeVat * (vatRate / 100);
   const deliveryFee = tipoEntrega === 'domicilio' ? (businessInfo?.deliveryFee ?? 0) : 0;
   const total = subtotalBeforeVat + vatAmount + deliveryFee;
-
-  const applicableGlobalPromo = activePromos.find(p => 
-      p.applicableTo === 'order' && 
-      p.minQuantity !== undefined && 
-      totalQuantity >= p.minQuantity
-  ) ?? null;
 
   const handleApplyCoupon = async () => {
     if (!couponCode.trim()) return;
@@ -231,8 +260,8 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
     orderSummary += `${emoReceipt} RESUMEN DE LA COMPRA\n`;
     orderSummary += `Subtotal:      ${formatCurrency(subtotalProducts).padStart(12)}\n`;
 
-    if (appliedCoupon) {
-        orderSummary += `Cupón:        -${formatCurrency(discountFromCoupon).padStart(12)}\n`;
+    if (finalDiscountAmount > 0) {
+        orderSummary += `${(discountLabel + ':').padEnd(14)}-${formatCurrency(finalDiscountAmount).padStart(12)}\n`;
     }
 
     if (totalPromoSavings > 0) {
@@ -254,7 +283,6 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
     orderSummary += `${emoCard} Método de pago:\n${paymentLabel}\n`;
     orderSummary += `${separator}\n`;
 
-    // Mensaje de cierre condicional según el tipo de entrega
     const finalStatusMsg = tipoEntrega === 'domicilio' 
         ? "Tu pedido será preparado y enviado lo antes posible." 
         : "Tu pedido estará listo para recoger en tienda muy pronto.";
@@ -480,10 +508,10 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
                     <span>{formatCurrency(subtotalProducts)}</span>
                 </div>
                 
-                {appliedCoupon && (
+                {finalDiscountAmount > 0 && (
                     <div className="flex justify-between text-sm text-green-600 font-bold">
-                        <span>Cupón ({appliedCoupon.codigo}):</span>
-                        <span>-{formatCurrency(discountFromCoupon)}</span>
+                        <span>{discountLabel}:</span>
+                        <span>-{formatCurrency(finalDiscountAmount)}</span>
                     </div>
                 )}
 
