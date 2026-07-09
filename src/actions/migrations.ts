@@ -127,6 +127,7 @@ export async function repairProductRatings(businessId: string): Promise<{ succes
 /**
  * Mapeo automático de groupKeys para Planes Híbridos basado en el significado del texto.
  * También limpia notas internas accidentales en las descripciones.
+ * Prioridad de matching corregida para Chatbot.
  */
 export async function syncHybridPlanKeys() {
   const db = await getAdminFirestore();
@@ -147,28 +148,29 @@ export async function syncHybridPlanKeys() {
         let textValue = f.value || "";
         
         // --- LIMPIEZA QUIRÚRGICA DE TEXTO ---
-        // Eliminamos "(Debe super al plan basico)" preservando el resto
         const cleanTextValue = textValue.replace(/\(Debe super al plan basico\)/g, '').trim();
 
         const textForMatch = cleanTextValue.toLowerCase();
-        let key = f.groupKey || null; // Usar null en lugar de undefined para Firestore
+        let key = f.groupKey || null;
 
-        // Lógica de match según el significado
-        if (textForMatch.includes('producto')) key = 'productos';
+        // Lógica de match por jerarquía de prioridad
+        // 1. Chatbot (Prioridad máxima para evitar colisión con 'IA' de sugerencias)
+        if (textForMatch.includes('chatbot')) key = 'chatbot';
+        // 2. Otros beneficios específicos
+        else if (textForMatch.includes('producto')) key = 'productos';
         else if (textForMatch.includes('blog') || textForMatch.includes('artículo')) key = 'posts_blog';
         else if (textForMatch.includes('landing')) key = 'landing_pages';
         else if (textForMatch.includes('soporte') || textForMatch.includes('asistencia')) key = 'soporte';
         else if (textForMatch.includes('pedido') || textForMatch.includes('orden') || textForMatch.includes('comisión')) key = 'pedidos';
+        // 3. Sugerencias (Incluye 'IA' e 'inteligente')
         else if (textForMatch.includes('sugerencia') || textForMatch.includes('ia') || textForMatch.includes('inteligente')) key = 'sugerencias';
         else if (textForMatch.includes('api')) key = 'api';
         else if (textForMatch.includes('onboarding') || textForMatch.includes('acompañamiento')) key = 'onboarding';
         else if (textForMatch.includes('usuario') || textForMatch.includes('staff')) key = 'usuarios';
-        else if (textForMatch.includes('chatbot')) key = 'chatbot';
 
         return { ...f, value: cleanTextValue, groupKey: key };
       });
 
-      // BLINDAJE: Solo actualizamos el array features
       batch.update(docSnap.ref, { features: updatedFeatures });
       updatedCount++;
     });
