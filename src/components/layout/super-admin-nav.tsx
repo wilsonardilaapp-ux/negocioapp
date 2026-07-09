@@ -39,6 +39,7 @@ const navItemsList = [
   { href: "/superadmin", icon: LayoutDashboard, label: "Dashboard" },
   { href: "/superadmin/usuarios", icon: Users, label: "Usuarios" },
   { href: "/superadmin/negocios", icon: Building, label: "Negocios" },
+  { href: "/superadmin/actividad-negocios", icon: Activity, label: "Actividad Negocios" },
   { href: "/superadmin/affiliates", icon: Gift, label: "Programa Socios" },
   { href: "/superadmin/business-directory", icon: Search, label: "Directorio", moduleId: 'business-directory' },
   { href: "/superadmin/valoraciones", icon: Star, label: "Valoraciones" },
