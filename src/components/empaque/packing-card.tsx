@@ -21,8 +21,12 @@ export function PackingCard({ order, onPack }: PackingCardProps) {
 
     useEffect(() => {
         const updateTimer = () => {
-            const minutes = Math.floor((Date.now() - new Date(order.orderDate).getTime()) / 60000);
-            setTimeElapsed(formatDistanceToNow(new Date(order.orderDate), { addSuffix: true, locale: es }));
+            const orderDate = order.orderDate;
+            if (!orderDate) return;
+            
+            const date = new Date(orderDate);
+            const minutes = Math.floor((Date.now() - date.getTime()) / 60000);
+            setTimeElapsed(formatDistanceToNow(date, { addSuffix: true, locale: es }));
             
             if (minutes >= 10) {
                 setUrgencyColor('border-red-500');
@@ -49,8 +53,8 @@ export function PackingCard({ order, onPack }: PackingCardProps) {
                         <span>{timeElapsed}</span>
                     </div>
                 </div>
-                <Badge variant={order.customerAddress ? 'default' : 'secondary'}>
-                    {order.customerAddress ? 'DOMICILIO' : 'RESTAURANTE'}
+                <Badge variant={order.customerAddress && order.customerAddress !== 'Recogida en tienda' ? 'default' : 'secondary'}>
+                    {order.customerAddress && order.customerAddress !== 'Recogida en tienda' ? 'DOMICILIO' : 'RESTAURANTE'}
                 </Badge>
             </CardHeader>
             <CardContent className="flex-grow space-y-3">
@@ -73,9 +77,21 @@ export function PackingCard({ order, onPack }: PackingCardProps) {
                     )}
                 </div>
                 <div className="border-t pt-3">
-                    <p className="font-medium text-sm mb-1">Item a empacar:</p>
-                    <div className="p-2 bg-muted rounded-md">
-                        <p className="font-semibold">{order.quantity}x {order.productName}</p>
+                    <p className="font-medium text-sm mb-1">Ítems a empacar:</p>
+                    <div className="space-y-2">
+                        {order.items && Array.isArray(order.items) ? (
+                            order.items.map((item, idx) => (
+                                <div key={idx} className="p-2 bg-muted rounded-md">
+                                    <p className="font-semibold text-xs">{item.quantity}x {item.productName}</p>
+                                </div>
+                            ))
+                        ) : (
+                            <div className="p-2 bg-muted rounded-md">
+                                <p className="font-semibold text-xs">
+                                    {(order as unknown as { quantity: number }).quantity || 0}x {(order as unknown as { productName: string }).productName || 'Producto'}
+                                </p>
+                            </div>
+                        )}
                     </div>
                 </div>
             </CardContent>
