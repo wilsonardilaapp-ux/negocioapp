@@ -142,33 +142,63 @@ export async function syncHybridPlanKeys() {
 
     snapshot.forEach(docSnap => {
       const data = docSnap.data();
-      if (!data.features || !Array.isArray(data.features)) return;
+      const planName = data.name || "";
+      let features = Array.isArray(data.features) ? [...data.features] : [];
 
-      const updatedFeatures = data.features.map((f: any) => {
+      // --- PASO 1: ADICIÓN QUIRÚRGICA DE BENEFICIO DE COMISIÓN ---
+      const commissionConfig: Record<string, string> = {
+        "Plan Básico": "Comisión por Venta: 8% — Pagas únicamente cuando generas ventas a través de la plataforma.",
+        "Plan Estándar": "Comisión por Venta: 6% — Pagas únicamente cuando generas ventas a través de la plataforma.",
+        "Plan Profesional": "Comisión por Venta: 4% — Pagas únicamente cuando generas ventas a través de la plataforma."
+      };
+
+      if (commissionConfig[planName]) {
+        const benefitText = commissionConfig[planName];
+        // Evitar duplicados revisando si ya existe un beneficio de comisión o con el groupKey 'pedidos'
+        const exists = features.some((f: any) => 
+          f.groupKey === 'pedidos' || 
+          (f.value && f.value.toLowerCase().includes("comisión por venta"))
+        );
+
+        if (!exists) {
+          features.push({
+            value: benefitText,
+            groupKey: 'pedidos',
+            displayOrder: features.length
+          });
+        }
+      }
+
+      // --- PASO 2: MAPEO DE CLAVES Y LIMPIEZA ---
+      const updatedFeatures = features.map((f: any) => {
         let textValue = f.value || "";
         
-        // --- LIMPIEZA QUIRÚRGICA DE TEXTO ---
+        // Limpieza quirúrgica de texto (notas internas)
         const cleanTextValue = textValue.replace(/\(Debe super al plan basico\)/g, '').trim();
 
         const textForMatch = cleanTextValue.toLowerCase();
         let key = f.groupKey || null;
 
         // Lógica de match por jerarquía de prioridad
-        // 1. Chatbot (Prioridad máxima para evitar colisión con 'IA' de sugerencias)
+        // 1. Chatbot (Prioridad máxima)
         if (textForMatch.includes('chatbot')) key = 'chatbot';
         // 2. Otros beneficios específicos
         else if (textForMatch.includes('producto')) key = 'productos';
         else if (textForMatch.includes('blog') || textForMatch.includes('artículo')) key = 'posts_blog';
         else if (textForMatch.includes('landing')) key = 'landing_pages';
         else if (textForMatch.includes('soporte') || textForMatch.includes('asistencia')) key = 'soporte';
-        else if (textForMatch.includes('pedido') || textForMatch.includes('orden') || textForMatch.includes('comisión')) key = 'pedidos';
+        else if (textForMatch.includes('pedido') || textForMatch.includes('orden') || textForMatch.includes('comisión') || textForMatch.includes('venta')) key = 'pedidos';
         // 3. Sugerencias (Incluye 'IA' e 'inteligente')
         else if (textForMatch.includes('sugerencia') || textForMatch.includes('ia') || textForMatch.includes('inteligente')) key = 'sugerencias';
         else if (textForMatch.includes('api')) key = 'api';
         else if (textForMatch.includes('onboarding') || textForMatch.includes('acompañamiento')) key = 'onboarding';
         else if (textForMatch.includes('usuario') || textForMatch.includes('staff')) key = 'usuarios';
 
-        return { ...f, value: cleanTextValue, groupKey: key };
+        return { 
+          ...f, 
+          value: cleanTextValue, 
+          groupKey: key === undefined ? null : key // Red de seguridad para undefined
+        };
       });
 
       batch.update(docSnap.ref, { features: updatedFeatures });
@@ -177,7 +207,7 @@ export async function syncHybridPlanKeys() {
 
     await batch.commit();
     revalidatePath('/superadmin/hybrid-plans');
-    return { success: true, message: `Se han actualizado las descripciones y claves de ${updatedCount} planes híbridos.` };
+    return { success: true, message: `Se han actualizado ${updatedCount} planes híbridos con los nuevos beneficios y claves.` };
 
   } catch (error: any) {
     console.error("[syncHybridPlanKeys] Error:", error);
