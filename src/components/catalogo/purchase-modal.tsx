@@ -98,7 +98,7 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
     }
   }, [paymentSettings]);
 
-  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<z.infer<typeof purchaseSchema>>({
+  const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<z.infer<typeof purchaseSchema>>({
     resolver: zodResolver(purchaseSchema),
   });
   
@@ -182,131 +182,145 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
   };
 
   const onSubmit = async (data: z.infer<typeof purchaseSchema>) => {
-    const separator = "━━━━━━━━━━━━━━━━━━━━";
-    const subSeparator = "────────────────────";
+    try {
+        const separator = "━━━━━━━━━━━━━━━━━━━━";
+        const subSeparator = "────────────────────";
 
-    const emoScooter = "\uD83D\uDEF5"; 
-    const emoStore = "\uD83C\uDFEC";   
-    const emoUser = "\uD83D\uDC64";    
-    const emoPhone = "\uD83D\uDCF1";   
-    const emoPin = "\uD83D\uDCCD";     
-    const emoCart = "\uD83D\uDED2";    
-    const emoReceipt = "\uD83E\uDDFE"; 
-    const emoMoneyBag = "\uD83D\uDCB0"; 
-    const emoCard = "\uD83D\uDCB3";    
-    const emoThanks = "\uD83D\uDE4F";  
+        const emoScooter = "\uD83D\uDEF5"; 
+        const emoStore = "\uD83C\uDFEC";   
+        const emoUser = "\uD83D\uDC64";    
+        const emoPhone = "\uD83D\uDCF1";   
+        const emoPin = "\uD83D\uDCCD";     
+        const emoCart = "\uD83D\uDED2";    
+        const emoReceipt = "\uD83E\uDDFE"; 
+        const emoMoneyBag = "\uD83D\uDCB0"; 
+        const emoCard = "\uD83D\uDCB3";    
+        const emoThanks = "\uD83D\uDE4F";  
 
-    let orderSummary = "```\n"; // Inicio de bloque monoespaciado
+        let orderSummary = "```\n"; // Inicio de bloque monoespaciado
 
-    if (tipoEntrega === 'domicilio') {
-        orderSummary += `${emoScooter} NUEVO PEDIDO A DOMICILIO\n`;
-    } else {
-        orderSummary += `${emoStore} NUEVO PEDIDO PARA RECOGER EN TIENDA\n`;
-    }
-
-    orderSummary += `${separator}\n`;
-    orderSummary += `${emoUser} Cliente: ${data.fullName}\n`;
-    orderSummary += `${emoPhone} WhatsApp: ${data.whatsapp}\n`;
-
-    if (tipoEntrega === 'domicilio') {
-        orderSummary += `${emoPin} Dirección: ${data.address || 'No especificada'}\n`;
-    }
-
-    orderSummary += `${separator}\n`;
-    orderSummary += `${emoCart} PRODUCTOS\n`;
-
-    const ordersCollectionRef = collection(firestore, `businesses/${businessId}/orders`);
-    const now = new Date().toISOString();
-
-    let totalPromoSavings = 0;
-
-    // 1. Mapear cartItems a OrderItem[] para el guardado único
-    const orderItems: OrderItem[] = cartItems.map(item => {
-        const itemUnitPrice = item.appliedPromotion?.discountedPrice ?? item.price;
-        const itemSubtotal = itemUnitPrice * item.quantity;
-        
-        let itemPriceText = formatCurrency(itemUnitPrice);
-        if (item.appliedPromotion) {
-            const orig = item.appliedPromotion.originalPrice;
-            const disc = item.appliedPromotion.discountedPrice;
-            const perc = Math.round((1 - disc / orig) * 100);
-            itemPriceText = `~${formatCurrency(orig)}~ ${formatCurrency(disc)} (-${perc}%)`;
-            totalPromoSavings += (orig - disc) * item.quantity;
+        if (tipoEntrega === 'domicilio') {
+            orderSummary += `${emoScooter} NUEVO PEDIDO A DOMICILIO\n`;
+        } else {
+            orderSummary += `${emoStore} NUEVO PEDIDO PARA RECOGER EN TIENDA\n`;
         }
 
-        orderSummary += `- ${item.quantity} \u00D7 ${item.name}\n  ${itemPriceText.padStart(12)}\n`;
+        orderSummary += `${separator}\n`;
+        orderSummary += `${emoUser} Cliente: ${data.fullName}\n`;
+        orderSummary += `${emoPhone} WhatsApp: ${data.whatsapp}\n`;
 
-        return {
-          productId: item.id,
-          productName: item.name,
-          quantity: item.quantity,
-          unitPrice: itemUnitPrice,
-          subtotal: itemSubtotal,
-          appliedPromotion: item.appliedPromotion,
+        if (tipoEntrega === 'domicilio') {
+            orderSummary += `${emoPin} Dirección: ${data.address || 'No especificada'}\n`;
+        }
+
+        orderSummary += `${separator}\n`;
+        orderSummary += `${emoCart} PRODUCTOS\n`;
+
+        const ordersCollectionRef = collection(firestore, `businesses/${businessId}/orders`);
+        const now = new Date().toISOString();
+
+        let totalPromoSavings = 0;
+
+        // 1. Mapear cartItems a OrderItem[] para el guardado único
+        const orderItems: OrderItem[] = cartItems.map(item => {
+            const itemUnitPrice = item.appliedPromotion?.discountedPrice ?? item.price;
+            const itemSubtotal = itemUnitPrice * item.quantity;
+            
+            let itemPriceText = formatCurrency(itemUnitPrice);
+            if (item.appliedPromotion) {
+                const orig = item.appliedPromotion.originalPrice;
+                const disc = item.appliedPromotion.discountedPrice;
+                const perc = Math.round((1 - disc / orig) * 100);
+                itemPriceText = `~${formatCurrency(orig)}~ ${formatCurrency(disc)} (-${perc}%)`;
+                totalPromoSavings += (orig - disc) * item.quantity;
+            }
+
+            orderSummary += `- ${item.quantity} \u00D7 ${item.name}\n  ${itemPriceText.padStart(12)}\n`;
+
+            return {
+            productId: item.id,
+            productName: item.name,
+            quantity: item.quantity,
+            unitPrice: itemUnitPrice,
+            subtotal: itemSubtotal,
+            appliedPromotion: item.appliedPromotion || undefined,
+            };
+        });
+
+        // 2. Guardar UN solo documento por pedido con todos los ítems y totales
+        const orderData = {
+            businessId,
+            customerName: data.fullName,
+            customerEmail: data.email,
+            customerPhone: data.whatsapp,
+            customerAddress: tipoEntrega === 'domicilio' ? (data.address || '') : 'Recogida en tienda',
+            items: orderItems,
+            subtotal: subtotalProducts,
+            discountAmount: finalDiscountAmount,
+            discountLabel: discountLabel,
+            packagingCost: packagingTotal,
+            deliveryFee: deliveryFee,
+            vatAmount: vatAmount,
+            total: total,
+            paymentMethod: selectedPaymentMethod || 'pagoContraEntrega',
+            orderDate: now,
+            orderStatus: 'Pendiente' as OrderStatus,
+            tipoEntrega,
         };
-    });
 
-    // 2. Guardar UN solo documento por pedido con todos los ítems y totales
-    await addDocumentNonBlocking(ordersCollectionRef, {
-        businessId,
-        customerName: data.fullName,
-        customerEmail: data.email,
-        customerPhone: data.whatsapp,
-        customerAddress: tipoEntrega === 'domicilio' ? (data.address || '') : 'Recogida en tienda',
-        items: orderItems,
-        subtotal: subtotalProducts,
-        discountAmount: finalDiscountAmount,
-        discountLabel: discountLabel,
-        packagingCost: packagingTotal,
-        deliveryFee: deliveryFee,
-        vatAmount: vatAmount,
-        total: total,
-        paymentMethod: selectedPaymentMethod,
-        orderDate: now,
-        orderStatus: 'Pendiente' as OrderStatus,
-        tipoEntrega,
-    });
+        // LIMPIEZA CRÍTICA: Eliminar undefined para evitar errores de Firestore
+        const cleanOrderData = JSON.parse(JSON.stringify(orderData));
 
-    const paymentLabel = PAYMENT_METHOD_LABELS[selectedPaymentMethod] ?? selectedPaymentMethod;
-    
-    orderSummary += `${separator}\n`;
-    orderSummary += `${emoReceipt} RESUMEN DE LA COMPRA\n`;
-    orderSummary += `Subtotal:      ${formatCurrency(subtotalProducts).padStart(12)}\n`;
+        await addDocumentNonBlocking(ordersCollectionRef, cleanOrderData);
 
-    if (finalDiscountAmount > 0) {
-        orderSummary += `${(discountLabel + ':').padEnd(14)}-${formatCurrency(finalDiscountAmount).padStart(12)}\n`;
+        const paymentLabel = PAYMENT_METHOD_LABELS[selectedPaymentMethod] ?? selectedPaymentMethod;
+        
+        orderSummary += `${separator}\n`;
+        orderSummary += `${emoReceipt} RESUMEN DE LA COMPRA\n`;
+        orderSummary += `Subtotal:      ${formatCurrency(subtotalProducts).padStart(12)}\n`;
+
+        if (finalDiscountAmount > 0) {
+            orderSummary += `${(discountLabel + ':').padEnd(14)}-${formatCurrency(finalDiscountAmount).padStart(12)}\n`;
+        }
+
+        if (totalPromoSavings > 0) {
+            orderSummary += `🎉 Ahorraste:   ${formatCurrency(totalPromoSavings).padStart(12)}\n`;
+        }
+
+        if (packagingTotal > 0) {
+            orderSummary += `Empaque:       ${formatCurrency(packagingTotal).padStart(12)}\n`;
+        }
+
+        orderSummary += `Envío:         ${tipoEntrega === 'domicilio' ? formatCurrency(deliveryFee).padStart(12) : 'Gratis'.padStart(12)}\n`;
+
+        if (vatAmount > 0) {
+            orderSummary += `IVA (${businessInfo?.vatRate}%):     ${formatCurrency(vatAmount).padStart(12)}\n`;
+        }
+
+        orderSummary += `${subSeparator}\n`;
+        orderSummary += `${emoMoneyBag} TOTAL:      ${formatCurrency(total).padStart(12)}\n`;
+        orderSummary += `${emoCard} Método de pago:\n${paymentLabel}\n`;
+        orderSummary += `${separator}\n`;
+
+        const finalStatusMsg = tipoEntrega === 'domicilio' 
+            ? "Tu pedido será preparado y enviado lo antes posible." 
+            : "Tu pedido estará listo para recoger en tienda muy pronto.";
+
+        orderSummary += `${emoThanks} Gracias por tu compra.\n${finalStatusMsg}\n` + "```";
+
+        const cleanPhone = normalizePhoneNumber(businessInfo?.phone || '3228831634');
+        window.open(`https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(orderSummary)}`, '_blank');
+        
+        onClearCart();
+        onOpenChange(false);
+    } catch (error: any) {
+        console.error("Error al procesar el pedido:", error);
+        toast({
+            variant: "destructive",
+            title: "Error al enviar pedido",
+            description: error.message || "Ocurrió un problema al guardar tu pedido. Por favor intenta de nuevo."
+        });
     }
-
-    if (totalPromoSavings > 0) {
-        orderSummary += `🎉 Ahorraste:   ${formatCurrency(totalPromoSavings).padStart(12)}\n`;
-    }
-
-    if (packagingTotal > 0) {
-        orderSummary += `Empaque:       ${formatCurrency(packagingTotal).padStart(12)}\n`;
-    }
-
-    orderSummary += `Envío:         ${tipoEntrega === 'domicilio' ? formatCurrency(deliveryFee).padStart(12) : 'Gratis'.padStart(12)}\n`;
-
-    if (vatAmount > 0) {
-        orderSummary += `IVA (${businessInfo?.vatRate}%):     ${formatCurrency(vatAmount).padStart(12)}\n`;
-    }
-
-    orderSummary += `${subSeparator}\n`;
-    orderSummary += `${emoMoneyBag} TOTAL:      ${formatCurrency(total).padStart(12)}\n`;
-    orderSummary += `${emoCard} Método de pago:\n${paymentLabel}\n`;
-    orderSummary += `${separator}\n`;
-
-    const finalStatusMsg = tipoEntrega === 'domicilio' 
-        ? "Tu pedido será preparado y enviado lo antes posible." 
-        : "Tu pedido estará listo para recoger en tienda muy pronto.";
-
-    orderSummary += `${emoThanks} Gracias por tu compra.\n${finalStatusMsg}\n` + "```";
-
-    const cleanPhone = normalizePhoneNumber(businessInfo?.phone || '3228831634');
-    window.open(`https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(orderSummary)}`, '_blank');
-    
-    onClearCart();
-    onOpenChange(false);
   };
 
   if (cartItems.length === 0) {
