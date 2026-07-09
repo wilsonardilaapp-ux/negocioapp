@@ -126,7 +126,7 @@ export async function repairProductRatings(businessId: string): Promise<{ succes
 
 /**
  * Mapeo automático de groupKeys para Planes Híbridos basado en el significado del texto.
- * También limpia notas internas accidentales en las descripciones.
+ * Implementa filtros de seguridad estrictos para evitar colisiones entre beneficios y descripciones.
  */
 export async function syncHybridPlanKeys() {
   const db = await getAdminFirestore();
@@ -167,35 +167,60 @@ export async function syncHybridPlanKeys() {
         }
       }
 
-      // --- PASO 2: MAPEO DE CLAVES Y LIMPIEZA ---
+      // --- PASO 2: MAPEO DE CLAVES CON FILTROS DE SEGURIDAD ---
       const updatedFeatures = features.map((f: any) => {
         let textValue = f.value || "";
+        
+        // Limpieza de notas internas
         const cleanTextValue = textValue.replace(/\(Debe super al plan basico\)/g, '').trim();
-        const textForMatch = cleanTextValue.toLowerCase();
-        let key = f.groupKey || null;
+        
+        // Normalización para comparación (sin acentos, minúsculas)
+        const textForMatch = cleanTextValue
+          .toLowerCase()
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "");
 
-        // Lógica de match por jerarquía de prioridad corregida
-        // 1. Chatbot (Prioridad máxima)
-        if (textForMatch.includes('chatbot')) {
-          key = 'chatbot';
+        let key = null;
+
+        // 1. Lógica de exclusión explícita de encabezados (separadores visuales)
+        const headerExclusions = [
+          "ventas y catalogo",
+          "marketing y posicionamiento",
+          "soporte y atencion",
+          "servicios de sistema",
+          "herramientas de gestion"
+        ];
+        
+        if (headerExclusions.includes(textForMatch)) {
+          key = null;
+        } else {
+          // 2. Lógica de match por jerarquía de prioridad con filtros estrictos
+          
+          // Chatbot (Prioridad máxima)
+          if (textForMatch.includes('chatbot')) {
+            key = 'chatbot';
+          }
+          // Pedidos (Solo si es un beneficio corto, evita descripciones largas)
+          else if ((textForMatch.includes('pedido') || textForMatch.includes('orden')) && cleanTextValue.length <= 40) {
+            key = 'pedidos';
+          }
+          // Comisión (Solo si incluye el símbolo "%" para evitar colisión con encabezados de "Ventas")
+          else if ((textForMatch.includes('comision') || textForMatch.includes('venta')) && textForMatch.includes('%')) {
+            key = 'comision';
+          }
+          // Productos (Solo si es un beneficio corto)
+          else if (textForMatch.includes('producto') && cleanTextValue.length <= 40) {
+            key = 'productos';
+          }
+          // Otros beneficios (sin restricciones de longitud solicitadas pero específicos)
+          else if (textForMatch.includes('blog') || textForMatch.includes('articulo')) key = 'posts_blog';
+          else if (textForMatch.includes('landing')) key = 'landing_pages';
+          else if (textForMatch.includes('soporte') || textForMatch.includes('asistencia')) key = 'soporte';
+          else if (textForMatch.includes('sugerencia') || textForMatch.includes('ia') || textForMatch.includes('inteligente')) key = 'sugerencias';
+          else if (textForMatch.includes('api')) key = 'api';
+          else if (textForMatch.includes('onboarding') || textForMatch.includes('acompanamiento')) key = 'onboarding';
+          else if (textForMatch.includes('usuario') || textForMatch.includes('staff')) key = 'usuarios';
         }
-        // 2. Pedidos (Prioridad alta para evitar colisión con comisión)
-        else if (textForMatch.includes('pedido') || textForMatch.includes('orden')) {
-          key = 'pedidos';
-        }
-        // 3. Comisión (Detecta el término específico)
-        else if (textForMatch.includes('comisión') || textForMatch.includes('venta')) {
-          key = 'comision';
-        }
-        // 4. Otros beneficios específicos
-        else if (textForMatch.includes('producto')) key = 'productos';
-        else if (textForMatch.includes('blog') || textForMatch.includes('artículo')) key = 'posts_blog';
-        else if (textForMatch.includes('landing')) key = 'landing_pages';
-        else if (textForMatch.includes('soporte') || textForMatch.includes('asistencia')) key = 'soporte';
-        else if (textForMatch.includes('sugerencia') || textForMatch.includes('ia') || textForMatch.includes('inteligente')) key = 'sugerencias';
-        else if (textForMatch.includes('api')) key = 'api';
-        else if (textForMatch.includes('onboarding') || textForMatch.includes('acompañamiento')) key = 'onboarding';
-        else if (textForMatch.includes('usuario') || textForMatch.includes('staff')) key = 'usuarios';
 
         return { 
           ...f, 
@@ -210,7 +235,7 @@ export async function syncHybridPlanKeys() {
 
     await batch.commit();
     revalidatePath('/superadmin/hybrid-plans');
-    return { success: true, message: `Se han sincronizado correctamente los beneficios en ${updatedCount} planes.` };
+    return { success: true, message: `Se han sincronizado correctamente los beneficios en ${updatedCount} planes con filtros de seguridad.` };
 
   } catch (error: any) {
     console.error("[syncHybridPlanKeys] Error:", error);
