@@ -24,7 +24,7 @@ import {
   ArrowRight,
   FileDown
 } from 'lucide-react';
-import { useCollection, useFirestore, useMemoFirebase, useDoc } from '@/firebase';
+import { useCollection, useFirestore, useMemoFirebase, useDoc, addDocumentNonBlocking } from '@/firebase';
 import { collection, getDocs, doc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import type { HybridPlan, HybridBillingResult } from '@/models/hybrid-plan';
@@ -254,7 +254,7 @@ export default function HybridBillingPage() {
     ));
   };
 
-  const handleSendWhatsApp = (res: HybridBillingResult) => {
+  const handleSendWhatsApp = async (res: HybridBillingResult) => {
     if (!res.phone) {
       toast({ variant: 'destructive', title: 'Error', description: 'El negocio no tiene un número de teléfono registrado.' });
       return;
@@ -285,6 +285,23 @@ Aquí está tu resumen de facturación para el mes de *${currentMonthLabel} ${se
 
 Gracias por tu puntualidad! 🚀`;
 
+    // 1. Intentar crear la notificación en el panel del cliente
+    try {
+      const notificationsRef = collection(firestore, `businesses/${res.businessId}/notifications`);
+      await addDocumentNonBlocking(notificationsRef, {
+        fromSuperAdmin: true,
+        subject: `💰 Recordatorio de Cobro - ${currentMonthLabel} ${selectedYear}`,
+        body: message,
+        read: false,
+        createdAt: new Date().toISOString(),
+        type: 'payment_reminder'
+      });
+    } catch (error) {
+      // Si falla la notificación, no bloqueamos el flujo de WhatsApp
+      console.error("[Billing Notification Error]", error);
+    }
+
+    // 2. Abrir WhatsApp Web
     const cleanPhone = normalizePhoneNumber(res.phone);
     const whatsappUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
     window.open(whatsappUrl, '_blank');
