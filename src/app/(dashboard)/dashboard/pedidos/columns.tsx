@@ -133,7 +133,7 @@ export const columns = ({ handleDeleteOrder, handleUpdateStatus, selectedOrders,
                                     {isNewFormat ? (
                                         orderItems.map((item, idx) => (
                                             <tr key={idx}>
-                                                <td className="px-3 py-2 font-medium">{item.productName}</td>
+                                                <td className="px-3 py-2 font-medium">{item.productName || (item as any).name}</td>
                                                 <td className="px-3 py-2 text-center">{item.quantity}</td>
                                                 <td className="px-3 py-2 text-right">{formatCurrency(item.unitPrice)}</td>
                                                 <td className="px-3 py-2 text-right font-semibold">{formatCurrency(item.subtotal)}</td>
@@ -141,9 +141,9 @@ export const columns = ({ handleDeleteOrder, handleUpdateStatus, selectedOrders,
                                         ))
                                     ) : (
                                         <tr>
-                                            <td className="px-3 py-2 font-medium">{(order as any).productName}</td>
-                                            <td className="px-3 py-2 text-center">{(order as any).quantity}</td>
-                                            <td className="px-3 py-2 text-right">{formatCurrency((order as any).unitPrice)}</td>
+                                            <td className="px-3 py-2 font-medium">{(order as any).productName || (order as any).name || 'Producto'}</td>
+                                            <td className="px-3 py-2 text-center">{(order as any).quantity || 1}</td>
+                                            <td className="px-3 py-2 text-right">{formatCurrency((order as any).unitPrice || (order as any).price || 0)}</td>
                                             <td className="px-3 py-2 text-right font-semibold">{formatCurrency(order.subtotal)}</td>
                                         </tr>
                                     )}
@@ -321,7 +321,7 @@ export const columns = ({ handleDeleteOrder, handleUpdateStatus, selectedOrders,
       cell: ({ row }) => {
         const order = row.original;
         if (order.items && Array.isArray(order.items) && order.items.length > 0) {
-            const firstItem = order.items[0].productName;
+            const firstItem = order.items[0].productName || (order.items[0] as any).name || 'Producto';
             const extraCount = order.items.length - 1;
             return (
                 <span className="font-medium truncate max-w-[200px] block">
@@ -331,7 +331,7 @@ export const columns = ({ handleDeleteOrder, handleUpdateStatus, selectedOrders,
             );
         }
         // Fallback para formato viejo
-        return <span className="font-medium">{(order as any).productName || 'N/A'}</span>;
+        return <span className="font-medium">{(order as any).productName || (order as any).name || 'N/A'}</span>;
       }
     },
     {
@@ -340,7 +340,7 @@ export const columns = ({ handleDeleteOrder, handleUpdateStatus, selectedOrders,
       cell: ({ row }) => {
         const order = row.original;
         if (order.items && Array.isArray(order.items)) {
-            const total = order.items.reduce((sum, item) => sum + item.quantity, 0);
+            const total = order.items.reduce((sum, item) => sum + (item.quantity || 0), 0);
             return <span>{total}</span>;
         }
         return <span>{(order as any).quantity || 0}</span>;
@@ -351,7 +351,6 @@ export const columns = ({ handleDeleteOrder, handleUpdateStatus, selectedOrders,
       header: "Total",
       cell: ({ row }) => {
           const order = row.original;
-          // Mostramos el campo total (nuevo) o subtotal (viejo)
           return <span className="font-bold text-primary">{formatCurrency(order.total || order.subtotal)}</span>;
       }
     },
