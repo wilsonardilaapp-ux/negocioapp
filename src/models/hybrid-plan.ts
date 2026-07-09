@@ -16,7 +16,7 @@ export const HybridPlanSchema = z.object({
   features: z.array(z.object({ 
     value: z.string(),
     displayOrder: z.number().optional(),
-    groupKey: z.string().optional()
+    groupKey: z.string().nullable().optional()
   })),
   limits: z.object({
     products: z.number(),

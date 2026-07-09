@@ -23,7 +23,7 @@ export const SubscriptionPlanSchema = z.object({
   features: z.array(z.object({ 
     value: z.string().min(1, 'La característica no puede estar vacía.'),
     displayOrder: z.number().optional(),
-    groupKey: z.string().optional()
+    groupKey: z.string().nullable().optional()
   })).describe("Lista de características clave para la página de precios."),
   limits: PlanLimitsSchema,
   extraLimits: z.array(z.object({ 
