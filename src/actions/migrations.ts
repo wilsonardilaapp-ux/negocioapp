@@ -188,18 +188,19 @@ export async function syncHybridPlanKeys() {
           "marketing y posicionamiento",
           "soporte y atencion",
           "servicios de sistema",
-          "herramientas de gestion"
+          "herramientas de gestion",
+          "resumen de limites"
         ];
         
         const isNarrative = textForMatch.startsWith("este plan");
-        const isHeader = headerExclusions.includes(textForMatch);
+        const isHeader = headerExclusions.some(ex => textForMatch.includes(ex));
 
         if (isHeader || isNarrative) {
           key = null;
         } else {
           // 2. Lógica de match por jerarquía de prioridad con filtros estrictos
           
-          // Chatbot (Prioridad máxima)
+          // Chatbot (Prioridad máxima para evitar colisión con IA)
           if (textForMatch.includes('chatbot')) {
             key = 'chatbot';
           }
