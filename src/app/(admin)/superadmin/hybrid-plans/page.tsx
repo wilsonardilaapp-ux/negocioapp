@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { PlusCircle, Edit, Trash2, Loader2, DollarSign, Percent, Package, Settings, Palette, GripVertical } from 'lucide-react';
+import { PlusCircle, Edit, Trash2, Loader2, DollarSign, Percent, Package, Settings, Palette, GripVertical, RefreshCw } from 'lucide-react';
 import { useCollection, useFirestore, useMemoFirebase, setDocumentNonBlocking, deleteDocumentNonBlocking, useUser } from '@/firebase';
 import { collection, doc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
@@ -21,6 +21,7 @@ import { useForm, Controller, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { HybridPlanSchema } from '@/models/hybrid-plan';
 import { cn } from "@/lib/utils";
+import { syncHybridPlanKeys } from '@/actions/migrations';
 
 // DND Kit Imports
 import {
@@ -46,6 +47,7 @@ export default function HybridPlansPage() {
   const { toast } = useToast();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingPlan, setEditingPlan] = useState<HybridPlan | null>(null);
+  const [isSyncing, setIsSyncing] = useState(false);
 
   const plansQuery = useMemoFirebase(() => !firestore ? null : collection(firestore, 'hybrid_plans'), [firestore]);
   const { data: unsortedPlans, isLoading } = useCollection<HybridPlan>(plansQuery);
@@ -58,6 +60,22 @@ export default function HybridPlansPage() {
   const handleOpenDialog = (plan: HybridPlan | null) => {
     setEditingPlan(plan);
     setIsDialogOpen(true);
+  };
+
+  const handleSyncKeys = async () => {
+    setIsSyncing(true);
+    try {
+      const result = await syncHybridPlanKeys();
+      if (result.success) {
+        toast({ title: "Sincronización completa", description: result.message });
+      } else {
+        toast({ variant: 'destructive', title: "Error", description: result.error });
+      }
+    } catch (e) {
+      toast({ variant: 'destructive', title: "Error crítico" });
+    } finally {
+      setIsSyncing(false);
+    }
   };
 
   const handleDelete = async (plan: HybridPlan) => {
@@ -86,9 +104,15 @@ export default function HybridPlansPage() {
             <CardTitle>Planes Híbridos (Zentry)</CardTitle>
             <CardDescription>Tarifa base + Comisión por transacción.</CardDescription>
           </div>
-          <Button onClick={() => handleOpenDialog(null)}>
-            <PlusCircle className="mr-2 h-4 w-4" /> Nuevo Plan Híbrido
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={handleSyncKeys} disabled={isSyncing}>
+              {isSyncing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+              Actualizar Beneficios Híbridos
+            </Button>
+            <Button onClick={() => handleOpenDialog(null)}>
+              <PlusCircle className="mr-2 h-4 w-4" /> Nuevo Plan Híbrido
+            </Button>
+          </div>
         </CardHeader>
       </Card>
 
@@ -97,7 +121,7 @@ export default function HybridPlansPage() {
       ) : (
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {plans?.map(plan => (
-            <Card key={plan.id} className="flex flex-col">
+            <Card key={doc.id} className="flex flex-col">
               <CardHeader>
                 <div className="flex justify-between items-start">
                   <CardTitle>{plan.name}</CardTitle>

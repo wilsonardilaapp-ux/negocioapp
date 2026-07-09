@@ -4,10 +4,8 @@ import { getAdminFirestore } from '@/firebase/server-init';
 import { revalidatePath } from 'next/cache';
 
 /**
- * @fileOverview Script de migración para reparar ratings de productos desincronizados.
- * 
- * Este script recalcula el rating y ratingCount basándose exclusivamente en los documentos
- * reales dentro de la subcolección /votes de cada producto.
+ * @fileOverview Script de migración para reparar ratings de productos desincronizados
+ * y sincronizar claves de beneficios de planes.
  */
 
 export type MigrationSummary = {
@@ -122,6 +120,57 @@ export async function repairProductRatings(businessId: string): Promise<{ succes
 
   } catch (error: any) {
     console.error("[repairProductRatings] Critical Error:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Mapeo automático de groupKeys para Planes Híbridos basado en el significado del texto.
+ */
+export async function syncHybridPlanKeys() {
+  const db = await getAdminFirestore();
+  const hybridRef = db.collection('hybrid_plans');
+  
+  try {
+    const snapshot = await hybridRef.get();
+    if (snapshot.empty) return { success: true, message: "No hay planes híbridos para procesar." };
+
+    const batch = db.batch();
+    let updatedCount = 0;
+
+    snapshot.forEach(docSnap => {
+      const data = docSnap.data();
+      if (!data.features || !Array.isArray(data.features)) return;
+
+      const updatedFeatures = data.features.map((f: any) => {
+        const text = (f.value || "").toLowerCase();
+        let key = f.groupKey;
+
+        // Lógica de match según el significado
+        if (text.includes('producto')) key = 'productos';
+        else if (text.includes('blog') || text.includes('artículo')) key = 'posts_blog';
+        else if (text.includes('landing')) key = 'landing_pages';
+        else if (text.includes('soporte') || text.includes('asistencia')) key = 'soporte';
+        else if (text.includes('pedido') || text.includes('orden') || text.includes('comisión')) key = 'pedidos';
+        else if (text.includes('sugerencia') || text.includes('ia') || text.includes('inteligente')) key = 'sugerencias';
+        else if (text.includes('api')) key = 'api';
+        else if (text.includes('onboarding') || text.includes('acompañamiento')) key = 'onboarding';
+        else if (text.includes('usuario') || text.includes('staff')) key = 'usuarios';
+
+        return { ...f, groupKey: key };
+      });
+
+      // BLINDAJE: Solo actualizamos el array features
+      batch.update(docSnap.ref, { features: updatedFeatures });
+      updatedCount++;
+    });
+
+    await batch.commit();
+    revalidatePath('/superadmin/hybrid-plans');
+    return { success: true, message: `Se han actualizado las claves de ${updatedCount} planes híbridos.` };
+
+  } catch (error: any) {
+    console.error("[syncHybridPlanKeys] Error:", error);
     return { success: false, error: error.message };
   }
 }
