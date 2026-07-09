@@ -24,6 +24,10 @@ export type Business = {
     imageLimit?: number | null;
     productLimit?: number | null;
     
+    // Activity Tracking
+    lastActiveAt?: string;
+    activityStatus?: string;
+
     // Referral System
     referralCode?: string;
     referredByBusinessId?: string | null;

@@ -37,7 +37,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
-import { Check, Plus, Search, Building2, Eye, Puzzle, Tag, AlertCircle, TrendingUp, Mail, User, ShieldCheck, Loader2, Sparkles, Trash2 } from 'lucide-react';
+import { Check, Plus, Search, Building2, Eye, Puzzle, Tag, AlertCircle, TrendingUp, Mail, User, ShieldCheck, Loader2, Sparkles, Trash2, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Label } from '@/components/ui/label';
 import { validateModuleExtra, validateLimitesExtra } from '@/utils/validateModuleExtra';
@@ -102,6 +102,34 @@ const StatusBadge = ({ status }: { status: EntityStatus | string | undefined }) 
       {label[currentStatus] || currentStatus.replace('_', ' ')}
     </Badge>
   );
+};
+
+const ActivityBadge = ({ status }: { status: string | undefined }) => {
+    if (!status) {
+        return (
+            <Badge variant="outline" className="bg-gray-50 text-gray-500 border-gray-200 font-medium">
+                Sin datos
+            </Badge>
+        );
+    }
+    
+    const config: Record<string, string> = {
+        active: 'bg-green-100 text-green-800 border-green-200',
+        at_risk: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+        dormant: 'bg-red-100 text-red-800 border-red-200',
+    };
+
+    const labels: Record<string, string> = {
+        active: 'Activo',
+        at_risk: 'En Riesgo',
+        dormant: 'Inactivo',
+    };
+
+    return (
+        <Badge variant="outline" className={cn('capitalize font-medium', config[status] || 'bg-gray-100 text-gray-800 border-gray-200')}>
+            {labels[status] || status.replace('_', ' ')}
+        </Badge>
+    );
 };
 
 export default function BusinessesPage() {
@@ -507,6 +535,7 @@ export default function BusinessesPage() {
                 <tr>
                   <th className="text-left px-6 py-4 font-medium text-gray-600">Negocio</th>
                   <th className="text-left px-6 py-4 font-medium text-gray-600">Plan</th>
+                  <th className="text-left px-6 py-4 font-medium text-gray-600">Actividad</th>
                   <th className="text-left px-6 py-4 font-medium text-gray-600">Estado</th>
                   <th className="text-left px-6 py-4 font-medium text-gray-600">Teléfono</th>
                   <th className="text-right px-6 py-4 font-medium text-gray-600">Acciones</th>
@@ -515,7 +544,7 @@ export default function BusinessesPage() {
               <tbody className="divide-y">
                 {businessesLoading ? (
                     <tr>
-                        <td colSpan={5} className="py-12 text-center">
+                        <td colSpan={6} className="py-12 text-center">
                             <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary mb-2" />
                             <p className="text-sm text-muted-foreground">Cargando negocios...</p>
                         </td>
@@ -542,6 +571,9 @@ export default function BusinessesPage() {
                                 return matched ? matched.name : (business.planName || 'Plan Crecimiento');
                             })()}
                         </Badge>
+                    </td>
+                    <td className="px-6 py-4">
+                        <ActivityBadge status={business.activityStatus} />
                     </td>
                     <td className="px-6 py-4">
                         <StatusBadge status={business.status} />
