@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import { useFirebase } from '@/firebase';
-import { doc, getDoc, collectionGroup, query, where, getDocs, limit } from 'firebase/firestore';
+import { doc, getDoc, collectionGroup, query, where, getDocs, limit, collection } from 'firebase/firestore';
 
 import LandingPageContent from '@/components/landing-page/landing-page-content';
 import { ChatbotWidget } from '@/components/chatbot/chatbot-widget';
@@ -11,6 +11,8 @@ import { Frown, Settings, Loader2, PackageSearch } from 'lucide-react';
 import type { LandingPageData } from '@/models/landing-page';
 import type { Module } from '@/models/module';
 import type { Business } from '@/models/business';
+import type { SubscriptionPlan } from '@/models/subscription-plan';
+import type { HybridPlan } from '@/models/hybrid-plan';
 
 function BusinessLandingContent() {
     const params = useParams();
@@ -23,17 +25,21 @@ function BusinessLandingContent() {
         business: Business | null;
         landingData: LandingPageData | null;
         chatbotModule: Module | null;
+        plans: SubscriptionPlan[];
+        hybridPlans: HybridPlan[];
         resolvedBusinessId: string | null;
     }>({
         business: null,
         landingData: null,
         chatbotModule: null,
+        plans: [],
+        hybridPlans: [],
         resolvedBusinessId: null,
     });
 
     useEffect(() => {
         if (!firestore || !slug || !isNetworkEnabled) {
-            if (!isNetworkEnabled && slug) return; // Wait for network
+            if (!isNetworkEnabled && slug) return; // Esperar a la red
             setIsLoading(false);
             return;
         }
@@ -42,7 +48,7 @@ function BusinessLandingContent() {
             setIsLoading(true);
             setError(null);
             try {
-                // 1. Resolve slug to businessId using the new slugLanding field
+                // 1. Resolver slug a businessId usando el campo slugLanding
                 const shareConfigQuery = query(collectionGroup(firestore, 'shareConfig'), where('slugLanding', '==', slug), limit(1));
                 const querySnapshot = await getDocs(shareConfigQuery);
                 const customSlugDoc = querySnapshot.docs.find(doc => doc.data().useCustomSlugLanding === true);
@@ -53,15 +59,19 @@ function BusinessLandingContent() {
                     throw new Error("El alias del negocio no es válido o no se encontró.");
                 }
 
-                // 2. Fetch all data in parallel
+                // 2. Obtener todos los datos en paralelo incluyendo los planes para sincronizar con el editor
                 const businessDocRef = doc(firestore, 'businesses', businessId);
                 const landingPageDocRef = doc(firestore, 'businesses', businessId, 'landingPages', 'main');
                 const chatbotModuleRef = doc(firestore, 'modules', 'chatbot-integrado-con-whatsapp-para-soporte-y-ventas');
+                const plansRef = collection(firestore, 'plans');
+                const hybridPlansRef = collection(firestore, 'hybrid_plans');
 
-                const [businessSnap, landingPageSnap, chatbotModuleSnap] = await Promise.all([
+                const [businessSnap, landingPageSnap, chatbotModuleSnap, plansSnap, hybridPlansSnap] = await Promise.all([
                     getDoc(businessDocRef),
                     getDoc(landingPageDocRef),
-                    getDoc(chatbotModuleRef)
+                    getDoc(chatbotModuleRef),
+                    getDocs(plansRef),
+                    getDocs(hybridPlansRef)
                 ]);
 
                 if (!businessSnap.exists()) {
@@ -72,10 +82,13 @@ function BusinessLandingContent() {
                     business: businessSnap.data() as Business,
                     landingData: landingPageSnap.exists() ? (landingPageSnap.data() as LandingPageData) : null,
                     chatbotModule: chatbotModuleSnap.exists() ? (chatbotModuleSnap.data() as Module) : null,
+                    plans: plansSnap.docs.map(d => ({ ...d.data(), id: d.id } as SubscriptionPlan)),
+                    hybridPlans: hybridPlansSnap.docs.map(d => ({ ...d.data(), id: d.id } as HybridPlan)),
                     resolvedBusinessId: businessId,
                 });
 
             } catch (e: any) {
+                console.error("Error al cargar la landing:", e.message);
                 setError(e.message);
             } finally {
                 setIsLoading(false);
@@ -123,7 +136,12 @@ function BusinessLandingContent() {
 
     return (
         <div>
-            <LandingPageContent data={pageData.landingData} businessId={pageData.resolvedBusinessId ?? undefined} />
+            <LandingPageContent 
+                data={pageData.landingData} 
+                plans={pageData.plans}
+                hybridPlans={pageData.hybridPlans}
+                businessId={pageData.resolvedBusinessId ?? undefined} 
+            />
             <ChatbotWidget 
                 enabled={isChatbotEnabled}
                 businessId={pageData.resolvedBusinessId!}
