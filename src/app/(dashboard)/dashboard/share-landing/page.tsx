@@ -128,7 +128,6 @@ export default function ShareLandingPage() {
     if (isLoading || !user) return;
 
     if (savedShareConfig) {
-        // Corrección de condición de carrera: comparar marcas de tiempo (updatedAt)
         const firestoreTime = new Date(savedShareConfig.updatedAt || 0).getTime();
         const localTime = new Date(shareConfig?.updatedAt || 0).getTime();
 
@@ -173,35 +172,26 @@ export default function ShareLandingPage() {
   };
   
   const handleManualSave = async () => {
+    console.log("DEBUG - User UID:", user?.uid);
     if (!shareConfig || !shareConfigRef || !firestore || !user) return;
     setIsSaving(true);
     try {
       const finalSlug = (shareConfig.slugLanding || user.uid).trim().toLowerCase().replace(/\s+/g, '-').replace(/^-+|-+$/g, '');
       const now = new Date().toISOString();
 
-      // Construcción explícita del objeto para evitar pérdida de campos del catálogo
       const dataToSave: MenuShare = {
-        // Identificadores
         id: 'main',
         businessId: user.uid,
-        
-        // Campos de Landing (gestionados en esta página)
         slugLanding: finalSlug,
         useCustomSlugLanding: !!shareConfig.useCustomSlugLanding,
         socialShareMessage: shareConfig.socialShareMessage || defaultShareConfig.socialShareMessage,
         socialPreviewImageUrl: shareConfig.socialPreviewImageUrl || null,
-        
-        // Campos de Catálogo (preservados explícitamente desde el estado local)
         slug: shareConfig.slug || user.uid,
         useCustomSlug: !!shareConfig.useCustomSlug,
-        
-        // Configuración y Métricas
         qrConfig: shareConfig.qrConfig || defaultShareConfig.qrConfig,
         totalViews: shareConfig.totalViews || 0,
         totalScans: shareConfig.totalScans || 0,
         totalShares: shareConfig.totalShares || 0,
-        
-        // Metadatos
         isActive: true,
         createdAt: shareConfig.createdAt || now,
         updatedAt: now,
