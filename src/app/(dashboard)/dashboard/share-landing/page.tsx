@@ -19,11 +19,11 @@ import {
 } from 'lucide-react';
 import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { doc, setDoc } from 'firebase/firestore';
-import type { MenuShare, QRConfig } from '@/models/share';
+import type { MenuShare } from '@/models/share';
 import { useToast } from '@/hooks/use-toast';
 import QRCode from "react-qr-code";
 import html2canvas from "html2canvas";
-import { WhatsAppIcon, TikTokIcon, XIcon, FacebookIcon } from '@/components/icons';
+import { WhatsAppIcon } from '@/components/icons';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { uploadMedia } from '@/ai/flows/upload-media-flow';
@@ -128,24 +128,33 @@ export default function ShareLandingPage() {
     if (isLoading || !user) return;
 
     if (savedShareConfig) {
-        if (!isSaving) {
+        // Corrección de condición de carrera: comparar marcas de tiempo (updatedAt)
+        const firestoreTime = new Date(savedShareConfig.updatedAt || 0).getTime();
+        const localTime = new Date(shareConfig?.updatedAt || 0).getTime();
+
+        if (!isSaving && (firestoreTime > localTime || !shareConfig)) {
             setShareConfig({
-                ...savedShareConfig,
                 id: savedShareConfig.id || 'main',
                 businessId: savedShareConfig.businessId || user.uid,
-                useCustomSlugLanding: !!savedShareConfig.useCustomSlugLanding,
+                slug: savedShareConfig.slug || user.uid,
                 slugLanding: savedShareConfig.slugLanding || user.uid,
+                useCustomSlug: !!savedShareConfig.useCustomSlug,
+                useCustomSlugLanding: !!savedShareConfig.useCustomSlugLanding,
+                socialPreviewImageUrl: savedShareConfig.socialPreviewImageUrl || null,
+                socialShareMessage: savedShareConfig.socialShareMessage || defaultShareConfig.socialShareMessage,
                 qrConfig: {
                     ...defaultShareConfig.qrConfig,
                     ...(savedShareConfig.qrConfig || {}),
                 },
-                socialShareMessage: savedShareConfig.socialShareMessage || defaultShareConfig.socialShareMessage,
+                totalViews: savedShareConfig.totalViews || 0,
+                totalScans: savedShareConfig.totalScans || 0,
+                totalShares: savedShareConfig.totalShares || 0,
                 isActive: savedShareConfig.isActive ?? true,
                 createdAt: savedShareConfig.createdAt || new Date().toISOString(),
                 updatedAt: savedShareConfig.updatedAt || new Date().toISOString(),
             });
         }
-    } else if (savedShareConfig === null) {
+    } else if (savedShareConfig === null && !shareConfig) {
       const newConfig: MenuShare = {
         id: 'main',
         businessId: user.uid,
@@ -157,7 +166,7 @@ export default function ShareLandingPage() {
       } as MenuShare;
       setShareConfig(newConfig);
     }
-  }, [savedShareConfig, isLoading, user, isSaving]);
+  }, [savedShareConfig, isLoading, user, isSaving, shareConfig?.updatedAt]);
 
   const handleLocalChange = (newValues: Partial<MenuShare>) => {
     setShareConfig(prev => prev ? { ...prev, ...newValues } : null);
@@ -168,12 +177,34 @@ export default function ShareLandingPage() {
     setIsSaving(true);
     try {
       const finalSlug = (shareConfig.slugLanding || user.uid).trim().toLowerCase().replace(/\s+/g, '-').replace(/^-+|-+$/g, '');
-      
-      const dataToSave = { 
-        ...shareConfig,
+      const now = new Date().toISOString();
+
+      // Construcción explícita del objeto para evitar pérdida de campos del catálogo
+      const dataToSave: MenuShare = {
+        // Identificadores
+        id: 'main',
+        businessId: user.uid,
+        
+        // Campos de Landing (gestionados en esta página)
         slugLanding: finalSlug,
-        isActive: true, 
-        updatedAt: new Date().toISOString() 
+        useCustomSlugLanding: !!shareConfig.useCustomSlugLanding,
+        socialShareMessage: shareConfig.socialShareMessage || defaultShareConfig.socialShareMessage,
+        socialPreviewImageUrl: shareConfig.socialPreviewImageUrl || null,
+        
+        // Campos de Catálogo (preservados explícitamente desde el estado local)
+        slug: shareConfig.slug || user.uid,
+        useCustomSlug: !!shareConfig.useCustomSlug,
+        
+        // Configuración y Métricas
+        qrConfig: shareConfig.qrConfig || defaultShareConfig.qrConfig,
+        totalViews: shareConfig.totalViews || 0,
+        totalScans: shareConfig.totalScans || 0,
+        totalShares: shareConfig.totalShares || 0,
+        
+        // Metadatos
+        isActive: true,
+        createdAt: shareConfig.createdAt || now,
+        updatedAt: now,
       };
       
       await setDoc(shareConfigRef, dataToSave, { merge: true });
