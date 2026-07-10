@@ -7,13 +7,15 @@ import { Save, Loader2, Info } from 'lucide-react';
 import type { LandingPageData } from '@/models/landing-page';
 import EditorLandingForm from '@/components/landing-page/editor-landing-form';
 import EditorLandingPreview from '@/components/landing-page/editor-landing-preview';
-import { useUser, useFirestore, useMemoFirebase, setDocumentNonBlocking, useCollection } from '@/firebase';
-import { doc, getDoc, collection } from 'firebase/firestore';
+import { useUser, useFirestore, useMemoFirebase, setDocumentNonBlocking, useDoc } from '@/firebase';
+import { doc, getDoc, collection, writeBatch } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { saveBusinessLanding } from '@/actions/save-business-landing';
 import type { SubscriptionPlan } from '@/models/subscription-plan';
 import { useSubscription } from '@/hooks/useSubscription';
 import { LimitBanner } from '@/components/dashboard/LimitBanner';
+import { CustomUrlSection } from '@/components/landing-page/CustomUrlSection';
+import type { MenuShare } from '@/models/share';
 
 const initialLandingData: LandingPageData = {
   hero: {
@@ -58,6 +60,43 @@ export default function LandingPageBuilder() {
 
   const docRef = useMemoFirebase(() => user ? doc(firestore, 'businesses', user.uid, 'landingPages', 'main') : null, [firestore, user]);
   
+  const shareConfigRef = useMemoFirebase(() => 
+    user ? doc(firestore, `businesses/${user.uid}/shareConfig`, 'main') : null,
+    [user, firestore]
+  );
+  const { data: savedShareConfig, isLoading: isShareLoading } = useDoc<MenuShare>(shareConfigRef);
+  const [shareConfig, setShareConfig] = useState<MenuShare | null>(null);
+
+  useEffect(() => {
+    if (savedShareConfig) {
+      setShareConfig(savedShareConfig);
+    } else if (savedShareConfig === null && user) {
+        // Inicialización por defecto si no existe el documento de URL personalizada
+        setShareConfig({
+            id: 'main',
+            businessId: user.uid,
+            slug: user.uid,
+            useCustomSlug: false,
+            socialPreviewImageUrl: null,
+            socialShareMessage: '¡Hola! Te invito a ver nuestro sitio ✨',
+            qrConfig: {
+                size: 256,
+                backgroundColor: "#ffffff",
+                foregroundColor: "#000000",
+                errorCorrectionLevel: 'L',
+                style: 'squares',
+                logoSize: 0.2,
+            },
+            totalViews: 0,
+            totalScans: 0,
+            totalShares: 0,
+            isActive: true,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+        } as MenuShare);
+    }
+  }, [savedShareConfig, user]);
+
   const plansQuery = useMemoFirebase(() => !firestore ? null : collection(firestore, 'plans'), [firestore]);
   const { data: plans, isLoading: loadingPlans } = useCollection<SubscriptionPlan>(plansQuery);
 
@@ -101,15 +140,39 @@ export default function LandingPageBuilder() {
 
 
   const handleSave = async () => {
-    if (!docRef || !data || !user?.uid) return;
+    if (!docRef || !data || !user?.uid || !firestore) return;
     setIsSaving(true);
     
     try {
-        await setDocumentNonBlocking(docRef, data, { merge: true });
+        const batch = writeBatch(firestore);
+        
+        // 1. Guardar contenido de la Landing
+        batch.set(docRef, data, { merge: true });
+
+        // 2. Guardar URL Personalizada si hay cambios (Aditivo)
+        if (shareConfig) {
+            const finalSlug = (shareConfig.slug || user.uid).trim().toLowerCase().replace(/\s+/g, '-').replace(/^-+|-+$/g, '');
+            const shareRef = doc(firestore, `businesses/${user.uid}/shareConfig`, 'main');
+            
+            const shareDataToSave = {
+                ...shareConfig,
+                slug: finalSlug,
+                updatedAt: new Date().toISOString()
+            };
+            batch.set(shareRef, shareDataToSave, { merge: true });
+
+            // Sincronizar el slug en publicData para consistencia en la resolución de rutas
+            const publicCatalogRef = doc(firestore, `businesses/${user.uid}/publicData`, 'catalog');
+            batch.set(publicCatalogRef, { slug: finalSlug }, { merge: true });
+        }
+
+        await batch.commit();
+
+        // 3. Revalidar caché de servidor
         const result = await saveBusinessLanding(user.uid);
         
         if (result.success) {
-            toast({ title: "Guardado y Publicado", description: "Tus cambios han sido guardados y la página pública ha sido actualizada." });
+            toast({ title: "Guardado y Publicado", description: "Tus cambios y la URL personalizada han sido actualizados." });
         } else {
             throw new Error(result.error || 'Los datos se guardaron, pero falló la actualización de la página pública.');
         }
@@ -124,7 +187,7 @@ export default function LandingPageBuilder() {
     }
   };
   
-  if (isFetching || loadingPlans || isSubscriptionLoading) {
+  if (isFetching || loadingPlans || isSubscriptionLoading || isShareLoading) {
     return (
       <div className="flex justify-center items-center h-full">
         <Loader2 className="h-10 w-10 animate-spin text-primary" />
@@ -143,6 +206,14 @@ export default function LandingPageBuilder() {
                 {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Save className="mr-2 h-4 w-4" />} Guardar Todo
             </Button>
         </Card>
+
+        {shareConfig && (
+            <CustomUrlSection 
+                shareConfig={shareConfig} 
+                setShareConfig={setShareConfig} 
+                businessId={user?.uid || ''} 
+            />
+        )}
 
         <Card>
             <CardContent className="pt-6">
