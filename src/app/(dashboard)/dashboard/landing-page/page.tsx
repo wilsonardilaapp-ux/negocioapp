@@ -7,7 +7,7 @@ import { Save, Loader2, Info } from 'lucide-react';
 import type { LandingPageData } from '@/models/landing-page';
 import EditorLandingForm from '@/components/landing-page/editor-landing-form';
 import EditorLandingPreview from '@/components/landing-page/editor-landing-preview';
-import { useUser, useFirestore, useMemoFirebase, setDocumentNonBlocking, useDoc } from '@/firebase';
+import { useUser, useFirestore, useMemoFirebase, useDoc } from '@/firebase';
 import { doc, getDoc, collection, writeBatch } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { saveBusinessLanding } from '@/actions/save-business-landing';
@@ -71,7 +71,6 @@ export default function LandingPageBuilder() {
     if (savedShareConfig) {
       setShareConfig(savedShareConfig);
     } else if (savedShareConfig === null && user) {
-        // Inicialización por defecto si no existe el documento de URL personalizada
         setShareConfig({
             id: 'main',
             businessId: user.uid,
@@ -149,7 +148,7 @@ export default function LandingPageBuilder() {
         // 1. Guardar contenido de la Landing
         batch.set(docRef, data, { merge: true });
 
-        // 2. Guardar URL Personalizada si hay cambios (Aditivo)
+        // 2. Guardar URL Personalizada
         if (shareConfig) {
             const finalSlug = (shareConfig.slug || user.uid).trim().toLowerCase().replace(/\s+/g, '-').replace(/^-+|-+$/g, '');
             const shareRef = doc(firestore, `businesses/${user.uid}/shareConfig`, 'main');
@@ -161,7 +160,7 @@ export default function LandingPageBuilder() {
             };
             batch.set(shareRef, shareDataToSave, { merge: true });
 
-            // Sincronizar el slug en publicData para consistencia en la resolución de rutas
+            // Sincronizar el slug en publicData para consistencia
             const publicCatalogRef = doc(firestore, `businesses/${user.uid}/publicData`, 'catalog');
             batch.set(publicCatalogRef, { slug: finalSlug }, { merge: true });
         }
@@ -174,7 +173,7 @@ export default function LandingPageBuilder() {
         if (result.success) {
             toast({ title: "Guardado y Publicado", description: "Tus cambios y la URL personalizada han sido actualizados." });
         } else {
-            throw new Error(result.error || 'Los datos se guardaron, pero falló la actualización de la página pública.');
+            throw new Error(result.error || 'Fallo la actualización de la página pública.');
         }
     } catch(error: any) {
         toast({

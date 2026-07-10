@@ -45,7 +45,7 @@ export function CustomUrlSection({ shareConfig, setShareConfig, businessId }: Cu
           URL Personalizada de tu Landing
         </CardTitle>
         <CardDescription>
-          Configura un alias fácil de recordar para tu marca.
+          Configura un alias fácil de recordar para tu marca. Este alias se comparte con tu catálogo.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -84,7 +84,7 @@ export function CustomUrlSection({ shareConfig, setShareConfig, businessId }: Cu
               </Button>
             </div>
             <p className="text-[10px] text-muted-foreground italic">
-              Este alias es global para el negocio y afectará también al Catálogo.
+              Este alias es global para el negocio y afectará también al enlace de tu Catálogo.
             </p>
           </div>
         )}
