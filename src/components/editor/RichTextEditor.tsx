@@ -1,20 +1,19 @@
 
 'use client';
 
-import React, { useMemo, useState, useEffect } from 'react';
-import dynamic from 'next/dynamic';
+import React, { useMemo, useState, useEffect, type ComponentType } from 'react';
 import { uploadMedia } from '@/ai/flows/upload-media-flow';
 import { useToast } from '@/hooks/use-toast';
 import 'react-quill/dist/quill.snow.css';
 
-// Importación dinámica robusta con manejo de carga
-const QuillEditor = dynamic(
-  () => import('react-quill'),
-  {
-    ssr: false,
-    loading: () => <div className="h-[200px] w-full animate-pulse rounded-md bg-muted" />,
-  }
-);
+// Definimos la interfaz para las props de ReactQuill para mantener el tipado estricto
+interface ReactQuillProps {
+  theme?: string;
+  value: string;
+  onChange: (value: string) => void;
+  modules?: any;
+  placeholder?: string;
+}
 
 interface RichTextEditorProps {
   value: string;
@@ -25,12 +24,28 @@ interface RichTextEditorProps {
 const RichTextEditor: React.FC<RichTextEditorProps> = ({ value, onChange, placeholder }) => {
   const { toast } = useToast();
   const [mounted, setMounted] = useState(false);
+  const [EditorComponent, setEditorComponent] = useState<ComponentType<ReactQuillProps> | null>(null);
 
-  // Asegurar que el componente solo se renderice en el cliente tras el montaje inicial
-  // Esto previene el ChunkLoadError al dar tiempo al cargador de Next.js a inicializarse
+  // Cargamos la librería de forma asíncrona solo en el cliente
   useEffect(() => {
     setMounted(true);
-  }, []);
+    
+    const loadQuill = async () => {
+      try {
+        const { default: Quill } = await import('react-quill');
+        setEditorComponent(() => Quill);
+      } catch (error) {
+        console.error('Error loading RichTextEditor:', error);
+        toast({
+          variant: 'destructive',
+          title: 'Error de carga',
+          description: 'No se pudo cargar el editor de texto. Por favor, refresca la página.',
+        });
+      }
+    };
+
+    loadQuill();
+  }, [toast]);
 
   const modules = useMemo(() => ({
     toolbar: {
@@ -59,7 +74,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({ value, onChange, placeh
           input.click();
 
           input.onchange = async () => {
-            if (!input.files) return;
+            if (!input.files || input.files.length === 0) return;
             const file = input.files[0];
             const MAX_FILE_SIZE_MB = 1;
             const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
@@ -104,13 +119,14 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({ value, onChange, placeh
     },
   }), [toast]);
 
-  if (!mounted) {
-    return <div className="h-[200px] w-full rounded-md bg-muted animate-pulse" />;
+  // Mientras no esté montado o el componente no esté cargado, mostramos el esqueleto de carga
+  if (!mounted || !EditorComponent) {
+    return <div className="h-[200px] w-full rounded-md bg-muted animate-pulse border border-input" />;
   }
 
   return (
-    <div className="rich-editor-wrapper text-foreground">
-      <QuillEditor
+    <div className="rich-editor-wrapper text-foreground min-h-[200px]">
+      <EditorComponent
         theme="snow"
         value={value}
         onChange={onChange}
