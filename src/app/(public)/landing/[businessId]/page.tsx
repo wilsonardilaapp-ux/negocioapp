@@ -49,8 +49,11 @@ function BusinessLandingContent() {
             setError(null);
             try {
                 // 1. Resolver slug a businessId usando el campo slugLanding
+                console.log("DEBUG slug recibido:", JSON.stringify(slug));
                 const shareConfigQuery = query(collectionGroup(firestore, 'shareConfig'), where('slugLanding', '==', slug), limit(1));
                 const querySnapshot = await getDocs(shareConfigQuery);
+                console.log("DEBUG resultados encontrados:", querySnapshot.docs.length);
+                
                 const customSlugDoc = querySnapshot.docs.find(doc => doc.data().useCustomSlugLanding === true);
                 
                 const businessId = customSlugDoc ? (customSlugDoc.ref.parent.parent?.id ?? slug) : slug;
