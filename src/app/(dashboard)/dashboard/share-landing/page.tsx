@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useRef, useMemo } from 'react';
@@ -151,8 +150,8 @@ export default function ShareLandingPage() {
         id: 'main',
         businessId: user.uid,
         ...defaultShareConfig,
-        slug: user.uid, // Mantiene el slug de catálogo por defecto
-        slugLanding: user.uid, // Usa el UID como slug inicial para landing
+        slug: user.uid,
+        slugLanding: user.uid,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       } as MenuShare;
@@ -177,7 +176,8 @@ export default function ShareLandingPage() {
         updatedAt: new Date().toISOString() 
       };
       
-      await setDoc(shareConfigRef, dataToSave);
+      // CAMBIO QUIRÚRGICO: Se añade { merge: true } para evitar borrar slug/useCustomSlug del Catálogo
+      await setDoc(shareConfigRef, dataToSave, { merge: true });
       
       toast({
         title: '¡Cambios Guardados!',
