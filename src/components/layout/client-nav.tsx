@@ -30,7 +30,7 @@ import {
   Bot,
   Star,
   Users,
-} from "lucide-center";
+} from "lucide-react";
 
 import { SidebarMenu, SidebarMenuItem, SidebarMenuButton, useSidebar } from "@/components/ui/sidebar";
 
