@@ -176,7 +176,6 @@ export default function ShareLandingPage() {
         updatedAt: new Date().toISOString() 
       };
       
-      // CAMBIO QUIRÚRGICO: Se añade { merge: true } para evitar borrar slug/useCustomSlug del Catálogo
       await setDoc(shareConfigRef, dataToSave, { merge: true });
       
       toast({
