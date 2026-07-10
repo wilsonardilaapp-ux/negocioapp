@@ -29,4 +29,8 @@ export interface MenuShare {
   useCustomSlug?: boolean;
   socialPreviewImageUrl?: string | null;
   socialShareMessage?: string;
+
+  // Fields for Landing Page alias
+  slugLanding?: string;
+  useCustomSlugLanding?: boolean;
 }

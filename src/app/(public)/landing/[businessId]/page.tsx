@@ -43,10 +43,10 @@ function BusinessLandingContent() {
             setIsLoading(true);
             setError(null);
             try {
-                // 1. Resolve slug to businessId
-                const shareConfigQuery = query(collectionGroup(firestore, 'shareConfig'), where('slug', '==', slug), limit(1));
+                // 1. Resolve slug to businessId using the new slugLanding field
+                const shareConfigQuery = query(collectionGroup(firestore, 'shareConfig'), where('slugLanding', '==', slug), limit(1));
                 const querySnapshot = await getDocs(shareConfigQuery);
-                const customSlugDoc = querySnapshot.docs.find(doc => doc.data().useCustomSlug === true);
+                const customSlugDoc = querySnapshot.docs.find(doc => doc.data().useCustomSlugLanding === true);
                 
                 const businessId = customSlugDoc ? (customSlugDoc.ref.parent.parent?.id ?? slug) : slug;
                 

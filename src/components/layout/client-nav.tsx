@@ -1,3 +1,4 @@
+
 "use client";
 
 import Link from "next/link";
@@ -36,6 +37,7 @@ import { SidebarMenu, SidebarMenuItem, SidebarMenuButton, useSidebar } from "@/c
 const allNavItems = [
   { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
   { href: "/dashboard/landing-page", icon: FileText, label: "Landing Page" },
+  { href: "/dashboard/share-landing", icon: Share2, label: "Compartir Landing Page" },
   { href: "/dashboard/catalogo", icon: ShoppingCart, label: "Catálogo", moduleId: 'catalogo' },
   { href: "/dashboard/catalogo/estadisticas", icon: BarChart, label: "Estadísticas de Productos", moduleId: 'catalogo' },
   { href: "/dashboard/share", icon: Share2, label: "Compartir Menú", moduleId: 'catalogo' },
