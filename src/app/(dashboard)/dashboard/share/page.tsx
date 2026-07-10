@@ -5,7 +5,6 @@ import { Card, CardHeader, CardContent, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   QrCode,
   Link2,
@@ -165,35 +164,45 @@ export default function SharePage() {
     if (isLoading || !user) return;
 
     if (savedShareConfig) {
-        if (!isSaving) {
+        // Corrección de condición de carrera: comparar marcas de tiempo (updatedAt)
+        const firestoreTime = new Date(savedShareConfig.updatedAt || 0).getTime();
+        const localTime = new Date(shareConfig?.updatedAt || 0).getTime();
+
+        if (!isSaving && (firestoreTime > localTime || !shareConfig)) {
             setShareConfig({
-                ...savedShareConfig,
                 id: savedShareConfig.id || 'main',
                 businessId: savedShareConfig.businessId || user.uid,
-                useCustomSlug: !!savedShareConfig.useCustomSlug,
                 slug: savedShareConfig.slug || user.uid,
+                slugLanding: savedShareConfig.slugLanding || user.uid,
+                useCustomSlug: !!savedShareConfig.useCustomSlug,
+                useCustomSlugLanding: !!savedShareConfig.useCustomSlugLanding,
+                socialPreviewImageUrl: savedShareConfig.socialPreviewImageUrl || null,
+                socialShareMessage: savedShareConfig.socialShareMessage || defaultShareConfig.socialShareMessage,
                 qrConfig: {
                     ...defaultShareConfig.qrConfig,
                     ...(savedShareConfig.qrConfig || {}),
                 },
-                socialShareMessage: savedShareConfig.socialShareMessage || defaultShareConfig.socialShareMessage,
+                totalViews: savedShareConfig.totalViews || 0,
+                totalScans: savedShareConfig.totalScans || 0,
+                totalShares: savedShareConfig.totalShares || 0,
                 isActive: savedShareConfig.isActive ?? true,
                 createdAt: savedShareConfig.createdAt || new Date().toISOString(),
                 updatedAt: savedShareConfig.updatedAt || new Date().toISOString(),
             });
         }
-    } else if (savedShareConfig === null) {
+    } else if (savedShareConfig === null && !shareConfig) {
       const newConfig: MenuShare = {
         id: 'main',
         businessId: user.uid,
         ...defaultShareConfig,
         slug: user.uid,
+        slugLanding: user.uid,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-      };
+      } as MenuShare;
       setShareConfig(newConfig);
     }
-  }, [savedShareConfig, isLoading, user, isSaving]);
+  }, [savedShareConfig, isLoading, user, isSaving, shareConfig?.updatedAt]);
 
   const handleLocalChange = (newValues: Partial<MenuShare>) => {
     setShareConfig(prev => prev ? { ...prev, ...newValues } : null);
@@ -204,15 +213,39 @@ export default function SharePage() {
     setIsSaving(true);
     try {
       const finalSlug = shareConfig.slug.trim().toLowerCase().replace(/\s+/g, '-').replace(/^-+|-+$/g, '');
-      
-      const dataToSave = { 
-        ...shareConfig,
+      const now = new Date().toISOString();
+
+      // Construcción explícita del objeto para evitar pérdida de campos de la landing page
+      const dataToSave: MenuShare = {
+        // Identificadores
+        id: 'main',
+        businessId: user.uid,
+        
+        // Campos de Catálogo (gestionados en esta página)
         slug: finalSlug,
-        isActive: true, 
-        updatedAt: new Date().toISOString() 
+        useCustomSlug: !!shareConfig.useCustomSlug,
+        
+        // Campos de Landing (preservados explícitamente desde el estado local)
+        slugLanding: shareConfig.slugLanding || user.uid,
+        useCustomSlugLanding: !!shareConfig.useCustomSlugLanding,
+        
+        // Configuración común
+        socialShareMessage: shareConfig.socialShareMessage || defaultShareConfig.socialShareMessage,
+        socialPreviewImageUrl: shareConfig.socialPreviewImageUrl || null,
+        qrConfig: shareConfig.qrConfig || defaultShareConfig.qrConfig,
+        
+        // Métricas
+        totalViews: shareConfig.totalViews || 0,
+        totalScans: shareConfig.totalScans || 0,
+        totalShares: shareConfig.totalShares || 0,
+        
+        // Metadatos
+        isActive: true,
+        createdAt: shareConfig.createdAt || now,
+        updatedAt: now,
       };
       
-      await setDoc(shareConfigRef, dataToSave);
+      await setDoc(shareConfigRef, dataToSave, { merge: true });
 
       const publicCatalogRef = doc(firestore, `businesses/${user.uid}/publicData`, 'catalog');
       const publicCatalogSnap = await getDoc(publicCatalogRef);
