@@ -172,31 +172,33 @@ export default function ShareLandingPage() {
   };
   
   const handleManualSave = async () => {
-    console.log("DEBUG - User UID:", user?.uid);
     if (!shareConfig || !shareConfigRef || !firestore || !user) return;
     setIsSaving(true);
     try {
       const finalSlug = (shareConfig.slugLanding || user.uid).trim().toLowerCase().replace(/\s+/g, '-').replace(/^-+|-+$/g, '');
       const now = new Date().toISOString();
 
-      const dataToSave: MenuShare = {
+      // ATOMICIDAD: Solo enviamos campos de LANDING y Comunes.
+      // Nunca incluimos slug ni useCustomSlug para evitar sobrescribirlos con datos locales viejos.
+      const dataToSave = {
         id: 'main',
         businessId: user.uid,
+        
+        // Campos específicos de Landing (Autoridad de esta página)
         slugLanding: finalSlug,
         useCustomSlugLanding: !!shareConfig.useCustomSlugLanding,
+        
+        // Campos comunes
         socialShareMessage: shareConfig.socialShareMessage || defaultShareConfig.socialShareMessage,
         socialPreviewImageUrl: shareConfig.socialPreviewImageUrl || null,
-        slug: shareConfig.slug || user.uid,
-        useCustomSlug: !!shareConfig.useCustomSlug,
         qrConfig: shareConfig.qrConfig || defaultShareConfig.qrConfig,
-        totalViews: shareConfig.totalViews || 0,
-        totalScans: shareConfig.totalScans || 0,
-        totalShares: shareConfig.totalShares || 0,
+        
+        // Metadatos
         isActive: true,
-        createdAt: shareConfig.createdAt || now,
         updatedAt: now,
       };
       
+      // El merge: true preservará slug y useCustomSlug que existan en Firestore
       await setDoc(shareConfigRef, dataToSave, { merge: true });
       
       toast({

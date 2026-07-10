@@ -164,7 +164,6 @@ export default function SharePage() {
     if (isLoading || !user) return;
 
     if (savedShareConfig) {
-        // Corrección de condición de carrera: comparar marcas de tiempo (updatedAt)
         const firestoreTime = new Date(savedShareConfig.updatedAt || 0).getTime();
         const localTime = new Date(shareConfig?.updatedAt || 0).getTime();
 
@@ -215,36 +214,27 @@ export default function SharePage() {
       const finalSlug = shareConfig.slug.trim().toLowerCase().replace(/\s+/g, '-').replace(/^-+|-+$/g, '');
       const now = new Date().toISOString();
 
-      // Construcción explícita del objeto para evitar pérdida de campos de la landing page
-      const dataToSave: MenuShare = {
-        // Identificadores
+      // ATOMICIDAD: Solo enviamos campos de CATÁLOGO y Comunes.
+      // Nunca incluimos slugLanding ni useCustomSlugLanding para evitar sobrescribirlos con datos locales viejos.
+      const dataToSave = {
         id: 'main',
         businessId: user.uid,
         
-        // Campos de Catálogo (gestionados en esta página)
+        // Campos específicos de Catálogo (Autoridad de esta página)
         slug: finalSlug,
         useCustomSlug: !!shareConfig.useCustomSlug,
         
-        // Campos de Landing (preservados explícitamente desde el estado local)
-        slugLanding: shareConfig.slugLanding || user.uid,
-        useCustomSlugLanding: !!shareConfig.useCustomSlugLanding,
-        
-        // Configuración común
+        // Campos comunes
         socialShareMessage: shareConfig.socialShareMessage || defaultShareConfig.socialShareMessage,
         socialPreviewImageUrl: shareConfig.socialPreviewImageUrl || null,
         qrConfig: shareConfig.qrConfig || defaultShareConfig.qrConfig,
         
-        // Métricas
-        totalViews: shareConfig.totalViews || 0,
-        totalScans: shareConfig.totalScans || 0,
-        totalShares: shareConfig.totalShares || 0,
-        
         // Metadatos
         isActive: true,
-        createdAt: shareConfig.createdAt || now,
         updatedAt: now,
       };
       
+      // El merge: true preservará slugLanding y useCustomSlugLanding que existan en Firestore
       await setDoc(shareConfigRef, dataToSave, { merge: true });
 
       const publicCatalogRef = doc(firestore, `businesses/${user.uid}/publicData`, 'catalog');
@@ -255,7 +245,7 @@ export default function SharePage() {
       
       toast({
         title: '¡Cambios Guardados!',
-        description: 'La configuración de tu enlace ha sido actualizada.',
+        description: 'La configuración de tu enlace de Catálogo ha sido actualizada.',
       });
     } catch (error: any) {
       console.error("Error al guardar:", error);
