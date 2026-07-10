@@ -29,7 +29,8 @@ interface CatalogPageProps {
 }
 
 function CatalogPageContent({ params }: CatalogPageProps) {
-    const slug = params.businessId;
+    // Decodificar el slug para manejar caracteres como tildes o emojis que llegan codificados por la URL
+    const slug = decodeURIComponent(params.businessId);
     const { firestore, isNetworkEnabled } = useFirebase();
     const { toast } = useToast();
 

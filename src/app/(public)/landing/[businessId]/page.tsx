@@ -16,7 +16,8 @@ import type { HybridPlan } from '@/models/hybrid-plan';
 
 function BusinessLandingContent() {
     const params = useParams();
-    const slug = params.businessId as string;
+    // Decodificar el slug para manejar caracteres como tildes o emojis que llegan codificados por la URL
+    const slug = decodeURIComponent(params.businessId as string);
     const { firestore, isNetworkEnabled } = useFirebase();
 
     const [isLoading, setIsLoading] = useState(true);
@@ -49,10 +50,8 @@ function BusinessLandingContent() {
             setError(null);
             try {
                 // 1. Resolver slug a businessId usando el campo slugLanding
-                console.log("DEBUG slug recibido:", JSON.stringify(slug));
                 const shareConfigQuery = query(collectionGroup(firestore, 'shareConfig'), where('slugLanding', '==', slug), limit(1));
                 const querySnapshot = await getDocs(shareConfigQuery);
-                console.log("DEBUG resultados encontrados:", querySnapshot.docs.length);
                 
                 const customSlugDoc = querySnapshot.docs.find(doc => doc.data().useCustomSlugLanding === true);
                 
