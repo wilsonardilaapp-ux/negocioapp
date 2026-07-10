@@ -121,7 +121,7 @@ export default function HybridPlansPage() {
       ) : (
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {plans?.map(plan => (
-            <Card key={doc.id} className="flex flex-col">
+            <Card key={plan.id} className="flex flex-col">
               <CardHeader>
                 <div className="flex justify-between items-start">
                   <CardTitle>{plan.name}</CardTitle>
