@@ -10,7 +10,8 @@ export const dynamic = 'force-dynamic';
 export async function GET() {
   try {
     const db = await getAdminFirestore();
-    const businessId = 'TPV0qjSyoINCYA3ScBfz2HXDSlM2';
+    // UID del usuario activo detectado en consola
+    const businessId = '5vbHBuJHb9Uklh2OoOl8kin7iZA2';
     
     // 1. Verificar shareConfig (Donde reside el alias)
     const shareRef = db.doc(`businesses/${businessId}/shareConfig/main`);
