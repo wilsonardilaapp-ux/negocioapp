@@ -20,7 +20,10 @@ const printerSchema = z.object({
   type: z.enum(['thermal', 'inkjet', 'laser']),
   connection: z.enum(['usb', 'network', 'bluetooth', 'wifi']),
   ipAddress: z.string().optional(),
-  port: z.preprocess(val => Number(val) || undefined, z.number().optional()),
+  port: z.preprocess(val => {
+    const num = Number(val);
+    return isNaN(num) ? undefined : num;
+  }, z.number().optional()),
   paperWidth: z.preprocess(val => Number(val), z.union([z.literal(58), z.literal(80)])),
   isDefault: z.boolean(),
 });
@@ -58,16 +61,22 @@ export default function PrinterForm({ existingPrinter, onClose }: PrinterFormPro
         const printerId = existingPrinter?.id || doc(collection(firestore, `businesses/${user.uid}/printers`)).id;
         const printerDocRef = doc(firestore, `businesses/${user.uid}/printers`, printerId);
         
-        const printerToSave: Partial<Printer> = {
+        // Build object avoiding undefined values which crash Firestore
+        const printerToSave: any = {
             name: data.name,
             type: data.type,
             connection: data.connection,
             paperWidth: data.paperWidth,
             isDefault: data.isDefault,
-            status: 'offline', // Default status
-            lastUsed: existingPrinter?.lastUsed,
+            status: existingPrinter?.status || 'offline',
         };
 
+        // Handle optional lastUsed field safely
+        if (existingPrinter?.lastUsed) {
+            printerToSave.lastUsed = existingPrinter.lastUsed;
+        }
+
+        // Add connection specific fields avoiding undefined
         if (data.connection === 'network') {
             printerToSave.ipAddress = data.ipAddress || '';
             printerToSave.port = data.port || 9100;
