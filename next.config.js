@@ -8,7 +8,15 @@ const nextConfig = {
         'embla-carousel-react', 
         'embla-carousel-autoplay',
         'react-quill',
-        'quill'
+        'quill',
+        'firebase',
+        '@firebase/app',
+        '@firebase/auth',
+        '@firebase/component',
+        '@firebase/firestore',
+        '@firebase/functions',
+        '@firebase/storage',
+        '@firebase/util'
     ],
     experimental: {
         serverComponentsExternalPackages: [
