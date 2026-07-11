@@ -88,7 +88,7 @@ const SocialPreviewImageUploader = ({ imageUrl, onUpload, onRemove }: {
                      <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                 ) : imageUrl ? (
                     <>
-                        <NextImage src={imageUrl} alt="Vista previa" layout="fill" className="object-contain rounded-md" />
+                        <NextImage src={imageUrl} alt="Vista previa" fill sizes="100vw" className="object-contain rounded-md" />
                         <div className="absolute top-2 right-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                             <Button variant="outline" size="icon" onClick={() => fileInputRef.current?.click()}><Pencil className="h-4 w-4" /></Button>
                             <Button variant="destructive" size="icon" className="h-7 w-7" onClick={onRemove}><Trash2 className="h-4 w-4" /></Button>
@@ -129,9 +129,11 @@ export default function ShareLandingPage() {
 
     if (savedShareConfig) {
         const firestoreTime = new Date(savedShareConfig.updatedAt || 0).getTime();
-        const localTime = new Date(shareConfig?.updatedAt || 0).getTime();
+        const localTime = shareConfig?.updatedAt ? new Date(shareConfig.updatedAt).getTime() : 0;
 
-        if (!isSaving && (firestoreTime > localTime || !shareConfig)) {
+        // Hidratación: siempre cargamos si es el primer montaje (!shareConfig) 
+        // o si el dato remoto es estrictamente más reciente.
+        if (!isSaving && (!shareConfig || firestoreTime > localTime)) {
             setShareConfig({
                 id: savedShareConfig.id || 'main',
                 businessId: savedShareConfig.businessId || user.uid,
@@ -178,8 +180,8 @@ export default function ShareLandingPage() {
       const finalSlug = (shareConfig.slugLanding || user.uid).trim().toLowerCase().replace(/\s+/g, '-').replace(/^-+|-+$/g, '');
       const now = new Date().toISOString();
 
-      // ATOMICIDAD: Solo enviamos campos de LANDING y Comunes.
-      // Nunca incluimos slug ni useCustomSlug para evitar sobrescribirlos con datos locales viejos.
+      // AUTORIDAD ATÓMICA: Solo escribimos campos de LANDING y Comunes.
+      // Jamás incluimos slug ni useCustomSlug para proteger los datos de la otra página.
       const dataToSave = {
         id: 'main',
         businessId: user.uid,
@@ -188,7 +190,7 @@ export default function ShareLandingPage() {
         slugLanding: finalSlug,
         useCustomSlugLanding: !!shareConfig.useCustomSlugLanding,
         
-        // Campos comunes
+        // Campos comunes (Social & QR)
         socialShareMessage: shareConfig.socialShareMessage || defaultShareConfig.socialShareMessage,
         socialPreviewImageUrl: shareConfig.socialPreviewImageUrl || null,
         qrConfig: shareConfig.qrConfig || defaultShareConfig.qrConfig,
@@ -198,8 +200,10 @@ export default function ShareLandingPage() {
         updatedAt: now,
       };
       
-      // El merge: true preservará slug y useCustomSlug que existan en Firestore
       await setDoc(shareConfigRef, dataToSave, { merge: true });
+
+      // Sincronizar timestamp local para evitar sobreescritura del listener
+      handleLocalChange({ updatedAt: now });
       
       toast({
         title: '¡Cambios Guardados!',
