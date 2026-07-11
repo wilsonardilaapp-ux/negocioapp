@@ -165,9 +165,9 @@ export default function SharePage() {
 
     if (savedShareConfig) {
         const firestoreTime = new Date(savedShareConfig.updatedAt || 0).getTime();
-        const localTime = new Date(shareConfig?.updatedAt || 0).getTime();
+        const localTime = shareConfig?.updatedAt ? new Date(shareConfig.updatedAt).getTime() : 0;
 
-        // FIX: Se usa !== en lugar de > para permitir que Firestore sobreescriba la inicialización local "nueva"
+        // Hidratación robusta: se activa si no hay estado local o si el tiempo es distinto (evita bucle pero resuelve inicialización)
         if (!isSaving && (!shareConfig || firestoreTime !== localTime)) {
             setShareConfig({
                 id: savedShareConfig.id || 'main',
@@ -236,7 +236,6 @@ export default function SharePage() {
       
       await setDoc(shareConfigRef, dataToSave, { merge: true });
 
-      // Sincronizar timestamp local para evitar sobreescritura del listener
       handleLocalChange({ updatedAt: now });
 
       const publicCatalogRef = doc(firestore, `businesses/${user.uid}/publicData`, 'catalog');
