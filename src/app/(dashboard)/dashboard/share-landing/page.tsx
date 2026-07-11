@@ -131,9 +131,8 @@ export default function ShareLandingPage() {
         const firestoreTime = new Date(savedShareConfig.updatedAt || 0).getTime();
         const localTime = new Date(shareConfig?.updatedAt || 0).getTime();
 
-        console.log("DEBUG hidratación:", { savedShareConfig, shareConfig, firestoreTime, localTime, isSaving });
-
-        if (!isSaving && (!shareConfig || firestoreTime > localTime)) {
+        // FIX: Se usa !== en lugar de > para permitir que Firestore sobreescriba la inicialización local "nueva"
+        if (!isSaving && (!shareConfig || firestoreTime !== localTime)) {
             setShareConfig({
                 id: savedShareConfig.id || 'main',
                 businessId: savedShareConfig.businessId || user.uid,
@@ -180,6 +179,7 @@ export default function ShareLandingPage() {
       const finalSlug = (shareConfig.slugLanding || user.uid).trim().toLowerCase().replace(/\s+/g, '-').replace(/^-+|-+$/g, '');
       const now = new Date().toISOString();
 
+      // AUTORIDAD ATÓMICA: Solo escribimos campos de la Landing y Comunes.
       const dataToSave = {
         id: 'main',
         businessId: user.uid,

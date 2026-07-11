@@ -165,11 +165,10 @@ export default function SharePage() {
 
     if (savedShareConfig) {
         const firestoreTime = new Date(savedShareConfig.updatedAt || 0).getTime();
-        const localTime = shareConfig?.updatedAt ? new Date(shareConfig.updatedAt).getTime() : 0;
+        const localTime = new Date(shareConfig?.updatedAt || 0).getTime();
 
-        // Hidratación: siempre cargamos si es el primer montaje (!shareConfig) 
-        // o si el dato remoto es estrictamente más reciente.
-        if (!isSaving && (!shareConfig || firestoreTime > localTime)) {
+        // FIX: Se usa !== en lugar de > para permitir que Firestore sobreescriba la inicialización local "nueva"
+        if (!isSaving && (!shareConfig || firestoreTime !== localTime)) {
             setShareConfig({
                 id: savedShareConfig.id || 'main',
                 businessId: savedShareConfig.businessId || user.uid,
@@ -217,7 +216,6 @@ export default function SharePage() {
       const now = new Date().toISOString();
 
       // AUTORIDAD ATÓMICA: Solo escribimos campos del Catálogo y Comunes.
-      // Jamás incluimos slugLanding ni useCustomSlugLanding para proteger los datos de la otra página.
       const dataToSave = {
         id: 'main',
         businessId: user.uid,
