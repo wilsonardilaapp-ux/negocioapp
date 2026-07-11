@@ -1,6 +1,6 @@
 import { getAdminFirestore } from "@/firebase/server-init";
-import FaviconInjector from "@/components/layout/FaviconInjector";
 import { Metadata } from "next";
+import { buildFaviconUrl } from "@/lib/favicon-url";
 
 type Props = {
   params: { businessId: string };
@@ -43,17 +43,16 @@ export async function generateMetadata({ params }: { params: { businessId: strin
   return {
     title: business.name ? `Catálogo - ${business.name}` : "Catálogo Digital",
     description: business.description || "Consulta nuestros productos disponibles.",
+    icons: {
+      icon: [{ url: buildFaviconUrl(business, 32), type: "image/png", sizes: "32x32" }],
+      apple: [{ url: buildFaviconUrl(business, 180), type: "image/png", sizes: "180x180" }],
+    },
   };
 }
 
-export default async function CatalogLayout({ children, params }: Props) {
-  const business = await getBusinessData(params.businessId);
-  const faviconUrl = business?.faviconUrl || business?.logoURL || null;
-  const title = business?.name ? `Catálogo - ${business.name}` : "Catálogo Digital";
-
+export default async function CatalogLayout({ children }: Props) {
   return (
     <>
-      <FaviconInjector faviconUrl={faviconUrl} title={title} />
       {children}
     </>
   );

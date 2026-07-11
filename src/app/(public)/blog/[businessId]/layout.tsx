@@ -1,6 +1,6 @@
 import { getAdminFirestore } from "@/firebase/server-init";
-import FaviconInjector from "@/components/layout/FaviconInjector";
 import { Metadata } from "next";
+import { buildFaviconUrl } from "@/lib/favicon-url";
 
 type Props = {
   params: { businessId: string };
@@ -40,17 +40,16 @@ export async function generateMetadata({ params }: { params: { businessId: strin
   return {
     title: business.name ? `Blog - ${business.name}` : "Blog",
     description: "Lee nuestras últimas noticias y artículos.",
+    icons: {
+      icon: [{ url: buildFaviconUrl(business, 32), type: "image/png", sizes: "32x32" }],
+      apple: [{ url: buildFaviconUrl(business, 180), type: "image/png", sizes: "180x180" }],
+    },
   };
 }
 
-export default async function BlogLayout({ children, params }: Props) {
-  const business = await getBusinessData(params.businessId);
-  const faviconUrl = business?.faviconUrl || business?.logoURL || null;
-  const title = business?.name ? `Blog - ${business.name}` : "Blog";
-
+export default async function BlogLayout({ children }: Props) {
   return (
     <>
-      <FaviconInjector faviconUrl={faviconUrl} title={title} />
       {children}
     </>
   );

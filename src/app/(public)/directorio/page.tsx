@@ -10,7 +10,6 @@ import { Button } from '@/components/ui/button';
 import { Filter, LayoutGrid } from 'lucide-react';
 import Link from 'next/link';
 import type { Metadata } from 'next';
-import FaviconInjector from '@/components/layout/FaviconInjector';
 import SearchBar from './SearchBar';
 import { getLandingData } from '@/lib/get-landing-data';
 import {
@@ -85,10 +84,9 @@ export default async function DirectoryPage({
 }) {
     const query = searchParams.q?.toLowerCase().trim() || '';
 
-    const [allBusinesses, dynamicCategories, faviconUrl, landingData] = await Promise.all([
+    const [allBusinesses, dynamicCategories, landingData] = await Promise.all([
         getDirectoryBusinesses(),
         getCategories(),
-        getGlobalFavicon(),
         getLandingData()
     ]);
 
@@ -102,7 +100,6 @@ export default async function DirectoryPage({
 
     return (
         <div className="min-h-screen bg-gray-50/30 flex flex-col">
-            <FaviconInjector faviconUrl={faviconUrl} title="Directorio de Negocios | Markix" />
             <Header businessId={null} navigation={landingData?.navigation || null} />
             
             <main className="flex-grow">

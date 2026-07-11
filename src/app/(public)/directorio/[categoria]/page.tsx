@@ -10,7 +10,6 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import { cn } from "@/lib/utils";
-import FaviconInjector from '@/components/layout/FaviconInjector';
 import { getLandingData } from '@/lib/get-landing-data';
 import SearchBar from "../SearchBar";
 import {
@@ -110,16 +109,6 @@ async function getEntriesByCategory(categoryParam: string, subcategoryParam?: st
     }
 }
 
-async function getGlobalFavicon() {
-    try {
-        const db = await getAdminFirestore();
-        const snap = await db.collection("globalConfig").doc("system").get();
-        return snap.exists ? snap.data()?.faviconUrl : null;
-    } catch {
-        return null;
-    }
-}
-
 export async function generateMetadata({ params, searchParams }: { params: { categoria: string }, searchParams: { sub?: string } }): Promise<Metadata> {
     const data = await getEntriesByCategory(params.categoria, searchParams?.sub);
     if (!data) return { title: 'Categoría no encontrada' };
@@ -135,9 +124,8 @@ export default async function CategoryPage({ params, searchParams }: { params: {
     // Asegurar que searchParams no sea null
     const safeSearchParams = searchParams || {};
     
-    const [data, faviconUrl, landingData] = await Promise.all([
+    const [data, landingData] = await Promise.all([
         getEntriesByCategory(params.categoria, safeSearchParams.sub),
-        getGlobalFavicon(),
         getLandingData()
     ]);
 
@@ -145,11 +133,8 @@ export default async function CategoryPage({ params, searchParams }: { params: {
         notFound();
     }
 
-    const pageTitle = safeSearchParams.sub ? `${data.category} - ${safeSearchParams.sub} | Zentry` : `${data.category} | Zentry`;
-
     return (
         <div className="min-h-screen bg-gray-50/30 flex flex-col">
-            <FaviconInjector faviconUrl={faviconUrl} title={pageTitle} />
             <Header businessId={null} navigation={landingData?.navigation || null} />
             
             <main className="flex-grow container mx-auto px-4 py-12">

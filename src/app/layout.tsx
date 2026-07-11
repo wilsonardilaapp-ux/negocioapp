@@ -1,4 +1,3 @@
-
 import type { Metadata } from 'next';
 import { PT_Sans } from 'next/font/google';
 import './globals.css';
@@ -11,6 +10,7 @@ const ptSans = PT_Sans({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'https://markix-saas.vercel.app'),
   title: 'Markix Platform',
   description: 'Centraliza y automatiza tu negocio con Markix.',
   icons: {
