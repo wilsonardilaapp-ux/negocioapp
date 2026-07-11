@@ -1,4 +1,3 @@
-
 import LandingPageContent from '@/components/landing-page/landing-page-content';
 import type { LandingPageData } from '@/models/landing-page';
 import { getAdminFirestore } from "@/firebase/server-init";
