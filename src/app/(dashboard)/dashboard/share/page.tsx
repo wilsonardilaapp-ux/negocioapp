@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
-  QrCode,
   Link2,
   Share2,
   Download,
@@ -17,7 +16,6 @@ import {
   Trash2,
   Save,
   Loader2,
-  ExternalLink,
 } from 'lucide-react';
 import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
@@ -54,41 +52,6 @@ const defaultShareConfig: Omit<MenuShare, 'id' | 'businessId' | 'createdAt' | 'u
   isActive: true,
 };
 
-const QRCodeCustomizer = ({ config, setConfig }: { config: QRConfig, setConfig: (newConfig: QRConfig) => void }) => {
-    return (
-        <Card>
-            <CardHeader>
-                <CardTitle>Personalizar QR</CardTitle>
-                <CardDescription>Ajusta la apariencia de tu código QR.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                    <div>
-                        <Label htmlFor="qr-fg-color">Color Principal</Label>
-                        <Input id="qr-fg-color" type="color" value={config.foregroundColor} onChange={(e) => setConfig({ ...config, foregroundColor: e.target.value })} />
-                    </div>
-                    <div>
-                        <Label htmlFor="qr-bg-color">Color de Fondo</Label>
-                        <Input id="qr-bg-color" type="color" value={config.backgroundColor} onChange={(e) => setConfig({ ...config, backgroundColor: e.target.value })} />
-                    </div>
-                </div>
-                 <div>
-                    <Label>Nivel de Corrección</Label>
-                     <Select onValueChange={(v: 'L'|'M'|'Q'|'H') => setConfig({...config, errorCorrectionLevel: v})} defaultValue={config.errorCorrectionLevel}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="L">Bajo (L)</SelectItem>
-                            <SelectItem value="M">Medio (M)</SelectItem>
-                            <SelectItem value="Q">Alto (Q)</SelectItem>
-                            <SelectItem value="H">Máximo (H)</SelectItem>
-                        </SelectContent>
-                    </Select>
-                </div>
-            </CardContent>
-        </Card>
-    );
-};
-
 const SocialPreviewImageUploader = ({ imageUrl, onUpload, onRemove }: {
     imageUrl: string | null | undefined;
     onUpload: (file: File) => void;
@@ -103,11 +66,7 @@ const SocialPreviewImageUploader = ({ imageUrl, onUpload, onRemove }: {
         if (!file) return;
 
         if (file.size > 5 * 1024 * 1024) {
-            toast({
-                variant: "destructive",
-                title: "Archivo muy grande",
-                description: "El tamaño máximo es de 5MB.",
-            });
+            toast({ variant: "destructive", title: "Archivo muy grande", description: "El tamaño máximo es de 5MB." });
             return;
         }
 
@@ -147,7 +106,6 @@ export default function SharePage() {
   const { user } = useUser();
   const firestore = useFirestore();
   const { toast } = useToast();
-  
   const [shareConfig, setShareConfig] = useState<MenuShare | null>(null);
   const [copied, setCopied] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -157,17 +115,13 @@ export default function SharePage() {
     user ? doc(firestore, `businesses/${user.uid}/shareConfig`, 'main') : null,
     [user, firestore]
   );
-  
   const { data: savedShareConfig, isLoading } = useDoc<MenuShare>(shareConfigRef);
   
   useEffect(() => {
     if (isLoading || !user) return;
-
     if (savedShareConfig) {
         const firestoreTime = new Date(savedShareConfig.updatedAt || 0).getTime();
         const localTime = new Date(shareConfig?.updatedAt || 0).getTime();
-
-        // FIX: Se usa !== en lugar de > para permitir que Firestore sobreescriba la inicialización local "nueva"
         if (!isSaving && (!shareConfig || firestoreTime !== localTime)) {
             setShareConfig({
                 id: savedShareConfig.id || 'main',
@@ -178,10 +132,7 @@ export default function SharePage() {
                 useCustomSlugLanding: !!savedShareConfig.useCustomSlugLanding,
                 socialPreviewImageUrl: savedShareConfig.socialPreviewImageUrl || null,
                 socialShareMessage: savedShareConfig.socialShareMessage || defaultShareConfig.socialShareMessage,
-                qrConfig: {
-                    ...defaultShareConfig.qrConfig,
-                    ...(savedShareConfig.qrConfig || {}),
-                },
+                qrConfig: { ...defaultShareConfig.qrConfig, ...(savedShareConfig.qrConfig || {}) },
                 totalViews: savedShareConfig.totalViews || 0,
                 totalScans: savedShareConfig.totalScans || 0,
                 totalShares: savedShareConfig.totalShares || 0,
@@ -191,74 +142,43 @@ export default function SharePage() {
             });
         }
     } else if (savedShareConfig === null && !shareConfig) {
-      const newConfig: MenuShare = {
-        id: 'main',
-        businessId: user.uid,
-        ...defaultShareConfig,
-        slug: user.uid,
-        slugLanding: user.uid,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      } as MenuShare;
-      setShareConfig(newConfig);
+      setShareConfig({ id: 'main', businessId: user.uid, ...defaultShareConfig, slug: user.uid, slugLanding: user.uid, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() } as MenuShare);
     }
   }, [savedShareConfig, isLoading, user, isSaving, shareConfig?.updatedAt]);
 
-  const handleLocalChange = (newValues: Partial<MenuShare>) => {
-    setShareConfig(prev => prev ? { ...prev, ...newValues } : null);
-  };
+  const handleLocalChange = (newValues: Partial<MenuShare>) => setShareConfig(prev => prev ? { ...prev, ...newValues } : null);
   
+  const handleSocialImageUpload = async (file: File) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onloadend = async () => {
+        const mediaDataUri = reader.result as string;
+        try {
+            const result = await uploadMedia({ mediaDataUri });
+            handleLocalChange({ socialPreviewImageUrl: result.secure_url });
+            toast({ title: "Imagen subida" });
+        } catch (error: any) {
+            toast({ variant: 'destructive', title: "Error", description: error.message });
+        }
+    };
+  };
+
   const handleManualSave = async () => {
     if (!shareConfig || !shareConfigRef || !firestore || !user) return;
     setIsSaving(true);
     try {
       const finalSlug = shareConfig.slug.trim().toLowerCase().replace(/\s+/g, '-').replace(/^-+|-+$/g, '');
       const now = new Date().toISOString();
-
-      // AUTORIDAD ATÓMICA: Solo escribimos campos del Catálogo y Comunes.
-      const dataToSave = {
-        id: 'main',
-        businessId: user.uid,
-        
-        // Campos específicos de Catálogo (Autoridad de esta página)
-        slug: finalSlug,
-        useCustomSlug: !!shareConfig.useCustomSlug,
-        
-        // Campos comunes (Social & QR)
-        socialShareMessage: shareConfig.socialShareMessage || defaultShareConfig.socialShareMessage,
-        socialPreviewImageUrl: shareConfig.socialPreviewImageUrl || null,
-        qrConfig: shareConfig.qrConfig || defaultShareConfig.qrConfig,
-        
-        // Metadatos
-        isActive: true,
-        updatedAt: now,
-      };
-      
+      const dataToSave = { id: 'main', businessId: user.uid, slug: finalSlug, useCustomSlug: !!shareConfig.useCustomSlug, socialShareMessage: shareConfig.socialShareMessage || defaultShareConfig.socialShareMessage, socialPreviewImageUrl: shareConfig.socialPreviewImageUrl || null, qrConfig: shareConfig.qrConfig || defaultShareConfig.qrConfig, isActive: true, updatedAt: now };
       await setDoc(shareConfigRef, dataToSave, { merge: true });
-
-      // Sincronizar timestamp local para evitar sobreescritura del listener
       handleLocalChange({ updatedAt: now });
-
       const publicCatalogRef = doc(firestore, `businesses/${user.uid}/publicData`, 'catalog');
       const publicCatalogSnap = await getDoc(publicCatalogRef);
-      if (publicCatalogSnap.exists()) {
-          await setDoc(publicCatalogRef, { slug: finalSlug }, { merge: true });
-      }
-      
-      toast({
-        title: '¡Cambios Guardados!',
-        description: 'La configuración de tu enlace de Catálogo ha sido actualizada.',
-      });
+      if (publicCatalogSnap.exists()) await setDoc(publicCatalogRef, { slug: finalSlug }, { merge: true });
+      toast({ title: '¡Cambios Guardados!', description: 'La configuración de tu enlace de Catálogo ha sido actualizada.' });
     } catch (error: any) {
-      console.error("Error al guardar:", error);
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: 'No se pudo guardar la configuración.',
-      });
-    } finally {
-      setIsSaving(false);
-    }
+      toast({ variant: 'destructive', title: 'Error', description: 'No se pudo guardar la configuración.' });
+    } finally { setIsSaving(false); }
   };
 
   const menuUrl = useMemo(() => {
@@ -284,25 +204,7 @@ export default function SharePage() {
     });
   };
 
-  const handleSocialImageUpload = async (file: File) => {
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onloadend = async () => {
-        const mediaDataUri = reader.result as string;
-        try {
-            const result = await uploadMedia({ mediaDataUri });
-            handleLocalChange({ socialPreviewImageUrl: result.secure_url });
-            toast({ title: "Imagen subida" });
-        } catch (error: any) {
-            toast({ variant: 'destructive', title: "Error", description: error.message });
-        }
-    };
-  };
-
-  if (isLoading && !shareConfig) {
-    return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin" /></div>;
-  }
-  
+  if (isLoading && !shareConfig) return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin" /></div>;
   if (!shareConfig || !user) return null;
 
   return (
@@ -321,34 +223,19 @@ export default function SharePage() {
       </Card>
 
       <Card>
-        <CardHeader>
-            <CardTitle className="flex items-center gap-2"><Link2 className="h-5 w-5" /> URL Personalizada</CardTitle>
-        </CardHeader>
+        <CardHeader><CardTitle className="flex items-center gap-2"><Link2 className="h-5 w-5" /> URL Personalizada</CardTitle></CardHeader>
         <CardContent className="space-y-4">
             <div className="flex items-center justify-between rounded-lg border p-4 bg-muted/30">
-                <div className="space-y-0.5">
-                    <Label htmlFor="custom-slug-switch" className="text-base">Usar alias personalizado</Label>
-                </div>
-                <Switch
-                    id="custom-slug-switch"
-                    checked={shareConfig.useCustomSlug === true}
-                    onCheckedChange={(checked) => handleLocalChange({ useCustomSlug: checked })}
-                />
+                <Label htmlFor="custom-slug-switch" className="text-base">Usar alias personalizado</Label>
+                <Switch id="custom-slug-switch" checked={shareConfig.useCustomSlug === true} onCheckedChange={(checked) => handleLocalChange({ useCustomSlug: checked })} />
             </div>
             {shareConfig.useCustomSlug && (
                 <div className="space-y-2">
                     <Label htmlFor="slug-input">Tu Alias</Label>
                     <div className="flex items-center">
                         <span className="p-2 bg-muted border border-r-0 rounded-l-md text-sm">/catalog/</span>
-                        <Input
-                            id="slug-input"
-                            className="rounded-none"
-                            value={shareConfig.slug === user.uid ? '' : shareConfig.slug}
-                            onChange={(e) => handleLocalChange({ slug: e.target.value })}
-                        />
-                         <Button variant="outline" size="icon" className="rounded-l-none" onClick={handleCopyLink}>
-                            {copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
-                        </Button>
+                        <Input id="slug-input" className="rounded-none" value={shareConfig.slug === user.uid ? '' : shareConfig.slug} onChange={(e) => handleLocalChange({ slug: e.target.value })} />
+                        <Button variant="outline" size="icon" className="rounded-l-none" onClick={handleCopyLink}>{copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}</Button>
                     </div>
                 </div>
             )}
@@ -359,18 +246,9 @@ export default function SharePage() {
         <CardHeader><CardTitle className="flex items-center gap-2"><Share2 className="h-5 w-5" /> Compartir</CardTitle></CardHeader>
         <CardContent className="space-y-6">
             <div className="flex justify-center">
-                <SocialPreviewImageUploader
-                    imageUrl={shareConfig.socialPreviewImageUrl}
-                    onUpload={handleSocialImageUpload}
-                    onRemove={() => handleLocalChange({ socialPreviewImageUrl: null })}
-                />
+                <SocialPreviewImageUploader imageUrl={shareConfig.socialPreviewImageUrl} onUpload={handleSocialImageUpload} onRemove={() => handleLocalChange({ socialPreviewImageUrl: null })} />
             </div>
-            <Textarea
-                placeholder="Mensaje de bienvenida..."
-                value={shareConfig.socialShareMessage || ''}
-                onChange={(e) => handleLocalChange({ socialShareMessage: e.target.value })}
-                rows={3}
-            />
+            <Textarea placeholder="Mensaje de bienvenida..." value={shareConfig.socialShareMessage || ''} onChange={(e) => handleLocalChange({ socialShareMessage: e.target.value })} rows={3} />
             <div className="flex justify-center p-6 border rounded-xl" ref={qrCodeRef} style={{ background: shareConfig.qrConfig.backgroundColor }}>
                 <QRCode value={menuUrl} size={180} bgColor={shareConfig.qrConfig.backgroundColor} fgColor={shareConfig.qrConfig.foregroundColor} />
             </div>
@@ -381,52 +259,17 @@ export default function SharePage() {
         </CardContent>
       </Card>
 
-      {/* NUEVA SECCIÓN: COMPARTE TU CATÁLOGO (SOCIAL) */}
       <Card>
         <CardHeader>
           <CardTitle>Comparte tu Catálogo</CardTitle>
           <CardDescription>Promociona tus productos en redes sociales para aumentar las ventas.</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-wrap items-center gap-2">
-          {/* TikTok */}
-          <Button 
-            onClick={() => window.open(`https://www.tiktok.com/`, '_blank')}
-            className="bg-[#000000] hover:bg-[#000000]/90 text-white font-bold"
-          >
-            <TikTokIcon className="mr-2 h-4 w-4" /> TikTok
-          </Button>
-
-          {/* Instagram */}
-          <Button 
-            onClick={() => window.open(`https://www.instagram.com/`, '_blank')}
-            className="bg-gradient-to-tr from-[#f9ce34] via-[#ee2a7b] to-[#6228d7] hover:opacity-90 text-white font-bold"
-          >
-            <InstagramIcon className="mr-2 h-4 w-4" /> Instagram
-          </Button>
-
-          {/* Facebook */}
-          <Button 
-            onClick={() => window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(menuUrl)}`, '_blank')}
-            className="bg-[#1877F2] hover:bg-[#1877F2]/90 text-white font-bold"
-          >
-            <FacebookIcon className="mr-2 h-4 w-4" /> Facebook
-          </Button>
-
-          {/* WhatsApp */}
-          <Button 
-            onClick={() => window.open(`https://wa.me/?text=${encodeURIComponent(menuUrl)}`, '_blank')}
-            className="bg-[#25D366] hover:bg-[#25D366]/90 text-white font-bold"
-          >
-            <WhatsAppIcon className="mr-2 h-4 w-4" /> WhatsApp
-          </Button>
-
-          {/* X (Twitter) */}
-          <Button 
-            onClick={() => window.open(`https://twitter.com/intent/tweet?url=${encodeURIComponent(menuUrl)}&text=${encodeURIComponent(shareConfig.socialShareMessage || '')}`, '_blank')}
-            className="bg-[#000000] hover:bg-[#000000]/90 text-white font-bold"
-          >
-            <XIcon className="mr-2 h-4 w-4" /> X
-          </Button>
+          <Button onClick={() => window.open(`https://www.tiktok.com/`, '_blank')} className="bg-[#000000] hover:bg-[#000000]/90 text-white font-bold"><TikTokIcon className="mr-2 h-4 w-4" /> TikTok</Button>
+          <Button onClick={() => window.open(`https://www.instagram.com/`, '_blank')} className="bg-gradient-to-tr from-[#f9ce34] via-[#ee2a7b] to-[#6228d7] hover:opacity-90 text-white font-bold"><InstagramIcon className="mr-2 h-4 w-4" /> Instagram</Button>
+          <Button onClick={() => window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(menuUrl)}`, '_blank')} className="bg-[#1877F2] hover:bg-[#1877F2]/90 text-white font-bold"><FacebookIcon className="mr-2 h-4 w-4" /> Facebook</Button>
+          <Button onClick={() => window.open(`https://wa.me/?text=${encodeURIComponent(shareConfig.socialShareMessage || '')} ${encodeURIComponent(menuUrl)}`, '_blank')} className="bg-[#25D366] hover:bg-[#25D366]/90 text-white font-bold"><WhatsAppIcon className="mr-2" /> WhatsApp</Button>
+          <Button onClick={() => window.open(`https://twitter.com/intent/tweet?url=${encodeURIComponent(menuUrl)}&text=${encodeURIComponent(shareConfig.socialShareMessage || '')}`, '_blank')} className="bg-[#000000] hover:bg-[#000000]/90 text-white font-bold"><XIcon className="mr-2 h-4 w-4" /> X</Button>
         </CardContent>
       </Card>
     </div>
