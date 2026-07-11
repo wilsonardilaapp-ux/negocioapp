@@ -238,8 +238,15 @@ export default function ShareLandingPage() {
                     <Label htmlFor="slug-input">Tu Alias de Landing</Label>
                     <div className="flex items-center">
                         <span className="p-2 bg-muted border border-r-0 rounded-l-md text-sm">/landing/</span>
-                        <Input id="slug-input" className="rounded-none" value={shareConfig.slugLanding === user.uid ? '' : shareConfig.slugLanding} onChange={(e) => handleLocalChange({ slugLanding: e.target.value })} />
-                        <Button variant="outline" size="icon" className="rounded-l-none" onClick={handleCopyLink}>{copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}</Button>
+                        <Input
+                            id="slug-input"
+                            className="rounded-none"
+                            value={shareConfig.slugLanding === user.uid ? '' : shareConfig.slugLanding}
+                            onChange={(e) => handleLocalChange({ slugLanding: e.target.value })}
+                        />
+                         <Button variant="outline" size="icon" className="rounded-l-none" onClick={handleCopyLink}>
+                            {copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
+                        </Button>
                     </div>
                 </div>
             )}
