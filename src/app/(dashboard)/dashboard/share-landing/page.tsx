@@ -23,7 +23,7 @@ import type { MenuShare } from '@/models/share';
 import { useToast } from '@/hooks/use-toast';
 import QRCode from "react-qr-code";
 import html2canvas from "html2canvas";
-import { WhatsAppIcon } from '@/components/icons';
+import { WhatsAppIcon, TikTokIcon, XIcon, FacebookIcon, InstagramIcon } from '@/components/icons';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { uploadMedia } from '@/ai/flows/upload-media-flow';
@@ -129,9 +129,9 @@ export default function ShareLandingPage() {
 
     if (savedShareConfig) {
         const firestoreTime = new Date(savedShareConfig.updatedAt || 0).getTime();
-        const localTime = shareConfig?.updatedAt ? new Date(shareConfig.updatedAt).getTime() : 0;
+        const localTime = new Date(shareConfig?.updatedAt || 0).getTime();
 
-        // Hidratación robusta: se activa si no hay estado local o si el tiempo es distinto (evita bucle pero resuelve inicialización)
+        // FIX: Se usa !== en lugar de > para permitir que Firestore sobreescriba la inicialización local "nueva"
         if (!isSaving && (!shareConfig || firestoreTime !== localTime)) {
             setShareConfig({
                 id: savedShareConfig.id || 'main',
@@ -330,8 +330,54 @@ export default function ShareLandingPage() {
             </div>
             <div className="grid grid-cols-2 gap-4">
                 <Button variant="outline" onClick={downloadQR}><Download className="mr-2 h-4 w-4" /> Bajar QR</Button>
-                <Button onClick={() => window.open(`https://wa.me/?text=${encodeURIComponent(landingUrl)}`, '_blank')}><WhatsAppIcon className="mr-2" /> WhatsApp</Button>
+                <Button onClick={() => window.open(`https://wa.me/?text=${encodeURIComponent((shareConfig.socialShareMessage || '') + ' ' + landingUrl)}`, '_blank')}><WhatsAppIcon className="mr-2" /> WhatsApp</Button>
             </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Comparte tu Catálogo</CardTitle>
+          <CardDescription>
+            Promociona tus productos en redes sociales para aumentar las ventas.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-wrap items-center gap-2">
+            <Button
+                className="bg-black text-white hover:bg-gray-800 font-bold"
+                onClick={() => window.open(`https://www.tiktok.com/`, '_blank')}
+            >
+                <TikTokIcon className="h-4 w-4 mr-2" />
+                TikTok
+            </Button>
+            <Button
+                className="bg-gradient-to-r from-pink-500 via-red-500 to-yellow-500 text-white font-bold"
+                onClick={() => window.open(`https://www.instagram.com/`, '_blank')}
+            >
+                <InstagramIcon className="h-4 w-4 mr-2" />
+                Instagram
+            </Button>
+            <Button
+                className="bg-[#1877F2] text-white hover:bg-[#1877F2]/90 font-bold"
+                onClick={() => window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(landingUrl)}`, '_blank')}
+            >
+                <FacebookIcon className="h-4 w-4 mr-2" />
+                Facebook
+            </Button>
+            <Button
+                className="bg-[#25D366] text-white hover:bg-[#25D366]/90 font-bold"
+                onClick={() => window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent((shareConfig.socialShareMessage || '') + ' ' + landingUrl)}`, '_blank')}
+            >
+                <WhatsAppIcon className="h-4 w-4 mr-2" />
+                WhatsApp
+            </Button>
+            <Button
+                className="bg-black text-white hover:bg-gray-800 font-bold"
+                onClick={() => window.open(`https://twitter.com/intent/tweet?url=${encodeURIComponent(landingUrl)}&text=${encodeURIComponent(shareConfig.socialShareMessage || '')}`, '_blank')}
+            >
+                <XIcon className="h-4 w-4 mr-2" />
+                X
+            </Button>
         </CardContent>
       </Card>
     </div>
