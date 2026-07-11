@@ -10,13 +10,15 @@ type Props = {
 async function getBusinessData(idOrSlug: string) {
   try {
     const db = await getAdminFirestore();
-    const cleanSlug = idOrSlug.toLowerCase().trim();
+    const cleanSlug = decodeURIComponent(idOrSlug).toLowerCase().trim();
 
+    // 1. Intentar por ID directo
     const directSnap = await db.collection("businesses").doc(idOrSlug).get();
     if (directSnap.exists) return directSnap.data();
 
+    // 2. Intentar por Alias (Slug) en shareConfig usando el campo slugLanding
     const shareSnap = await db.collectionGroup("shareConfig")
-      .where("slug", "==", cleanSlug)
+      .where("slugLanding", "==", cleanSlug)
       .limit(1)
       .get();
 
