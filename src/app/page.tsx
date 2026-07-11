@@ -6,6 +6,7 @@ import { DefaultSubscriptionPlans } from '@/models/subscription-plan';
 import type { HybridPlan } from '@/models/hybrid-plan';
 import { getLandingData } from '@/lib/get-landing-data';
 import type { Metadata } from 'next';
+import { buildFaviconUrl } from "@/lib/favicon-url";
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -45,15 +46,26 @@ export async function generateMetadata(): Promise<Metadata> {
     const { data: business, globalConfig } = await getMainData();
     const siteTitle = business?.name || globalConfig?.name || "Markix Platform";
     
-    // Jerarquía de prioridad: Favicon Negocio > Favicon Plataforma > Logo Negocio > Default
-    const faviconUrl = business?.faviconUrl || globalConfig?.faviconUrl || business?.logoURL || '/favicon.ico';
+    // Jerarquía de prioridad: Favicon Negocio > Favicon Plataforma > Logo Negocio
+    const faviconSource = business?.faviconUrl || globalConfig?.faviconUrl || business?.logoURL || null;
+    const updatedAt = business?.updatedAt || globalConfig?.updatedAt;
+
+    // Construir objeto compatible con el helper buildFaviconUrl
+    const faviconObj = { faviconUrl: faviconSource, updatedAt };
+
+    const faviconIcon = buildFaviconUrl(faviconObj, 32);
+    const appleIcon = buildFaviconUrl(faviconObj, 180);
 
     return {
       title: siteTitle,
       description: business?.description || globalConfig?.description || "Centraliza y automatiza tu negocio con Markix.",
       icons: {
-        icon: [{ url: faviconUrl }],
-        apple: faviconUrl,
+        icon: faviconSource 
+          ? [{ url: faviconIcon, type: "image/png", sizes: "32x32" }]
+          : "/favicon.ico",
+        apple: faviconSource 
+          ? [{ url: appleIcon, type: "image/png", sizes: "180x180" }]
+          : "/favicon.ico",
       }
     };
   } catch (e) {
