@@ -180,6 +180,7 @@ export default async function RootPage() {
           plans={plansData} 
           hybridPlans={hybridPlansData} 
           businessId={mainBusiness.id || undefined}
+          showPlatformPlans={true}
         />
       </main>
     );
@@ -187,7 +188,7 @@ export default async function RootPage() {
     console.error("Critical error in RootPage:", error);
     return (
       <main className="w-full">
-          <LandingPageContent data={fallbackData} plans={DefaultSubscriptionPlans} hybridPlans={[]} />
+          <LandingPageContent data={fallbackData} plans={DefaultSubscriptionPlans} hybridPlans={[]} showPlatformPlans={true} />
       </main>
     );
   }

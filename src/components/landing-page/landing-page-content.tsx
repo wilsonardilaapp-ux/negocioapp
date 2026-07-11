@@ -35,6 +35,7 @@ interface LandingPageContentProps {
   hybridPlans?: HybridPlan[];
   businessId?: string;
   logoUrl?: string;
+  showPlatformPlans?: boolean;
 }
 
 const getLinkUrl = (link: NavLink, currentBusinessId: string | undefined): string => {
@@ -307,7 +308,7 @@ const PlanCard = ({
     );
 };
 
-export default function LandingPageContent({ data, plans = [], hybridPlans = [], businessId, logoUrl }: LandingPageContentProps) {
+export default function LandingPageContent({ data, plans = [], hybridPlans = [], businessId, logoUrl, showPlatformPlans = false }: LandingPageContentProps) {
   const { hero, navigation, sections, testimonials, form, footer, header, plans: customPlans } = data;
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -607,7 +608,7 @@ export default function LandingPageContent({ data, plans = [], hybridPlans = [],
                 </div>
              </div>
           </section>
-      ) : sortedPlans.length > 0 ? (
+      ) : (showPlatformPlans && sortedPlans.length > 0) ? (
           <section className="py-16 px-4 bg-gray-50" id="precios">
             <div className="max-w-6xl mx-auto">
               <div className="text-center mb-10">
