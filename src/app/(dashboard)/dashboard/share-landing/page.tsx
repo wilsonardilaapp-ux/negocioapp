@@ -224,8 +224,14 @@ export default function ShareLandingPage() {
         <CardHeader><CardTitle className="flex items-center gap-2"><Link2 className="h-5 w-5" /> URL Personalizada</CardTitle></CardHeader>
         <CardContent className="space-y-4">
             <div className="flex items-center justify-between rounded-lg border p-4 bg-muted/30">
-                <Label htmlFor="custom-slug-switch" className="text-base">Usar alias personalizado para Landing</Label>
-                <Switch id="custom-slug-switch" checked={shareConfig.useCustomSlugLanding === true} onCheckedChange={(checked) => handleLocalChange({ useCustomSlugLanding: checked })} />
+                <div className="space-y-0.5">
+                    <Label htmlFor="custom-slug-switch" className="text-base">Usar alias personalizado para Landing</Label>
+                </div>
+                <Switch
+                    id="custom-slug-switch"
+                    checked={shareConfig.useCustomSlugLanding === true}
+                    onCheckedChange={(checked) => handleLocalChange({ useCustomSlugLanding: checked })}
+                />
             </div>
             {shareConfig.useCustomSlugLanding && (
                 <div className="space-y-2">
@@ -266,7 +272,7 @@ export default function ShareLandingPage() {
           <Button onClick={() => window.open(`https://www.tiktok.com/`, '_blank')} className="bg-[#000000] hover:bg-[#000000]/90 text-white font-bold"><TikTokIcon className="mr-2 h-4 w-4" /> TikTok</Button>
           <Button onClick={() => window.open(`https://www.instagram.com/`, '_blank')} className="bg-gradient-to-tr from-[#f9ce34] via-[#ee2a7b] to-[#6228d7] hover:opacity-90 text-white font-bold"><InstagramIcon className="mr-2 h-4 w-4" /> Instagram</Button>
           <Button onClick={() => window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(landingUrl)}`, '_blank')} className="bg-[#1877F2] hover:bg-[#1877F2]/90 text-white font-bold"><FacebookIcon className="mr-2 h-4 w-4" /> Facebook</Button>
-          <Button onClick={() => window.open(`https://wa.me/?text=${encodeURIComponent(shareConfig.socialShareMessage || '')} ${encodeURIComponent(landingUrl)}`, '_blank')} className="bg-[#25D366] hover:bg-[#25D366]/90 text-white font-bold"><WhatsAppIcon className="mr-2 h-4 w-4" /> WhatsApp</Button>
+          <Button onClick={() => window.open(`https://wa.me/?text=${encodeURIComponent(shareConfig.socialShareMessage || '')} ${encodeURIComponent(landingUrl)}`, '_blank')} className="bg-[#25D366] hover:bg-[#25D366]/90 text-white font-bold"><WhatsAppIcon className="mr-2" /> WhatsApp</Button>
           <Button onClick={() => window.open(`https://twitter.com/intent/tweet?url=${encodeURIComponent(landingUrl)}&text=${encodeURIComponent(shareConfig.socialShareMessage || '')}`, '_blank')} className="bg-[#000000] hover:bg-[#000000]/90 text-white font-bold"><XIcon className="mr-2 h-4 w-4" /> X</Button>
         </CardContent>
       </Card>

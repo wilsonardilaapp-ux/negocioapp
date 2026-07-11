@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useMemo, useState, useEffect, type ComponentType } from 'react';
@@ -33,7 +32,8 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({ value, onChange, placeh
     const loadQuill = async () => {
       try {
         const { default: Quill } = await import('react-quill');
-        setEditorComponent(() => Quill);
+        // Se usa cast a unknown -> ComponentType para evitar error TS2345 en SetStateAction
+        setEditorComponent(() => Quill as unknown as ComponentType<ReactQuillProps>);
       } catch (error) {
         console.error('Error loading RichTextEditor:', error);
         toast({
