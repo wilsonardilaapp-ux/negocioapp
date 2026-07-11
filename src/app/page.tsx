@@ -11,26 +11,30 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 /**
- * Obtiene los datos del negocio principal de forma segura.
+ * Obtiene los datos del negocio principal y la configuración global de forma segura.
  */
-async function getMainBusinessData() {
+async function getMainData() {
   try {
     const db = await getAdminFirestore();
     const configSnap = await db.collection("globalConfig").doc("system").get();
+    const globalConfig = configSnap.exists ? configSnap.data() : null;
+
     if (configSnap.exists) {
         const mainBusinessId = configSnap.data()?.mainBusinessId;
         if (mainBusinessId) {
             const bSnap = await db.collection("businesses").doc(mainBusinessId).get();
             return { 
                 id: mainBusinessId, 
-                data: bSnap.exists ? bSnap.data() : null 
+                data: bSnap.exists ? bSnap.data() : null,
+                globalConfig
             };
         }
     }
+    return { id: null, data: null, globalConfig };
   } catch (error) {
-    console.error("[getMainBusinessData] Error:", error);
+    console.error("[getMainData] Error:", error);
+    return { id: null, data: null, globalConfig: null };
   }
-  return { id: null, data: null };
 }
 
 /**
@@ -38,13 +42,15 @@ async function getMainBusinessData() {
  */
 export async function generateMetadata(): Promise<Metadata> {
   try {
-    const { data: business } = await getMainBusinessData();
-    const siteTitle = business?.name || "Markix Platform";
-    const faviconUrl = business?.faviconUrl || business?.logoURL || '/favicon.ico';
+    const { data: business, globalConfig } = await getMainData();
+    const siteTitle = business?.name || globalConfig?.name || "Markix Platform";
+    
+    // Jerarquía de prioridad: Favicon Negocio > Favicon Plataforma > Logo Negocio > Default
+    const faviconUrl = business?.faviconUrl || globalConfig?.faviconUrl || business?.logoURL || '/favicon.ico';
 
     return {
       title: siteTitle,
-      description: business?.description || "Centraliza y automatiza tu negocio con Markix.",
+      description: business?.description || globalConfig?.description || "Centraliza y automatiza tu negocio con Markix.",
       icons: {
         icon: [{ url: faviconUrl }],
         apple: faviconUrl,
@@ -158,7 +164,7 @@ export default async function RootPage() {
       getLandingData(),
       getPlans(),
       getHybridPlans(),
-      getMainBusinessData()
+      getMainData()
     ]);
     
     if (results[0].status === 'fulfilled') landingData = results[0].value;
