@@ -381,49 +381,52 @@ export default function SharePage() {
         </CardContent>
       </Card>
 
+      {/* NUEVA SECCIÓN: COMPARTE TU CATÁLOGO (SOCIAL) */}
       <Card>
         <CardHeader>
           <CardTitle>Comparte tu Catálogo</CardTitle>
-          <CardDescription>
-            Promociona tus productos en redes sociales para aumentar las ventas.
-          </CardDescription>
+          <CardDescription>Promociona tus productos en redes sociales para aumentar las ventas.</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-wrap items-center gap-2">
-            <Button
-                className="bg-black text-white hover:bg-gray-800 font-bold"
-                onClick={() => window.open(`https://www.tiktok.com/`, '_blank')}
-            >
-                <TikTokIcon className="h-4 w-4 mr-2" />
-                TikTok
-            </Button>
-            <Button
-                className="bg-gradient-to-r from-pink-500 via-red-500 to-yellow-500 text-white font-bold"
-                onClick={() => window.open(`https://www.instagram.com/`, '_blank')}
-            >
-                <InstagramIcon className="h-4 w-4 mr-2" />
-                Instagram
-            </Button>
-            <Button
-                className="bg-[#1877F2] text-white hover:bg-[#1877F2]/90 font-bold"
-                onClick={() => window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(menuUrl)}`, '_blank')}
-            >
-                <FacebookIcon className="h-4 w-4 mr-2" />
-                Facebook
-            </Button>
-            <Button
-                className="bg-[#25D366] text-white hover:bg-[#25D366]/90 font-bold"
-                onClick={() => window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent((shareConfig.socialShareMessage || '') + ' ' + menuUrl)}`, '_blank')}
-            >
-                <WhatsAppIcon className="h-4 w-4 mr-2" />
-                WhatsApp
-            </Button>
-            <Button
-                className="bg-black text-white hover:bg-gray-800 font-bold"
-                onClick={() => window.open(`https://twitter.com/intent/tweet?url=${encodeURIComponent(menuUrl)}&text=${encodeURIComponent(shareConfig.socialShareMessage || '')}`, '_blank')}
-            >
-                <XIcon className="h-4 w-4 mr-2" />
-                X
-            </Button>
+          {/* TikTok */}
+          <Button 
+            onClick={() => window.open(`https://www.tiktok.com/`, '_blank')}
+            className="bg-[#000000] hover:bg-[#000000]/90 text-white font-bold"
+          >
+            <TikTokIcon className="mr-2 h-4 w-4" /> TikTok
+          </Button>
+
+          {/* Instagram */}
+          <Button 
+            onClick={() => window.open(`https://www.instagram.com/`, '_blank')}
+            className="bg-gradient-to-tr from-[#f9ce34] via-[#ee2a7b] to-[#6228d7] hover:opacity-90 text-white font-bold"
+          >
+            <InstagramIcon className="mr-2 h-4 w-4" /> Instagram
+          </Button>
+
+          {/* Facebook */}
+          <Button 
+            onClick={() => window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(menuUrl)}`, '_blank')}
+            className="bg-[#1877F2] hover:bg-[#1877F2]/90 text-white font-bold"
+          >
+            <FacebookIcon className="mr-2 h-4 w-4" /> Facebook
+          </Button>
+
+          {/* WhatsApp */}
+          <Button 
+            onClick={() => window.open(`https://wa.me/?text=${encodeURIComponent(menuUrl)}`, '_blank')}
+            className="bg-[#25D366] hover:bg-[#25D366]/90 text-white font-bold"
+          >
+            <WhatsAppIcon className="mr-2 h-4 w-4" /> WhatsApp
+          </Button>
+
+          {/* X (Twitter) */}
+          <Button 
+            onClick={() => window.open(`https://twitter.com/intent/tweet?url=${encodeURIComponent(menuUrl)}&text=${encodeURIComponent(shareConfig.socialShareMessage || '')}`, '_blank')}
+            className="bg-[#000000] hover:bg-[#000000]/90 text-white font-bold"
+          >
+            <XIcon className="mr-2 h-4 w-4" /> X
+          </Button>
         </CardContent>
       </Card>
     </div>
