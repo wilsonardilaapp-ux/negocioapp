@@ -129,10 +129,10 @@ export default function ShareLandingPage() {
 
     if (savedShareConfig) {
         const firestoreTime = new Date(savedShareConfig.updatedAt || 0).getTime();
-        const localTime = shareConfig?.updatedAt ? new Date(shareConfig.updatedAt).getTime() : 0;
+        const localTime = new Date(shareConfig?.updatedAt || 0).getTime();
 
-        // Hidratación: siempre cargamos si es el primer montaje (!shareConfig) 
-        // o si el dato remoto es estrictamente más reciente.
+        console.log("DEBUG hidratación:", { savedShareConfig, shareConfig, firestoreTime, localTime, isSaving });
+
         if (!isSaving && (!shareConfig || firestoreTime > localTime)) {
             setShareConfig({
                 id: savedShareConfig.id || 'main',
@@ -180,29 +180,23 @@ export default function ShareLandingPage() {
       const finalSlug = (shareConfig.slugLanding || user.uid).trim().toLowerCase().replace(/\s+/g, '-').replace(/^-+|-+$/g, '');
       const now = new Date().toISOString();
 
-      // AUTORIDAD ATÓMICA: Solo escribimos campos de LANDING y Comunes.
-      // Jamás incluimos slug ni useCustomSlug para proteger los datos de la otra página.
       const dataToSave = {
         id: 'main',
         businessId: user.uid,
         
-        // Campos específicos de Landing (Autoridad de esta página)
         slugLanding: finalSlug,
         useCustomSlugLanding: !!shareConfig.useCustomSlugLanding,
         
-        // Campos comunes (Social & QR)
         socialShareMessage: shareConfig.socialShareMessage || defaultShareConfig.socialShareMessage,
         socialPreviewImageUrl: shareConfig.socialPreviewImageUrl || null,
         qrConfig: shareConfig.qrConfig || defaultShareConfig.qrConfig,
         
-        // Metadatos
         isActive: true,
         updatedAt: now,
       };
       
       await setDoc(shareConfigRef, dataToSave, { merge: true });
 
-      // Sincronizar timestamp local para evitar sobreescritura del listener
       handleLocalChange({ updatedAt: now });
       
       toast({
