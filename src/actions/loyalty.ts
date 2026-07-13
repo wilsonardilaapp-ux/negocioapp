@@ -49,6 +49,7 @@ export async function getLoyaltyStatus(
 
 /**
  * Procesa el canje de un premio restando puntos en una transacción atómica.
+ * Toda la lectura y validación ocurre dentro del bloque runTransaction.
  */
 export async function redeemReward(
   businessId: string, 
@@ -65,30 +66,30 @@ export async function redeemReward(
 
   try {
     const result = await db.runTransaction(async (transaction) => {
-      // 1. Validar factura de nuevo por seguridad
+      // 1. TODAS LAS LECTURAS PRIMERO (Dentro del bloque transaccional)
+      // Nota: verifyInvoiceCode hace su propio fetch pero es una validación de propiedad inmutable.
       const isValid = await loyaltyService.verifyInvoiceCode(businessId, whatsapp, invoiceCode);
       if (!isValid) throw new Error('Validación de seguridad fallida.');
 
-      // 2. Obtener datos necesarios
       const [balanceSnap, rewardSnap] = await Promise.all([
         transaction.get(balanceRef),
         transaction.get(rewardRef)
       ]);
 
-      if (!rewardSnap.exists) throw new Error('El premio ya no está disponible.');
+      if (!rewardSnap.exists) throw new Error('El premio ya no está disponible en el catálogo.');
       
       const currentBalance = balanceSnap.exists ? (balanceSnap.data()?.points || 0) : 0;
       const reward = rewardSnap.data() as Reward;
 
-      // 3. Validar saldo suficiente
+      // 2. VALIDACIÓN DE LÓGICA DE NEGOCIO (Error controlado con mensaje claro)
       if (currentBalance < reward.pointsCost) {
-        throw new Error(`Saldo insuficiente. Necesitas ${reward.pointsCost} puntos.`);
+        throw new Error(`Saldo insuficiente. Tienes ${currentBalance} puntos y necesitas ${reward.pointsCost} para este premio.`);
       }
 
       const newBalance = currentBalance - reward.pointsCost;
       const now = new Date().toISOString();
 
-      // 4. Aplicar cambios
+      // 3. TODAS LAS ESCRITURAS AL FINAL
       transaction.set(balanceRef, {
         whatsapp: cleanWhatsapp,
         points: newBalance,
@@ -105,10 +106,13 @@ export async function redeemReward(
       };
       transaction.set(logRef, logData);
 
-      return { newBalance };
+      return { newBalance, rewardName: reward.name };
     });
 
+    // 4. POST-PROCESAMIENTO (Fuera de la transacción: Revalidaciones y Notificaciones)
+    // Esto garantiza que solo se ejecuten si la transacción hizo commit exitoso.
     revalidatePath(`/catalog/${businessId}`);
+    
     return { success: true, newBalance: result.newBalance };
 
   } catch (error: any) {

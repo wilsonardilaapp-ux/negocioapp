@@ -121,6 +121,7 @@ class LoyaltyService {
   /**
    * Valida si un código de factura corresponde a un pedido real del cliente.
    * Lógica resiliente: compara contra teléfono normalizado y crudo para cubrir historial.
+   * Incluye capa de defensa extra en memoria para normalización de ambos lados.
    */
   async verifyInvoiceCode(businessId: string, whatsapp: string, invoiceCode: string): Promise<boolean> {
     const db = await this.getDb();
@@ -131,7 +132,7 @@ class LoyaltyService {
 
     const ordersRef = db.collection('businesses').doc(businessId).collection('orders');
     
-    // Consultamos pedidos asociados al número (en formato estandarizado e histórico)
+    // 1. Filtro por Base de Datos (Primera capa)
     const snapshot = await ordersRef
       .where('customerPhone', 'in', [whatsapp, cleanWhatsapp])
       .get();
@@ -140,8 +141,14 @@ class LoyaltyService {
       return false;
     }
 
-    // Buscamos coincidencia con el sufijo de 8 caracteres del ID del documento
+    // 2. Validación en Memoria (Capa extra de defensa con normalización estricta)
     return snapshot.docs.some(doc => {
+      const orderData = doc.data();
+      const dbPhoneNormalized = normalizePhoneNumber(orderData.customerPhone);
+      
+      // El teléfono del pedido en la DB debe ser el mismo que el del cliente tras normalizar ambos
+      if (dbPhoneNormalized !== cleanWhatsapp) return false;
+
       const displayCode = doc.id.slice(-8).toUpperCase();
       return displayCode === cleanCode;
     });
