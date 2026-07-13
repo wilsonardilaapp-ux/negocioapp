@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   Table,
   TableBody,
@@ -11,7 +11,8 @@ import {
 } from '@/components/ui/table';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Crown, Trophy, Medal, User, Loader2, Calendar } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Crown, Trophy, Medal, User, Loader2, Calendar, RefreshCw } from 'lucide-react';
 import { getVipRanking } from '@/actions/loyalty';
 import type { LoyaltyBalance } from '@/services/loyalty-service';
 import { formatDistanceToNow } from 'date-fns';
@@ -24,7 +25,6 @@ interface VipRankingProps {
 
 /**
  * Enmascara el número de WhatsApp para proteger la privacidad del cliente.
- * Formato: 310****123
  */
 const maskPhone = (phone: string): string => {
   if (phone.length < 7) return phone;
@@ -36,22 +36,29 @@ const maskPhone = (phone: string): string => {
 export default function VipCustomersRanking({ businessId }: VipRankingProps) {
   const [ranking, setRanking] = useState<LoyaltyBalance[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const fetchRanking = useCallback(async (silent = false) => {
+    if (!silent) setIsLoading(true);
+    try {
+      const data = await getVipRanking(businessId);
+      setRanking(data);
+    } catch (error) {
+      console.error("Error loading VIP ranking:", error);
+    } finally {
+      if (!silent) setIsLoading(false);
+    }
+  }, [businessId]);
 
   useEffect(() => {
-    const fetchRanking = async () => {
-      setIsLoading(true);
-      try {
-        const data = await getVipRanking(businessId);
-        setRanking(data);
-      } catch (error) {
-        console.error("Error loading VIP ranking:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
     if (businessId) fetchRanking();
-  }, [businessId]);
+  }, [businessId, fetchRanking]);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await fetchRanking(true);
+    setIsRefreshing(false);
+  };
 
   const getRankIcon = (index: number) => {
     switch (index) {
@@ -74,14 +81,20 @@ export default function VipCustomersRanking({ businessId }: VipRankingProps) {
   return (
     <Card className="shadow-sm border-none bg-card">
       <CardHeader>
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-primary/10 rounded-lg">
-            <Trophy className="h-6 w-6 text-primary" />
-          </div>
-          <div>
-            <CardTitle>Ranking de Clientes VIP</CardTitle>
-            <CardDescription>Tus clientes más fieles basados en frecuencia de consumo.</CardDescription>
-          </div>
+        <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+                <div className="p-2 bg-primary/10 rounded-lg">
+                    <Trophy className="h-6 w-6 text-primary" />
+                </div>
+                <div>
+                    <CardTitle>Ranking de Clientes VIP</CardTitle>
+                    <CardDescription>Basado en puntos acumulados y frecuencia.</CardDescription>
+                </div>
+            </div>
+            <Button variant="outline" size="sm" onClick={handleRefresh} disabled={isRefreshing} className="gap-2 font-bold">
+                <RefreshCw className={cn("h-3.5 w-3.5", isRefreshing && "animate-spin")} />
+                {isRefreshing ? 'Actualizando...' : 'Refrescar Datos'}
+            </Button>
         </div>
       </CardHeader>
       <CardContent>
@@ -110,7 +123,7 @@ export default function VipCustomersRanking({ businessId }: VipRankingProps) {
                         <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center shrink-0">
                           <User className="h-4 w-4 text-muted-foreground" />
                         </div>
-                        <div className="flex flex-col">
+                        <div className="flex flex-col text-left">
                           <span className="font-bold text-sm">{client.name || 'Cliente'}</span>
                           <span className="text-[10px] font-mono text-muted-foreground">
                             {maskPhone(client.whatsapp)}

@@ -124,7 +124,8 @@ class LoyaltyService {
 
   /**
    * Obtiene los clientes con mayor actividad para el ranking VIP.
-   * Ordenado por visitas y luego por puntos acumulados.
+   * Simplificado a un solo orderBy por puntos para evitar requerir índices compuestos
+   * obligatorios inmediatos durante el prototipado.
    */
   async getTopLoyaltyCustomers(businessId: string, limitNum: number = 20): Promise<LoyaltyBalance[]> {
     const db = await this.getDb();
@@ -133,7 +134,6 @@ class LoyaltyService {
       .collection('businesses')
       .doc(businessId)
       .collection('loyaltyBalances')
-      .orderBy('visitCount', 'desc')
       .orderBy('points', 'desc')
       .limit(limitNum)
       .get();

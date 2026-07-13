@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { 
   Users, 
   Bot, 
@@ -72,7 +73,6 @@ export default function ChurnRiskCard({ businessId }: { businessId: string }) {
           title: "¡Recuperación iniciada!",
           description: `Se han programado ${result.count} invitaciones personalizadas por WhatsApp.`,
         });
-        // Refrescar estadísticas tras la acción
         fetchStats();
       } else {
         toast({
@@ -106,15 +106,15 @@ export default function ChurnRiskCard({ businessId }: { businessId: string }) {
 
   return (
     <Card className="shadow-sm border-orange-100 bg-orange-50/10">
-      <CardHeader>
+      <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-orange-100 rounded-lg">
-              <UserX className="h-6 w-6 text-orange-600" />
+            <div className="p-2 bg-orange-100 rounded-lg text-orange-600">
+              <UserX className="h-6 w-6" />
             </div>
             <div>
-              <CardTitle>Riesgo de Abandono</CardTitle>
-              <CardDescription>Clientes sin visitas en los últimos 30 días.</CardDescription>
+              <CardTitle className="text-base">Riesgo de Abandono</CardTitle>
+              <CardDescription className="text-xs">Inactivos (umbral {stats?.totalCount ? 'actual' : ''})</CardDescription>
             </div>
           </div>
           <Badge variant="destructive" className="font-black text-[10px] uppercase">
@@ -123,27 +123,21 @@ export default function ChurnRiskCard({ businessId }: { businessId: string }) {
         </div>
       </CardHeader>
       <CardContent>
-        <div className="flex flex-col items-center justify-center py-4 space-y-2">
-            <div className="text-6xl font-black text-gray-900 tracking-tighter">
-                {riskCount}
-            </div>
-            <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em]">
-                Clientes Inactivos
-            </p>
-        </div>
-        
-        {riskCount > 0 && (
-            <div className="mt-4 space-y-2">
-                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-2">Últimos detectados:</p>
-                <div className="space-y-1">
-                    {stats?.customers.slice(0, 3).map((c, i) => (
-                        <div key={i} className="flex justify-between items-center text-xs p-2 bg-white rounded-lg border border-orange-100">
-                            <span className="font-bold text-gray-700">{c.name || 'Cliente'}</span>
-                            <span className="font-mono text-muted-foreground">{maskPhone(c.whatsapp)}</span>
+        {riskCount > 0 ? (
+            <ScrollArea className="h-[200px] pr-3 -mr-3">
+                <div className="space-y-1.5">
+                    {stats?.customers.map((c, i) => (
+                        <div key={i} className="flex justify-between items-center text-xs p-2 bg-white rounded-lg border border-orange-100 hover:border-orange-200 transition-colors">
+                            <span className="font-bold text-gray-700 truncate mr-2">{c.name || 'Cliente'}</span>
+                            <span className="font-mono text-muted-foreground shrink-0">{maskPhone(c.whatsapp)}</span>
                         </div>
                     ))}
-                    {riskCount > 3 && <p className="text-[10px] text-center text-muted-foreground italic pt-1">Y {riskCount - 3} clientes más en riesgo...</p>}
                 </div>
+            </ScrollArea>
+        ) : (
+            <div className="flex flex-col items-center justify-center py-10 space-y-2 text-center">
+                <CheckCircle2 className="h-10 w-10 text-green-500 opacity-20" />
+                <p className="text-xs font-medium text-muted-foreground">¡Felicidades! Todos tus clientes están activos.</p>
             </div>
         )}
       </CardContent>
@@ -162,7 +156,7 @@ export default function ChurnRiskCard({ businessId }: { businessId: string }) {
                 Iniciar recuperación por IA
               </AlertDialogTitle>
               <AlertDialogDescription className="space-y-4 pt-2">
-                <p className="text-sm">
+                <p className="text-sm text-foreground">
                   El sistema generará <strong>invitaciones personalizadas y cálidas</strong> para intentar que tus clientes vuelvan.
                 </p>
                 <div className="p-4 bg-muted rounded-xl border border-dashed text-xs space-y-3">
@@ -176,7 +170,7 @@ export default function ChurnRiskCard({ businessId }: { businessId: string }) {
                 <div className="flex items-start gap-2 p-3 bg-blue-50 text-blue-800 rounded-lg border border-blue-100">
                     <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
                     <p className="text-[11px] leading-tight">
-                        Se enviará el mensaje a los <strong>{Math.min(riskCount, 10)}</strong> clientes que llevan más tiempo inactivos. Esta acción no ofrece descuentos automáticos.
+                        Se enviará el mensaje a los <strong>{Math.min(riskCount, 10)}</strong> clientes más antiguos.
                     </p>
                 </div>
               </AlertDialogDescription>
