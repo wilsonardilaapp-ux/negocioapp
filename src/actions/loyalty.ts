@@ -232,7 +232,8 @@ export async function awardLoyaltyPoints(
   businessId: string, 
   whatsapp: string, 
   orderId: string, 
-  totalPago: number
+  totalPago: number,
+  overrideDate?: string
 ): Promise<{ success: boolean; error?: string; pointsAwarded?: number }> {
   const db = await getAdminFirestore();
   const cleanWhatsapp = normalizePhoneNumber(whatsapp);
@@ -285,6 +286,7 @@ export async function awardLoyaltyPoints(
       const currentPoints = balanceSnap.exists ? (balanceSnap.data()?.points || 0) : 0;
       const newPoints = currentPoints + pointsToAward;
       const nowISO = new Date().toISOString();
+      const visitDate = overrideDate ? Timestamp.fromDate(new Date(overrideDate)) : FieldValue.serverTimestamp();
 
       // 3. ESCRITURAS TRANSACCIONALES
       
@@ -302,7 +304,7 @@ export async function awardLoyaltyPoints(
         whatsapp: cleanWhatsapp,
         points: newPoints,
         visitCount: FieldValue.increment(1),
-        lastVisitAt: FieldValue.serverTimestamp(),
+        lastVisitAt: visitDate,
         updatedAt: nowISO
       }, { merge: true });
 
@@ -314,7 +316,7 @@ export async function awardLoyaltyPoints(
         amount: pointsToAward,
         reason: `Puntos por compra (Pedido #${orderId.slice(-8).toUpperCase()})`,
         orderId: orderId,
-        createdAt: nowISO
+        createdAt: overrideDate ? overrideDate : nowISO
       };
       transaction.set(txLogRef, logData);
 
@@ -329,6 +331,87 @@ export async function awardLoyaltyPoints(
 
   } catch (error: any) {
     console.error('[Action: awardLoyaltyPoints] Error:', error.message);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Sincroniza masivamente el historial de pedidos de un negocio para otorgar puntos pendientes.
+ * Procesa únicamente pedidos con estado 'Entregado' que no tengan transacciones previas.
+ */
+export async function syncBusinessLoyaltyHistory(businessId: string) {
+  if (!businessId) return { success: false, error: 'ID de negocio no proporcionado.' };
+
+  const db = await getAdminFirestore();
+  const summary = {
+    processed: 0,
+    alreadySynced: 0,
+    errors: 0,
+    totalPointsAwarded: 0
+  };
+
+  try {
+    // 1. Obtener todos los pedidos entregados del negocio
+    const ordersSnap = await db.collection('businesses')
+      .doc(businessId)
+      .collection('orders')
+      .where('orderStatus', '==', 'Entregado')
+      .get();
+
+    if (ordersSnap.empty) {
+      return { success: true, summary, message: "No se encontraron pedidos entregados para sincronizar." };
+    }
+
+    // 2. Procesamiento secuencial para proteger la estabilidad de Firestore (Max 500 writes/batch)
+    // El bucle garantiza que no saturemos la memoria ni el rate-limit del Admin SDK
+    for (const orderDoc of ordersSnap.docs) {
+      const order = orderDoc.data() as Order;
+      const orderId = orderDoc.id;
+      
+      // Sanitización: Ignorar pedidos sin teléfono identificado
+      if (!order.customerPhone) {
+        summary.errors++;
+        continue;
+      }
+
+      try {
+        // La función awardLoyaltyPoints ya es idempotente (verifica earn_{orderId})
+        const result = await awardLoyaltyPoints(
+          businessId,
+          order.customerPhone,
+          orderId,
+          order.total || order.subtotal || 0,
+          order.orderDate // Pasamos la fecha original para el lastVisitAt
+        );
+
+        if (result.success) {
+          if (result.pointsAwarded && result.pointsAwarded > 0) {
+            summary.processed++;
+            summary.totalPointsAwarded += result.pointsAwarded;
+          } else {
+            summary.alreadySynced++;
+          }
+        } else {
+          summary.errors++;
+        }
+      } catch (e) {
+        console.error(`[LoyaltySync] Error en pedido ${orderId}:`, e);
+        summary.errors++;
+      }
+    }
+
+    // 3. Invalidar la caché de las páginas relevantes tras la sincronización masiva
+    revalidatePath('/dashboard/loyalty');
+    revalidatePath(`/catalog/${businessId}`);
+
+    return { 
+      success: true, 
+      summary, 
+      message: `Sincronización finalizada. ${summary.processed} pedidos nuevos procesados.` 
+    };
+
+  } catch (error: any) {
+    console.error('[Action: syncBusinessLoyaltyHistory] Error Crítico:', error.message);
     return { success: false, error: error.message };
   }
 }
