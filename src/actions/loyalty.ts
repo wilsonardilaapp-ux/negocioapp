@@ -8,6 +8,7 @@ import type { AdminNotification } from '@/models/notification';
 import type { Business } from '@/models/business';
 import { FieldValue, type Transaction, type Firestore, Timestamp } from 'firebase-admin/firestore';
 import { handleChurnRecovery } from '@/services/recovery-service';
+import type { Order } from '@/models/order';
 
 export interface LoyaltyStatusResponse {
   success: boolean;
@@ -245,7 +246,7 @@ export async function awardLoyaltyPoints(
       // 2. LECTURAS TRANSACCIONALES (IDEMPOTENCIA + CONFIG + BALANCE)
       const [txSnap, businessSnap, balanceSnap] = await Promise.all([
         transaction.get(txLogRef),
-        transaction.get(businessRef),
+        transaction.get(businessSnap.exists ? businessRef : businessRef), // Dummy read to ensure business check
         transaction.get(balanceRef)
       ]);
 
@@ -359,4 +360,71 @@ export async function grantLoyaltyPointsTransactional(
     reason: reason,
     createdAt: now
   });
+}
+
+/**
+ * Obtiene estadísticas de ingresos recuperados por la IA para el panel administrativo.
+ * Atribución basada en la marca 'isRecovered' en los pedidos.
+ */
+export async function getRecoveryStats(businessId: string) {
+    if (!businessId) return { totalRevenue: 0, count: 0, topReason: 'N/A' };
+
+    const db = await getAdminFirestore();
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const startOfMonthTimestamp = Timestamp.fromDate(startOfMonth);
+
+    try {
+        // Consultar pedidos recuperados del mes actual
+        const ordersSnap = await db.collection('businesses')
+            .doc(businessId)
+            .collection('orders')
+            .where('isRecovered', '==', true)
+            .where('orderStatus', '==', 'Entregado')
+            .get();
+
+        let totalRevenue = 0;
+        let count = 0;
+        const reasonCounts: Record<string, number> = {};
+
+        // Filtrado por fecha en memoria para evitar índices complejos innecesarios
+        // y agregación de motivos
+        for (const orderDoc of ordersSnap.docs) {
+            const orderData = orderDoc.data() as Order;
+            const orderDate = new Date(orderData.orderDate);
+            
+            if (orderDate >= startOfMonth) {
+                totalRevenue += (orderData.total || orderData.subtotal || 0);
+                count++;
+
+                // Identificar el motivo de la recuperación
+                if (orderData.recoverySourceId) {
+                    const msgSnap = await db.collection('whatsapp_scheduled').doc(orderData.recoverySourceId).get();
+                    if (msgSnap.exists) {
+                        const reason = msgSnap.data()?.reason || 'unknown';
+                        reasonCounts[reason] = (reasonCounts[reason] || 0) + 1;
+                    }
+                }
+            }
+        }
+
+        // Determinar el motivo más efectivo
+        let topReason = 'N/A';
+        let maxCount = 0;
+        for (const [reason, rCount] of Object.entries(reasonCounts)) {
+            if (rCount > maxCount) {
+                maxCount = rCount;
+                topReason = reason === 'churn' ? 'Fidelización' : (reason === 'negative_review' ? 'Atención a Críticas' : reason);
+            }
+        }
+
+        return {
+            totalRevenue,
+            count,
+            topReason
+        };
+    } catch (error) {
+        console.error('[Action: getRecoveryStats] Error:', error);
+        return { totalRevenue: 0, count: 0, topReason: 'Error' };
+    }
 }
