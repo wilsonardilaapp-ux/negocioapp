@@ -72,7 +72,7 @@ export async function redeemReward(
 
   try {
     const result = await db.runTransaction(async (transaction) => {
-      // 2. LECTURAS TRANSACCIONALES
+      // 2. LECTURAS TRANSACCIONALES (Siempre primero)
       const [balanceSnap, rewardSnap] = await Promise.all([
         transaction.get(balanceRef),
         transaction.get(rewardRef)
@@ -111,7 +111,7 @@ export async function redeemReward(
       return { newBalance, rewardName: reward.name };
     });
 
-    // 4. POST-PROCESAMIENTO (Fuera de la transacción)
+    // 4. POST-PROCESAMIENTO (Notificación al negocio)
     const notificationRef = db.collection(`businesses/${businessId}/notifications`).doc();
     const notificationData: Omit<AdminNotification, 'id'> = {
         fromSuperAdmin: true,
