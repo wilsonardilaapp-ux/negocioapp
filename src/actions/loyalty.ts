@@ -142,7 +142,7 @@ export async function redeemReward(
 
 /**
  * Otorga puntos de fidelidad por consumo tras la facturación de un pedido.
- * Implementa idempotencia basada en el orderId.
+ * Implementa idempotencia basada en el orderId mediante una transacción atómica.
  */
 export async function awardLoyaltyPoints(
   businessId: string, 
@@ -153,54 +153,47 @@ export async function awardLoyaltyPoints(
   const db = await getAdminFirestore();
   const cleanWhatsapp = normalizePhoneNumber(whatsapp);
   
+  const balanceRef = db.collection('businesses').doc(businessId).collection('loyaltyBalances').doc(cleanWhatsapp);
+  const txLogRef = db.collection('businesses').doc(businessId).collection('loyaltyTransactions').doc(`earn_${orderId}`);
+  const businessRef = db.collection('businesses').doc(businessId);
+
   try {
-    // 1. IDEMPOTENCIA: Verificar si ya se otorgaron puntos para este pedido
-    const existingTx = await db.collection('businesses').doc(businessId)
-      .collection('loyaltyTransactions')
-      .where('orderId', '==', orderId)
-      .where('type', '==', 'earn')
-      .limit(1)
-      .get();
+    const result = await db.runTransaction(async (transaction) => {
+      // 1. LECTURAS TRANSACCIONALES (IDEMPOTENCIA + CONFIG + BALANCE)
+      const [txSnap, businessSnap, balanceSnap] = await Promise.all([
+        transaction.get(txLogRef),
+        transaction.get(businessRef),
+        transaction.get(balanceRef)
+      ]);
 
-    if (!existingTx.empty) {
-      return { success: true, pointsAwarded: 0 }; // Ya procesado anteriormente
-    }
+      // Guard 1: Idempotencia (¿Ya se otorgaron puntos para este pedido?)
+      if (txSnap.exists) return { pointsAwarded: 0 }; 
 
-    // 2. OBTENER CONFIGURACIÓN DEL NEGOCIO
-    const businessSnap = await db.collection('businesses').doc(businessId).get();
-    if (!businessSnap.exists) throw new Error('Negocio no encontrado.');
-    
-    const business = businessSnap.data() as Business;
-    const loyaltyConfig = business.loyaltyConfig;
+      // Guard 2: Configuración (¿Módulo activo y umbral válido?)
+      const business = businessSnap.data() as Business;
+      const loyaltyConfig = business.loyaltyConfig;
 
-    if (!loyaltyConfig?.enabled || !loyaltyConfig.amountThreshold || loyaltyConfig.amountThreshold <= 0) {
-      return { success: true, pointsAwarded: 0 }; // Módulo desactivado o mal configurado
-    }
+      if (!loyaltyConfig?.enabled || !loyaltyConfig.amountThreshold || loyaltyConfig.amountThreshold <= 0) {
+        return { pointsAwarded: 0 };
+      }
 
-    // 3. CÁLCULO DE PUNTOS
-    const pointsToAward = Math.floor(totalPago / loyaltyConfig.amountThreshold);
-    if (pointsToAward <= 0) return { success: true, pointsAwarded: 0 };
+      // 2. CÁLCULO DE PUNTOS
+      const pointsToAward = Math.floor(totalPago / loyaltyConfig.amountThreshold);
+      if (pointsToAward <= 0) return { pointsAwarded: 0 };
 
-    // 4. TRANSACCIÓN ATÓMICA
-    const balanceRef = db.collection('businesses').doc(businessId).collection('loyaltyBalances').doc(cleanWhatsapp);
-    const transactionCol = db.collection('businesses').doc(businessId).collection('loyaltyTransactions');
-
-    await db.runTransaction(async (transaction) => {
-      const balanceSnap = await transaction.get(balanceRef);
       const currentPoints = balanceSnap.exists ? (balanceSnap.data()?.points || 0) : 0;
       const newPoints = currentPoints + pointsToAward;
       const now = new Date().toISOString();
 
-      // Actualizar Balance
+      // 3. ESCRITURAS ATÓMICAS
       transaction.set(balanceRef, {
         whatsapp: cleanWhatsapp,
         points: newPoints,
         updatedAt: now
       }, { merge: true });
 
-      // Registrar Transacción
-      const logRef = transactionCol.doc();
-      const logData: Omit<LoyaltyTransaction, 'id'> = {
+      const logData: LoyaltyTransaction = {
+        id: txLogRef.id,
         whatsapp: cleanWhatsapp,
         type: 'earn',
         amount: pointsToAward,
@@ -208,11 +201,16 @@ export async function awardLoyaltyPoints(
         orderId: orderId,
         createdAt: now
       };
-      transaction.set(logRef, logData);
+      transaction.set(txLogRef, logData);
+
+      return { pointsAwarded: pointsToAward };
     });
 
-    revalidatePath(`/catalog/${businessId}`);
-    return { success: true, pointsAwarded: pointsToAward };
+    if (result.pointsAwarded && result.pointsAwarded > 0) {
+      revalidatePath(`/catalog/${businessId}`);
+    }
+    
+    return { success: true, pointsAwarded: result.pointsAwarded };
 
   } catch (error: any) {
     console.error('[Action: awardLoyaltyPoints] Error:', error.message);
