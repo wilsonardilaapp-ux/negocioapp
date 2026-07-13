@@ -8,7 +8,6 @@ import {
   CardTitle,
   CardDescription,
   CardContent,
-  CardFooter,
 } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
@@ -86,20 +85,28 @@ export default function ModulesPage() {
     resolver: zodResolver(moduleSchema),
   });
 
-  // Seed default modules if empty
+  // Sincronizador diferencial de módulos
   useEffect(() => {
-    if (!isLoading && modules && modules.length === 0 && firestore) {
+    if (!isLoading && modules && firestore) {
       DEFAULT_MODULES.forEach(async (m) => {
         const moduleId = m.idOverride || m.name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, "");
-        const docRef = doc(firestore, 'modules', moduleId);
-        await setDocumentNonBlocking(docRef, {
-          id: moduleId,
-          name: m.name,
-          description: m.description,
-          limit: m.limit,
-          status: 'inactive', // Se crean inactivos para control del admin
-          createdAt: new Date().toISOString(),
-        });
+        
+        // Verificar si el módulo ya existe en la base de datos cargada
+        const exists = modules.some(existing => existing.id === moduleId);
+
+        if (!exists) {
+          console.log(`[ModuleSeeder] Sincronizando módulo faltante: ${m.name} (${moduleId})`);
+          const docRef = doc(firestore, 'modules', moduleId);
+          await setDocumentNonBlocking(docRef, {
+            id: moduleId,
+            name: m.name,
+            description: m.description,
+            limit: m.limit,
+            status: 'inactive', // Se crean inactivos para control del admin
+            createdAt: new Date().toISOString(),
+          });
+          console.log(`[ModuleSeeder] Módulo ${m.name} sincronizado con éxito.`);
+        }
       });
     }
   }, [modules, isLoading, firestore]);
