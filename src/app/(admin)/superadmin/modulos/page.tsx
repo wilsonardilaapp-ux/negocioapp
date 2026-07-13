@@ -8,6 +8,7 @@ import {
   CardTitle,
   CardDescription,
   CardContent,
+  CardFooter,
 } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
@@ -251,7 +252,7 @@ export default function ModulesPage() {
                     <AlertDialogHeader>
                       <AlertDialogTitle>¿Eliminar módulo?</AlertDialogTitle>
                       <AlertDialogDescription>Esta acción afectará a todos los negocios que usen este módulo.</AlertDialogDescription>
-                    </AlertDialogHeader>
+                    </AccordionHeader>
                     <AlertDialogFooter>
                       <AlertDialogCancel>Cancelar</AlertDialogCancel>
                       <AlertDialogAction onClick={() => handleDelete(module.id)} className="bg-destructive hover:bg-destructive/90">Eliminar</AlertDialogAction>
