@@ -4,6 +4,7 @@ import { getAdminFirestore } from '@/firebase/server-init';
 import { loyaltyService, type LoyaltyTransaction, type Reward } from '@/services/loyalty-service';
 import { normalizePhoneNumber } from '@/lib/utils';
 import { revalidatePath } from 'next/cache';
+import type { AdminNotification } from '@/models/notification';
 
 export interface LoyaltyStatusResponse {
   success: boolean;
@@ -49,7 +50,7 @@ export async function getLoyaltyStatus(
 
 /**
  * Procesa el canje de un premio restando puntos en una transacción atómica.
- * Toda la lectura y validación ocurre dentro del bloque runTransaction.
+ * La validación de seguridad ocurre fuera de la transacción para optimizar recursos.
  */
 export async function redeemReward(
   businessId: string, 
@@ -60,17 +61,17 @@ export async function redeemReward(
   const db = await getAdminFirestore();
   const cleanWhatsapp = normalizePhoneNumber(whatsapp);
   
+  // 1. VALIDACIÓN DE SEGURIDAD (Fuera de la transacción para evitar re-ejecución pesada)
+  const isValid = await loyaltyService.verifyInvoiceCode(businessId, whatsapp, invoiceCode);
+  if (!isValid) return { success: false, error: 'Validación de seguridad fallida. Código de factura no válido.' };
+
   const balanceRef = db.collection('businesses').doc(businessId).collection('loyaltyBalances').doc(cleanWhatsapp);
   const rewardRef = db.collection('businesses').doc(businessId).collection('rewards').doc(rewardId);
   const transactionCol = db.collection('businesses').doc(businessId).collection('loyaltyTransactions');
 
   try {
     const result = await db.runTransaction(async (transaction) => {
-      // 1. TODAS LAS LECTURAS PRIMERO (Dentro del bloque transaccional)
-      // Nota: verifyInvoiceCode hace su propio fetch pero es una validación de propiedad inmutable.
-      const isValid = await loyaltyService.verifyInvoiceCode(businessId, whatsapp, invoiceCode);
-      if (!isValid) throw new Error('Validación de seguridad fallida.');
-
+      // 2. LECTURAS TRANSACCIONALES
       const [balanceSnap, rewardSnap] = await Promise.all([
         transaction.get(balanceRef),
         transaction.get(rewardRef)
@@ -81,15 +82,16 @@ export async function redeemReward(
       const currentBalance = balanceSnap.exists ? (balanceSnap.data()?.points || 0) : 0;
       const reward = rewardSnap.data() as Reward;
 
-      // 2. VALIDACIÓN DE LÓGICA DE NEGOCIO (Error controlado con mensaje claro)
+      // 3. VALIDACIÓN DE LÓGICA DE NEGOCIO (Error controlado)
       if (currentBalance < reward.pointsCost) {
-        throw new Error(`Saldo insuficiente. Tienes ${currentBalance} puntos y necesitas ${reward.pointsCost} para este premio.`);
+        // Lanzamos error para abortar la transacción, se captura en el catch externo
+        throw new Error(`INSUFFICIENT_POINTS|Saldo insuficiente. Tienes ${currentBalance} puntos y necesitas ${reward.pointsCost}.`);
       }
 
       const newBalance = currentBalance - reward.pointsCost;
       const now = new Date().toISOString();
 
-      // 3. TODAS LAS ESCRITURAS AL FINAL
+      // 4. ESCRITURAS ATÓMICAS
       transaction.set(balanceRef, {
         whatsapp: cleanWhatsapp,
         points: newBalance,
@@ -99,8 +101,8 @@ export async function redeemReward(
       const logRef = transactionCol.doc();
       const logData: Omit<LoyaltyTransaction, 'id'> = {
         whatsapp: cleanWhatsapp,
-        type: 'redeem',
-        amount: -reward.pointsCost,
+        type: 'redeem', // Valor estandarizado
+        amount: -reward.pointsCost, // Campo estandarizado
         reason: `Canje de premio: ${reward.name}`,
         createdAt: now
       };
@@ -109,14 +111,31 @@ export async function redeemReward(
       return { newBalance, rewardName: reward.name };
     });
 
-    // 4. POST-PROCESAMIENTO (Fuera de la transacción: Revalidaciones y Notificaciones)
-    // Esto garantiza que solo se ejecuten si la transacción hizo commit exitoso.
+    // 5. POST-PROCESAMIENTO (Fuera de la transacción: Notificaciones y Revalidación)
+    
+    // Notificación al restaurante (Patrón replicado de directory-ratings)
+    const notificationRef = db.collection(`businesses/${businessId}/notifications`).doc();
+    const notificationData: any = {
+        fromSuperAdmin: true,
+        subject: '🎁 Nuevo canje de premio',
+        body: `<p>El cliente con WhatsApp <strong>${whatsapp}</strong> ha canjeado sus puntos por: <strong>${result.rewardName}</strong>.</p><p>Por favor, verifica el código de factura <strong>${invoiceCode}</strong> si es necesario para la entrega.</p>`,
+        read: false,
+        createdAt: new Date().toISOString(),
+        type: 'promotion',
+    };
+    await notificationRef.set(notificationData);
+
     revalidatePath(`/catalog/${businessId}`);
     
     return { success: true, newBalance: result.newBalance };
 
   } catch (error: any) {
-    console.error('[Action: redeemReward] Transaction failed:', error.message);
-    return { success: false, error: error.message };
+    console.error('[Action: redeemReward] Error:', error.message);
+    
+    if (error.message.startsWith('INSUFFICIENT_POINTS|')) {
+        return { success: false, error: error.message.split('|')[1] };
+    }
+    
+    return { success: false, error: 'Ocurrió un error al procesar el canje. Por favor intente de nuevo.' };
   }
 }
