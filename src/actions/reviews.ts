@@ -1,3 +1,4 @@
+
 'use server';
 
 import { getAdminFirestore } from '@/firebase/server-init';
@@ -9,6 +10,7 @@ import { grantLoyaltyPointsTransactional } from './loyalty';
 /**
  * Crea una nueva reseña de cliente en Firestore.
  * Implementa auto-aprobación para ratings altos y otorga bono de puntos si aplica.
+ * CORREGIDO: Las lecturas de puntos ahora ocurren antes de la escritura de la reseña.
  */
 export async function createReview(data: {
   businessId: string;
@@ -26,7 +28,6 @@ export async function createReview(data: {
   const reviewId = reviewsCol.doc().id;
   const now = new Date().toISOString();
 
-  // Lógica de estado inicial
   const status: ReviewStatus = data.rating >= 4 ? 'approved' : 'pending';
 
   const reviewData: any = {
@@ -46,11 +47,9 @@ export async function createReview(data: {
 
   try {
     await db.runTransaction(async (transaction) => {
-      // 1. Guardar el documento de la reseña
-      transaction.set(reviewsCol.doc(reviewId), reviewData);
-
-      // 2. Otorgar bono de lealtad si el cliente está identificado
+      // 1. LECTURAS Y ESCRITURAS DE PUNTOS (Debe ir primero porque contiene 'get')
       if (reviewData.whatsapp) {
+        // Esta función interna hace transaction.get() y luego transaction.set()
         await grantLoyaltyPointsTransactional(
           transaction,
           db,
@@ -61,6 +60,9 @@ export async function createReview(data: {
           `earn_review_${reviewId}`
         );
       }
+
+      // 2. ESCRITURA DE LA RESEÑA (Después de todas las posibles lecturas)
+      transaction.set(reviewsCol.doc(reviewId), reviewData);
     });
 
     revalidatePath(`/catalog/${data.businessId}`);

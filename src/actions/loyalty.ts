@@ -1,3 +1,4 @@
+
 'use server';
 
 import { getAdminFirestore } from '@/firebase/server-init';
@@ -61,6 +62,7 @@ export async function redeemReward(
   const db = await getAdminFirestore();
   const cleanWhatsapp = normalizePhoneNumber(whatsapp);
   
+  // Validación de seguridad fuera de la transacción para optimizar performance
   const isValid = await loyaltyService.verifyInvoiceCode(businessId, whatsapp, invoiceCode);
   if (!isValid) return { success: false, error: 'Validación de seguridad fallida. Código de factura no válido.' };
 
@@ -81,6 +83,7 @@ export async function redeemReward(
       const reward = rewardSnap.data() as Reward;
 
       if (currentBalance < reward.pointsCost) {
+        // CORREGIDO: Se usa currentBalance (variable correcta en este scope)
         throw new Error(`INSUFFICIENT_POINTS|Saldo insuficiente. Tienes ${currentBalance} puntos y necesitas ${reward.pointsCost}.`);
       }
 
@@ -106,6 +109,7 @@ export async function redeemReward(
       return { newBalance, rewardName: reward.name };
     });
 
+    // Notificación al restaurante DESPUÉS del commit exitoso
     const notificationRef = db.collection(`businesses/${businessId}/notifications`).doc();
     const notificationData: Omit<AdminNotification, 'id'> = {
         fromSuperAdmin: true,
@@ -205,7 +209,7 @@ export async function awardLoyaltyPoints(
 /**
  * Función interna reutilizable para otorgar puntos de forma transaccional.
  * Garantiza la idempotencia mediante el transactionId proporcionado.
- * No debe invocarse directamente desde componentes cliente.
+ * DEBE ser invocada al inicio del bloque runTransaction para cumplir la regla "Read before Write".
  */
 export async function grantLoyaltyPointsTransactional(
   transaction: Transaction,
@@ -220,6 +224,7 @@ export async function grantLoyaltyPointsTransactional(
   const balanceRef = db.collection('businesses').doc(businessId).collection('loyaltyBalances').doc(cleanWhatsapp);
   const txLogRef = db.collection('businesses').doc(businessId).collection('loyaltyTransactions').doc(transactionId);
 
+  // LECTURAS (Siempre al inicio de la transacción)
   const [txSnap, balanceSnap] = await Promise.all([
     transaction.get(txLogRef),
     transaction.get(balanceRef)
@@ -231,6 +236,7 @@ export async function grantLoyaltyPointsTransactional(
   const newPoints = currentPoints + amount;
   const now = new Date().toISOString();
 
+  // ESCRITURAS
   transaction.set(balanceRef, {
     whatsapp: cleanWhatsapp,
     points: newPoints,
