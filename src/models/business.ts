@@ -21,6 +21,7 @@ export type Business = {
     website?: string;
     description: string;
     googleAnalyticsId?: string;
+    googleReviewLink?: string; // Link para Google Reviews (Fase 9/10)
     vatRate?: number;
     deliveryFee?: number;
     packagingFee?: number;
@@ -61,5 +62,6 @@ export type Business = {
         suggestions?: number;
         [key: string]: number | undefined;
     };
-    loyaltyConfig?: LoyaltyConfig;
+    loyaltyConfig?: loyaltyConfig;
+    updatedAt?: string;
 };
