@@ -35,12 +35,13 @@ const simpleTextFlow = ai.defineFlow(
     outputSchema: z.string(),
   },
   async (input) => {
-    // Obtener la configuración (API Key, Proveedor, Modelo) de forma dinámica
+    // Obtener la configuración (API Key, Proveedor, Modelo) de forma dinámica.
+    // La función getAIConfig ya consulta el documento global de integraciones del Super Admin.
     const aiConfig = await getAIConfig(input.businessId);
 
-    // Validación de seguridad: si se pasó un businessId y no hay llave, informar al usuario
-    if (input.businessId && !aiConfig.apiKey) {
-        throw new Error("Configuración de IA no encontrada para este negocio. Por favor, contacta al administrador.");
+    // Validación de seguridad global: si no hay ninguna llave configurada en la plataforma.
+    if (!aiConfig.apiKey) {
+        return "⚠️ [Error de Configuración]: El administrador de la plataforma no ha configurado las llaves de IA en el panel de Super Admin.";
     }
 
     // CASO 1: Google AI (Gemini)
@@ -50,7 +51,7 @@ const simpleTextFlow = ai.defineFlow(
         prompt: input.prompt,
         config: {
           temperature: 0.7,
-          apiKey: aiConfig.apiKey, // Inyección dinámica de la llave desde Firestore
+          apiKey: aiConfig.apiKey, // Inyección dinámica de la llave desde Firestore (Motor Global)
         },
       });
 
@@ -88,7 +89,7 @@ const simpleTextFlow = ai.defineFlow(
 
     } catch (e: any) {
       console.error("[simpleTextFlow] Error:", e.message);
-      throw new Error(`Fallo en la comunicación con la IA: ${e.message}`);
+      return `❌ [Error de Comunicación]: Fallo al contactar con el proveedor de IA (${aiConfig.provider}).`;
     }
   }
 );
