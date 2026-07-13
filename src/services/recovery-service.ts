@@ -1,8 +1,8 @@
 'use server';
 
 /**
- * @fileOverview Servicio de recuperación de clientes insatisfechos.
- * Utiliza IA para generar mensajes de disculpa personalizados y los envía vía WhatsApp.
+ * @fileOverview Servicio de recuperación de clientes insatisfechos o inactivos.
+ * Utiliza IA para generar mensajes personalizados y los envía vía WhatsApp.
  */
 
 import { getAdminFirestore } from '../firebase/server-init';
@@ -17,6 +17,13 @@ interface RecoveryParams {
   rating: number;
   comment: string;
   reviewId?: string;
+}
+
+interface ChurnRecoveryParams {
+  businessId: string;
+  name: string;
+  whatsapp: string;
+  daysInactive: number;
 }
 
 /**
@@ -83,8 +90,6 @@ export async function handleNegativeReviewRecovery(params: RecoveryParams): Prom
       } catch (fetchError) {
         console.error(`[RecoveryService] Network error sending to WHAPI:`, fetchError);
       }
-    } else {
-      console.warn(`[RecoveryService] WhatsApp token missing for business ${businessId}. Message marked as failed.`);
     }
 
     // 6. Auditoría y Registro en Firestore
@@ -99,9 +104,76 @@ export async function handleNegativeReviewRecovery(params: RecoveryParams): Prom
       createdAt: FieldValue.serverTimestamp(),
     });
 
-    console.log(`[RecoveryService] Proceso completado para ${name}. Status: ${status}`);
+    console.log(`[RecoveryService] Proceso de reseña completado para ${name}. Status: ${status}`);
 
   } catch (error) {
     console.error(`[RecoveryService] Critical error in handleNegativeReviewRecovery:`, error);
+  }
+}
+
+/**
+ * Orquesta la recuperación de clientes en riesgo de abandono (Churn).
+ */
+export async function handleChurnRecovery(params: ChurnRecoveryParams): Promise<void> {
+  const { businessId, name, whatsapp, daysInactive } = params;
+
+  try {
+    const db = await getAdminFirestore();
+
+    const [businessSnap, chatbotConfigSnap] = await Promise.all([
+      db.collection('businesses').doc(businessId).get(),
+      db.doc(`businesses/${businessId}/chatbotConfig/main`).get()
+    ]);
+
+    if (!businessSnap.exists) return;
+
+    const businessData = businessSnap.data();
+    const businessName = businessData?.name || 'Nuestro Negocio';
+    const whatsappToken = chatbotConfigSnap.data()?.whatsApp?.token;
+
+    const aiConfig = await getAIConfig(businessId);
+    if (!aiConfig.apiKey) return;
+
+    const prompt = `Actúa como el dueño del negocio. El cliente ${name} no nos visita desde hace ${daysInactive} días. Escribe un mensaje de WhatsApp corto, muy cálido y humano, diciéndole que lo extrañamos y que nos encantaría volver a verlo pronto. No ofrezcas descuentos. Firma como 'El equipo de ${businessName}'.`;
+
+    const generatedMessage = await generateSimpleText(prompt);
+
+    let status: 'sent' | 'failed' = 'failed';
+    
+    if (whatsappToken) {
+      try {
+        const response = await fetch('https://gate.whapi.cloud/messages/text', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${whatsappToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            to: `${whatsapp}@s.whatsapp.net`,
+            body: generatedMessage,
+          }),
+        });
+
+        if (response.ok) status = 'sent';
+      } catch (e) {
+        console.error(`[RecoveryService] Churn fetch error:`, e);
+      }
+    }
+
+    const auditRef = db.collection('whatsapp_scheduled').doc();
+    await auditRef.set({
+      businessId,
+      whatsapp,
+      message: generatedMessage,
+      status,
+      reason: 'churn',
+      daysInactive,
+      createdAt: FieldValue.serverTimestamp(),
+    });
+
+    console.log(`[RecoveryService] Proceso de Churn completado para ${name}. Status: ${status}`);
+
+  } catch (error) {
+    console.error(`[RecoveryService] Critical error in handleChurnRecovery:`, error);
   }
 }

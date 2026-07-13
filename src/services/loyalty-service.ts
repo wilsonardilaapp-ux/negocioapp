@@ -1,5 +1,6 @@
 import { getAdminFirestore } from '@/firebase/server-init';
 import { normalizePhoneNumber } from '@/lib/utils';
+import { Timestamp } from 'firebase-admin/firestore';
 
 /**
  * @fileOverview Servicio interno para la gestión del sistema de fidelización (Loyalty).
@@ -144,6 +145,39 @@ class LoyaltyService {
             lastVisitAt: data.lastVisitAt?.toDate?.()?.toISOString() || null
         } as LoyaltyBalance;
     });
+  }
+
+  /**
+   * Detecta clientes en riesgo de abandono (Churn).
+   * Filtra aquellos cuya última visita fue hace más de X días.
+   */
+  async getChurnRiskCustomers(businessId: string, daysThreshold: number = 30) {
+    const db = await this.getDb();
+    
+    const deadline = new Date();
+    deadline.setDate(deadline.getDate() - daysThreshold);
+    const deadlineTimestamp = Timestamp.fromDate(deadline);
+
+    const snapshot = await db
+      .collection('businesses')
+      .doc(businessId)
+      .collection('loyaltyBalances')
+      .where('lastVisitAt', '<', deadlineTimestamp)
+      .orderBy('lastVisitAt', 'asc')
+      .get();
+
+    const customers = snapshot.docs.map(doc => {
+      const data = doc.data();
+      return {
+        ...data,
+        lastVisitAt: data.lastVisitAt?.toDate?.()?.toISOString() || null
+      } as LoyaltyBalance;
+    });
+
+    return {
+      customers,
+      totalCount: snapshot.size
+    };
   }
 
   /**

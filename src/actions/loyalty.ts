@@ -62,6 +62,18 @@ export async function getVipRanking(businessId: string): Promise<LoyaltyBalance[
 }
 
 /**
+ * Obtiene estadísticas de Churn (abandono) para el panel administrativo.
+ */
+export async function getChurnStatistics(businessId: string, days: number = 30) {
+  try {
+    return await loyaltyService.getChurnRiskCustomers(businessId, days);
+  } catch (error) {
+    console.error('[Action: getChurnStatistics] Error:', error);
+    return { customers: [], totalCount: 0 };
+  }
+}
+
+/**
  * Procesa el canje de un premio restando puntos en una transacción atómica.
  * Requisito: invoiceCode verificado antes de la transacción.
  */
