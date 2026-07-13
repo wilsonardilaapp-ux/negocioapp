@@ -158,6 +158,34 @@ service cloud.firestore {
         allow create: if isSuperAdmin() || isBusinessMember(businessId);
       }
 
+      // --- MÓDULO DE RESEÑAS Y FIDELIZACIÓN ---
+
+      match /reviews/{reviewId} {
+        allow read: if resource.data.status == 'approved' || isBusinessMember(businessId) || isSuperAdmin();
+        allow create: if true && (
+          (isBusinessMember(businessId) || isSuperAdmin()) || 
+          (!('reply' in request.resource.data) && (!('status' in request.resource.data) || request.resource.data.status != 'approved'))
+        );
+        allow update, delete: if isBusinessMember(businessId) || isSuperAdmin();
+      }
+
+      match /loyaltyBalances/{whatsapp} {
+        allow get: if true;
+        allow list: if isBusinessMember(businessId) || isSuperAdmin();
+        allow write: if false;
+      }
+
+      match /loyaltyTransactions/{transactionId} {
+        allow get: if true;
+        allow list: if isBusinessMember(businessId) || isSuperAdmin();
+        allow write: if false;
+      }
+
+      match /rewards/{rewardId} {
+        allow read: if resource.data.isActive == true || isBusinessMember(businessId) || isSuperAdmin();
+        allow write: if isBusinessMember(businessId) || isSuperAdmin();
+      }
+
       match /productAlerts/{alertId} {
         allow read, write: if isSuperAdmin() || isBusinessMember(businessId);
       }
