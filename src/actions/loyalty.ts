@@ -1,4 +1,3 @@
-
 'use server';
 
 import { getAdminFirestore } from '@/firebase/server-init';
@@ -52,6 +51,7 @@ export async function getLoyaltyStatus(
 
 /**
  * Procesa el canje de un premio restando puntos en una transacción atómica.
+ * Requisito: invoiceCode verificado antes de la transacción.
  */
 export async function redeemReward(
   businessId: string, 
@@ -62,7 +62,7 @@ export async function redeemReward(
   const db = await getAdminFirestore();
   const cleanWhatsapp = normalizePhoneNumber(whatsapp);
   
-  // Validación de seguridad fuera de la transacción para optimizar performance
+  // 1. VALIDACIÓN EXTERNA (Fuera de la transacción para optimizar reintentos)
   const isValid = await loyaltyService.verifyInvoiceCode(businessId, whatsapp, invoiceCode);
   if (!isValid) return { success: false, error: 'Validación de seguridad fallida. Código de factura no válido.' };
 
@@ -72,6 +72,7 @@ export async function redeemReward(
 
   try {
     const result = await db.runTransaction(async (transaction) => {
+      // 2. LECTURAS TRANSACCIONALES
       const [balanceSnap, rewardSnap] = await Promise.all([
         transaction.get(balanceRef),
         transaction.get(rewardRef)
@@ -83,13 +84,14 @@ export async function redeemReward(
       const reward = rewardSnap.data() as Reward;
 
       if (currentBalance < reward.pointsCost) {
-        // CORREGIDO: Se usa currentBalance (variable correcta en este scope)
+        // CORREGIDO: Se usa currentBalance (variable correcta en este scope) para el mensaje de error
         throw new Error(`INSUFFICIENT_POINTS|Saldo insuficiente. Tienes ${currentBalance} puntos y necesitas ${reward.pointsCost}.`);
       }
 
       const newBalance = currentBalance - reward.pointsCost;
       const now = new Date().toISOString();
 
+      // 3. ESCRITURAS TRANSACCIONALES
       transaction.set(balanceRef, {
         whatsapp: cleanWhatsapp,
         points: newBalance,
@@ -109,7 +111,7 @@ export async function redeemReward(
       return { newBalance, rewardName: reward.name };
     });
 
-    // Notificación al restaurante DESPUÉS del commit exitoso
+    // 4. POST-PROCESAMIENTO (Fuera de la transacción)
     const notificationRef = db.collection(`businesses/${businessId}/notifications`).doc();
     const notificationData: Omit<AdminNotification, 'id'> = {
         fromSuperAdmin: true,
