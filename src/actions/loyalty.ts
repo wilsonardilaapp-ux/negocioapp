@@ -65,13 +65,31 @@ export async function getVipRanking(businessId: string): Promise<LoyaltyBalance[
 
 /**
  * Obtiene estadísticas de Churn (abandono) para el panel administrativo.
+ * Utiliza el umbral dinámico configurado en el negocio.
  */
-export async function getChurnStatistics(businessId: string, days: number = 30) {
+export async function getChurnStatistics(businessId: string) {
+  if (!businessId) return { customers: [], totalCount: 0, threshold: 30 };
+
   try {
-    return await loyaltyService.getChurnRiskCustomers(businessId, days);
+    const db = await getAdminFirestore();
+    const businessSnap = await db.collection('businesses').doc(businessId).get();
+    
+    let threshold = 30; // Fallback por defecto
+    
+    if (businessSnap.exists) {
+      const data = businessSnap.data() as Business;
+      threshold = data.loyaltyConfig?.churnDaysThreshold ?? 30;
+    }
+
+    const stats = await loyaltyService.getChurnRiskCustomers(businessId, threshold);
+    
+    return {
+      ...stats,
+      threshold
+    };
   } catch (error) {
     console.error('[Action: getChurnStatistics] Error:', error);
-    return { customers: [], totalCount: 0 };
+    return { customers: [], totalCount: 0, threshold: 30 };
   }
 }
 
@@ -83,7 +101,7 @@ export async function bulkRecoverChurnClients(businessId: string) {
   if (!businessId) return { success: false, error: 'ID de negocio no proporcionado.' };
 
   try {
-    const { customers } = await loyaltyService.getChurnRiskCustomers(businessId, 30);
+    const { customers } = await getChurnStatistics(businessId);
     
     // Seguridad: limitar a los 10 más antiguos en esta versión para evitar spam masivo
     const toRecover = customers.slice(0, 10);
@@ -246,7 +264,7 @@ export async function awardLoyaltyPoints(
       // 2. LECTURAS TRANSACCIONALES (IDEMPOTENCIA + CONFIG + BALANCE)
       const [txSnap, businessSnap, balanceSnap] = await Promise.all([
         transaction.get(txLogRef),
-        transaction.get(businessSnap.exists ? businessRef : businessRef), // Dummy read to ensure business check
+        transaction.get(businessRef),
         transaction.get(balanceRef)
       ]);
 

@@ -4,6 +4,7 @@ export type DirectoryStatus = 'approved' | 'suspended' | 'hidden';
 export type LoyaltyConfig = {
     enabled: boolean;
     amountThreshold: number; // Ej: 1000 para otorgar 1 punto por cada $1000
+    churnDaysThreshold?: number; // Umbral de días para considerar riesgo de abandono
 };
 
 export type Business = {
@@ -62,6 +63,6 @@ export type Business = {
         suggestions?: number;
         [key: string]: number | undefined;
     };
-    loyaltyConfig?: loyaltyConfig;
+    loyaltyConfig?: LoyaltyConfig;
     updatedAt?: string;
 };
