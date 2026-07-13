@@ -16,6 +16,7 @@ import { updateBusinessLoyaltyConfig } from '@/actions/business';
 // Componentes del Módulo
 import RecoveredRevenueCard from '@/components/admin/loyalty/RecoveredRevenueCard';
 import ChurnRiskCard from '@/components/admin/loyalty/ChurnRiskCard';
+import ChurnConfigCard from '@/components/admin/loyalty/ChurnConfigCard';
 import VipCustomersRanking from '@/components/admin/loyalty/VipCustomersRanking';
 import ReviewSummary from '@/components/reviews/ReviewSummary';
 import ReviewModerationList from '@/components/reviews/ReviewModerationList';
@@ -86,7 +87,7 @@ export default function LoyaltyDashboardPage() {
     );
   }
 
-  if (!user) return null;
+  if (!user || !business) return null;
 
   return (
     <div className="container mx-auto space-y-8 animate-in fade-in duration-700 max-w-7xl">
@@ -133,8 +134,9 @@ export default function LoyaltyDashboardPage() {
             </div>
 
             {/* FILA CENTRAL: Acción Proactiva (Churn) */}
-            <div className="grid grid-cols-1 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <ChurnRiskCard businessId={user.uid} />
+                <ChurnConfigCard business={business} />
             </div>
 
             {/* FILA INFERIOR: Tabla de Ranking de Clientes */}
@@ -180,7 +182,7 @@ export default function LoyaltyDashboardPage() {
                         </div>
                         <div className="flex items-start gap-3 p-4 bg-blue-50 text-blue-800 rounded-xl border border-blue-100 text-xs leading-relaxed">
                             <Info className="h-4 w-4 shrink-0 mt-0.5" />
-                            <p>
+                            <p { /* @ts-ignore */ } >
                                 <span className="font-black">💡 Tip:</span> Usa el link directo de <strong>&quot;Escribir una reseña&quot;</strong> de tu perfil de Google Business. 
                                 Esto permitirá que la IA invite a tus clientes a calificarte públicamente de forma efectiva.
                             </p>
