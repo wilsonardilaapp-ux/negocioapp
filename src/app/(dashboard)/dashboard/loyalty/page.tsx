@@ -120,7 +120,7 @@ export default function LoyaltyDashboardPage() {
                 <Card className="shadow-sm border-none bg-white p-6 flex flex-col justify-center border border-gray-100">
                     <div className="flex items-center gap-2 mb-4">
                         <div className="p-1.5 bg-yellow-50 rounded-lg">
-                            <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" />
+                            <Star className="h-4 w-4 text-yellow-500 fill-yellow-400" />
                         </div>
                         <h3 className="text-xs font-black uppercase tracking-widest text-muted-foreground">Resumen de Reputación</h3>
                     </div>
@@ -150,7 +150,11 @@ export default function LoyaltyDashboardPage() {
                     <p className="text-sm text-muted-foreground">Aprueba las valoraciones pendientes y responde a tus clientes.</p>
                 </div>
                 
-                <ReviewModerationList businessId={user.uid} />
+                <ReviewModerationList 
+                    businessId={user.uid} 
+                    businessName={business?.name}
+                    googleReviewLink={business?.googleReviewLink}
+                />
 
                 {/* SECCIÓN: CONFIGURACIÓN DE GOOGLE REVIEWS */}
                 <Card className="border-primary/20 bg-primary/5">

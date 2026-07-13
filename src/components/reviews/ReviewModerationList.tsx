@@ -22,6 +22,7 @@ import {
 } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useToast } from '@/hooks/use-toast';
 import { moderateReview } from '@/actions/reviews';
 import { 
@@ -33,18 +34,26 @@ import {
     Loader2, 
     User,
     Calendar,
-    MessageCircle
+    MessageCircle,
+    Bot,
+    Smartphone,
+    Mail,
+    AlertTriangle,
+    CheckCircle2
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { cn } from '@/lib/utils';
+import { cn, normalizePhoneNumber } from '@/lib/utils';
 import type { Review, ReviewStatus } from '@/models/review';
+import { generateSimpleText } from '@/ai/flows/simple-text-flow';
 
 interface ReviewModerationListProps {
   businessId: string;
+  businessName?: string;
+  googleReviewLink?: string | null;
 }
 
-export default function ReviewModerationList({ businessId }: ReviewModerationListProps) {
+export default function ReviewModerationList({ businessId, businessName, googleReviewLink }: ReviewModerationListProps) {
     const firestore = useFirestore();
     const { toast } = useToast();
     
@@ -59,6 +68,11 @@ export default function ReviewModerationList({ businessId }: ReviewModerationLis
     const [isActionLoading, setIsActionLoading] = useState<string | null>(null);
     const [replyTarget, setReplyTarget] = useState<Review | null>(null);
     const [replyText, setReplyText] = useState('');
+
+    // Estados para Recuperación con IA
+    const [recoveryTarget, setRecoveryTarget] = useState<Review | null>(null);
+    const [generatedMessage, setGeneratedMessage] = useState('');
+    const [isGenerating, setIsGenerating] = useState(false);
 
     const handleUpdateStatus = async (reviewId: string, status: ReviewStatus) => {
         setIsActionLoading(reviewId);
@@ -91,6 +105,35 @@ export default function ReviewModerationList({ businessId }: ReviewModerationLis
         } finally {
             setIsActionLoading(null);
         }
+    };
+
+    const handleGenerateAiMessage = async () => {
+        if (!recoveryTarget) return;
+        
+        setIsGenerating(true);
+        try {
+            const prompt = `Actúa como el dueño del negocio. El cliente ${recoveryTarget.name} calificó con ${recoveryTarget.rating} estrellas y dijo: '${recoveryTarget.comment}'. Redacta un mensaje muy amable para WhatsApp, invitándolo a volver y ofreciéndole una mejor experiencia. Incluye este enlace para que actualice su reseña si queda satisfecho: ${googleReviewLink || ''}. Si el enlace no existe, omite esa parte. El mensaje debe ser corto y empático.`;
+            
+            const response = await generateSimpleText(prompt);
+            setGeneratedMessage(response);
+        } catch (error) {
+            toast({ variant: 'destructive', title: "Error de IA", description: "No se pudo generar el mensaje." });
+        } finally {
+            setIsGenerating(false);
+        }
+    };
+
+    const handleSendWhatsApp = () => {
+        if (!recoveryTarget?.whatsapp || !generatedMessage) return;
+        const cleanPhone = normalizePhoneNumber(recoveryTarget.whatsapp);
+        const whatsappUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(generatedMessage)}`;
+        window.open(whatsappUrl, '_blank');
+    };
+
+    const handleSendEmail = () => {
+        if (!generatedMessage) return;
+        const mailtoUrl = `mailto:?subject=Seguimiento de tu experiencia en ${businessName || 'nuestro negocio'}&body=${encodeURIComponent(generatedMessage)}`;
+        window.location.href = mailtoUrl;
     };
 
     const getStatusBadge = (status: ReviewStatus) => {
@@ -166,12 +209,15 @@ export default function ReviewModerationList({ businessId }: ReviewModerationLis
                                             <>
                                                 <Button 
                                                     size="sm" 
-                                                    className="bg-green-600 hover:bg-green-700 font-bold gap-2"
-                                                    onClick={() => handleUpdateStatus(review.id, 'approved')}
+                                                    className="bg-sky-500 hover:bg-sky-600 font-bold gap-2 text-white"
+                                                    onClick={() => {
+                                                        setRecoveryTarget(review);
+                                                        setGeneratedMessage('');
+                                                    }}
                                                     disabled={isActionLoading === review.id}
                                                 >
-                                                    {isActionLoading === review.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
-                                                    Aprobar
+                                                    <Bot className="h-3 w-3" />
+                                                    Recuperar Cliente
                                                 </Button>
                                                 <Button 
                                                     size="sm" 
@@ -212,7 +258,7 @@ export default function ReviewModerationList({ businessId }: ReviewModerationLis
                 )}
             </div>
 
-            {/* Modal de Respuesta */}
+            {/* Modal de Respuesta Estándar */}
             <Dialog open={!!replyTarget} onOpenChange={(open) => !open && setReplyTarget(null)}>
                 <DialogContent>
                     <DialogHeader>
@@ -239,6 +285,116 @@ export default function ReviewModerationList({ businessId }: ReviewModerationLis
                         <Button onClick={handleSaveReply} disabled={isActionLoading === replyTarget?.id || !replyText.trim()} className="font-bold">
                             {isActionLoading === replyTarget?.id && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                             Publicar Respuesta
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* MODAL DE RECUPERACIÓN CON IA */}
+            <Dialog open={!!recoveryTarget} onOpenChange={(open) => !open && !isGenerating && setRecoveryTarget(null)}>
+                <DialogContent className="max-w-2xl">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <Bot className="h-5 w-5 text-sky-500" />
+                            Recuperar a {recoveryTarget?.name}
+                        </DialogTitle>
+                        <DialogDescription>Genera un mensaje empático para invitar al cliente a darnos una segunda oportunidad.</DialogDescription>
+                    </DialogHeader>
+
+                    <div className="py-4 space-y-6">
+                        {/* Resumen de la reseña original */}
+                        <div className="bg-muted/50 p-4 rounded-xl border space-y-2">
+                            <div className="flex items-center gap-2">
+                                <div className="flex">
+                                    {[1, 2, 3, 4, 5].map(s => (
+                                        <Star key={s} className={cn("h-3 w-3", s <= (recoveryTarget?.rating || 0) ? "text-yellow-400 fill-yellow-400" : "text-gray-200")} />
+                                    ))}
+                                </div>
+                                <span className="text-[10px] font-bold text-muted-foreground uppercase">Opinión Original</span>
+                            </div>
+                            <p className="text-sm italic text-gray-600">"{recoveryTarget?.comment}"</p>
+                        </div>
+
+                        {!googleReviewLink && (
+                            <Alert className="bg-amber-50 border-amber-200">
+                                <AlertTriangle className="h-4 w-4 text-amber-600" />
+                                <AlertTitle className="text-amber-800 font-bold">Configuración Incompleta</AlertTitle>
+                                <AlertDescription className="text-amber-700 text-xs">
+                                    No has configurado el link de Google Reviews. El mensaje se generará sin enlace de redirección.
+                                </AlertDescription>
+                            </Alert>
+                        )}
+
+                        <div className="space-y-4">
+                            <div className="flex items-center justify-between">
+                                <Label className="font-bold text-gray-700">Mensaje sugerido por IA</Label>
+                                <Button 
+                                    size="sm" 
+                                    variant="outline" 
+                                    onClick={handleGenerateAiMessage} 
+                                    disabled={isGenerating}
+                                    className="gap-2 border-sky-200 text-sky-700 hover:bg-sky-50"
+                                >
+                                    {isGenerating ? <Loader2 className="h-3 w-3 animate-spin" /> : <Bot className="h-3 w-3" />}
+                                    {generatedMessage ? 'Regenerar Mensaje' : 'Generar Mensaje con IA'}
+                                </Button>
+                            </div>
+
+                            {isGenerating ? (
+                                <div className="h-32 flex flex-col items-center justify-center border-2 border-dashed rounded-xl gap-2">
+                                    <Loader2 className="h-6 w-6 animate-spin text-sky-500" />
+                                    <p className="text-xs text-muted-foreground animate-pulse">Redactando una respuesta perfecta...</p>
+                                </div>
+                            ) : (
+                                <Textarea 
+                                    value={generatedMessage}
+                                    onChange={(e) => setGeneratedMessage(e.target.value)}
+                                    placeholder="El mensaje generado aparecerá aquí..."
+                                    className="min-h-[150px] bg-sky-50/20 border-sky-100 focus-visible:ring-sky-500"
+                                />
+                            )}
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                            <Button 
+                                onClick={handleSendWhatsApp} 
+                                disabled={!generatedMessage || isGenerating || !recoveryTarget?.whatsapp}
+                                className="bg-[#25D366] hover:bg-[#128C7E] text-white font-bold gap-2 h-12"
+                            >
+                                <Smartphone className="h-4 w-4" />
+                                Enviar por WhatsApp
+                            </Button>
+                            <Button 
+                                onClick={handleSendEmail} 
+                                disabled={!generatedMessage || isGenerating}
+                                variant="outline"
+                                className="font-bold gap-2 h-12"
+                            >
+                                <Mail className="h-4 w-4" />
+                                Enviar por Correo
+                            </Button>
+                        </div>
+                    </div>
+
+                    <DialogFooter className="bg-muted/30 p-6 -mx-6 -mb-6 border-t flex-col sm:flex-row gap-3">
+                        <Button 
+                            variant="ghost" 
+                            onClick={() => setRecoveryTarget(null)}
+                            disabled={isGenerating}
+                            className="font-bold"
+                        >
+                            Cerrar sin cambios
+                        </Button>
+                        <Button 
+                            onClick={() => {
+                                if(recoveryTarget) handleUpdateStatus(recoveryTarget.id, 'approved');
+                                setRecoveryTarget(null);
+                            }}
+                            className="bg-primary hover:bg-primary/90 font-black px-8"
+                            disabled={isGenerating || !generatedMessage}
+                        >
+                            <CheckCircle2 className="h-4 w-4 mr-2" />
+                            Cerrar y Marcar como Aprobada
                         </Button>
                     </DialogFooter>
                 </DialogContent>
