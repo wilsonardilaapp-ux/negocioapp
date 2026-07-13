@@ -81,7 +81,11 @@ ${productsContent}
   }
 }
 
-async function getAIConfig(): Promise<{ provider: string; apiKey: string; model: string }> {
+/**
+ * Obtiene la configuración de IA activa (API Key y Proveedor).
+ * Se exporta para ser utilizada por otros servicios como el de recuperación.
+ */
+export async function getAIConfig(businessId?: string): Promise<{ provider: string; apiKey: string; model: string }> {
   try {
     const firestore = await getAdminFirestore();
     const snap = await firestore.doc('integrations/chatbot-integrado-con-whatsapp-para-soporte-y-ventas').get();
@@ -104,7 +108,6 @@ async function getAIConfig(): Promise<{ provider: string; apiKey: string; model:
       fields = data.fields;
     }
 
-    // ✅ CORREGIDO: modelo gemini-2.0-flash (estable, sin thinking por defecto)
     if (fields.openai?.apiKey) return { provider: 'openai', apiKey: fields.openai.apiKey, model: 'gpt-4o-mini' };
     if (fields.groq?.apiKey) return { provider: 'groq', apiKey: fields.groq.apiKey, model: 'llama-3.1-8b-instant' };
     if (fields.google?.apiKey) return { provider: 'googleai', apiKey: fields.google.apiKey, model: 'gemini-2.0-flash' };
@@ -113,7 +116,6 @@ async function getAIConfig(): Promise<{ provider: string; apiKey: string; model:
     console.error("Error getting AI config from Firestore:", e.message);
   }
 
-  // ✅ CORREGIDO: fallback con modelo válido
   return { provider: 'openai', apiKey: '', model: 'gpt-4o-mini' };
 }
 
@@ -131,7 +133,7 @@ const chatFlow = ai.defineFlow(
       return "Error de Permisos: Ve a la consola de Firebase -> Firestore -> Reglas y cambia 'allow read' a true.";
     }
 
-    const aiConfig = await getAIConfig();
+    const aiConfig = await getAIConfig(input.businessId);
 
     const systemPrompt = `
 Eres el Asistente de ${input.businessId}.
@@ -150,7 +152,6 @@ ${contextData}
 
     const userMessage = input.message;
 
-    // ✅ Google AI con thinking desactivado explícitamente
     if (aiConfig.provider === 'googleai') {
       const response = await ai.generate({
         model: `googleai/${aiConfig.model}`,
@@ -161,7 +162,6 @@ ${contextData}
         config: {
           temperature: 0.1,
           apiKey: aiConfig.apiKey,
-          // ✅ CORRECCIÓN PRINCIPAL: deshabilitar thinking completamente
           thinkingConfig: {
             thinkingBudget: 0,
           },
@@ -170,7 +170,6 @@ ${contextData}
       return response.text ?? 'Error.';
     }
 
-    // OpenAI / Groq
     try {
       const endpoint = aiConfig.provider === 'groq'
         ? 'https://api.groq.com/openai/v1/chat/completions'
