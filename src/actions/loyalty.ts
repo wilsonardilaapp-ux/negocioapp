@@ -244,16 +244,23 @@ export async function awardLoyaltyPoints(
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
   const thresholdDate = Timestamp.fromDate(sevenDaysAgo);
 
-  const recoverySnap = await db.collection('whatsapp_scheduled')
-    .where('businessId', '==', businessId)
-    .where('whatsapp', '==', cleanWhatsapp)
-    .where('status', '==', 'sent')
-    .where('createdAt', '>=', thresholdDate)
-    .orderBy('createdAt', 'desc')
-    .limit(1)
-    .get();
+  let recoveryMessageId: string | null = null;
+  
+  try {
+    const recoverySnap = await db.collection('whatsapp_scheduled')
+      .where('businessId', '==', businessId)
+      .where('whatsapp', '==', cleanWhatsapp)
+      .where('status', '==', 'sent')
+      .where('createdAt', '>=', thresholdDate)
+      .orderBy('createdAt', 'desc')
+      .limit(1)
+      .get();
 
-  const recoveryMessageId = !recoverySnap.empty ? recoverySnap.docs[0].id : null;
+    recoveryMessageId = !recoverySnap.empty ? recoverySnap.docs[0].id : null;
+  } catch (e: any) {
+    // Si falla por falta de índice compuesto, logueamos aviso pero permitimos continuar
+    console.warn(`[ROI Attribution Warn] No se pudo consultar la atribución ROI para ${orderId}: ${e.message}. El sistema continuará otorgando los puntos.`);
+  }
 
   const balanceRef = db.collection('businesses').doc(businessId).collection('loyaltyBalances').doc(cleanWhatsapp);
   const txLogRef = db.collection('businesses').doc(businessId).collection('loyaltyTransactions').doc(`earn_${orderId}`);
@@ -338,6 +345,7 @@ export async function awardLoyaltyPoints(
 /**
  * Sincroniza masivamente el historial de pedidos de un negocio para otorgar puntos pendientes.
  * Procesa únicamente pedidos con estado 'Entregado' que no tengan transacciones previas.
+ * Implementa resiliencia ante datos inválidos e índices faltantes.
  */
 export async function syncBusinessLoyaltyHistory(businessId: string) {
   if (!businessId) return { success: false, error: 'ID de negocio no proporcionado.' };
@@ -346,12 +354,20 @@ export async function syncBusinessLoyaltyHistory(businessId: string) {
   const summary = {
     processed: 0,
     alreadySynced: 0,
+    skippedInvalidData: 0, // Pedidos sin teléfono (Fase 17.1)
     errors: 0,
     totalPointsAwarded: 0
   };
 
   try {
-    // 1. Obtener todos los pedidos entregados del negocio
+    // 1. Validación de Configuración (Fase 17.1)
+    const businessSnap = await db.collection('businesses').doc(businessId).get();
+    const bData = businessSnap.data() as Business;
+    if (!bData?.loyaltyConfig?.amountThreshold || bData.loyaltyConfig.amountThreshold <= 0) {
+      return { success: false, error: 'Debe configurar el valor de los puntos (Umbral de Consumo) antes de sincronizar.' };
+    }
+
+    // 2. Obtener todos los pedidos entregados del negocio
     const ordersSnap = await db.collection('businesses')
       .doc(businessId)
       .collection('orders')
@@ -362,20 +378,19 @@ export async function syncBusinessLoyaltyHistory(businessId: string) {
       return { success: true, summary, message: "No se encontraron pedidos entregados para sincronizar." };
     }
 
-    // 2. Procesamiento secuencial para proteger la estabilidad de Firestore (Max 500 writes/batch)
-    // El bucle garantiza que no saturemos la memoria ni el rate-limit del Admin SDK
+    // 3. Procesamiento secuencial para proteger la estabilidad de Firestore (Max 500 writes/batch)
     for (const orderDoc of ordersSnap.docs) {
       const order = orderDoc.data() as Order;
       const orderId = orderDoc.id;
       
-      // Sanitización: Ignorar pedidos sin teléfono identificado
+      // Sanitización (Fase 17.1): Ignorar pedidos sin teléfono sin contar como error crítico
       if (!order.customerPhone) {
-        summary.errors++;
+        summary.skippedInvalidData++;
         continue;
       }
 
       try {
-        // La función awardLoyaltyPoints ya es idempotente (verifica earn_{orderId})
+        // La función awardLoyaltyPoints ya es resiliente (atribución ROI opcional) e idempotente
         const result = await awardLoyaltyPoints(
           businessId,
           order.customerPhone,
@@ -392,6 +407,7 @@ export async function syncBusinessLoyaltyHistory(businessId: string) {
             summary.alreadySynced++;
           }
         } else {
+          // Si el error es manejable, aumentamos contador pero seguimos
           summary.errors++;
         }
       } catch (e) {
@@ -400,14 +416,14 @@ export async function syncBusinessLoyaltyHistory(businessId: string) {
       }
     }
 
-    // 3. Invalidar la caché de las páginas relevantes tras la sincronización masiva
+    // 4. Invalidar la caché de las páginas relevantes tras la sincronización masiva
     revalidatePath('/dashboard/loyalty');
     revalidatePath(`/catalog/${businessId}`);
 
     return { 
       success: true, 
       summary, 
-      message: `Sincronización finalizada. ${summary.processed} pedidos nuevos procesados.` 
+      message: `Sincronización finalizada. ${summary.processed} pedidos procesados retroactivamente.` 
     };
 
   } catch (error: any) {
@@ -473,7 +489,6 @@ export async function getRecoveryStats(businessId: string) {
     const db = await getAdminFirestore();
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const startOfMonthTimestamp = Timestamp.fromDate(startOfMonth);
 
     try {
         // Consultar pedidos recuperados del mes actual
