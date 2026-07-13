@@ -1,3 +1,4 @@
+'use client';
 /**
  * @fileOverview Definición del modelo de reseñas para negocios.
  */

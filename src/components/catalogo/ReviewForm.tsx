@@ -19,7 +19,7 @@ const reviewSchema = z.object({
   name: z.string().min(2, 'Por favor, ingresa tu nombre.'),
   whatsapp: z.string().min(10, 'WhatsApp inválido (ej: 3001234567).'),
   rating: z.number().min(1, 'Selecciona una calificación.').max(5),
-  comment: z.string().min(10, 'Tu comentario debe ser más detallado (mín. 10 caracteres).'),
+  comment: z.string().min(10, 'Tu comentario debe tener al menos 10 caracteres.'),
 });
 
 type ReviewFormData = z.infer<typeof reviewSchema>;
@@ -142,7 +142,7 @@ export default function ReviewForm({ businessId }: ReviewFormProps) {
         </CardContent>
         <CardFooter className="bg-muted/10 border-t pt-6">
           <Button type="submit" className="w-full h-12 text-lg font-black shadow-lg shadow-primary/10" disabled={isSubmitting}>
-            {isSubmitting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : 'Publicar Reseña'}
+            {isSubmitting ? <Loader2 className="mr-2 h-5 v-5 animate-spin" /> : 'Publicar Reseña'}
           </Button>
         </CardFooter>
       </form>

@@ -81,7 +81,7 @@ export async function redeemReward(
       const reward = rewardSnap.data() as Reward;
 
       if (currentBalance < reward.pointsCost) {
-        throw new Error(`INSUFFICIENT_POINTS|Saldo insuficiente. Tienes ${currentPoints} puntos y necesitas ${reward.pointsCost}.`);
+        throw new Error(`INSUFFICIENT_POINTS|Saldo insuficiente. Tienes ${currentBalance} puntos y necesitas ${reward.pointsCost}.`);
       }
 
       const newBalance = currentBalance - reward.pointsCost;
