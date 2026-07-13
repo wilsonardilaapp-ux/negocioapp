@@ -84,7 +84,6 @@ export async function redeemReward(
 
       // 3. VALIDACIÓN DE LÓGICA DE NEGOCIO (Error controlado)
       if (currentBalance < reward.pointsCost) {
-        // Lanzamos error para abortar la transacción, se captura en el catch externo
         throw new Error(`INSUFFICIENT_POINTS|Saldo insuficiente. Tienes ${currentBalance} puntos y necesitas ${reward.pointsCost}.`);
       }
 
@@ -101,8 +100,8 @@ export async function redeemReward(
       const logRef = transactionCol.doc();
       const logData: Omit<LoyaltyTransaction, 'id'> = {
         whatsapp: cleanWhatsapp,
-        type: 'redeem', // Valor estandarizado
-        amount: -reward.pointsCost, // Campo estandarizado
+        type: 'redeem',
+        amount: -reward.pointsCost,
         reason: `Canje de premio: ${reward.name}`,
         createdAt: now
       };
@@ -113,15 +112,15 @@ export async function redeemReward(
 
     // 5. POST-PROCESAMIENTO (Fuera de la transacción: Notificaciones y Revalidación)
     
-    // Notificación al restaurante (Patrón replicado de directory-ratings)
+    // Notificación al restaurante (Replicando patrón oficial de directory-ratings)
     const notificationRef = db.collection(`businesses/${businessId}/notifications`).doc();
     const notificationData: Omit<AdminNotification, 'id'> = {
-        fromSuperAdmin: true, // Representa una notificación oficial del sistema
+        fromSuperAdmin: true,
         subject: '🎁 Nuevo canje de premio',
         body: `<p>El cliente con WhatsApp <strong>${whatsapp}</strong> ha canjeado sus puntos por: <strong>${result.rewardName}</strong>.</p><p>Por favor, verifica el código de factura <strong>${invoiceCode}</strong> si es necesario para la entrega.</p>`,
         read: false,
         createdAt: new Date().toISOString(),
-        type: 'general', // Evento administrativo general
+        type: 'general',
     };
     await notificationRef.set(notificationData);
 

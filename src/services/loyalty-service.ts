@@ -67,6 +67,7 @@ class LoyaltyService {
     }
 
     const data = balanceDoc.data() as LoyaltyBalance;
+    // Confirmado: usamos 'points' como nombre definitivo del campo
     return data.points || 0;
   }
 
@@ -132,7 +133,7 @@ class LoyaltyService {
 
     const ordersRef = db.collection('businesses').doc(businessId).collection('orders');
     
-    // 1. Filtro por Base de Datos (Primera capa)
+    // 1. Filtro por Base de Datos (Primera capa resiliente)
     const snapshot = await ordersRef
       .where('customerPhone', 'in', [whatsapp, cleanWhatsapp])
       .get();
@@ -146,7 +147,6 @@ class LoyaltyService {
       const orderData = doc.data();
       const dbPhoneNormalized = normalizePhoneNumber(orderData.customerPhone);
       
-      // El teléfono del pedido en la DB debe ser el mismo que el del cliente tras normalizar ambos
       if (dbPhoneNormalized !== cleanWhatsapp) return false;
 
       const displayCode = doc.id.slice(-8).toUpperCase();
