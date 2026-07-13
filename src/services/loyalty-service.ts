@@ -67,7 +67,6 @@ class LoyaltyService {
     }
 
     const data = balanceDoc.data() as LoyaltyBalance;
-    // Confirmado: usamos 'points' como nombre definitivo del campo
     return data.points || 0;
   }
 
