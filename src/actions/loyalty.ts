@@ -6,7 +6,7 @@ import { normalizePhoneNumber } from '@/lib/utils';
 import { revalidatePath } from 'next/cache';
 import type { AdminNotification } from '@/models/notification';
 import type { Business } from '@/models/business';
-import { FieldValue, type Transaction, type Firestore } from 'firebase-admin/firestore';
+import { FieldValue, type Transaction, type Firestore, Timestamp } from 'firebase-admin/firestore';
 import { handleChurnRecovery } from '@/services/recovery-service';
 
 export interface LoyaltyStatusResponse {
@@ -93,8 +93,8 @@ export async function bulkRecoverChurnClients(businessId: string) {
 
     const recoveryPromises = toRecover.map(async (client) => {
       // Calcular días inactivos para el prompt de la IA
-      const lastVisitDate = client.lastVisitAt ? new Date(client.lastVisitAt) : new Date();
-      const diffTime = Math.abs(Date.now() - lastVisitDate.getTime());
+      const lastVisitAtDate = client.lastVisitAt ? new Date(client.lastVisitAt) : new Date();
+      const diffTime = Math.abs(Date.now() - lastVisitAtDate.getTime());
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
       return handleChurnRecovery({
@@ -207,6 +207,7 @@ export async function redeemReward(
 /**
  * Otorga puntos de fidelidad por consumo tras la facturación de un pedido.
  * Implementa contador de visitas e idempotencia basada en el ID del pedido.
+ * También gestiona la ATRIBUCIÓN ROI (Fase 4.1) si el pedido viene de una recuperación.
  */
 export async function awardLoyaltyPoints(
   businessId: string, 
@@ -217,13 +218,31 @@ export async function awardLoyaltyPoints(
   const db = await getAdminFirestore();
   const cleanWhatsapp = normalizePhoneNumber(whatsapp);
   
+  // --- 1. LÓGICA DE ATRIBUCIÓN (Fase 4.1) ---
+  // Buscamos si el cliente recibió un mensaje de recuperación en los últimos 7 días
+  const sevenDaysAgo = new Date();
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+  const thresholdDate = Timestamp.fromDate(sevenDaysAgo);
+
+  const recoverySnap = await db.collection('whatsapp_scheduled')
+    .where('businessId', '==', businessId)
+    .where('whatsapp', '==', cleanWhatsapp)
+    .where('status', '==', 'sent')
+    .where('createdAt', '>=', thresholdDate)
+    .orderBy('createdAt', 'desc')
+    .limit(1)
+    .get();
+
+  const recoveryMessageId = !recoverySnap.empty ? recoverySnap.docs[0].id : null;
+
   const balanceRef = db.collection('businesses').doc(businessId).collection('loyaltyBalances').doc(cleanWhatsapp);
   const txLogRef = db.collection('businesses').doc(businessId).collection('loyaltyTransactions').doc(`earn_${orderId}`);
   const businessRef = db.collection('businesses').doc(businessId);
+  const orderRef = db.collection('businesses').doc(businessId).collection('orders').doc(orderId);
 
   try {
     const result = await db.runTransaction(async (transaction) => {
-      // 1. LECTURAS TRANSACCIONALES (IDEMPOTENCIA + CONFIG + BALANCE)
+      // 2. LECTURAS TRANSACCIONALES (IDEMPOTENCIA + CONFIG + BALANCE)
       const [txSnap, businessSnap, balanceSnap] = await Promise.all([
         transaction.get(txLogRef),
         transaction.get(businessRef),
@@ -248,9 +267,18 @@ export async function awardLoyaltyPoints(
       const newPoints = currentPoints + pointsToAward;
       const nowISO = new Date().toISOString();
 
-      // 2. ESCRITURAS TRANSACCIONALES
+      // 3. ESCRITURAS TRANSACCIONALES
       
-      // Actualizar Balance sumando puntos, incrementando visitas y registrando fecha
+      // A. ATRIBUCIÓN ROI: Marcar pedido como recuperado si aplica
+      if (recoveryMessageId) {
+        transaction.update(orderRef, {
+            isRecovered: true,
+            recoverySourceId: recoveryMessageId,
+            recoveredAt: nowISO
+        });
+      }
+
+      // B. Actualizar Balance sumando puntos, incrementando visitas y registrando fecha
       transaction.set(balanceRef, {
         whatsapp: cleanWhatsapp,
         points: newPoints,
@@ -259,7 +287,7 @@ export async function awardLoyaltyPoints(
         updatedAt: nowISO
       }, { merge: true });
 
-      // Registrar Log de Transacción (Sirve de ancla para la idempotencia)
+      // C. Registrar Log de Transacción (Sirve de ancla para la idempotencia)
       const logData = {
         id: txLogRef.id,
         whatsapp: cleanWhatsapp,

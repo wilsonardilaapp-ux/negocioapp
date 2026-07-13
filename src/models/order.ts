@@ -1,4 +1,5 @@
 import type { AppliedPromotion } from './cart';
+import type { Timestamp } from 'firebase/firestore';
 
 export type OrderStatus = "Pendiente" | "En proceso" | "Enviado" | "Entregado" | "Cancelado";
 
@@ -63,4 +64,8 @@ export type Order = {
   orderDate: string;
   orderStatus: OrderStatus;
   tipoEntrega: TipoEntrega;
+  // --- Campos de Atribución ROI (Fase 4.1) ---
+  isRecovered?: boolean;
+  recoverySourceId?: string;
+  recoveredAt?: Timestamp | string;
 };

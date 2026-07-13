@@ -33,6 +33,16 @@
       ]
     },
     {
+      "collectionId": "whatsapp_scheduled",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "businessId", "order": "ASCENDING" },
+        { "fieldPath": "whatsapp", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
       "collectionId": "shareConfig",
       "queryScope": "COLLECTION_GROUP",
       "fields": [
