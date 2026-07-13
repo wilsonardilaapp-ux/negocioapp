@@ -24,10 +24,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Loader2, CheckCircle, XCircle } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { Separator } from '@/components/ui/separator';
+import { Badge } from '@/components/ui/badge';
+import { Loader2, CheckCircle, XCircle, Plus, Trash2, Clock, Globe } from 'lucide-react';
 import { testApiKey } from '@/ai/flows/test-api-key-flow';
 import { useToast } from '@/hooks/use-toast';
-import type { Integration, AIProviderFields } from '@/models/integration';
+import type { Integration, AIProviderFields, PeakHourRange } from '@/models/integration';
 
 type Provider = 'google' | 'openai' | 'groq' | 'nanobanana' | 'deepseek' | 'qwen' | 'zai' | 'custom';
 type TestStatus = 'idle' | 'testing' | 'success' | 'error';
@@ -62,15 +65,57 @@ export const AIProviderForm = ({
         parsed = JSON.parse(integration.fields);
       }
     } catch (e) { console.error('AI parse error', e); }
+    
     return {
-      google: { apiKey: parsed?.google?.apiKey || '' },
-      openai: { apiKey: parsed?.openai?.apiKey || '' },
-      groq:   { apiKey: parsed?.groq?.apiKey   || '' },
-      nanobanana: { apiKey: parsed?.nanobanana?.apiKey || '' },
-      deepseek: { apiKey: parsed?.deepseek?.apiKey || '' },
-      qwen: { apiKey: parsed?.qwen?.apiKey || '' },
-      zai: { apiKey: parsed?.zai?.apiKey || '' },
-      custom: { endpoint: parsed?.custom?.endpoint || '', apiKey: parsed?.custom?.apiKey || '' },
+      google: { 
+        apiKey: parsed?.google?.apiKey || '',
+        peakHours: parsed?.google?.peakHours || [],
+        timezone: parsed?.google?.timezone || 'America/Bogota',
+        avoidInPeakHours: parsed?.google?.avoidInPeakHours || false,
+      },
+      openai: { 
+        apiKey: parsed?.openai?.apiKey || '',
+        peakHours: parsed?.openai?.peakHours || [],
+        timezone: parsed?.openai?.timezone || 'America/Bogota',
+        avoidInPeakHours: parsed?.openai?.avoidInPeakHours || false,
+      },
+      groq: { 
+        apiKey: parsed?.groq?.apiKey || '',
+        peakHours: parsed?.groq?.peakHours || [],
+        timezone: parsed?.groq?.timezone || 'America/Bogota',
+        avoidInPeakHours: parsed?.groq?.avoidInPeakHours || false,
+      },
+      nanobanana: { 
+        apiKey: parsed?.nanobanana?.apiKey || '',
+        peakHours: parsed?.nanobanana?.peakHours || [],
+        timezone: parsed?.nanobanana?.timezone || 'America/Bogota',
+        avoidInPeakHours: parsed?.nanobanana?.avoidInPeakHours || false,
+      },
+      deepseek: { 
+        apiKey: parsed?.deepseek?.apiKey || '',
+        peakHours: parsed?.deepseek?.peakHours || [],
+        timezone: parsed?.deepseek?.timezone || 'America/Bogota',
+        avoidInPeakHours: parsed?.deepseek?.avoidInPeakHours || false,
+      },
+      qwen: { 
+        apiKey: parsed?.qwen?.apiKey || '',
+        peakHours: parsed?.qwen?.peakHours || [],
+        timezone: parsed?.qwen?.timezone || 'America/Bogota',
+        avoidInPeakHours: parsed?.qwen?.avoidInPeakHours || false,
+      },
+      zai: { 
+        apiKey: parsed?.zai?.apiKey || '',
+        peakHours: parsed?.zai?.peakHours || [],
+        timezone: parsed?.zai?.timezone || 'America/Bogota',
+        avoidInPeakHours: parsed?.zai?.avoidInPeakHours || false,
+      },
+      custom: { 
+        endpoint: parsed?.custom?.endpoint || '', 
+        apiKey: parsed?.custom?.apiKey || '',
+        peakHours: parsed?.custom?.peakHours || [],
+        timezone: parsed?.custom?.timezone || 'America/Bogota',
+        avoidInPeakHours: parsed?.custom?.avoidInPeakHours || false,
+      },
     };
   });
 
@@ -81,6 +126,18 @@ export const AIProviderForm = ({
   });
 
   const [modalState, setModalState] = useState<ModalState>({ isOpen: false, title: '', message: '' });
+
+  // Estado temporal para los nuevos rangos horarios que se están escribiendo
+  const [tempRanges, setTempRanges] = useState<Record<Provider, { start: string, end: string }>>({
+    google: { start: '09:00', end: '18:00' },
+    openai: { start: '09:00', end: '18:00' },
+    groq: { start: '09:00', end: '18:00' },
+    nanobanana: { start: '09:00', end: '18:00' },
+    deepseek: { start: '09:00', end: '18:00' },
+    qwen: { start: '09:00', end: '18:00' },
+    zai: { start: '09:00', end: '18:00' },
+    custom: { start: '09:00', end: '18:00' },
+  });
 
   const handleTestConnection = async (provider: Provider) => {
     const config = fields[provider];
@@ -102,6 +159,35 @@ export const AIProviderForm = ({
     }
   };
 
+  const addPeakHour = (provider: Provider) => {
+    const range = tempRanges[provider];
+    setFields(prev => {
+        const currentProviderFields = prev[provider] || {};
+        const currentPeakHours = currentProviderFields.peakHours || [];
+        return {
+            ...prev,
+            [provider]: {
+                ...currentProviderFields,
+                peakHours: [...currentPeakHours, range]
+            }
+        };
+    });
+  };
+
+  const removePeakHour = (provider: Provider, index: number) => {
+    setFields(prev => {
+        const currentProviderFields = prev[provider] || {};
+        const currentPeakHours = currentProviderFields.peakHours || [];
+        return {
+            ...prev,
+            [provider]: {
+                ...currentProviderFields,
+                peakHours: currentPeakHours.filter((_, i) => i !== index)
+            }
+        };
+    });
+  };
+
   const TestButton = ({ provider }: { provider: Provider }) => {
     const status = testStatus[provider];
     if (status === 'testing') return <Button variant="outline" size="sm" disabled><Loader2 className="h-4 w-4 animate-spin mr-2" />Probando...</Button>;
@@ -117,10 +203,10 @@ export const AIProviderForm = ({
           {(Object.keys(PROVIDER_LABELS) as Provider[]).map((p) => (
             <Card key={p} className={fields[p]?.apiKey ? 'border-primary/30 bg-primary/5' : ''}>
               <CardHeader className="py-3"><CardTitle className="text-base">{PROVIDER_LABELS[p]}</CardTitle></CardHeader>
-              <CardContent className="space-y-3 pb-4">
+              <CardContent className="space-y-4 pb-4">
                 {p === 'custom' && (
                   <div className="space-y-1">
-                    <Label className="text-xs">Endpoint API (OpenAI Compatible)</Label>
+                    <Label className="text-[10px] uppercase font-bold text-muted-foreground">Endpoint API (OpenAI Compatible)</Label>
                     <Input 
                       placeholder="https://api.tu-servicio.com/v1/chat/completions"
                       value={fields.custom?.endpoint || ''} 
@@ -133,17 +219,105 @@ export const AIProviderForm = ({
                   </div>
                 )}
                 <div className="space-y-1">
-                  <Label className="text-xs">API Key</Label>
+                  <Label className="text-[10px] uppercase font-bold text-muted-foreground">API Key</Label>
                   <Input type="password" value={fields[p]?.apiKey || ''} onChange={(e) => {
                     const val = e.target.value;
                     setFields(prev => {
-                      if (p === 'custom') return { ...prev, custom: { ...prev.custom!, apiKey: val } };
-                      return { ...prev, [p]: { apiKey: val } };
+                      const current = prev[p] || {};
+                      return { ...prev, [p]: { ...current, apiKey: val } };
                     });
                     setTestStatus(prev => ({ ...prev, [p]: 'idle' }));
                   }} disabled={isSaving} />
                 </div>
-                <TestButton provider={p} />
+                
+                <div className="flex justify-between items-center">
+                    <TestButton provider={p} />
+                </div>
+
+                <Separator className="my-2" />
+
+                {/* CONFIGURACIÓN DE HORARIOS DE COSTOS */}
+                <div className="space-y-3 pt-1">
+                    <div className="flex items-center justify-between">
+                        <div className="space-y-0.5">
+                            <Label className="text-xs font-bold">Optimización de Horarios</Label>
+                            <p className="text-[10px] text-muted-foreground">Define cuándo evitar este proveedor por costos.</p>
+                        </div>
+                        <Switch 
+                            checked={fields[p]?.avoidInPeakHours || false}
+                            onCheckedChange={(val) => setFields(prev => ({ ...prev, [p]: { ...prev[p]!, avoidInPeakHours: val } }))}
+                            disabled={isSaving}
+                        />
+                    </div>
+
+                    {fields[p]?.avoidInPeakHours && (
+                        <div className="space-y-3 animate-in fade-in slide-in-from-top-1 duration-200">
+                            <div className="space-y-1">
+                                <Label className="text-[10px] uppercase font-bold text-muted-foreground flex items-center gap-1">
+                                    <Globe className="h-3 w-3" /> Zona Horaria de Referencia
+                                </Label>
+                                <Input 
+                                    placeholder="America/Bogota" 
+                                    className="h-8 text-xs" 
+                                    value={fields[p]?.timezone || ''}
+                                    onChange={(e) => setFields(prev => ({ ...prev, [p]: { ...prev[p]!, timezone: e.target.value } }))}
+                                />
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label className="text-[10px] uppercase font-bold text-muted-foreground flex items-center gap-1">
+                                    <Clock className="h-3 w-3" /> Horas Pico (Bloqueadas)
+                                </Label>
+                                
+                                <div className="flex flex-wrap gap-2 mb-2">
+                                    {fields[p]?.peakHours?.map((range, idx) => (
+                                        <Badge key={idx} variant="secondary" className="gap-1 pl-2 pr-1 h-6 text-[10px] font-mono">
+                                            {range.start} - {range.end}
+                                            <button 
+                                                onClick={() => removePeakHour(p, idx)}
+                                                className="rounded-full hover:bg-muted p-0.5"
+                                            >
+                                                <Trash2 className="h-3 w-3 text-destructive" />
+                                            </button>
+                                        </Badge>
+                                    ))}
+                                </div>
+
+                                <div className="flex items-end gap-2 bg-muted/30 p-2 rounded-lg border">
+                                    <div className="grid grid-cols-2 gap-2 flex-1">
+                                        <div className="space-y-1">
+                                            <Label className="text-[9px] font-bold uppercase">Inicio</Label>
+                                            <Input 
+                                                type="time" 
+                                                className="h-7 text-[10px] px-1" 
+                                                value={tempRanges[p].start}
+                                                onChange={(e) => setTempRanges(prev => ({ ...prev, [p]: { ...prev[p], start: e.target.value } }))}
+                                            />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <Label className="text-[9px] font-bold uppercase">Fin</Label>
+                                            <Input 
+                                                type="time" 
+                                                className="h-7 text-[10px] px-1" 
+                                                value={tempRanges[p].end}
+                                                onChange={(e) => setTempRanges(prev => ({ ...prev, [p]: { ...prev[p], end: e.target.value } }))}
+                                            />
+                                        </div>
+                                    </div>
+                                    <Button 
+                                        type="button" 
+                                        variant="outline" 
+                                        size="icon" 
+                                        className="h-7 w-7 shrink-0"
+                                        onClick={() => addPeakHour(p)}
+                                    >
+                                        <Plus className="h-3 w-3" />
+                                    </Button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
               </CardContent>
             </Card>
           ))}
