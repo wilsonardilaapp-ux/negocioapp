@@ -8,7 +8,7 @@ import {
   useMemoFirebase,
   updateDocumentNonBlocking,
 } from '@/firebase';
-import { collection, query, orderBy, doc, deleteDoc, writeBatch } from 'firebase/firestore';
+import { collection, query, orderBy, doc, deleteDoc, writeBatch, getDoc } from 'firebase/firestore';
 import {
   Card,
   CardHeader,
@@ -30,6 +30,7 @@ import { format } from 'date-fns';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { useSubscription } from '@/hooks/useSubscription';
 import { LimitBanner } from '@/components/dashboard/LimitBanner';
+import { awardLoyaltyPoints } from '@/actions/loyalty';
 
 
 declare module 'jspdf' {
@@ -86,7 +87,7 @@ export default function PedidosPage() {
 
   const handleSelectRow = (orderId: string) => {
     setSelectedOrders(prev => 
-      prev.includes(orderId) ? prev.filter(id => id !== orderId) : [...prev, orderId]
+      prev.includes(orderId) ? prev.filter(id => id !== orderId) : [...prev, id]
     );
   };
   
@@ -184,7 +185,27 @@ export default function PedidosPage() {
   const handleUpdateStatus = async (orderId: string, status: OrderStatus) => {
     if (!firestore || !user) return;
     const docRef = doc(firestore, `businesses/${user.uid}/orders`, orderId);
-    updateDocumentNonBlocking(docRef, { orderStatus: status });
+    await updateDocumentNonBlocking(docRef, { orderStatus: status });
+
+    // ACUMULACIÓN DE PUNTOS: Si el pedido se marca como Entregado, otorgamos puntos
+    if (status === 'Entregado') {
+        try {
+            const orderSnap = await getDoc(docRef);
+            if (orderSnap.exists()) {
+                const orderData = orderSnap.data() as Order;
+                if (orderData.customerPhone) {
+                    await awardLoyaltyPoints(
+                        user.uid, 
+                        orderData.customerPhone, 
+                        orderId, 
+                        orderData.total || orderData.subtotal
+                    );
+                }
+            }
+        } catch (error) {
+            console.error("Error al otorgar puntos por pedido entregado:", error);
+        }
+    }
   };
 
   const handlePrint = () => {

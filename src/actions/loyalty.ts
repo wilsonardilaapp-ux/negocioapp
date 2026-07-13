@@ -5,6 +5,7 @@ import { loyaltyService, type LoyaltyTransaction, type Reward } from '@/services
 import { normalizePhoneNumber } from '@/lib/utils';
 import { revalidatePath } from 'next/cache';
 import type { AdminNotification } from '@/models/notification';
+import type { Business } from '@/models/business';
 
 export interface LoyaltyStatusResponse {
   success: boolean;
@@ -112,7 +113,7 @@ export async function redeemReward(
 
     // 5. POST-PROCESAMIENTO (Fuera de la transacción: Notificaciones y Revalidación)
     
-    // Notificación al restaurante (Replicando patrón oficial de directory-ratings)
+    // Notificación al restaurante
     const notificationRef = db.collection(`businesses/${businessId}/notifications`).doc();
     const notificationData: Omit<AdminNotification, 'id'> = {
         fromSuperAdmin: true,
@@ -136,5 +137,85 @@ export async function redeemReward(
     }
     
     return { success: false, error: 'Ocurrió un error al procesar el canje. Por favor intente de nuevo.' };
+  }
+}
+
+/**
+ * Otorga puntos de fidelidad por consumo tras la facturación de un pedido.
+ * Implementa idempotencia basada en el orderId.
+ */
+export async function awardLoyaltyPoints(
+  businessId: string, 
+  whatsapp: string, 
+  orderId: string, 
+  totalPago: number
+): Promise<{ success: boolean; error?: string; pointsAwarded?: number }> {
+  const db = await getAdminFirestore();
+  const cleanWhatsapp = normalizePhoneNumber(whatsapp);
+  
+  try {
+    // 1. IDEMPOTENCIA: Verificar si ya se otorgaron puntos para este pedido
+    const existingTx = await db.collection('businesses').doc(businessId)
+      .collection('loyaltyTransactions')
+      .where('orderId', '==', orderId)
+      .where('type', '==', 'earn')
+      .limit(1)
+      .get();
+
+    if (!existingTx.empty) {
+      return { success: true, pointsAwarded: 0 }; // Ya procesado anteriormente
+    }
+
+    // 2. OBTENER CONFIGURACIÓN DEL NEGOCIO
+    const businessSnap = await db.collection('businesses').doc(businessId).get();
+    if (!businessSnap.exists) throw new Error('Negocio no encontrado.');
+    
+    const business = businessSnap.data() as Business;
+    const loyaltyConfig = business.loyaltyConfig;
+
+    if (!loyaltyConfig?.enabled || !loyaltyConfig.amountThreshold || loyaltyConfig.amountThreshold <= 0) {
+      return { success: true, pointsAwarded: 0 }; // Módulo desactivado o mal configurado
+    }
+
+    // 3. CÁLCULO DE PUNTOS
+    const pointsToAward = Math.floor(totalPago / loyaltyConfig.amountThreshold);
+    if (pointsToAward <= 0) return { success: true, pointsAwarded: 0 };
+
+    // 4. TRANSACCIÓN ATÓMICA
+    const balanceRef = db.collection('businesses').doc(businessId).collection('loyaltyBalances').doc(cleanWhatsapp);
+    const transactionCol = db.collection('businesses').doc(businessId).collection('loyaltyTransactions');
+
+    await db.runTransaction(async (transaction) => {
+      const balanceSnap = await transaction.get(balanceRef);
+      const currentPoints = balanceSnap.exists ? (balanceSnap.data()?.points || 0) : 0;
+      const newPoints = currentPoints + pointsToAward;
+      const now = new Date().toISOString();
+
+      // Actualizar Balance
+      transaction.set(balanceRef, {
+        whatsapp: cleanWhatsapp,
+        points: newPoints,
+        updatedAt: now
+      }, { merge: true });
+
+      // Registrar Transacción
+      const logRef = transactionCol.doc();
+      const logData: Omit<LoyaltyTransaction, 'id'> = {
+        whatsapp: cleanWhatsapp,
+        type: 'earn',
+        amount: pointsToAward,
+        reason: `Puntos por compra (Pedido #${orderId.slice(-8).toUpperCase()})`,
+        orderId: orderId,
+        createdAt: now
+      };
+      transaction.set(logRef, logData);
+    });
+
+    revalidatePath(`/catalog/${businessId}`);
+    return { success: true, pointsAwarded: pointsToAward };
+
+  } catch (error: any) {
+    console.error('[Action: awardLoyaltyPoints] Error:', error.message);
+    return { success: false, error: error.message };
   }
 }

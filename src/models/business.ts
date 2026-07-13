@@ -1,6 +1,11 @@
 export type EntityStatus = 'active' | 'inactive' | 'suspended' | 'pending_payment';
 export type DirectoryStatus = 'approved' | 'suspended' | 'hidden';
 
+export type LoyaltyConfig = {
+    enabled: boolean;
+    amountThreshold: number; // Ej: 1000 para otorgar 1 punto por cada $1000
+};
+
 export type Business = {
     id: string;
     name: string;
@@ -56,4 +61,5 @@ export type Business = {
         suggestions?: number;
         [key: string]: number | undefined;
     };
+    loyaltyConfig?: LoyaltyConfig;
 };
