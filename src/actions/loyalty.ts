@@ -7,6 +7,7 @@ import { revalidatePath } from 'next/cache';
 import type { AdminNotification } from '@/models/notification';
 import type { Business } from '@/models/business';
 import { FieldValue, type Transaction, type Firestore } from 'firebase-admin/firestore';
+import { handleChurnRecovery } from '@/services/recovery-service';
 
 export interface LoyaltyStatusResponse {
   success: boolean;
@@ -70,6 +71,50 @@ export async function getChurnStatistics(businessId: string, days: number = 30) 
   } catch (error) {
     console.error('[Action: getChurnStatistics] Error:', error);
     return { customers: [], totalCount: 0 };
+  }
+}
+
+/**
+ * Recupera de forma masiva a los clientes en riesgo de abandono.
+ * Limita a 10 clientes por tanda por seguridad de la API y IA.
+ */
+export async function bulkRecoverChurnClients(businessId: string) {
+  if (!businessId) return { success: false, error: 'ID de negocio no proporcionado.' };
+
+  try {
+    const { customers } = await loyaltyService.getChurnRiskCustomers(businessId, 30);
+    
+    // Seguridad: limitar a los 10 más antiguos en esta versión para evitar spam masivo
+    const toRecover = customers.slice(0, 10);
+    
+    if (toRecover.length === 0) {
+      return { success: true, count: 0, message: 'No hay clientes que cumplan los criterios de abandono.' };
+    }
+
+    const recoveryPromises = toRecover.map(async (client) => {
+      // Calcular días inactivos para el prompt de la IA
+      const lastVisitDate = client.lastVisitAt ? new Date(client.lastVisitAt) : new Date();
+      const diffTime = Math.abs(Date.now() - lastVisitDate.getTime());
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+      return handleChurnRecovery({
+        businessId,
+        name: client.name || 'Cliente',
+        whatsapp: client.whatsapp,
+        daysInactive: diffDays
+      });
+    });
+
+    // Ejecutamos los procesos de IA y WHAPI en paralelo
+    await Promise.all(recoveryPromises);
+
+    return { 
+      success: true, 
+      count: toRecover.length 
+    };
+  } catch (error: any) {
+    console.error('[Action: bulkRecoverChurnClients] Error:', error.message);
+    return { success: false, error: error.message };
   }
 }
 
