@@ -1,12 +1,17 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { doc } from 'firebase/firestore';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Loader2, Sparkles, Star, Trophy, MessageSquare } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Loader2, Sparkles, Star, Trophy, MessageSquare, Save, Info, Globe } from 'lucide-react';
 import type { Business } from '@/models/business';
+import { useToast } from '@/hooks/use-toast';
+import { updateBusinessLoyaltyConfig } from '@/actions/business';
 
 // Componentes del Módulo
 import RecoveredRevenueCard from '@/components/admin/loyalty/RecoveredRevenueCard';
@@ -22,6 +27,7 @@ import ReviewModerationList from '@/components/reviews/ReviewModerationList';
 export default function LoyaltyDashboardPage() {
   const { user } = useUser();
   const firestore = useFirestore();
+  const { toast } = useToast();
 
   // Suscripción a los datos raíz del negocio
   const businessRef = useMemoFirebase(
@@ -30,6 +36,46 @@ export default function LoyaltyDashboardPage() {
   );
   
   const { data: business, isLoading: loadingBusiness } = useDoc<Business>(businessRef);
+
+  // Estados para la configuración de Google Reviews
+  const [googleLink, setGoogleLink] = useState('');
+  const [isSavingLink, setIsSavingLink] = useState(false);
+
+  // Sincronizar el estado inicial cuando cargan los datos del negocio
+  useEffect(() => {
+    if (business?.googleReviewLink) {
+      setGoogleLink(business.googleReviewLink);
+    }
+  }, [business?.googleReviewLink]);
+
+  const handleSaveLink = async () => {
+    if (!user) return;
+    
+    setIsSavingLink(true);
+    try {
+      const result = await updateBusinessLoyaltyConfig(user.uid, { googleReviewLink: googleLink });
+      if (result.success) {
+        toast({
+          title: "Enlace guardado",
+          description: "Tu enlace de Google Reviews ha sido actualizado correctamente.",
+        });
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Error al guardar",
+          description: result.error || "Ocurrió un error inesperado.",
+        });
+      }
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Error de red",
+        description: "No se pudo conectar con el servidor.",
+      });
+    } finally {
+      setIsSavingLink(false);
+    }
+  };
 
   if (loadingBusiness) {
     return (
@@ -98,12 +144,55 @@ export default function LoyaltyDashboardPage() {
         </TabsContent>
 
         <TabsContent value="reviews" className="animate-in fade-in duration-500 outline-none">
-            <div className="max-w-4xl mx-auto">
-                <div className="mb-6">
+            <div className="max-w-4xl mx-auto space-y-8">
+                <div className="space-y-1">
                     <h2 className="text-xl font-bold text-gray-900">Moderación de Opiniones</h2>
                     <p className="text-sm text-muted-foreground">Aprueba las valoraciones pendientes y responde a tus clientes.</p>
                 </div>
+                
                 <ReviewModerationList businessId={user.uid} />
+
+                {/* SECCIÓN: CONFIGURACIÓN DE GOOGLE REVIEWS */}
+                <Card className="border-primary/20 bg-primary/5">
+                    <CardHeader>
+                        <CardTitle className="text-lg flex items-center gap-2">
+                            <Globe className="h-5 w-5 text-primary" />
+                            Link Directo de Google Reviews
+                        </CardTitle>
+                        <CardDescription>
+                            Configura el enlace que tus clientes usarán para calificarte públicamente.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="google-link" className="font-bold text-gray-700">Enlace de Reseñas de Google</Label>
+                            <Input 
+                                id="google-link"
+                                placeholder="https://g.page/r/XXXXXXXX/review"
+                                value={googleLink}
+                                onChange={(e) => setGoogleLink(e.target.value)}
+                                className="bg-white border-primary/20 focus-visible:ring-primary"
+                            />
+                        </div>
+                        <div className="flex items-start gap-3 p-4 bg-blue-50 text-blue-800 rounded-xl border border-blue-100 text-xs leading-relaxed">
+                            <Info className="h-4 w-4 shrink-0 mt-0.5" />
+                            <p>
+                                <span className="font-black">💡 Tip:</span> Usa el link directo de <strong>&quot;Escribir una reseña&quot;</strong> de tu perfil de Google Business. 
+                                Esto permitirá que la IA invite a tus clientes a calificarte públicamente de forma efectiva.
+                            </p>
+                        </div>
+                    </CardContent>
+                    <CardFooter className="border-t bg-white/50 py-4">
+                        <Button 
+                            onClick={handleSaveLink} 
+                            disabled={isSavingLink}
+                            className="ml-auto font-black px-8"
+                        >
+                            {isSavingLink ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                            Guardar Enlace
+                        </Button>
+                    </CardFooter>
+                </Card>
             </div>
         </TabsContent>
       </Tabs>
