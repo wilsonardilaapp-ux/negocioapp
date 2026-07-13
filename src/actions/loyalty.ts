@@ -115,13 +115,13 @@ export async function redeemReward(
     
     // Notificación al restaurante (Patrón replicado de directory-ratings)
     const notificationRef = db.collection(`businesses/${businessId}/notifications`).doc();
-    const notificationData: any = {
-        fromSuperAdmin: true,
+    const notificationData: Omit<AdminNotification, 'id'> = {
+        fromSuperAdmin: true, // Representa una notificación oficial del sistema
         subject: '🎁 Nuevo canje de premio',
         body: `<p>El cliente con WhatsApp <strong>${whatsapp}</strong> ha canjeado sus puntos por: <strong>${result.rewardName}</strong>.</p><p>Por favor, verifica el código de factura <strong>${invoiceCode}</strong> si es necesario para la entrega.</p>`,
         read: false,
         createdAt: new Date().toISOString(),
-        type: 'promotion',
+        type: 'general', // Evento administrativo general
     };
     await notificationRef.set(notificationData);
 
