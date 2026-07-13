@@ -13,7 +13,6 @@ import type { Business } from '@/models/business';
 import { useToast } from '@/hooks/use-toast';
 import { updateBusinessLoyaltyConfig } from '@/actions/business';
 
-// Componentes del Módulo
 import RecoveredRevenueCard from '@/components/admin/loyalty/RecoveredRevenueCard';
 import ChurnRiskCard from '@/components/admin/loyalty/ChurnRiskCard';
 import ChurnConfigCard from '@/components/admin/loyalty/ChurnConfigCard';
@@ -21,16 +20,11 @@ import VipCustomersRanking from '@/components/admin/loyalty/VipCustomersRanking'
 import ReviewSummary from '@/components/reviews/ReviewSummary';
 import ReviewModerationList from '@/components/reviews/ReviewModerationList';
 
-/**
- * @fileOverview Página principal del Módulo de Fidelización e Inteligencia.
- * Ensambla los componentes de ROI, Churn, Ranking VIP y Moderación de Reseñas.
- */
 export default function LoyaltyDashboardPage() {
   const { user } = useUser();
   const firestore = useFirestore();
   const { toast } = useToast();
 
-  // Suscripción a los datos raíz del negocio
   const businessRef = useMemoFirebase(
     () => (user ? doc(firestore, 'businesses', user.uid) : null),
     [user, firestore]
@@ -38,11 +32,9 @@ export default function LoyaltyDashboardPage() {
   
   const { data: business, isLoading: loadingBusiness } = useDoc<Business>(businessRef);
 
-  // Estados para la configuración de Google Reviews
   const [googleLink, setGoogleLink] = useState('');
   const [isSavingLink, setIsSavingLink] = useState(false);
 
-  // Sincronizar el estado inicial cuando cargan los datos del negocio
   useEffect(() => {
     if (business?.googleReviewLink) {
       setGoogleLink(business.googleReviewLink);
@@ -114,7 +106,6 @@ export default function LoyaltyDashboardPage() {
         </TabsList>
 
         <TabsContent value="overview" className="space-y-8 animate-in fade-in duration-500 outline-none">
-            {/* FILA SUPERIOR: Métricas de Impacto y Reputación */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <RecoveredRevenueCard businessId={user.uid} />
                 
@@ -133,13 +124,11 @@ export default function LoyaltyDashboardPage() {
                 </Card>
             </div>
 
-            {/* FILA CENTRAL: Acción Proactiva (Churn) */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <ChurnRiskCard businessId={user.uid} />
                 <ChurnConfigCard business={business} />
             </div>
 
-            {/* FILA INFERIOR: Tabla de Ranking de Clientes */}
             <div className="grid grid-cols-1 gap-6">
                 <VipCustomersRanking businessId={user.uid} />
             </div>
@@ -158,7 +147,6 @@ export default function LoyaltyDashboardPage() {
                     googleReviewLink={business?.googleReviewLink}
                 />
 
-                {/* SECCIÓN: CONFIGURACIÓN DE GOOGLE REVIEWS */}
                 <Card className="border-primary/20 bg-primary/5">
                     <CardHeader>
                         <CardTitle className="text-lg flex items-center gap-2">
@@ -182,7 +170,7 @@ export default function LoyaltyDashboardPage() {
                         </div>
                         <div className="flex items-start gap-3 p-4 bg-blue-50 text-blue-800 rounded-xl border border-blue-100 text-xs leading-relaxed">
                             <Info className="h-4 w-4 shrink-0 mt-0.5" />
-                            <p { /* @ts-ignore */ } >
+                            <p>
                                 <span className="font-black">💡 Tip:</span> Usa el link directo de <strong>&quot;Escribir una reseña&quot;</strong> de tu perfil de Google Business. 
                                 Esto permitirá que la IA invite a tus clientes a calificarte públicamente de forma efectiva.
                             </p>
@@ -203,7 +191,6 @@ export default function LoyaltyDashboardPage() {
         </TabsContent>
       </Tabs>
       
-      {/* Footer Informativo de Atribución */}
       <footer className="pt-8 pb-4 text-center">
           <p className="text-[10px] text-muted-foreground italic uppercase tracking-wider font-medium">
               * El sistema utiliza una ventana de 7 días para la atribución de ventas recuperadas por IA.
