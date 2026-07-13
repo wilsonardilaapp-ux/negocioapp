@@ -29,6 +29,7 @@ import { syncBusinessLoyaltyHistory } from '@/actions/loyalty';
 import RecoveredRevenueCard from '@/components/admin/loyalty/RecoveredRevenueCard';
 import ChurnRiskCard from '@/components/admin/loyalty/ChurnRiskCard';
 import ChurnConfigCard from '@/components/admin/loyalty/ChurnConfigCard';
+import PointsConfigCard from '@/components/admin/loyalty/PointsConfigCard';
 import VipCustomersRanking from '@/components/admin/loyalty/VipCustomersRanking';
 import ReviewSummary from '@/components/reviews/ReviewSummary';
 import ReviewModerationList from '@/components/reviews/ReviewModerationList';
@@ -159,14 +160,17 @@ export default function LoyaltyDashboardPage() {
                 </Card>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div className="lg:col-span-1">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div className="md:col-span-1">
                     <ChurnRiskCard businessId={user.uid} />
                 </div>
-                <div className="lg:col-span-1">
+                <div className="md:col-span-1">
                     <ChurnConfigCard business={business} />
                 </div>
-                <Card className="lg:col-span-1 shadow-sm border-gray-100 flex flex-col">
+                <div className="md:col-span-1">
+                    <PointsConfigCard business={business} />
+                </div>
+                <Card className="md:col-span-1 shadow-sm border-gray-100 flex flex-col">
                     <CardHeader>
                         <div className="flex items-center gap-3">
                             <div className="p-2 bg-blue-50 rounded-lg">
@@ -259,7 +263,6 @@ export default function LoyaltyDashboardPage() {
         </TabsContent>
       </Tabs>
       
-      {/* Modal de Resultados de Sincronización */}
       <AlertDialog open={showSyncResult} onOpenChange={setShowSyncResult}>
         <AlertDialogContent>
           <AlertDialogHeader>
