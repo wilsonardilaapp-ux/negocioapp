@@ -169,11 +169,13 @@ export async function awardLoyaltyPoints(
       // Guard 1: Idempotencia (¿Ya se otorgaron puntos para este pedido?)
       if (txSnap.exists) return { pointsAwarded: 0 }; 
 
-      // Guard 2: Configuración (¿Módulo activo y umbral válido?)
+      // Guard 2: Configuración (¿Umbral válido?)
       const business = businessSnap.data() as Business;
       const loyaltyConfig = business.loyaltyConfig;
 
-      if (!loyaltyConfig?.enabled || !loyaltyConfig.amountThreshold || loyaltyConfig.amountThreshold <= 0) {
+      // El campo 'enabled' se validará cuando exista UI de configuración.
+      // Por ahora basta con que el negocio tenga un umbral definido > 0.
+      if (!loyaltyConfig?.amountThreshold || loyaltyConfig.amountThreshold <= 0) {
         return { pointsAwarded: 0 };
       }
 
