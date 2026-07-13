@@ -1,4 +1,3 @@
-
 "use client";
 
 import Link from "next/link";
@@ -30,6 +29,7 @@ import {
   Bot,
   Star,
   Users,
+  Sparkles,
 } from "lucide-react";
 
 import { SidebarMenu, SidebarMenuItem, SidebarMenuButton, useSidebar } from "@/components/ui/sidebar";
@@ -40,6 +40,7 @@ const allNavItems = [
   { href: "/dashboard/share-landing", icon: Share2, label: "Compartir Landing Page" },
   { href: "/dashboard/catalogo", icon: ShoppingCart, label: "Catálogo", moduleId: 'catalogo' },
   { href: "/dashboard/catalogo/estadisticas", icon: BarChart, label: "Estadísticas de Productos", moduleId: 'catalogo' },
+  { href: "/dashboard/loyalty", icon: Sparkles, label: "Fidelización", moduleId: 'catalogo' },
   { href: "/dashboard/share", icon: Share2, label: "Compartir Menú", moduleId: 'catalogo' },
   { href: "/dashboard/blog", icon: FileText, label: "Blog", moduleId: 'blog' },
   { href: "/dashboard/valoraciones-directorio", icon: Star, label: "Valoraciones del Directorio" },
