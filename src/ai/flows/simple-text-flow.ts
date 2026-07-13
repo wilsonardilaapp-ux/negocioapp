@@ -58,11 +58,14 @@ const simpleTextFlow = ai.defineFlow(
       return llmResponse.text ?? "No se pudo generar una respuesta.";
     }
 
-    // CASO 2: Proveedores compatibles con OpenAI (OpenAI, Groq, etc.)
+    // CASO 2: Proveedores compatibles con OpenAI (OpenAI, Groq, DeepSeek, etc.)
     try {
-      const endpoint = aiConfig.provider === 'groq'
-        ? 'https://api.groq.com/openai/v1/chat/completions'
-        : 'https://api.openai.com/v1/chat/completions';
+      let endpoint = 'https://api.openai.com/v1/chat/completions';
+      if (aiConfig.provider === 'groq') {
+        endpoint = 'https://api.groq.com/openai/v1/chat/completions';
+      } else if (aiConfig.provider === 'deepseek') {
+        endpoint = 'https://api.deepseek.com/v1/chat/completions';
+      }
 
       const response = await fetch(endpoint, {
         method: 'POST',

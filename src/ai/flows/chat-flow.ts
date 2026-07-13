@@ -147,6 +147,7 @@ export async function getAIConfig(businessId?: string): Promise<{ provider: stri
     // Definición de proveedores en orden de prioridad SaaS
     const candidates = [
         { dbKey: 'openai', codeId: 'openai', model: 'gpt-4o-mini' },
+        { dbKey: 'deepseek', codeId: 'deepseek', model: 'deepseek-chat' },
         { dbKey: 'groq', codeId: 'groq', model: 'llama-3.1-8b-instant' },
         { dbKey: 'google', codeId: 'googleai', model: 'gemini-2.0-flash' }
     ];
@@ -235,9 +236,12 @@ ${contextData}
     }
 
     try {
-      const endpoint = aiConfig.provider === 'groq'
-        ? 'https://api.groq.com/openai/v1/chat/completions'
-        : 'https://api.openai.com/v1/chat/completions';
+      let endpoint = 'https://api.openai.com/v1/chat/completions';
+      if (aiConfig.provider === 'groq') {
+        endpoint = 'https://api.groq.com/openai/v1/chat/completions';
+      } else if (aiConfig.provider === 'deepseek') {
+        endpoint = 'https://api.deepseek.com/v1/chat/completions';
+      }
 
       const response = await fetch(endpoint, {
         method: 'POST',
