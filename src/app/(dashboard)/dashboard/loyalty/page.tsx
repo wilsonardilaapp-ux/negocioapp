@@ -8,10 +8,23 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, Sparkles, Star, Trophy, MessageSquare, Save, Info, Globe } from 'lucide-react';
+import { 
+    Loader2, 
+    Sparkles, 
+    Star, 
+    Trophy, 
+    MessageSquare, 
+    Save, 
+    Info, 
+    Globe, 
+    RefreshCw,
+    CheckCircle2,
+    Database
+} from 'lucide-react';
 import type { Business } from '@/models/business';
 import { useToast } from '@/hooks/use-toast';
 import { updateBusinessLoyaltyConfig } from '@/actions/business';
+import { syncBusinessLoyaltyHistory } from '@/actions/loyalty';
 
 import RecoveredRevenueCard from '@/components/admin/loyalty/RecoveredRevenueCard';
 import ChurnRiskCard from '@/components/admin/loyalty/ChurnRiskCard';
@@ -19,6 +32,16 @@ import ChurnConfigCard from '@/components/admin/loyalty/ChurnConfigCard';
 import VipCustomersRanking from '@/components/admin/loyalty/VipCustomersRanking';
 import ReviewSummary from '@/components/reviews/ReviewSummary';
 import ReviewModerationList from '@/components/reviews/ReviewModerationList';
+
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export default function LoyaltyDashboardPage() {
   const { user } = useUser();
@@ -34,6 +57,11 @@ export default function LoyaltyDashboardPage() {
 
   const [googleLink, setGoogleLink] = useState('');
   const [isSavingLink, setIsSavingLink] = useState(false);
+  
+  // Estados para Sincronización Histórica
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [showSyncResult, setShowSyncResult] = useState(false);
+  const [syncSummary, setSyncResult] = useState<any>(null);
 
   useEffect(() => {
     if (business?.googleReviewLink) {
@@ -43,30 +71,37 @@ export default function LoyaltyDashboardPage() {
 
   const handleSaveLink = async () => {
     if (!user) return;
-    
     setIsSavingLink(true);
     try {
       const result = await updateBusinessLoyaltyConfig(user.uid, { googleReviewLink: googleLink });
       if (result.success) {
-        toast({
-          title: "Enlace guardado",
-          description: "Tu enlace de Google Reviews ha sido actualizado correctamente.",
-        });
+        toast({ title: "Enlace guardado", description: "Tu enlace de Google Reviews ha sido actualizado." });
       } else {
-        toast({
-          variant: "destructive",
-          title: "Error al guardar",
-          description: result.error || "Ocurrió un error inesperado.",
-        });
+        toast({ variant: "destructive", title: "Error", description: result.error || "Ocurrió un error." });
       }
     } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Error de red",
-        description: "No se pudo conectar con el servidor.",
-      });
+      toast({ variant: "destructive", title: "Error de red", description: "No se pudo conectar con el servidor." });
     } finally {
       setIsSavingLink(false);
+    }
+  };
+
+  const handleSyncHistory = async () => {
+    if (!user) return;
+    setIsSyncing(true);
+    try {
+      const result = await syncBusinessLoyaltyHistory(user.uid);
+      if (result.success) {
+        setSyncResult(result.summary);
+        setShowSyncResult(true);
+        toast({ title: "¡Sincronización finalizada!", description: result.message });
+      } else {
+        toast({ variant: "destructive", title: "Fallo en la sincronización", description: result.error });
+      }
+    } catch (error) {
+      toast({ variant: "destructive", title: "Error crítico", description: "Error de conexión con el servidor." });
+    } finally {
+      setIsSyncing(false);
     }
   };
 
@@ -124,9 +159,42 @@ export default function LoyaltyDashboardPage() {
                 </Card>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <ChurnRiskCard businessId={user.uid} />
-                <ChurnConfigCard business={business} />
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="lg:col-span-1">
+                    <ChurnRiskCard businessId={user.uid} />
+                </div>
+                <div className="lg:col-span-1">
+                    <ChurnConfigCard business={business} />
+                </div>
+                <Card className="lg:col-span-1 shadow-sm border-gray-100 flex flex-col">
+                    <CardHeader>
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-blue-50 rounded-lg">
+                                <Database className="h-6 w-6 text-blue-600" />
+                            </div>
+                            <div>
+                                <CardTitle className="text-lg">Herramientas</CardTitle>
+                                <CardDescription>Acciones de mantenimiento.</CardDescription>
+                            </div>
+                        </div>
+                    </CardHeader>
+                    <CardContent className="flex-grow flex items-center justify-center">
+                        <p className="text-xs text-center text-muted-foreground leading-relaxed">
+                            Sincroniza pedidos antiguos para otorgar puntos no registrados previamente.
+                        </p>
+                    </CardContent>
+                    <CardFooter className="border-t bg-blue-50/10 pt-4">
+                        <Button 
+                            variant="outline" 
+                            className="w-full font-bold gap-2 border-blue-200 text-blue-700 hover:bg-blue-50"
+                            onClick={handleSyncHistory}
+                            disabled={isSyncing}
+                        >
+                            {isSyncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                            Sincronizar Pedidos
+                        </Button>
+                    </CardFooter>
+                </Card>
             </div>
 
             <div className="grid grid-cols-1 gap-6">
@@ -191,6 +259,49 @@ export default function LoyaltyDashboardPage() {
         </TabsContent>
       </Tabs>
       
+      {/* Modal de Resultados de Sincronización */}
+      <AlertDialog open={showSyncResult} onOpenChange={setShowSyncResult}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <CheckCircle2 className="h-6 w-6 text-green-500" />
+              ¡Sincronización Exitosa!
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-4 pt-2">
+              <p className="text-sm">El historial de pedidos entregados ha sido procesado e integrado al sistema de fidelización.</p>
+              
+              <div className="grid grid-cols-1 gap-2 bg-muted p-4 rounded-xl border text-sm">
+                  <div className="flex justify-between items-center">
+                      <span className="text-muted-foreground font-medium">Nuevos puntos otorgados:</span>
+                      <span className="font-black text-primary">+{syncSummary?.processed || 0} pedidos</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                      <span className="text-muted-foreground font-medium">Ya estaban sincronizados:</span>
+                      <span className="font-bold">{syncSummary?.alreadySynced || 0} pedidos</span>
+                  </div>
+                  <div className="flex justify-between items-center border-t pt-2 mt-1">
+                      <span className="text-muted-foreground font-medium">Puntos totales inyectados:</span>
+                      <span className="font-black text-primary">{syncSummary?.totalPointsAwarded || 0} pts</span>
+                  </div>
+                  {syncSummary?.errors > 0 && (
+                      <div className="flex justify-between items-center text-destructive font-bold pt-1">
+                          <span>Pedidos con error:</span>
+                          <span>{syncSummary?.errors}</span>
+                      </div>
+                  )}
+              </div>
+              
+              <p className="text-xs text-muted-foreground italic">
+                El Ranking VIP y el Riesgo de Abandono se han recalculado con estos nuevos datos.
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction className="font-black px-8">Entendido</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <footer className="pt-8 pb-4 text-center">
           <p className="text-[10px] text-muted-foreground italic uppercase tracking-wider font-medium">
               * El sistema utiliza una ventana de 7 días para la atribución de ventas recuperadas por IA.
