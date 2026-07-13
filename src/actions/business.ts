@@ -5,11 +5,11 @@ import { revalidatePath } from 'next/cache';
 
 /**
  * Actualiza la configuración de fidelización del negocio.
- * Soporta actualización de link de Google y umbral de abandono (Churn).
+ * Soporta actualización de link de Google, umbral de abandono (Churn) y valor de puntos.
  */
 export async function updateBusinessLoyaltyConfig(
   businessId: string, 
-  data: { googleReviewLink?: string; churnDaysThreshold?: number }
+  data: { googleReviewLink?: string; churnDaysThreshold?: number; amountThreshold?: number }
 ) {
   if (!businessId) {
     return { success: false, error: 'ID de negocio no proporcionado.' };
@@ -33,6 +33,16 @@ export async function updateBusinessLoyaltyConfig(
       // Validación: entre 1 y 365 días
       const threshold = Math.max(1, Math.min(365, Math.floor(data.churnDaysThreshold)));
       updates['loyaltyConfig.churnDaysThreshold'] = threshold;
+    }
+
+    // Actualización quirúrgica del valor de puntos (Umbral de Consumo)
+    if (data.amountThreshold !== undefined) {
+      // Validación: debe ser un número positivo (mínimo 1 para evitar divisiones por cero en cálculos de puntos)
+      const amount = Math.max(1, Math.floor(data.amountThreshold));
+      updates['loyaltyConfig.amountThreshold'] = amount;
+      
+      // Aseguramos que el módulo esté marcado como habilitado si se configura el umbral
+      updates['loyaltyConfig.enabled'] = true;
     }
 
     await businessRef.update(updates);
