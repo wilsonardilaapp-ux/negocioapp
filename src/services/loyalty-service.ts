@@ -10,6 +10,8 @@ import { normalizePhoneNumber } from '@/lib/utils';
 export interface LoyaltyBalance {
   whatsapp: string;
   points: number;
+  visitCount: number; // Nuevo campo: Total de consumos confirmados
+  lastVisitAt: any;   // Nuevo campo: Fecha del último consumo
   updatedAt: string;
 }
 

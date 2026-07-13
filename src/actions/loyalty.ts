@@ -6,7 +6,7 @@ import { normalizePhoneNumber } from '@/lib/utils';
 import { revalidatePath } from 'next/cache';
 import type { AdminNotification } from '@/models/notification';
 import type { Business } from '@/models/business';
-import type { Transaction, Firestore } from 'firebase-admin/firestore';
+import { FieldValue, type Transaction, type Firestore } from 'firebase-admin/firestore';
 
 export interface LoyaltyStatusResponse {
   success: boolean;
@@ -84,7 +84,6 @@ export async function redeemReward(
       const reward = rewardSnap.data() as Reward;
 
       if (currentBalance < reward.pointsCost) {
-        // CORREGIDO: Se usa currentBalance (variable correcta en este scope) para el mensaje de error
         throw new Error(`INSUFFICIENT_POINTS|Saldo insuficiente. Tienes ${currentBalance} puntos y necesitas ${reward.pointsCost}.`);
       }
 
@@ -138,6 +137,7 @@ export async function redeemReward(
 
 /**
  * Otorga puntos de fidelidad por consumo tras la facturación de un pedido.
+ * Implementa contador de visitas e idempotencia basada en el ID del pedido.
  */
 export async function awardLoyaltyPoints(
   businessId: string, 
@@ -154,14 +154,17 @@ export async function awardLoyaltyPoints(
 
   try {
     const result = await db.runTransaction(async (transaction) => {
+      // 1. LECTURAS TRANSACCIONALES (IDEMPOTENCIA + CONFIG + BALANCE)
       const [txSnap, businessSnap, balanceSnap] = await Promise.all([
         transaction.get(txLogRef),
         transaction.get(businessRef),
         transaction.get(balanceRef)
       ]);
 
+      // Guard 1: Idempotencia (¿Ya se otorgaron puntos/visitas para este pedido?)
       if (txSnap.exists) return { pointsAwarded: 0 }; 
 
+      // Guard 2: Configuración (¿Umbral válido?)
       const business = businessSnap.data() as Business;
       const loyaltyConfig = business.loyaltyConfig;
 
@@ -174,14 +177,20 @@ export async function awardLoyaltyPoints(
 
       const currentPoints = balanceSnap.exists ? (balanceSnap.data()?.points || 0) : 0;
       const newPoints = currentPoints + pointsToAward;
-      const now = new Date().toISOString();
+      const nowISO = new Date().toISOString();
 
+      // 2. ESCRITURAS TRANSACCIONALES
+      
+      // Actualizar Balance sumando puntos, incrementando visitas y registrando fecha
       transaction.set(balanceRef, {
         whatsapp: cleanWhatsapp,
         points: newPoints,
-        updatedAt: now
+        visitCount: FieldValue.increment(1),
+        lastVisitAt: FieldValue.serverTimestamp(),
+        updatedAt: nowISO
       }, { merge: true });
 
+      // Registrar Log de Transacción (Sirve de ancla para la idempotencia)
       const logData = {
         id: txLogRef.id,
         whatsapp: cleanWhatsapp,
@@ -189,7 +198,7 @@ export async function awardLoyaltyPoints(
         amount: pointsToAward,
         reason: `Puntos por compra (Pedido #${orderId.slice(-8).toUpperCase()})`,
         orderId: orderId,
-        createdAt: now
+        createdAt: nowISO
       };
       transaction.set(txLogRef, logData);
 
