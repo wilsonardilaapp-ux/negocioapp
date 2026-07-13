@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache';
 import { normalizePhoneNumber } from '@/lib/utils';
 import type { Review, ReviewStatus } from '@/models/review';
 import { grantLoyaltyPointsTransactional } from './loyalty';
+import { handleNegativeReviewRecovery } from '@/services/recovery-service';
 
 /**
  * Crea una nueva reseña de cliente en Firestore.
@@ -63,6 +64,19 @@ export async function createReview(data: {
       // 2. ESCRITURA DE LA RESEÑA (Después de todas las posibles lecturas)
       transaction.set(reviewsCol.doc(reviewId), reviewData);
     });
+
+    // 3. DISPARADOR DE RECUPERACIÓN (Fuera de la transacción para no bloquear)
+    // Se activa solo para calificaciones de 1 o 2 estrellas con WhatsApp identificado
+    if (data.rating <= 2 && reviewData.whatsapp) {
+      handleNegativeReviewRecovery({
+        businessId: data.businessId,
+        name: data.name,
+        whatsapp: reviewData.whatsapp,
+        rating: data.rating,
+        comment: data.comment,
+        reviewId: reviewId,
+      });
+    }
 
     revalidatePath(`/catalog/${data.businessId}`);
     return { success: true };
