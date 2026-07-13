@@ -61,6 +61,12 @@ const DEFAULT_MODULES = [
   { name: 'Google Analytics', description: 'Integración de métricas avanzadas para la landing page.', limit: -1, idOverride: 'google-analytics' },
   { name: 'Directorio de Negocios', description: 'Módulo para listar el negocio en el directorio público de la plataforma.', limit: -1, idOverride: 'business-directory' },
   { name: 'Chatbot Menú Público', description: 'Asistente virtual para el menú público que responde preguntas de los visitantes sobre productos, precios, horarios y promociones del negocio.', limit: -1, idOverride: PUBLIC_MENU_CHATBOT_MODULE_ID },
+  { 
+    name: 'Fidelización e Inteligencia (IA)', 
+    description: 'Sistema de puntos, ranking VIP, reseñas y recuperación automática de clientes mediante IA por WhatsApp.', 
+    limit: -1, 
+    idOverride: 'loyalty' 
+  },
 ];
 
 export default function ModulesPage() {
