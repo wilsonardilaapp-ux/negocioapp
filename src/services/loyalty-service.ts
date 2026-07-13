@@ -9,9 +9,10 @@ import { normalizePhoneNumber } from '@/lib/utils';
 
 export interface LoyaltyBalance {
   whatsapp: string;
+  name?: string; // Campo opcional para identificación
   points: number;
-  visitCount: number; // Nuevo campo: Total de consumos confirmados
-  lastVisitAt: any;   // Nuevo campo: Fecha del último consumo
+  visitCount: number; // Total de consumos confirmados
+  lastVisitAt: any;   // Fecha del último consumo
   updatedAt: string;
 }
 
@@ -118,6 +119,31 @@ class LoyaltyService {
       id: doc.id,
       ...doc.data()
     } as Reward));
+  }
+
+  /**
+   * Obtiene los clientes con mayor actividad para el ranking VIP.
+   * Ordenado por visitas y luego por puntos acumulados.
+   */
+  async getTopLoyaltyCustomers(businessId: string, limitNum: number = 20): Promise<LoyaltyBalance[]> {
+    const db = await this.getDb();
+    
+    const snapshot = await db
+      .collection('businesses')
+      .doc(businessId)
+      .collection('loyaltyBalances')
+      .orderBy('visitCount', 'desc')
+      .orderBy('points', 'desc')
+      .limit(limitNum)
+      .get();
+
+    return snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+            ...data,
+            lastVisitAt: data.lastVisitAt?.toDate?.()?.toISOString() || null
+        } as LoyaltyBalance;
+    });
   }
 
   /**

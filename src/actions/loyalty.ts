@@ -1,7 +1,7 @@
 'use server';
 
 import { getAdminFirestore } from '@/firebase/server-init';
-import { loyaltyService, type LoyaltyTransaction, type Reward } from '@/services/loyalty-service';
+import { loyaltyService, type LoyaltyTransaction, type Reward, type LoyaltyBalance } from '@/services/loyalty-service';
 import { normalizePhoneNumber } from '@/lib/utils';
 import { revalidatePath } from 'next/cache';
 import type { AdminNotification } from '@/models/notification';
@@ -46,6 +46,18 @@ export async function getLoyaltyStatus(
   } catch (error: any) {
     console.error('[Action: getLoyaltyStatus] Error:', error.message);
     return { success: false, balance: 0, catalog: [], history: [], error: 'Error interno del servidor.' };
+  }
+}
+
+/**
+ * Obtiene el ranking de clientes con más visitas para el panel administrativo.
+ */
+export async function getVipRanking(businessId: string): Promise<LoyaltyBalance[]> {
+  try {
+    return await loyaltyService.getTopLoyaltyCustomers(businessId);
+  } catch (error) {
+    console.error('[Action: getVipRanking] Error:', error);
+    return [];
   }
 }
 
