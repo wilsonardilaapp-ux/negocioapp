@@ -31,6 +31,7 @@ import ReviewSummary from '@/components/reviews/ReviewSummary';
 import LoyaltyStatus from '@/components/loyalty/LoyaltyStatus';
 import RewardsCatalog from '@/components/loyalty/RewardsCatalog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import type { Business } from '@/models/business';
 import type { Reward } from '@/services/loyalty-service';
 
