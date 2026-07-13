@@ -114,10 +114,15 @@ export default function ReviewModerationList({ businessId, businessName, googleR
         try {
             const prompt = `Actúa como el dueño del negocio. El cliente ${recoveryTarget.name} calificó con ${recoveryTarget.rating} estrellas y dijo: '${recoveryTarget.comment}'. Redacta un mensaje muy amable para WhatsApp, invitándolo a volver y ofreciéndole una mejor experiencia. Incluye este enlace para que actualice su reseña si queda satisfecho: ${googleReviewLink || ''}. Si el enlace no existe, omite esa parte. El mensaje debe ser corto y empático.`;
             
-            const response = await generateSimpleText(prompt);
+            // FASE 11.2: Pasamos el businessId para inyectar las API Keys correctas del servidor
+            const response = await generateSimpleText(prompt, businessId);
             setGeneratedMessage(response);
-        } catch (error) {
-            toast({ variant: 'destructive', title: "Error de IA", description: "No se pudo generar el mensaje." });
+        } catch (error: any) {
+            toast({ 
+              variant: 'destructive', 
+              title: "Error de IA", 
+              description: error.message || "No se pudo generar el mensaje." 
+            });
         } finally {
             setIsGenerating(false);
         }
