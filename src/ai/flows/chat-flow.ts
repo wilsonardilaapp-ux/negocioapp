@@ -82,8 +82,44 @@ ${productsContent}
 }
 
 /**
+ * Helper para verificar si un proveedor está en su rango de horas pico configurado.
+ */
+function isProviderInPeakHour(config: any): boolean {
+  if (!config.peakHours || !Array.isArray(config.peakHours) || config.peakHours.length === 0) return false;
+  
+  try {
+    const timezone = config.timezone || 'UTC';
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+      timeZone: timezone,
+    });
+    
+    const timeStr = formatter.format(new Date());
+    // Normalización: algunas implementaciones retornan 24:xx en lugar de 00:xx
+    const currentTime = timeStr === "24:00" ? "00:00" : timeStr;
+
+    return config.peakHours.some((range: { start: string; end: string }) => {
+      const { start, end } = range;
+      if (!start || !end) return false;
+      
+      // Lógica de rango circular (cruce de medianoche)
+      if (start <= end) {
+        return currentTime >= start && currentTime <= end;
+      } else {
+        return currentTime >= start || currentTime <= end;
+      }
+    });
+  } catch (e) {
+    return false;
+  }
+}
+
+/**
  * Obtiene la configuración de IA activa (API Key y Proveedor).
  * Se exporta para ser utilizada por otros servicios como el de recuperación.
+ * Implementa balanceo inteligente por horas pico para optimización de costos.
  */
 export async function getAIConfig(businessId?: string): Promise<{ provider: string; apiKey: string; model: string }> {
   try {
@@ -108,9 +144,37 @@ export async function getAIConfig(businessId?: string): Promise<{ provider: stri
       fields = data.fields;
     }
 
-    if (fields.openai?.apiKey) return { provider: 'openai', apiKey: fields.openai.apiKey, model: 'gpt-4o-mini' };
-    if (fields.groq?.apiKey) return { provider: 'groq', apiKey: fields.groq.apiKey, model: 'llama-3.1-8b-instant' };
-    if (fields.google?.apiKey) return { provider: 'googleai', apiKey: fields.google.apiKey, model: 'gemini-2.0-flash' };
+    // Definición de proveedores en orden de prioridad SaaS
+    const candidates = [
+        { dbKey: 'openai', codeId: 'openai', model: 'gpt-4o-mini' },
+        { dbKey: 'groq', codeId: 'groq', model: 'llama-3.1-8b-instant' },
+        { dbKey: 'google', codeId: 'googleai', model: 'gemini-2.0-flash' }
+    ];
+
+    let fallbackWithKey: { provider: string; apiKey: string; model: string } | null = null;
+
+    for (const cand of candidates) {
+        const config = fields[cand.dbKey];
+        if (!config?.apiKey) continue;
+
+        // Guardamos el primer proveedor válido como red de seguridad (Servicio > Costo)
+        if (!fallbackWithKey) {
+            fallbackWithKey = { provider: cand.codeId, apiKey: config.apiKey, model: cand.model };
+        }
+
+        // Validación de optimización por horas pico
+        if (config.avoidInPeakHours && isProviderInPeakHour(config)) {
+            console.log(`[IA Optimization] Saltando proveedor ${cand.dbKey} por política de horas pico en zona ${config.timezone || 'UTC'}.`);
+            continue;
+        }
+
+        // Si tiene llave y NO está en hora pico, se elige inmediatamente
+        return { provider: cand.codeId, apiKey: config.apiKey, model: cand.model };
+    }
+
+    // Si llegamos aquí y tenemos un fallback, es porque todos los disponibles están en hora pico.
+    // Priorizamos el servicio sobre el costo.
+    if (fallbackWithKey) return fallbackWithKey;
 
   } catch (e: any) {
     console.error("Error getting AI config from Firestore:", e.message);
