@@ -12,9 +12,10 @@ import { cn } from '@/lib/utils';
 
 interface Props {
   businessId: string;
+  onSuccess?: (balance: number, whatsapp: string) => void;
 }
 
-export default function LoyaltyStatus({ businessId }: Props) {
+export default function LoyaltyStatus({ businessId, onSuccess }: Props) {
   const [whatsapp, setWhatsapp] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -37,9 +38,8 @@ export default function LoyaltyStatus({ businessId }: Props) {
     setIsLoading(true);
 
     try {
-      // Nota: getLoyaltyStatus requiere invoiceCode para validación completa.
-      // En este componente de consulta rápida, pasamos un valor vacío para obtener
-      // solo la información básica si el sistema lo permite o manejar el error.
+      // Nota: getLoyaltyStatus requiere invoiceCode para validación completa si es para canje.
+      // Aquí lo usamos para consulta rápida, pasando vacío para el código de factura.
       const result = await getLoyaltyStatus(businessId, normalized, "");
       
       if (result.success) {
@@ -47,7 +47,12 @@ export default function LoyaltyStatus({ businessId }: Props) {
           balance: result.balance,
           history: result.history
         });
+        if (onSuccess) {
+            onSuccess(result.balance, normalized);
+        }
       } else {
+        // Si falla por validación de seguridad (código de factura), mostramos un mensaje amigable
+        // pero permitimos ver que el sistema está activo.
         setError(result.error || "No se pudo obtener el estado de puntos.");
       }
     } catch (err) {
@@ -76,11 +81,11 @@ export default function LoyaltyStatus({ businessId }: Props) {
               placeholder="Ej: 300 123 4567"
               value={whatsapp}
               onChange={(e) => setWhatsapp(e.target.value)}
-              className="pl-10"
+              className="pl-10 h-12"
               disabled={isLoading}
             />
           </div>
-          <Button type="submit" disabled={isLoading} className="font-bold">
+          <Button type="submit" disabled={isLoading} className="font-bold h-12 px-8">
             {isLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
             Ver mi saldo
           </Button>

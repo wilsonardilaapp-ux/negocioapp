@@ -1,9 +1,9 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useCallback, Suspense } from 'react';
-import { useParams, useSearchParams } from 'next/navigation';
-import { useFirebase } from '@/firebase';
-import { doc, getDoc, collectionGroup, query, where, getDocs, limit } from 'firebase/firestore';
+import { useParams } from 'next/navigation';
+import { useFirebase, useCollection, useDoc, useMemoFirebase } from '@/firebase';
+import { doc, getDoc, collectionGroup, query, where, getDocs, limit, collection } from 'firebase/firestore';
 
 import CatalogHeader from '@/components/catalogo/catalog-header';
 import PublicProductCard from '@/components/catalogo/public-product-card';
@@ -11,7 +11,7 @@ import ProductViewModal from '@/components/catalogo/product-view-modal';
 import { PurchaseModal } from '@/components/catalogo/purchase-modal';
 import { CartDrawer } from '@/components/catalogo/cart-drawer';
 import { SuggestionModal } from '@/components/suggestions/suggestion-modal';
-import { Frown, Loader2, PackageSearch } from 'lucide-react';
+import { Frown, Loader2, PackageSearch, Utensils, Star, Award, MessageSquare } from 'lucide-react';
 import type { LandingHeaderConfigData } from '@/models/landing-page';
 import type { Product } from '@/models/product';
 import type { Promotion } from '@/models/promotion';
@@ -23,16 +23,26 @@ import { updateSuggestionMetrics } from '@/ai/flows/update-suggestion-metrics-fl
 import { PublicMenuChatWidget } from '@/components/public-menu-chatbot/PublicMenuChatWidget';
 import { useToast } from '@/hooks/use-toast';
 import { promotionService } from '@/services/promotion-service';
+import { useSubscription } from '@/hooks/useSubscription';
+
+// Componentes de Fidelización y Reseñas
+import ReviewForm from '@/components/catalogo/ReviewForm';
+import ReviewSummary from '@/components/reviews/ReviewSummary';
+import LoyaltyStatus from '@/components/loyalty/LoyaltyStatus';
+import RewardsCatalog from '@/components/loyalty/RewardsCatalog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import type { Business } from '@/models/business';
+import type { Reward } from '@/services/loyalty-service';
 
 interface CatalogPageProps {
     params: { businessId: string };
 }
 
 function CatalogPageContent({ params }: CatalogPageProps) {
-    // Decodificar el slug para manejar caracteres como tildes o emojis que llegan codificados por la URL
     const slug = decodeURIComponent(params.businessId);
     const { firestore, isNetworkEnabled } = useFirebase();
     const { toast } = useToast();
+    const { isModuleAuthorized } = useSubscription();
 
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -55,6 +65,8 @@ function CatalogPageContent({ params }: CatalogPageProps) {
     const [isCartOpen, setIsCartOpen] = useState(false);
     const [isPurchaseModalOpen, setIsPurchaseModalOpen] = useState(false);
     
+    // Estado para la sesión de fidelización del cliente
+    const [loyaltySession, setLoyaltySession] = useState<{ balance: number; whatsapp: string } | null>(null);
     const [activeSuggestion, setActiveSuggestion] = useState<{ original: Product, suggestion: SuggestionOutput } | null>(null);
 
     useEffect(() => {
@@ -66,7 +78,6 @@ function CatalogPageContent({ params }: CatalogPageProps) {
             setIsLoading(true);
             setError(null);
             try {
-                // Resolver el businessId (soporte para alias personalizados)
                 const shareConfigQuery = query(collectionGroup(firestore, 'shareConfig'), where('slug', '==', slug), limit(1));
                 const querySnapshot = await getDocs(shareConfigQuery);
                 const customSlugDoc = querySnapshot.docs.find(doc => doc.data().useCustomSlug === true);
@@ -104,8 +115,20 @@ function CatalogPageContent({ params }: CatalogPageProps) {
         fetchData();
     }, [slug, firestore, isNetworkEnabled]);
 
+    // Suscripciones para Fidelización y Reseñas
+    const businessRef = useMemoFirebase(() => 
+        pageData.resolvedBusinessId ? doc(firestore, 'businesses', pageData.resolvedBusinessId) : null,
+    [firestore, pageData.resolvedBusinessId]);
+    const { data: businessInfo } = useDoc<Business>(businessRef);
+
+    const rewardsQuery = useMemoFirebase(() => 
+        pageData.resolvedBusinessId ? query(collection(firestore, `businesses/${pageData.resolvedBusinessId}/rewards`), where('isActive', '==', true)) : null,
+    [firestore, pageData.resolvedBusinessId]);
+    const { data: rewards } = useCollection<Reward>(rewardsQuery);
+
+    const isLoyaltyActive = useMemo(() => isModuleAuthorized('loyalty'), [isModuleAuthorized]);
+
     const handleAddToCart = (product: Product, quantity: number) => {
-        // 1. Calcular si el producto tiene una promoción aplicable
         const discountInfo = promotionService.calculateDiscountedPrice(product, pageData.promotions || []);
         
         let appliedPromotion = undefined;
@@ -126,7 +149,6 @@ function CatalogPageContent({ params }: CatalogPageProps) {
                         ? { 
                             ...item, 
                             quantity: item.quantity + quantity,
-                            // Conservamos la promoción ya asignada o la nueva calculada
                             appliedPromotion: item.appliedPromotion || appliedPromotion 
                         } 
                         : item
@@ -228,26 +250,82 @@ function CatalogPageContent({ params }: CatalogPageProps) {
                 />
             )}
 
-            <main className="container mx-auto px-4 py-12">
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                    {pageData.products?.map(product => (
-                        <PublicProductCard 
-                            key={product.id} 
-                            product={product} 
-                            promotions={pageData.promotions || []}
-                            onView={() => setSelectedProduct(product)}
-                            onBuy={() => handleBuyNow(product)}
-                        />
-                    ))}
-                </div>
-
-                {(!pageData.products || pageData.products.length === 0) && (
-                    <div className="flex flex-col items-center justify-center py-20 text-center text-muted-foreground">
-                        <PackageSearch className="h-16 w-16 mb-4 opacity-20" />
-                        <h3 className="text-xl font-semibold">No hay productos disponibles</h3>
-                        <p>El catálogo está vacío actualmente.</p>
+            <main className="container mx-auto px-4 py-8">
+                <Tabs defaultValue="menu" className="w-full">
+                    <div className="flex justify-center mb-8 sticky top-20 z-40">
+                        <TabsList className="bg-white shadow-xl border rounded-full p-1 h-14">
+                            <TabsTrigger value="menu" className="rounded-full px-6 gap-2 font-bold data-[state=active]:bg-primary data-[state=active]:text-white">
+                                <Utensils className="h-4 w-4" /> Menú
+                            </TabsTrigger>
+                            <TabsTrigger value="reviews" className="rounded-full px-6 gap-2 font-bold data-[state=active]:bg-primary data-[state=active]:text-white">
+                                <Star className="h-4 w-4" /> Reseñas
+                            </TabsTrigger>
+                            {isLoyaltyActive && (
+                                <TabsTrigger value="puntos" className="rounded-full px-6 gap-2 font-bold data-[state=active]:bg-primary data-[state=active]:text-white">
+                                    <Award className="h-4 w-4" /> Mis Puntos
+                                </TabsTrigger>
+                            )}
+                        </TabsList>
                     </div>
-                )}
+
+                    <TabsContent value="menu" className="animate-in fade-in duration-500 outline-none">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                            {pageData.products?.map(product => (
+                                <PublicProductCard 
+                                    key={product.id} 
+                                    product={product} 
+                                    promotions={pageData.promotions || []}
+                                    onView={() => setSelectedProduct(product)}
+                                    onBuy={() => handleBuyNow(product)}
+                                />
+                            ))}
+                        </div>
+
+                        {(!pageData.products || pageData.products.length === 0) && (
+                            <div className="flex flex-col items-center justify-center py-20 text-center text-muted-foreground">
+                                <PackageSearch className="h-16 w-16 mb-4 opacity-20" />
+                                <h3 className="text-xl font-semibold">No hay productos disponibles</h3>
+                                <p>El catálogo está vacío actualmente.</p>
+                            </div>
+                        )}
+                    </TabsContent>
+
+                    <TabsContent value="reviews" className="max-w-4xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-500 outline-none">
+                        <ReviewSummary 
+                            rating={businessInfo?.rating || 5.0} 
+                            reviewCount={businessInfo?.reviewCount || 0} 
+                            distribution={businessInfo?.ratingDistribution}
+                        />
+                        <ReviewForm businessId={pageData.resolvedBusinessId!} />
+                    </TabsContent>
+
+                    {isLoyaltyActive && (
+                        <TabsContent value="puntos" className="max-w-4xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-500 outline-none">
+                            <LoyaltyStatus 
+                                businessId={pageData.resolvedBusinessId!} 
+                                onSuccess={(balance, whatsapp) => setLoyaltySession({ balance, whatsapp })}
+                            />
+                            <Card className="border-none shadow-sm bg-primary/5">
+                                <CardHeader>
+                                    <div className="flex items-center gap-2">
+                                        <Award className="h-6 w-6 text-primary" />
+                                        <CardTitle className="text-xl">Premios Disponibles</CardTitle>
+                                    </div>
+                                    <CardDescription>Canjea tus puntos acumulados por estos productos o servicios.</CardDescription>
+                                </CardHeader>
+                                <CardContent>
+                                    <RewardsCatalog 
+                                        businessId={pageData.resolvedBusinessId!}
+                                        rewards={rewards || []}
+                                        currentBalance={loyaltySession?.balance || 0}
+                                        whatsapp={loyaltySession?.whatsapp || ''}
+                                        onRedeemed={() => setLoyaltySession(null)} // Forzar recarga al canjear
+                                    />
+                                </CardContent>
+                            </Card>
+                        </TabsContent>
+                    )}
+                </Tabs>
             </main>
 
             <ProductViewModal 
