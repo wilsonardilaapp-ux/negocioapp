@@ -1,0 +1,51 @@
+{
+  "indexes": [
+    {
+      "collectionId": "referrals",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "referentBusinessId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionId": "referrals",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "referreeBusinessId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionId": "referrals",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionId": "loyaltyTransactions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "whatsapp", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionId": "shareConfig",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "slug", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionId": "shareConfig",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "slugLanding", "order": "ASCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

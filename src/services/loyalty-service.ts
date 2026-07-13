@@ -73,6 +73,7 @@ class LoyaltyService {
   /**
    * Obtiene el historial de movimientos de puntos de un cliente.
    * Path: businesses/{businessId}/loyaltyTransactions
+   * Requiere índice compuesto: whatsapp ASC, createdAt DESC
    */
   async getLoyaltyTransactionHistory(
     businessId: string, 
@@ -119,10 +120,7 @@ class LoyaltyService {
 
   /**
    * Valida si un código de factura corresponde a un pedido real del cliente.
-   * 
-   * Lógica de validación:
-   * - Filtra por 'customerPhone' (número original y normalizado).
-   * - Compara el 'invoiceCode' contra el sufijo (últimos 8 caracteres en mayúsculas) del ID del pedido.
+   * Lógica resiliente: compara contra teléfono normalizado y crudo para cubrir historial.
    */
   async verifyInvoiceCode(businessId: string, whatsapp: string, invoiceCode: string): Promise<boolean> {
     const db = await this.getDb();
@@ -133,7 +131,7 @@ class LoyaltyService {
 
     const ordersRef = db.collection('businesses').doc(businessId).collection('orders');
     
-    // Consultamos pedidos asociados al número de teléfono
+    // Consultamos pedidos asociados al número (en formato estandarizado e histórico)
     const snapshot = await ordersRef
       .where('customerPhone', 'in', [whatsapp, cleanWhatsapp])
       .get();
@@ -142,7 +140,7 @@ class LoyaltyService {
       return false;
     }
 
-    // Buscamos coincidencia con el sufijo del ID del documento
+    // Buscamos coincidencia con el sufijo de 8 caracteres del ID del documento
     return snapshot.docs.some(doc => {
       const displayCode = doc.id.slice(-8).toUpperCase();
       return displayCode === cleanCode;
