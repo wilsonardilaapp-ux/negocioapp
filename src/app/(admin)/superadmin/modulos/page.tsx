@@ -29,6 +29,7 @@ import {
   DialogDescription,
   DialogFooter,
   DialogTrigger,
+  DialogClose,
 } from "@/components/ui/dialog";
 import {
   AlertDialog,
@@ -86,13 +87,10 @@ export default function ModulesPage() {
     resolver: zodResolver(moduleSchema),
   });
 
-  // Sincronizador diferencial de módulos
   useEffect(() => {
     if (!isLoading && modules && firestore) {
       DEFAULT_MODULES.forEach(async (m) => {
         const moduleId = m.idOverride || m.name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, "");
-        
-        // Verificar si el módulo ya existe en la base de datos cargada
         const exists = modules.some(existing => existing.id === moduleId);
 
         if (!exists) {
@@ -103,7 +101,7 @@ export default function ModulesPage() {
             name: m.name,
             description: m.description,
             limit: m.limit,
-            status: 'inactive', // Se crean inactivos para control del admin
+            status: 'inactive',
             createdAt: new Date().toISOString(),
           });
           console.log(`[ModuleSeeder] Módulo ${m.name} sincronizado con éxito.`);
@@ -133,7 +131,7 @@ export default function ModulesPage() {
 
     try {
       await setDocumentNonBlocking(docRef, moduleData, { merge: true });
-      toast({ title: typeof editingModule === 'object' && editingModule !== null ? "Módulo actualizado" : "Módulo creado" });
+      toast({ title: editingModule ? "Módulo actualizado" : "Módulo creado" });
       handleCloseDialog();
     } catch (e) {
       toast({ variant: 'destructive', title: "Error al guardar" });
@@ -213,7 +211,9 @@ export default function ModulesPage() {
                   <Input id="limit" type="number" {...register('limit', { valueAsNumber: true })} />
                 </div>
                 <DialogFooter>
-                  <Button type="button" variant="outline" onClick={handleCloseDialog}>Cancelar</Button>
+                  <DialogClose asChild>
+                    <Button type="button" variant="outline">Cancelar</Button>
+                  </DialogClose>
                   <Button type="submit" disabled={isSubmitting}>
                     {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     Guardar
@@ -252,7 +252,7 @@ export default function ModulesPage() {
                     <AlertDialogHeader>
                       <AlertDialogTitle>¿Eliminar módulo?</AlertDialogTitle>
                       <AlertDialogDescription>Esta acción afectará a todos los negocios que usen este módulo.</AlertDialogDescription>
-                    </AccordionHeader>
+                    </AlertDialogHeader>
                     <AlertDialogFooter>
                       <AlertDialogCancel>Cancelar</AlertDialogCancel>
                       <AlertDialogAction onClick={() => handleDelete(module.id)} className="bg-destructive hover:bg-destructive/90">Eliminar</AlertDialogAction>
