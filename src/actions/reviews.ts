@@ -1,4 +1,4 @@
-'use server';
+'use client';
 
 import { getAdminFirestore } from '@/firebase/server-init';
 import { revalidatePath } from 'next/cache';
@@ -114,10 +114,42 @@ export async function moderateReview(
 
     await reviewRef.update(updates);
     revalidatePath(`/catalog/${businessId}`);
+    revalidatePath('/dashboard/loyalty');
     
     return { success: true };
   } catch (error: any) {
     console.error('[Action: moderateReview] Error:', error.message);
     return { success: false, error: 'Error al actualizar el estado de la reseña.' };
+  }
+}
+
+/**
+ * Actualiza o añade una respuesta del negocio a una reseña.
+ */
+export async function updateReviewReply(
+  businessId: string,
+  reviewId: string,
+  reply: string
+) {
+  if (!businessId || !reviewId) {
+    return { success: false, error: 'Faltan parámetros de identificación.' };
+  }
+
+  const db = await getAdminFirestore();
+  const reviewRef = db.collection('businesses').doc(businessId).collection('reviews').doc(reviewId);
+
+  try {
+    await reviewRef.update({
+      reply: reply,
+      updatedAt: new Date().toISOString()
+    });
+    
+    revalidatePath(`/catalog/${businessId}`);
+    revalidatePath('/dashboard/loyalty');
+    
+    return { success: true };
+  } catch (error: any) {
+    console.error('[Action: updateReviewReply] Error:', error.message);
+    return { success: false, error: 'No se pudo guardar la respuesta.' };
   }
 }
