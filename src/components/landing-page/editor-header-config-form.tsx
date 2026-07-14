@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useRef, useState, useEffect } from 'react';
@@ -326,8 +325,8 @@ export default function EditorHeaderConfigForm({ data, setData }: EditorHeaderCo
                 mediaType={data.banner.mediaType}
                 onUpload={handleBannerUpload}
                 onRemove={() => setData((prev) => ({ ...prev, banner: { mediaUrl: null, mediaType: null } }))}
-                aspectRatio="aspect-[1920/500]"
-                dimensions="1920 × 500 px (desktop)"
+                aspectRatio="aspect-[1920/350]"
+                dimensions="1920 × 350 px (desktop)"
                 description="Dimensiones recomendadas para Markix"
             />
         </div>

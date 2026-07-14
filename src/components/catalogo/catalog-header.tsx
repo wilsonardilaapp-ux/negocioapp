@@ -19,7 +19,7 @@ export default function CatalogHeader({ config, cartCount, onOpenCart }: Catalog
   return (
     <header className="bg-white border-b sticky top-0 z-50 shadow-sm">
       {banner.mediaUrl && (
-        <div className="hidden md:block relative h-32 w-full overflow-hidden">
+        <div className="hidden md:block relative h-[350px] w-full overflow-hidden">
           <Image src={banner.mediaUrl} alt="Banner" fill className="object-cover" />
         </div>
       )}
