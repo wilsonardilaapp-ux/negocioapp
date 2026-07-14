@@ -1,4 +1,4 @@
-'use client';
+'use server';
 
 import { getAdminFirestore } from '@/firebase/server-init';
 import { revalidatePath } from 'next/cache';
@@ -10,7 +10,7 @@ import { handleNegativeReviewRecovery } from '@/services/recovery-service';
 /**
  * Crea una nueva reseña de cliente en Firestore.
  * Implementa auto-aprobación para ratings altos y otorga bono de puntos si aplica.
- * CORREGIDO: Las lecturas de puntos ahora ocurren antes de la escritura de la reseña.
+ * Se ejecuta estrictamente en el servidor para proteger las credenciales de Admin.
  */
 export async function createReview(data: {
   businessId: string;
@@ -47,9 +47,8 @@ export async function createReview(data: {
 
   try {
     await db.runTransaction(async (transaction) => {
-      // 1. LECTURAS Y ESCRITURAS DE PUNTOS (Debe ir primero porque contiene 'get')
+      // 1. LECTURAS Y ESCRITURAS DE PUNTOS (Transaccional)
       if (reviewData.whatsapp) {
-        // Esta función interna hace transaction.get() y luego transaction.set()
         await grantLoyaltyPointsTransactional(
           transaction,
           db,
@@ -61,14 +60,15 @@ export async function createReview(data: {
         );
       }
 
-      // 2. ESCRITURA DE LA RESEÑA (Después de todas las posibles lecturas)
+      // 2. ESCRITURA DE LA RESEÑA
       transaction.set(reviewsCol.doc(reviewId), reviewData);
     });
 
-    // 3. DISPARADOR DE RECUPERACIÓN (Fuera de la transacción para no bloquear)
+    // 3. DISPARADOR DE RECUPERACIÓN (IA)
     // Se activa solo para calificaciones de 1 o 2 estrellas con WhatsApp identificado
     if (data.rating <= 2 && reviewData.whatsapp) {
-      handleNegativeReviewRecovery({
+      // Esperamos el inicio del proceso de recuperación antes de finalizar la acción
+      await handleNegativeReviewRecovery({
         businessId: data.businessId,
         name: data.name,
         whatsapp: reviewData.whatsapp,
