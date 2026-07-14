@@ -11,9 +11,12 @@ import {
     Mail, 
     CheckCircle2, 
     ArrowRight,
-    MessageSquareQuote
+    MessageSquareQuote,
+    Smartphone
 } from 'lucide-react';
-import { WhatsAppIcon, TikTokIcon, FacebookIcon, InstagramIcon } from '@/components/icons';
+import { WhatsAppIcon, TikTokIcon, FacebookIcon, InstagramIcon, XIcon, YoutubeIcon } from '@/components/icons';
+import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
+import Autoplay from "embla-carousel-autoplay";
 import Link from 'next/link';
 import Image from 'next/image';
 import { notFound } from 'next/navigation';
@@ -38,6 +41,11 @@ type BusinessWithSocial = Business & {
     socialYoutube?: string;
     shortDescription?: string;
     subcategory?: string;
+    phone2?: string;
+    phone3?: string;
+    phone4?: string;
+    phone5?: string;
+    carouselItems?: any[];
 };
 
 async function getBusinessEntry(id: string) {
@@ -57,20 +65,24 @@ async function getBusinessEntry(id: string) {
             const socialLinks = catalog?.headerConfig?.socialLinks;
             const businessInfo = catalog?.headerConfig?.businessInfo;
             
-            if (socialLinks) {
-                const cleanValue = (val: any) => (typeof val === 'string' && val.trim().length > 0) ? val.trim() : undefined;
-                additionalData = {
-                    socialInstagram: cleanValue(socialLinks.instagram),
-                    socialFacebook: cleanValue(socialLinks.facebook),
-                    socialTiktok: cleanValue(socialLinks.tiktok),
-                    socialTwitter: cleanValue(socialLinks.twitter),
-                    socialYoutube: cleanValue(socialLinks.youtube),
-                    socialWhatsapp: cleanValue(socialLinks.whatsapp),
-                    shortDescription: cleanValue(businessInfo?.shortDescription),
-                    category: data.category || cleanValue(businessInfo?.category),
-                    subcategory: data.subcategory || cleanValue(businessInfo?.subcategory)
-                };
-            }
+            const cleanValue = (val: any) => (typeof val === 'string' && val.trim().length > 0) ? val.trim() : undefined;
+            
+            additionalData = {
+                socialInstagram: socialLinks ? cleanValue(socialLinks.instagram) : undefined,
+                socialFacebook: socialLinks ? cleanValue(socialLinks.facebook) : undefined,
+                socialTiktok: socialLinks ? cleanValue(socialLinks.tiktok) : undefined,
+                socialTwitter: socialLinks ? cleanValue(socialLinks.twitter) : undefined,
+                socialYoutube: socialLinks ? cleanValue(socialLinks.youtube) : undefined,
+                socialWhatsapp: socialLinks ? cleanValue(socialLinks.whatsapp) : undefined,
+                shortDescription: cleanValue(businessInfo?.shortDescription),
+                category: data.category || cleanValue(businessInfo?.category),
+                subcategory: data.subcategory || cleanValue(businessInfo?.subcategory),
+                phone2: cleanValue(businessInfo?.phone2),
+                phone3: cleanValue(businessInfo?.phone3),
+                phone4: cleanValue(businessInfo?.phone4),
+                phone5: cleanValue(businessInfo?.phone5),
+                carouselItems: catalog?.headerConfig?.carouselItems || []
+            };
         }
         
         return { ...data, ...additionalData, id: businessDoc.id };
@@ -141,6 +153,9 @@ export default async function BusinessProfilePage({ params }: { params: { id: st
         businessName: entry.name,
     };
 
+    // Filtrar teléfonos existentes
+    const allPhones = [entry.phone, entry.phone2, entry.phone3, entry.phone4, entry.phone5].filter(Boolean);
+
     return (
         <div className="min-h-screen bg-gray-50/30 flex flex-col">
             <FaviconInjector faviconUrl={faviconUrl} title={`${entry.name} | Directorio Markix`} />
@@ -185,6 +200,14 @@ export default async function BusinessProfilePage({ params }: { params: { id: st
                                         <Badge variant="secondary" className="font-bold">{entry.category || 'Servicios'}</Badge>
                                         {entry.subcategory && <Badge variant="outline" className="font-bold border-muted">{entry.subcategory}</Badge>}
                                     </div>
+                                    <div className="flex flex-wrap gap-x-4 gap-y-1">
+                                        {allPhones.map((p, idx) => (
+                                            <div key={idx} className="flex items-center gap-1.5">
+                                                <Phone className="h-4 w-4 text-primary" />
+                                                <span className="text-sm font-medium">{p}</span>
+                                            </div>
+                                        ))}
+                                    </div>
                                     {entry.address && (
                                         <div className="flex items-center gap-1.5">
                                             <MapPin className="h-5 w-5 text-primary" />
@@ -211,6 +234,37 @@ export default async function BusinessProfilePage({ params }: { params: { id: st
                         </div>
                     </div>
                 </div>
+
+                {/* --- CARRUSEL PROMOCIONAL --- */}
+                {entry.carouselItems && entry.carouselItems.some((item: any) => item.mediaUrl) && (
+                    <div className="container mx-auto px-4 mt-8">
+                        <Carousel 
+                            className="w-full" 
+                            opts={{ loop: true }}
+                        >
+                            <CarouselContent>
+                                {entry.carouselItems.map((item: any) => item.mediaUrl && (
+                                    <CarouselItem key={item.id}>
+                                        <div className="relative aspect-[21/9] md:aspect-[1920/500] w-full rounded-2xl overflow-hidden shadow-md">
+                                            {item.mediaType === 'image' ? (
+                                                <Image src={item.mediaUrl} alt={item.slogan || 'Promoción'} fill sizes="100vw" className="object-cover" />
+                                            ) : (
+                                                <video src={item.mediaUrl} autoPlay loop muted className="w-full h-full object-cover" />
+                                            )}
+                                            {item.slogan && (
+                                                <div className="absolute inset-0 bg-black/30 flex items-center justify-center p-4">
+                                                    <p className="text-white text-xl md:text-4xl font-black text-center drop-shadow-lg">{item.slogan}</p>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </CarouselItem>
+                                ))}
+                            </CarouselContent>
+                            <CarouselPrevious className="left-4" />
+                            <CarouselNext className="right-4" />
+                        </Carousel>
+                    </div>
+                )}
 
                 <div className="container mx-auto px-4 py-12">
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
@@ -279,14 +333,23 @@ export default async function BusinessProfilePage({ params }: { params: { id: st
                             <div className="bg-white p-8 rounded-[2rem] border shadow-sm space-y-6">
                                 <h3 className="font-bold text-xl">Contacto</h3>
                                 <div className="space-y-4 text-sm">
-                                    {entry.phone && <div className="flex items-center gap-3"><Phone className="h-4 w-4 text-primary"/><span>{entry.phone}</span></div>}
+                                    {allPhones.map((p, idx) => (
+                                        <div key={idx} className="flex items-center gap-3">
+                                            <Phone className="h-4 w-4 text-primary"/>
+                                            <span>{p}</span>
+                                        </div>
+                                    ))}
                                     {entry.address && <div className="flex items-center gap-3"><MapPin className="h-4 w-4 text-primary"/><span>{entry.address}</span></div>}
                                     {entry.ownerEmail && <div className="flex items-center gap-3"><Mail className="h-4 w-4 text-primary"/><span>{entry.ownerEmail}</span></div>}
                                 </div>
+                                
                                 <div className="pt-6 border-t flex flex-wrap gap-4">
                                     {entry.socialInstagram && <a href={entry.socialInstagram} target="_blank" rel="noopener noreferrer"><InstagramIcon /></a>}
                                     {entry.socialFacebook && <a href={entry.socialFacebook} target="_blank" rel="noopener noreferrer"><FacebookIcon /></a>}
                                     {entry.socialTiktok && <a href={entry.socialTiktok} target="_blank" rel="noopener noreferrer"><TikTokIcon /></a>}
+                                    {entry.socialTwitter && <a href={entry.socialTwitter} target="_blank" rel="noopener noreferrer"><XIcon /></a>}
+                                    {entry.socialYoutube && <a href={entry.socialYoutube} target="_blank" rel="noopener noreferrer"><YoutubeIcon /></a>}
+                                    {entry.socialWhatsapp && <a href={`https://wa.me/${normalizePhoneNumber(entry.socialWhatsapp)}`} target="_blank" rel="noopener noreferrer"><WhatsAppIcon /></a>}
                                 </div>
                                 
                                 <BusinessCatalogQR businessId={entry.id} />
