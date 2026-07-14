@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, useMemo, useCallback, Suspense } from 'react';
@@ -12,7 +11,7 @@ import ProductViewModal from '@/components/catalogo/product-view-modal';
 import { PurchaseModal } from '@/components/catalogo/purchase-modal';
 import { CartDrawer } from '@/components/catalogo/cart-drawer';
 import { SuggestionModal } from '@/components/suggestions/suggestion-modal';
-import { Frown, Loader2, PackageSearch, Utensils, Star, Award, MessageSquare, Phone, MapPin, Globe } from 'lucide-react';
+import { Frown, Loader2, PackageSearch, Utensils, Star, Award } from 'lucide-react';
 import type { LandingHeaderConfigData } from '@/models/landing-page';
 import type { Product } from '@/models/product';
 import type { Promotion } from '@/models/promotion';
@@ -36,12 +35,10 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import type { Business } from '@/models/business';
 import type { Reward } from '@/services/loyalty-service';
 
-// Carrusel e Iconos
+// Carrusel
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
 import Autoplay from "embla-carousel-autoplay";
-import { WhatsAppIcon, TikTokIcon, FacebookIcon, InstagramIcon, XIcon, YoutubeIcon } from '@/components/icons';
 import Image from 'next/image';
-import { cn, normalizePhoneNumber } from "@/lib/utils";
 
 interface CatalogPageProps {
     params: { businessId: string };
@@ -136,27 +133,6 @@ function CatalogPageContent({ params }: CatalogPageProps) {
     const { data: rewards } = useCollection<Reward>(rewardsQuery);
 
     const isLoyaltyActive = useMemo(() => isModuleAuthorized('loyalty'), [isModuleAuthorized]);
-
-    // Redes Sociales Dinámicas
-    const socialLinks = useMemo(() => {
-        if (!pageData.headerConfig?.socialLinks) return [];
-        const links = pageData.headerConfig.socialLinks;
-        return [
-            { id: 'whatsapp', icon: <WhatsAppIcon className="h-5 w-5" />, url: links.whatsapp, color: 'bg-green-500' },
-            { id: 'instagram', icon: <InstagramIcon className="h-5 w-5" />, url: links.instagram, color: 'bg-gradient-to-tr from-yellow-400 via-red-500 to-purple-600' },
-            { id: 'facebook', icon: <FacebookIcon className="h-5 w-5" />, url: links.facebook, color: 'bg-blue-600' },
-            { id: 'tiktok', icon: <TikTokIcon className="h-5 w-5" />, url: links.tiktok, color: 'bg-black' },
-            { id: 'twitter', icon: <XIcon className="h-5 w-5" />, url: links.twitter, color: 'bg-black' },
-            { id: 'youtube', icon: <YoutubeIcon className="h-5 w-5" />, url: links.youtube, color: 'bg-red-600' },
-        ].filter(link => link.url && link.url.trim() !== '');
-    }, [pageData.headerConfig]);
-
-    // Teléfonos Dinámicos (1 al 5)
-    const allPhones = useMemo(() => {
-        if (!pageData.headerConfig?.businessInfo) return [];
-        const info = pageData.headerConfig.businessInfo;
-        return [info.phone, info.phone2, info.phone3, info.phone4, info.phone5].filter(Boolean);
-    }, [pageData.headerConfig]);
 
     const handleAddToCart = (product: Product, quantity: number) => {
         const discountInfo = promotionService.calculateDiscountedPrice(product, pageData.promotions || []);
@@ -262,7 +238,6 @@ function CatalogPageContent({ params }: CatalogPageProps) {
         return (
             <div className="flex h-screen w-full flex-col items-center justify-center bg-gray-50 p-4 text-center">
                 <div className="bg-white p-10 rounded-3xl shadow-sm max-w-md border border-gray-100">
-                    <Frown className="text-red-300 w-16 h-16 mx-auto mb-4" />
                     <h2 className="text-2xl font-bold text-red-800">Catálogo no disponible</h2>
                     <p className="text-gray-500 leading-relaxed">{error}</p>
                 </div>
@@ -296,7 +271,7 @@ function CatalogPageContent({ params }: CatalogPageProps) {
                         <CarouselContent>
                             {pageData.headerConfig.carouselItems.map(item => item.mediaUrl && (
                                 <CarouselItem key={item.id}>
-                                    <div className="relative aspect-[21/9] md:aspect-[1920/500] w-full">
+                                    <div className="relative aspect-video w-full">
                                         {item.mediaType === 'image' ? (
                                             <Image 
                                                 src={item.mediaUrl} 
@@ -326,61 +301,13 @@ function CatalogPageContent({ params }: CatalogPageProps) {
                                 </CarouselItem>
                             ))}
                         </CarouselContent>
-                        <CarouselPrevious className="left-4" />
-                        <CarouselNext className="right-4" />
                     </Carousel>
                 </div>
             )}
 
-            {/* --- BLOQUE DINÁMICO DE CONTACTO Y REDES --- */}
-            <section className="bg-white border-b py-6 shadow-sm">
-                <div className="container mx-auto px-4">
-                    <div className="flex flex-col lg:flex-row justify-between items-center gap-6">
-                        <div className="flex flex-wrap justify-center lg:justify-start gap-x-8 gap-y-3">
-                            {allPhones.map((p, idx) => (
-                                <div key={idx} className="flex items-center gap-2 text-sm font-bold text-gray-700 hover:text-primary transition-colors">
-                                    <div className="p-1.5 bg-primary/10 rounded-full">
-                                        <Phone className="h-3.5 w-3.5 text-primary" />
-                                    </div>
-                                    <span>{p}</span>
-                                </div>
-                            ))}
-                            {pageData.headerConfig?.businessInfo.address && (
-                                <div className="flex items-center gap-2 text-sm font-bold text-gray-700">
-                                    <div className="p-1.5 bg-primary/10 rounded-full">
-                                        <MapPin className="h-3.5 w-3.5 text-primary" />
-                                    </div>
-                                    <span>{pageData.headerConfig.businessInfo.address}</span>
-                                </div>
-                            )}
-                        </div>
-
-                        {socialLinks.length > 0 && (
-                            <div className="flex items-center gap-3">
-                                <span className="text-[10px] font-black uppercase text-muted-foreground tracking-widest mr-2">Siguenos</span>
-                                {socialLinks.map(link => (
-                                    <a 
-                                        key={link.id} 
-                                        href={link.url} 
-                                        target="_blank" 
-                                        rel="noopener noreferrer"
-                                        className={cn(
-                                            "h-10 w-10 rounded-xl flex items-center justify-center text-white transition-all hover:scale-110 shadow-md",
-                                            link.color
-                                        )}
-                                    >
-                                        {link.icon}
-                                    </a>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-                </div>
-            </section>
-
             <main className="container mx-auto px-4 py-8">
                 <Tabs defaultValue="menu" className="w-full">
-                    <div className="flex justify-center mb-8 sticky top-20 z-40">
+                    <div className="flex justify-center mb-8 sticky top-4 z-40">
                         <TabsList className="bg-white shadow-xl border rounded-full p-1 h-14">
                             <TabsTrigger value="menu" className="rounded-full px-6 gap-2 font-bold data-[state=active]:bg-primary data-[state=active]:text-white">
                                 <Utensils className="h-4 w-4" /> Menú
