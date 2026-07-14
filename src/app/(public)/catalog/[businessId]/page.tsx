@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, useMemo, useCallback, Suspense } from 'react';
@@ -11,7 +12,7 @@ import ProductViewModal from '@/components/catalogo/product-view-modal';
 import { PurchaseModal } from '@/components/catalogo/purchase-modal';
 import { CartDrawer } from '@/components/catalogo/cart-drawer';
 import { SuggestionModal } from '@/components/suggestions/suggestion-modal';
-import { Frown, Loader2, PackageSearch, Utensils, Star, Award, MessageSquare } from 'lucide-react';
+import { Frown, Loader2, PackageSearch, Utensils, Star, Award, MessageSquare, Phone, MapPin, Globe } from 'lucide-react';
 import type { LandingHeaderConfigData } from '@/models/landing-page';
 import type { Product } from '@/models/product';
 import type { Promotion } from '@/models/promotion';
@@ -34,6 +35,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import type { Business } from '@/models/business';
 import type { Reward } from '@/services/loyalty-service';
+
+// Carrusel e Iconos
+import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
+import Autoplay from "embla-carousel-autoplay";
+import { WhatsAppIcon, TikTokIcon, FacebookIcon, InstagramIcon, XIcon, YoutubeIcon } from '@/components/icons';
+import Image from 'next/image';
+import { cn, normalizePhoneNumber } from "@/lib/utils";
 
 interface CatalogPageProps {
     params: { businessId: string };
@@ -128,6 +136,27 @@ function CatalogPageContent({ params }: CatalogPageProps) {
     const { data: rewards } = useCollection<Reward>(rewardsQuery);
 
     const isLoyaltyActive = useMemo(() => isModuleAuthorized('loyalty'), [isModuleAuthorized]);
+
+    // Redes Sociales Dinámicas
+    const socialLinks = useMemo(() => {
+        if (!pageData.headerConfig?.socialLinks) return [];
+        const links = pageData.headerConfig.socialLinks;
+        return [
+            { id: 'whatsapp', icon: <WhatsAppIcon className="h-5 w-5" />, url: links.whatsapp, color: 'bg-green-500' },
+            { id: 'instagram', icon: <InstagramIcon className="h-5 w-5" />, url: links.instagram, color: 'bg-gradient-to-tr from-yellow-400 via-red-500 to-purple-600' },
+            { id: 'facebook', icon: <FacebookIcon className="h-5 w-5" />, url: links.facebook, color: 'bg-blue-600' },
+            { id: 'tiktok', icon: <TikTokIcon className="h-5 w-5" />, url: links.tiktok, color: 'bg-black' },
+            { id: 'twitter', icon: <XIcon className="h-5 w-5" />, url: links.twitter, color: 'bg-black' },
+            { id: 'youtube', icon: <YoutubeIcon className="h-5 w-5" />, url: links.youtube, color: 'bg-red-600' },
+        ].filter(link => link.url && link.url.trim() !== '');
+    }, [pageData.headerConfig]);
+
+    // Teléfonos Dinámicos (1 al 5)
+    const allPhones = useMemo(() => {
+        if (!pageData.headerConfig?.businessInfo) return [];
+        const info = pageData.headerConfig.businessInfo;
+        return [info.phone, info.phone2, info.phone3, info.phone4, info.phone5].filter(Boolean);
+    }, [pageData.headerConfig]);
 
     const handleAddToCart = (product: Product, quantity: number) => {
         const discountInfo = promotionService.calculateDiscountedPrice(product, pageData.promotions || []);
@@ -251,6 +280,104 @@ function CatalogPageContent({ params }: CatalogPageProps) {
                 />
             )}
 
+            {/* --- CARRUSEL PROMOCIONAL --- */}
+            {pageData.headerConfig?.carouselItems && pageData.headerConfig.carouselItems.some(item => item.mediaUrl) && (
+                <div className="w-full bg-white border-b overflow-hidden">
+                    <Carousel 
+                        className="w-full" 
+                        opts={{ loop: true }}
+                        plugins={[
+                            Autoplay({
+                                delay: 5000,
+                                stopOnInteraction: true,
+                            }),
+                        ]}
+                    >
+                        <CarouselContent>
+                            {pageData.headerConfig.carouselItems.map(item => item.mediaUrl && (
+                                <CarouselItem key={item.id}>
+                                    <div className="relative aspect-[21/9] md:aspect-[1920/500] w-full">
+                                        {item.mediaType === 'image' ? (
+                                            <Image 
+                                                src={item.mediaUrl} 
+                                                alt={item.slogan || 'Promoción'} 
+                                                fill 
+                                                priority
+                                                sizes="100vw" 
+                                                className="object-cover" 
+                                            />
+                                        ) : (
+                                            <video 
+                                                src={item.mediaUrl} 
+                                                autoPlay 
+                                                loop 
+                                                muted 
+                                                className="w-full h-full object-cover" 
+                                            />
+                                        )}
+                                        {item.slogan && (
+                                            <div className="absolute inset-0 bg-black/30 flex items-center justify-center p-4">
+                                                <p className="text-white text-xl md:text-5xl font-black text-center drop-shadow-xl animate-in fade-in zoom-in duration-700">
+                                                    {item.slogan}
+                                                </p>
+                                            </div>
+                                        )}
+                                    </div>
+                                </CarouselItem>
+                            ))}
+                        </CarouselContent>
+                        <CarouselPrevious className="left-4" />
+                        <CarouselNext className="right-4" />
+                    </Carousel>
+                </div>
+            )}
+
+            {/* --- BLOQUE DINÁMICO DE CONTACTO Y REDES --- */}
+            <section className="bg-white border-b py-6 shadow-sm">
+                <div className="container mx-auto px-4">
+                    <div className="flex flex-col lg:flex-row justify-between items-center gap-6">
+                        <div className="flex flex-wrap justify-center lg:justify-start gap-x-8 gap-y-3">
+                            {allPhones.map((p, idx) => (
+                                <div key={idx} className="flex items-center gap-2 text-sm font-bold text-gray-700 hover:text-primary transition-colors">
+                                    <div className="p-1.5 bg-primary/10 rounded-full">
+                                        <Phone className="h-3.5 w-3.5 text-primary" />
+                                    </div>
+                                    <span>{p}</span>
+                                </div>
+                            ))}
+                            {pageData.headerConfig?.businessInfo.address && (
+                                <div className="flex items-center gap-2 text-sm font-bold text-gray-700">
+                                    <div className="p-1.5 bg-primary/10 rounded-full">
+                                        <MapPin className="h-3.5 w-3.5 text-primary" />
+                                    </div>
+                                    <span>{pageData.headerConfig.businessInfo.address}</span>
+                                </div>
+                            )}
+                        </div>
+
+                        {socialLinks.length > 0 && (
+                            <div className="flex items-center gap-3">
+                                <span className="text-[10px] font-black uppercase text-muted-foreground tracking-widest mr-2">Siguenos</span>
+                                {socialLinks.map(link => (
+                                    <a 
+                                        key={link.id} 
+                                        href={link.url} 
+                                        target="_blank" 
+                                        rel="noopener noreferrer"
+                                        className={cn(
+                                            "h-10 w-10 rounded-xl flex items-center justify-center text-white transition-all hover:scale-110 shadow-md",
+                                            link.color
+                                        )}
+                                    >
+                                        {link.icon}
+                                    </a>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </section>
+
             <main className="container mx-auto px-4 py-8">
                 <Tabs defaultValue="menu" className="w-full">
                     <div className="flex justify-center mb-8 sticky top-20 z-40">
@@ -320,7 +447,7 @@ function CatalogPageContent({ params }: CatalogPageProps) {
                                         rewards={rewards || []}
                                         currentBalance={loyaltySession?.balance || 0}
                                         whatsapp={loyaltySession?.whatsapp || ''}
-                                        onRedeemed={() => setLoyaltySession(null)} // Forzar recarga al canjear
+                                        onRedeemed={() => setLoyaltySession(null)} 
                                     />
                                 </CardContent>
                             </Card>
