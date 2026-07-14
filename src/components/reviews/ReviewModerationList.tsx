@@ -13,6 +13,7 @@ import { es } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
 import { generateSimpleText } from "@/ai/flows/simple-text-flow";
 import { moderateReview } from "@/actions/reviews";
+import { cn } from "@/lib/utils";
 
 interface Review {
   id: string;
