@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
-import { doc } from 'firebase/firestore';
+import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
+import { doc, collection, query, orderBy } from 'firebase/firestore';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
@@ -32,7 +32,7 @@ import ChurnConfigCard from '@/components/admin/loyalty/ChurnConfigCard';
 import PointsConfigCard from '@/components/admin/loyalty/PointsConfigCard';
 import VipCustomersRanking from '@/components/admin/loyalty/VipCustomersRanking';
 import ReviewSummary from '@/components/reviews/ReviewSummary';
-import ReviewModerationList from '@/components/reviews/ReviewModerationList';
+import { ReviewModerationList } from '@/components/reviews/ReviewModerationList';
 
 import {
   AlertDialog,
@@ -55,6 +55,17 @@ export default function LoyaltyDashboardPage() {
   );
   
   const { data: business, isLoading: loadingBusiness } = useDoc<Business>(businessRef);
+
+  // [NUEVA LÓGICA DE RESEÑAS - INYECTADA PARA REPARACIÓN]
+  const reviewsQuery = useMemoFirebase(() => {
+    if (!firestore || !user?.uid) return null;
+    return query(
+        collection(firestore, 'businesses', user.uid, 'reviews'),
+        orderBy('createdAt', 'desc')
+    );
+  }, [firestore, user?.uid]);
+
+  const { data: reviewsData, isLoading: loadingReviews } = useCollection(reviewsQuery);
 
   const [googleLink, setGoogleLink] = useState('');
   const [isSavingLink, setIsSavingLink] = useState(false);
@@ -206,20 +217,35 @@ export default function LoyaltyDashboardPage() {
             </div>
         </TabsContent>
 
-        <TabsContent value="reviews" className="animate-in fade-in duration-500 outline-none">
+        <TabsContent value="reviews" className="animate-in fade-in duration-500 outline-none space-y-8">
             <div className="max-w-4xl mx-auto space-y-8">
-                <div className="space-y-1">
-                    <h2 className="text-xl font-bold text-gray-900">Moderación de Opiniones</h2>
-                    <p className="text-sm text-muted-foreground">Aprueba las valoraciones pendientes y responde a tus clientes.</p>
-                </div>
-                
-                <ReviewModerationList 
-                    businessId={user.uid} 
-                    businessName={business?.name}
-                    googleReviewLink={business?.googleReviewLink}
-                />
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="text-lg flex items-center gap-2">
+                            <MessageSquare className="h-5 w-5 text-primary" />
+                            Moderación de Opiniones
+                        </CardTitle>
+                        <CardDescription>
+                            Aprueba las valoraciones pendientes y responde a tus clientes.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        {loadingReviews ? (
+                            <div className="flex justify-center py-10">
+                                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                            </div>
+                        ) : (
+                            <ReviewModerationList 
+                                reviews={reviewsData || []} 
+                                businessId={user.uid}
+                                businessName={business?.name}
+                                googleReviewLink={business?.googleReviewLink}
+                            />
+                        )}
+                    </CardContent>
+                </Card>
 
-                <Card className="border-primary/20 bg-primary/5">
+                <Card className="border-primary/20 bg-primary/5 shadow-sm">
                     <CardHeader>
                         <CardTitle className="text-lg flex items-center gap-2">
                             <Globe className="h-5 w-5 text-primary" />
