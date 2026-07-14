@@ -6,32 +6,43 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
-} from "@/components/ui/select";
+  Dialog, 
+  DialogContent, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogFooter, 
+  DialogDescription 
+} from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
+import { 
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { 
   Star, 
   MessageSquare, 
   Bot, 
   Send, 
-  AlertTriangle, 
   XCircle, 
   CheckCircle2, 
   Loader2, 
-  Mail
+  Mail,
+  Trash2
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
+import { useUser } from "@/firebase";
 import { generateSimpleText } from "@/ai/flows/simple-text-flow";
-import { moderateReview } from "@/actions/reviews";
+import { moderateReview, deleteReview } from "@/actions/reviews";
 import { cn } from "@/lib/utils";
 
 interface Review {
@@ -39,13 +50,12 @@ interface Review {
   name: string;
   rating: number;
   comment: string;
-  status: 'pending' | 'approved' | 'rejected';
+  status: 'pending' | 'approved' | 'rejected' | 'deleted';
   whatsapp?: string;
   reply?: string;
   createdAt: any;
 }
 
-// 1. Definición de las 5 Plantillas Oficiales de Recuperación
 const RECOVERY_TEMPLATES = [
   {
     id: "disculpa-segunda-oportunidad",
@@ -137,11 +147,18 @@ export function ReviewModerationList({
   businessName?: string,
   googleReviewLink?: string 
 }) {
+  const { user, profile } = useUser();
   const { toast } = useToast();
   const [isRecovering, setIsRecovering] = useState(false);
   const [recoveryTarget, setRecoveryTarget] = useState<Review | null>(null);
   const [generatedMessage, setGeneratedMessage] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  const isAdmin = profile?.role === 'super_admin' || profile?.role === 'cliente_admin';
+
+  // Filtrado de seguridad: No mostrar reseñas eliminadas
+  const visibleReviews = reviews.filter(r => r.status !== 'deleted');
 
   const handleRecoverClick = (review: Review) => {
     setRecoveryTarget(review);
@@ -149,7 +166,6 @@ export function ReviewModerationList({
     setIsRecovering(true);
   };
 
-  // 2. Lógica de Aplicación de Plantillas con reemplazo de variables
   const applyTemplate = (templateText: string) => {
     if (!recoveryTarget) return;
     
@@ -159,14 +175,13 @@ export function ReviewModerationList({
       .replace(/{GOOGLE_REVIEW_URL}/g, googleReviewLink || "https://g.page/r/...");
       
     setGeneratedMessage(processedText);
-    toast({ title: "Plantilla aplicada", description: "El mensaje ha sido generado." });
   };
 
   const handleGenerateAiMessage = async () => {
     if (!recoveryTarget) return;
     setIsGenerating(true);
     try {
-      const prompt = `Actúa como el dueño del negocio ${businessName || 'nuestro restaurante'}. El cliente ${recoveryTarget.name} calificó con ${recoveryTarget.rating} estrellas y dijo: '${recoveryTarget.comment}'. Redacta un mensaje muy amable para WhatsApp, invitándolo a volver y ofreciéndole una mejor experiencia. Incluye este enlace para que actualice su reseña si queda satisfecho: ${googleReviewLink || 'TU_LINK_DE_GOOGLE'}. Si el enlace no existe, omite esa parte. El mensaje debe ser corto y empático.`;
+      const prompt = `Actúa como el dueño del negocio ${businessName || 'nuestro restaurante'}. El cliente ${recoveryTarget.name} calificó con ${recoveryTarget.rating} estrellas y dijo: '${recoveryTarget.comment}'. Redacta un mensaje muy amable para WhatsApp, invitándolo a volver y ofreciéndole una mejor experiencia. Incluye este enlace para que actualice su reseña si queda satisfecho: ${googleReviewLink || 'TU_LINK_DE_GOOGLE'}. El mensaje debe ser corto y empático.`;
       
       const response = await generateSimpleText(prompt, businessId);
       setGeneratedMessage(response);
@@ -188,6 +203,7 @@ export function ReviewModerationList({
   };
 
   const handleAction = async (reviewId: string, status: 'approved' | 'rejected') => {
+    setIsProcessing(true);
     try {
       const result = await moderateReview(businessId, reviewId, status);
       if (result.success) {
@@ -197,19 +213,38 @@ export function ReviewModerationList({
       }
     } catch (error: any) {
       toast({ variant: "destructive", title: "Error al moderar", description: error.message });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleDelete = async (reviewId: string) => {
+    if (!user) return;
+    setIsProcessing(true);
+    try {
+      const result = await deleteReview(businessId, reviewId, user.uid);
+      if (result.success) {
+        toast({ title: "Reseña eliminada", description: "El registro ha sido removido de la vista pública." });
+      } else {
+        throw new Error(result.error);
+      }
+    } catch (error: any) {
+      toast({ variant: "destructive", title: "Error al eliminar", description: error.message });
+    } finally {
+      setIsProcessing(false);
     }
   };
 
   return (
     <div className="space-y-4 py-4">
-      {reviews.length === 0 && (
+      {visibleReviews.length === 0 && (
         <div className="text-center py-10 text-muted-foreground border-2 border-dashed rounded-xl">
             <MessageSquare className="h-10 w-10 mx-auto opacity-20 mb-2" />
             No hay reseñas para mostrar.
         </div>
       )}
       
-      {reviews.map((review) => (
+      {visibleReviews.map((review) => (
         <Card key={review.id} className="overflow-hidden border-gray-100">
           <CardContent className="p-6">
             <div className="flex justify-between items-start mb-4">
@@ -245,7 +280,13 @@ export function ReviewModerationList({
                   >
                     <Bot className="h-4 w-4" /> Recuperar Cliente
                   </button>
-                  <Button size="sm" variant="ghost" className="text-red-600 font-bold hover:bg-red-50" onClick={() => handleAction(review.id, 'rejected')}>
+                  <Button 
+                    size="sm" 
+                    variant="ghost" 
+                    className="text-red-600 font-bold hover:bg-red-50" 
+                    onClick={() => handleAction(review.id, 'rejected')}
+                    disabled={isProcessing}
+                  >
                     <XCircle className="h-4 w-4 mr-2" /> Rechazar
                   </Button>
                 </>
@@ -255,12 +296,45 @@ export function ReviewModerationList({
                     <CheckCircle2 className="h-4 w-4" /> Reseña Visible
                 </div>
               )}
+              
+              {/* ACCIÓN DE ELIMINAR (Solo Administradores) */}
+              {isAdmin && (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="text-red-500 hover:bg-red-50 hover:text-red-600"
+                      disabled={isProcessing}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>¿Eliminar reseña permanentemente?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Esta acción ocultará la reseña de la vista pública y de los reportes. Podrás seguir consultándola en los registros de auditoría.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                      <AlertDialogAction 
+                        onClick={() => handleDelete(review.id)}
+                        className="bg-red-600 hover:bg-red-700 font-bold"
+                      >
+                        Eliminar Reseña
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              )}
             </div>
           </CardContent>
         </Card>
       ))}
 
-      {/* MODAL DE RECUPERACIÓN (5 Plantillas + IA) */}
+      {/* MODAL DE RECUPERACIÓN */}
       <Dialog open={isRecovering} onOpenChange={setIsRecovering}>
         <DialogContent className="sm:max-w-[650px]">
           <DialogHeader>
@@ -278,38 +352,37 @@ export function ReviewModerationList({
               "{recoveryTarget?.comment}"
             </div>
 
-            {/* 3. Selector de Plantillas (Posición Central) */}
             <div className="space-y-2">
               <Label className="text-[10px] uppercase font-bold text-muted-foreground">Plantillas de Recuperación</Label>
-              <Select onValueChange={(value) => {
-                const template = RECOVERY_TEMPLATES.find(t => t.id === value);
-                if (template) applyTemplate(template.text);
-              }}>
-                <SelectTrigger className="w-full text-sm bg-white">
-                  <SelectValue placeholder="Selecciona una estrategia de respuesta..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {RECOVERY_TEMPLATES.map((t) => (
-                    <SelectItem key={t.id} value={t.id}>{t.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                {RECOVERY_TEMPLATES.map((t) => (
+                  <Button 
+                    key={t.id} 
+                    variant="outline" 
+                    size="sm" 
+                    className="text-[10px] h-auto py-2 px-3 text-left justify-start font-medium bg-white"
+                    onClick={() => applyTemplate(t.text)}
+                  >
+                    {t.label}
+                  </Button>
+                ))}
+              </div>
             </div>
 
             <Separator className="my-2" />
 
             <div className="space-y-2">
               <div className="flex justify-between items-center">
-                <Label className="text-xs font-bold uppercase text-muted-foreground">Mensaje para enviar</Label>
+                <Label className="text-xs font-bold uppercase text-muted-foreground">Mensaje sugerido por IA</Label>
                 <Button size="sm" variant="outline" className="h-7 text-[10px] font-bold" onClick={handleGenerateAiMessage} disabled={isGenerating}>
                   {isGenerating ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Bot className="h-3 w-3 mr-1" />}
-                  {isGenerating ? "Generando..." : "Mejorar con IA"}
+                  {isGenerating ? "Generando..." : "Generar con IA"}
                 </Button>
               </div>
               <Textarea 
                 value={generatedMessage} 
                 onChange={(e) => setGeneratedMessage(e.target.value)}
-                placeholder="Selecciona una plantilla arriba o escribe aquí tu respuesta..."
+                placeholder="Selecciona una plantilla o genera un mensaje con IA..."
                 className="min-h-[180px] text-sm bg-white"
               />
             </div>
