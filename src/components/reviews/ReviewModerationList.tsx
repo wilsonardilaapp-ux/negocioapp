@@ -25,8 +25,7 @@ import {
   XCircle, 
   CheckCircle2, 
   Loader2, 
-  Mail,
-  FileText
+  Mail
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
@@ -46,22 +45,84 @@ interface Review {
   createdAt: any;
 }
 
-// 1. Definición de Plantillas de Recuperación
+// 1. Definición de las 5 Plantillas Oficiales de Recuperación
 const RECOVERY_TEMPLATES = [
   {
-    id: 'apology',
-    label: '🤝 Disculpa Directa',
-    text: 'Hola {{name}}, lamentamos mucho que tu experiencia no haya sido la mejor. En {{businessName}} valoramos mucho tu opinión y nos gustaría saber más para mejorar. ¿Podrías darnos más detalles?'
+    id: "disculpa-segunda-oportunidad",
+    label: "Disculpa y segunda oportunidad",
+    text: `Hola {NOMBRE_CLIENTE},
+
+Lamentamos sinceramente la experiencia que tuviste con {NOMBRE_NEGOCIO}.
+
+Tu opinión es muy importante para nosotros y nos gustaría tener la oportunidad de mejorar.
+
+Si logramos resolver tu situación y quedas satisfecho con nuestra atención, te agradeceríamos compartir tu experiencia actualizada aquí:
+
+{GOOGLE_REVIEW_URL}
+
+Gracias por brindarnos una segunda oportunidad.`
   },
   {
-    id: 'invite',
-    label: '🚀 Invitación a Volver',
-    text: 'Hola {{name}}, gracias por tu opinión. Nos encantaría que nos dieras una segunda oportunidad en {{businessName}} para demostrarte nuestro compromiso. Si quedas satisfecho, podrías actualizar tu opinión aquí: {{googleLink}}'
+    id: "recuperar-confianza",
+    label: "Recuperar confianza",
+    text: `Hola {NOMBRE_CLIENTE},
+
+Gracias por compartir tu experiencia.
+
+Sentimos no haber cumplido tus expectativas y estamos trabajando para mejorar cada día.
+
+Nos gustaría tener una nueva oportunidad para demostrar nuestro compromiso contigo.
+
+Si consideras que hemos solucionado tu inconveniente, puedes compartir tu experiencia aquí:
+
+{GOOGLE_REVIEW_URL}
+
+Muchas gracias por tu confianza.`
   },
   {
-    id: 'improvement',
-    label: '📝 Agradecimiento por Mejora',
-    text: 'Hola {{name}}, gracias por calificarnos con {{rating}} estrellas. Tus comentarios sobre "{{comment}}" son muy importantes para nosotros en {{businessName}} y ya estamos trabajando para que tu próxima visita sea perfecta.'
+    id: "resolver-inconveniente",
+    label: "Resolver inconveniente",
+    text: `Hola {NOMBRE_CLIENTE},
+
+Hemos revisado tu comentario y queremos ayudarte a solucionar lo ocurrido.
+
+Nuestro objetivo es ofrecerte una experiencia satisfactoria y recuperar tu confianza.
+
+Si quedas conforme con la solución brindada, puedes actualizar tu opinión aquí:
+
+{GOOGLE_REVIEW_URL}
+
+Gracias por permitirnos mejorar.`
+  },
+  {
+    id: "cliente-valioso",
+    label: "Cliente valioso",
+    text: `Hola {NOMBRE_CLIENTE},
+
+Valoramos enormemente tu confianza en {NOMBRE_NEGOCIO}.
+
+Lamentamos cualquier inconveniente presentado y queremos asegurarnos de brindarte una mejor experiencia.
+
+Si tu situación fue resuelta satisfactoriamente, puedes compartir tu opinión aquí:
+
+{GOOGLE_REVIEW_URL}
+
+Gracias por seguir confiando en nosotros.`
+  },
+  {
+    id: "actualizacion-resena",
+    label: "Actualización de reseña",
+    text: `Hola {NOMBRE_CLIENTE},
+
+Gracias por compartir tu comentario.
+
+Tu opinión nos ayuda a mejorar constantemente.
+
+Si consideras que tu experiencia ha mejorado después de nuestra atención, agradeceríamos que actualizaras tu reseña en el siguiente enlace:
+
+{GOOGLE_REVIEW_URL}
+
+Muchas gracias por tu apoyo.`
   }
 ];
 
@@ -88,21 +149,17 @@ export function ReviewModerationList({
     setIsRecovering(true);
   };
 
-  // 2. Lógica para aplicar plantillas dinámicas
-  const applyTemplate = (templateId: string) => {
+  // 2. Lógica de Aplicación de Plantillas con reemplazo de variables
+  const applyTemplate = (templateText: string) => {
     if (!recoveryTarget) return;
-    const template = RECOVERY_TEMPLATES.find(t => t.id === templateId);
-    if (!template) return;
-
-    let text = template.text;
-    text = text.replace(/{{name}}/g, recoveryTarget.name);
-    text = text.replace(/{{businessName}}/g, businessName || 'nuestro negocio');
-    text = text.replace(/{{rating}}/g, recoveryTarget.rating.toString());
-    text = text.replace(/{{comment}}/g, recoveryTarget.comment);
-    text = text.replace(/{{googleLink}}/g, googleReviewLink || '[Link de Google]');
-
-    setGeneratedMessage(text);
-    toast({ title: "Plantilla aplicada", description: "El mensaje ha sido actualizado." });
+    
+    let processedText = templateText
+      .replace(/{NOMBRE_CLIENTE}/g, recoveryTarget.name || "cliente")
+      .replace(/{NOMBRE_NEGOCIO}/g, businessName || "nuestro negocio")
+      .replace(/{GOOGLE_REVIEW_URL}/g, googleReviewLink || "https://g.page/r/...");
+      
+    setGeneratedMessage(processedText);
+    toast({ title: "Plantilla aplicada", description: "El mensaje ha sido generado." });
   };
 
   const handleGenerateAiMessage = async () => {
@@ -182,9 +239,12 @@ export function ReviewModerationList({
             <div className="flex gap-2 justify-end">
               {review.status === 'pending' && (
                 <>
-                  <Button size="sm" variant="outline" className="bg-sky-50 text-sky-600 border-sky-200 hover:bg-sky-100 font-bold" onClick={() => handleRecoverClick(review)}>
-                    <Bot className="h-4 w-4 mr-2" /> Recuperar Cliente
-                  </Button>
+                  <button 
+                    onClick={() => handleRecoverClick(review)}
+                    className="flex items-center gap-2 px-4 py-2 rounded-lg bg-sky-50 text-sky-600 border border-sky-200 hover:bg-sky-100 transition-colors text-xs font-bold"
+                  >
+                    <Bot className="h-4 w-4" /> Recuperar Cliente
+                  </button>
                   <Button size="sm" variant="ghost" className="text-red-600 font-bold hover:bg-red-50" onClick={() => handleAction(review.id, 'rejected')}>
                     <XCircle className="h-4 w-4 mr-2" /> Rechazar
                   </Button>
@@ -200,25 +260,17 @@ export function ReviewModerationList({
         </Card>
       ))}
 
-      {/* MODAL DE RECUPERACIÓN (IA + Plantillas) */}
+      {/* MODAL DE RECUPERACIÓN (5 Plantillas + IA) */}
       <Dialog open={isRecovering} onOpenChange={setIsRecovering}>
         <DialogContent className="sm:max-w-[650px]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Bot className="h-5 w-5 text-sky-500" /> Recuperar Cliente
             </DialogTitle>
-            <DialogDescription>Elige una respuesta predefinida o deja que la IA redacte un mensaje personalizado.</DialogDescription>
+            <DialogDescription>
+              Usa una de nuestras plantillas profesionales o genera un mensaje personalizado con IA.
+            </DialogDescription>
           </DialogHeader>
-
-          {!googleReviewLink && (
-            <Alert variant="destructive" className="bg-amber-50 border-amber-200 text-amber-800">
-              <AlertTriangle className="h-4 w-4 text-amber-600" />
-              <AlertTitle className="text-xs font-bold">Configuración Incompleta</AlertTitle>
-              <AlertDescription className="text-[10px]">
-                No has configurado el link de Google Reviews. Las plantillas y la IA omitirán este enlace.
-              </AlertDescription>
-            </Alert>
-          )}
 
           <div className="space-y-4 my-4">
             <div className="bg-muted p-3 rounded-lg text-xs italic">
@@ -226,38 +278,39 @@ export function ReviewModerationList({
               "{recoveryTarget?.comment}"
             </div>
 
-            {/* Selector de Plantillas */}
+            {/* 3. Selector de Plantillas (Posición Central) */}
             <div className="space-y-2">
-                <Label className="text-[10px] uppercase font-bold text-muted-foreground flex items-center gap-1.5">
-                  <FileText className="h-3 w-3 text-primary" /> Usar una Plantilla Rápida
-                </Label>
-                <Select onValueChange={applyTemplate}>
-                    <SelectTrigger className="bg-white">
-                        <SelectValue placeholder="Seleccionar una estrategia de respuesta..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                        {RECOVERY_TEMPLATES.map(t => (
-                            <SelectItem key={t.id} value={t.id}>{t.label}</SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
+              <Label className="text-[10px] uppercase font-bold text-muted-foreground">Plantillas de Recuperación</Label>
+              <Select onValueChange={(value) => {
+                const template = RECOVERY_TEMPLATES.find(t => t.id === value);
+                if (template) applyTemplate(template.text);
+              }}>
+                <SelectTrigger className="w-full text-sm bg-white">
+                  <SelectValue placeholder="Selecciona una estrategia de respuesta..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {RECOVERY_TEMPLATES.map((t) => (
+                    <SelectItem key={t.id} value={t.id}>{t.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <Separator className="my-2" />
 
             <div className="space-y-2">
               <div className="flex justify-between items-center">
-                <Label className="text-xs font-bold uppercase text-muted-foreground">Mensaje de Recuperación</Label>
+                <Label className="text-xs font-bold uppercase text-muted-foreground">Mensaje para enviar</Label>
                 <Button size="sm" variant="outline" className="h-7 text-[10px] font-bold" onClick={handleGenerateAiMessage} disabled={isGenerating}>
                   {isGenerating ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Bot className="h-3 w-3 mr-1" />}
-                  {isGenerating ? "Generando..." : "Generar con IA"}
+                  {isGenerating ? "Generando..." : "Mejorar con IA"}
                 </Button>
               </div>
               <Textarea 
                 value={generatedMessage} 
                 onChange={(e) => setGeneratedMessage(e.target.value)}
-                placeholder="Elige una plantilla arriba o pulsa 'Generar con IA' para redactar una respuesta..."
-                className="min-h-[150px] text-sm bg-white"
+                placeholder="Selecciona una plantilla arriba o escribe aquí tu respuesta..."
+                className="min-h-[180px] text-sm bg-white"
               />
             </div>
           </div>
