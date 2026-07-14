@@ -7,7 +7,26 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Star, MessageSquare, Bot, Send, AlertTriangle, XCircle, CheckCircle2, Loader2, Mail } from "lucide-react";
+import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
+} from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
+import { 
+  Star, 
+  MessageSquare, 
+  Bot, 
+  Send, 
+  AlertTriangle, 
+  XCircle, 
+  CheckCircle2, 
+  Loader2, 
+  Mail,
+  FileText
+} from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
@@ -25,6 +44,25 @@ interface Review {
   reply?: string;
   createdAt: any;
 }
+
+// 1. Definición de Plantillas de Recuperación
+const RECOVERY_TEMPLATES = [
+  {
+    id: 'apology',
+    label: '🤝 Disculpa Directa',
+    text: 'Hola {{name}}, lamentamos mucho que tu experiencia no haya sido la mejor. En {{businessName}} valoramos mucho tu opinión y nos gustaría saber más para mejorar. ¿Podrías darnos más detalles?'
+  },
+  {
+    id: 'invite',
+    label: '🚀 Invitación a Volver',
+    text: 'Hola {{name}}, gracias por tu opinión. Nos encantaría que nos dieras una segunda oportunidad en {{businessName}} para demostrarte nuestro compromiso. Si quedas satisfecho, podrías actualizar tu opinión aquí: {{googleLink}}'
+  },
+  {
+    id: 'improvement',
+    label: '📝 Agradecimiento por Mejora',
+    text: 'Hola {{name}}, gracias por calificarnos con {{rating}} estrellas. Tus comentarios sobre "{{comment}}" son muy importantes para nosotros en {{businessName}} y ya estamos trabajando para que tu próxima visita sea perfecta.'
+  }
+];
 
 export function ReviewModerationList({ 
   reviews, 
@@ -47,6 +85,23 @@ export function ReviewModerationList({
     setRecoveryTarget(review);
     setGeneratedMessage("");
     setIsRecovering(true);
+  };
+
+  // 2. Lógica para aplicar plantillas dinámicas
+  const applyTemplate = (templateId: string) => {
+    if (!recoveryTarget) return;
+    const template = RECOVERY_TEMPLATES.find(t => t.id === templateId);
+    if (!template) return;
+
+    let text = template.text;
+    text = text.replace(/{{name}}/g, recoveryTarget.name);
+    text = text.replace(/{{businessName}}/g, businessName || 'nuestro negocio');
+    text = text.replace(/{{rating}}/g, recoveryTarget.rating.toString());
+    text = text.replace(/{{comment}}/g, recoveryTarget.comment);
+    text = text.replace(/{{googleLink}}/g, googleReviewLink || '[Link de Google]');
+
+    setGeneratedMessage(text);
+    toast({ title: "Plantilla aplicada", description: "El mensaje ha sido actualizado." });
   };
 
   const handleGenerateAiMessage = async () => {
@@ -144,14 +199,14 @@ export function ReviewModerationList({
         </Card>
       ))}
 
-      {/* MODAL DE RECUPERACIÓN (IA) */}
+      {/* MODAL DE RECUPERACIÓN (IA + Plantillas) */}
       <Dialog open={isRecovering} onOpenChange={setIsRecovering}>
         <DialogContent className="sm:max-w-[650px]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Bot className="h-5 w-5 text-sky-500" /> Recuperar Cliente con IA
+              <Bot className="h-5 w-5 text-sky-500" /> Recuperar Cliente
             </DialogTitle>
-            <DialogDescription>Genera un mensaje empático para invitar al cliente a darnos una segunda oportunidad.</DialogDescription>
+            <DialogDescription>Elige una respuesta predefinida o deja que la IA redacte un mensaje personalizado.</DialogDescription>
           </DialogHeader>
 
           {!googleReviewLink && (
@@ -159,7 +214,7 @@ export function ReviewModerationList({
               <AlertTriangle className="h-4 w-4 text-amber-600" />
               <AlertTitle className="text-xs font-bold">Configuración Incompleta</AlertTitle>
               <AlertDescription className="text-[10px]">
-                No has configurado el link de Google Reviews. El mensaje se generará sin enlace de redirección.
+                No has configurado el link de Google Reviews. Las plantillas y la IA omitirán este enlace.
               </AlertDescription>
             </Alert>
           )}
@@ -170,18 +225,37 @@ export function ReviewModerationList({
               "{recoveryTarget?.comment}"
             </div>
 
+            {/* Selector de Plantillas */}
+            <div className="space-y-2">
+                <Label className="text-[10px] uppercase font-bold text-muted-foreground flex items-center gap-1.5">
+                  <FileText className="h-3 w-3 text-primary" /> Usar una Plantilla Rápida
+                </Label>
+                <Select onValueChange={applyTemplate}>
+                    <SelectTrigger className="bg-white">
+                        <SelectValue placeholder="Seleccionar una estrategia de respuesta..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {RECOVERY_TEMPLATES.map(t => (
+                            <SelectItem key={t.id} value={t.id}>{t.label}</SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            </div>
+
+            <Separator className="my-2" />
+
             <div className="space-y-2">
               <div className="flex justify-between items-center">
-                <label className="text-xs font-bold uppercase text-muted-foreground">Mensaje sugerido por IA</label>
+                <label className="text-xs font-bold uppercase text-muted-foreground">Mensaje de Recuperación</label>
                 <Button size="sm" variant="outline" className="h-7 text-[10px] font-bold" onClick={handleGenerateAiMessage} disabled={isGenerating}>
                   {isGenerating ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Bot className="h-3 w-3 mr-1" />}
-                  {isGenerating ? "Generando..." : "Generar Mensaje"}
+                  {isGenerating ? "Generando..." : "Generar con IA"}
                 </Button>
               </div>
               <Textarea 
                 value={generatedMessage} 
                 onChange={(e) => setGeneratedMessage(e.target.value)}
-                placeholder="El mensaje generado aparecerá aquí..."
+                placeholder="Elige una plantilla arriba o pulsa 'Generar con IA' para redactar una respuesta..."
                 className="min-h-[150px] text-sm bg-white"
               />
             </div>
