@@ -87,7 +87,7 @@ export default function PedidosPage() {
 
   const handleSelectRow = (orderId: string) => {
     setSelectedOrders(prev => 
-      prev.includes(orderId) ? prev.filter(id => id !== orderId) : [...prev, id]
+      prev.includes(orderId) ? prev.filter(id => id !== orderId) : [...prev, orderId]
     );
   };
   

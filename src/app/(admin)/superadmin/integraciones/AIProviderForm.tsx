@@ -162,7 +162,7 @@ export const AIProviderForm = ({
   const addPeakHour = (provider: Provider) => {
     const range = tempRanges[provider];
     setFields(prev => {
-        const currentProviderFields = prev[provider] || {};
+        const currentProviderFields = prev[provider] || { apiKey: '', peakHours: [], timezone: '', avoidInPeakHours: false };
         const currentPeakHours = currentProviderFields.peakHours || [];
         return {
             ...prev,
@@ -176,13 +176,13 @@ export const AIProviderForm = ({
 
   const removePeakHour = (provider: Provider, index: number) => {
     setFields(prev => {
-        const currentProviderFields = prev[provider] || {};
+        const currentProviderFields = prev[provider] || { apiKey: '', peakHours: [], timezone: '', avoidInPeakHours: false };
         const currentPeakHours = currentProviderFields.peakHours || [];
         return {
             ...prev,
             [provider]: {
                 ...currentProviderFields,
-                peakHours: currentPeakHours.filter((_, i) => i !== index)
+                peakHours: currentPeakHours.filter((_: any, i: number) => i !== index)
             }
         };
     });
