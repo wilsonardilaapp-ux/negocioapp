@@ -153,3 +153,33 @@ export async function updateReviewReply(
     return { success: false, error: 'No se pudo guardar la respuesta.' };
   }
 }
+
+/**
+ * Realiza la eliminación lógica de una reseña marcándola como 'deleted'.
+ * Incluye datos de auditoría para el seguimiento administrativo.
+ */
+export async function deleteReview(businessId: string, reviewId: string, adminId: string) {
+  if (!businessId || !reviewId || !adminId) {
+    return { success: false, error: 'Datos de identificación insuficientes.' };
+  }
+
+  try {
+    const db = await getAdminFirestore();
+    const reviewRef = db.collection('businesses').doc(businessId).collection('reviews').doc(reviewId);
+
+    await reviewRef.update({
+      status: 'deleted',
+      deletedAt: new Date().toISOString(),
+      deletedBy: adminId,
+      updatedAt: new Date().toISOString(),
+    });
+
+    revalidatePath(`/catalog/${businessId}`);
+    revalidatePath('/dashboard/loyalty');
+    
+    return { success: true };
+  } catch (error: any) {
+    console.error('[Action: deleteReview] Error:', error.message);
+    return { success: false, error: 'No se pudo eliminar la reseña.' };
+  }
+}
