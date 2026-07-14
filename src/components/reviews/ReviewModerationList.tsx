@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Star, MessageSquare, Bot, Send, AlertTriangle, XCircle, CheckCircle2, Loader2 } from "lucide-react";
+import { Star, MessageSquare, Bot, Send, AlertTriangle, XCircle, CheckCircle2, Loader2, Mail } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
@@ -116,8 +116,8 @@ export function ReviewModerationList({
                   </div>
                 </div>
               </div>
-              <Badge variant={review.status === 'approved' ? 'default' : review.status === 'pending' ? 'secondary' : 'destructive'} className="capitalize">
-                {review.status}
+              <Badge variant={review.status === 'approved' ? 'default' : review.status === 'pending' ? 'secondary' : 'destructive'}>
+                {review.status === 'approved' ? 'Aprobado' : review.status === 'pending' ? 'Pendiente' : 'Rechazado'}
               </Badge>
             </div>
             
@@ -190,6 +190,9 @@ export function ReviewModerationList({
           <DialogFooter className="flex flex-col gap-2 sm:flex-row">
             <Button className="w-full bg-green-500 hover:bg-green-600 font-bold" onClick={sendWhatsApp} disabled={!generatedMessage}>
               <Send className="h-4 w-4 mr-2" /> Enviar por WhatsApp
+            </Button>
+            <Button variant="outline" className="w-full font-bold" onClick={() => window.open(`mailto:?body=${encodeURIComponent(generatedMessage)}`, "_blank")} disabled={!generatedMessage}>
+              <Mail className="h-4 w-4 mr-2" /> Enviar por Correo
             </Button>
             <Button variant="outline" className="w-full font-bold" onClick={() => handleAction(recoveryTarget?.id!, 'approved').then(() => setIsRecovering(false))}>
               Cerrar y Aprobar Reseña
