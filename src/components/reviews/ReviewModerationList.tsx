@@ -78,7 +78,7 @@ export function ReviewModerationList({
     try {
       const result = await moderateReview(businessId, reviewId, status);
       if (result.success) {
-        toast({ title: `Reseña ${status === 'approved' ? 'aprobada' : 'rechazada'}` });
+        toast({ title: `Reseña ${status === 'approved' ? 'Aprobada' : 'Rechazada'}` });
       } else {
         throw new Error(result.error);
       }
@@ -146,7 +146,7 @@ export function ReviewModerationList({
 
       {/* MODAL DE RECUPERACIÓN (IA) */}
       <Dialog open={isRecovering} onOpenChange={setIsRecovering}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="sm:max-w-[650px]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Bot className="h-5 w-5 text-sky-500" /> Recuperar Cliente con IA
@@ -187,15 +187,15 @@ export function ReviewModerationList({
             </div>
           </div>
 
-          <DialogFooter className="flex flex-col gap-2 sm:flex-row">
-            <Button className="w-full bg-green-500 hover:bg-green-600 font-bold" onClick={sendWhatsApp} disabled={!generatedMessage}>
-              <Send className="h-4 w-4 mr-2" /> Enviar por WhatsApp
+          <DialogFooter className="flex flex-wrap justify-center sm:justify-between gap-3 mt-6 border-t pt-6 bg-muted/20 -mx-6 -mb-6 p-6">
+            <Button className="flex-1 min-w-[140px] bg-green-500 hover:bg-green-600 font-bold" onClick={sendWhatsApp} disabled={!generatedMessage}>
+              <Send className="h-4 w-4 mr-2" /> WhatsApp
             </Button>
-            <Button variant="outline" className="w-full font-bold" onClick={() => window.open(`mailto:?body=${encodeURIComponent(generatedMessage)}`, "_blank")} disabled={!generatedMessage}>
-              <Mail className="h-4 w-4 mr-2" /> Enviar por Correo
+            <Button variant="outline" className="flex-1 min-w-[140px] font-bold" onClick={() => window.open(`mailto:?body=${encodeURIComponent(generatedMessage)}`, "_blank")} disabled={!generatedMessage}>
+              <Mail className="h-4 w-4 mr-2" /> Correo
             </Button>
-            <Button variant="outline" className="w-full font-bold" onClick={() => handleAction(recoveryTarget?.id!, 'approved').then(() => setIsRecovering(false))}>
-              Cerrar y Aprobar Reseña
+            <Button variant="outline" className="flex-1 min-w-[140px] font-bold" onClick={() => handleAction(recoveryTarget?.id!, 'approved').then(() => setIsRecovering(false))}>
+              <CheckCircle2 className="h-4 w-4 mr-2" /> Aprobar Reseña
             </Button>
           </DialogFooter>
         </DialogContent>
