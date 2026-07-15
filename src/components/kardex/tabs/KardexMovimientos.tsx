@@ -11,8 +11,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import type { ItemInventario, MovimientoKardex, NuevoMovimientoForm, TipoMovimiento } from '@/types/kardex.types';
-import { Save, Loader2 } from 'lucide-react';
+import { Save, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useState } from 'react';
 
 interface KardexMovimientosProps {
     items: ItemInventario[];
@@ -37,6 +38,9 @@ const movimientoSchema = z.object({
 
 export default function KardexMovimientos({ items, movimientos, registrarMovimiento }: KardexMovimientosProps) {
     const { toast } = useToast();
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 20;
+
     const { register, handleSubmit, control, reset, formState: { errors, isSubmitting } } = useForm<NuevoMovimientoForm>({
         resolver: zodResolver(movimientoSchema),
         defaultValues: {
@@ -55,10 +59,19 @@ export default function KardexMovimientos({ items, movimientos, registrarMovimie
             await registrarMovimiento(data);
             toast({ title: 'Movimiento Registrado', description: 'El nuevo movimiento se ha guardado en el kardex.' });
             reset();
+            setCurrentPage(1); // Reset a página 1 tras nuevo registro
         } catch (error: any) {
             toast({ variant: 'destructive', title: 'Error al registrar', description: error.message });
         }
     };
+
+    // Lógica de Paginación Visual
+    const sortedMovimientos = [...movimientos].reverse();
+    const totalPages = Math.ceil(sortedMovimientos.length / itemsPerPage);
+    const paginatedMovimientos = sortedMovimientos.slice(
+        (currentPage - 1) * itemsPerPage,
+        currentPage * itemsPerPage
+    );
 
     return (
         <div className="grid md:grid-cols-3 gap-6">
@@ -74,16 +87,80 @@ export default function KardexMovimientos({ items, movimientos, registrarMovimie
                         <div><Label>Documento (Factura/Remisión)</Label><Input {...register('documento')} />{errors.documento && <p className="text-sm text-destructive mt-1">{errors.documento.message}</p>}</div>
                         <div><Label>Fecha</Label><Input type="date" {...register('fecha')} /></div>
                         <div><Label>Observaciones</Label><Textarea {...register('observaciones')} /></div>
-                        <Button type="submit" className="w-full" disabled={isSubmitting}>{isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Save className="mr-2 h-4 w-4" />} Registrar</Button>
+                        <Button type="submit" className="w-full" disabled={isSubmitting}>{isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />} Registrar</Button>
                     </form>
                 </CardContent></Card>
             </div>
             <div className="md:col-span-2">
-                <Card><CardHeader><CardTitle>Últimos 20 Movimientos</CardTitle></CardHeader><CardContent><div className="rounded-md border"><Table><TableHeader><TableRow><TableHead>Fecha</TableHead><TableHead>Tipo</TableHead><TableHead>Ítem</TableHead><TableHead>Doc.</TableHead><TableHead>Cant.</TableHead><TableHead className="text-right">Total</TableHead></TableRow></TableHeader><TableBody>
-                    {[...movimientos].reverse().slice(0, 20).map(mov => (
-                        <TableRow key={mov.id}><TableCell>{new Date(mov.fecha).toLocaleDateString()}</TableCell><TableCell><Badge variant={mov.tipo.startsWith('entrada') ? 'default' : 'secondary'} className="capitalize">{mov.tipo.replace(/_/g, ' ')}</Badge></TableCell><TableCell>{items.find(p => p.id === mov.itemId)?.nombre ?? 'N/A'}</TableCell><TableCell>{mov.documento}</TableCell><TableCell>{mov.cantidad}</TableCell><TableCell className="text-right">{formatCurrency(mov.costoTotal)}</TableCell></TableRow>
-                    ))}
-                </TableBody></Table></div></CardContent></Card>
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Historial de Movimientos</CardTitle>
+                        <CardDescription>Mostrando {paginatedMovimientos.length} de {movimientos.length} registros totales.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="rounded-md border">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Fecha</TableHead>
+                                        <TableHead>Tipo</TableHead>
+                                        <TableHead>Ítem</TableHead>
+                                        <TableHead>Doc.</TableHead>
+                                        <TableHead>Cant.</TableHead>
+                                        <TableHead className="text-right">Total</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {paginatedMovimientos.length > 0 ? (
+                                        paginatedMovimientos.map(mov => (
+                                            <TableRow key={mov.id}>
+                                                <TableCell>{new Date(mov.fecha).toLocaleDateString()}</TableCell>
+                                                <TableCell><Badge variant={mov.tipo.startsWith('entrada') ? 'default' : 'secondary'} className="capitalize">{mov.tipo.replace(/_/g, ' ')}</Badge></TableCell>
+                                                <TableCell>{items.find(p => p.id === mov.itemId)?.nombre ?? 'N/A'}</TableCell>
+                                                <TableCell>{mov.documento}</TableCell>
+                                                <TableCell>{mov.cantidad}</TableCell>
+                                                <TableCell className="text-right">{formatCurrency(mov.costoTotal)}</TableCell>
+                                            </TableRow>
+                                        ))
+                                    ) : (
+                                        <TableRow>
+                                            <TableCell colSpan={6} className="h-24 text-center">No hay movimientos registrados.</TableCell>
+                                        </TableRow>
+                                    )}
+                                </TableBody>
+                            </Table>
+                        </div>
+
+                        {/* Controles de Paginación */}
+                        {totalPages > 1 && (
+                            <div className="flex items-center justify-between py-4 border-t mt-4">
+                                <div className="text-sm text-muted-foreground font-medium">
+                                    Página {currentPage} de {totalPages}
+                                </div>
+                                <div className="flex gap-2">
+                                    <Button 
+                                        variant="outline" 
+                                        size="sm" 
+                                        onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                                        disabled={currentPage === 1}
+                                        className="font-bold"
+                                    >
+                                        <ChevronLeft className="mr-2 h-4 w-4" /> Anterior
+                                    </Button>
+                                    <Button 
+                                        variant="outline" 
+                                        size="sm" 
+                                        onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                                        disabled={currentPage >= totalPages}
+                                        className="font-bold"
+                                    >
+                                        Siguiente <ChevronRight className="ml-2 h-4 w-4" />
+                                    </Button>
+                                </div>
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
             </div>
         </div>
     );
