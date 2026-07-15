@@ -1,12 +1,13 @@
 
 'use client';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { ItemInventario, LineaKardexCalculada, MetodoValuacion } from '@/types/kardex.types';
 import { Button } from '@/components/ui/button';
+import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 
 interface KardexTablaProps {
     items: ItemInventario[];
@@ -19,17 +20,31 @@ export default function KardexTabla({ items, calcularKardex }: KardexTablaProps)
     const [selectedItemId, setSelectedItemId] = useState<string>(items[0]?.id ?? '');
     const [selectedMetodo, setSelectedMetodo] = useState<MetodoValuacion>('promedio_ponderado');
     const [lineas, setLineas] = useState<LineaKardexCalculada[]>([]);
+    
+    // --- LÓGICA DE PAGINACIÓN ---
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 20;
 
     const handleCalculate = () => {
         if (selectedItemId) {
+            // CRÍTICO: calcularKardex procesa el 100% del historial para mantener integridad contable
             const result = calcularKardex(selectedItemId, selectedMetodo);
             setLineas(result);
+            setCurrentPage(1); // Reset a la primera página tras nuevo cálculo
         }
     };
     
-    const costoTotalVentas = lineas.reduce((sum, l) => sum + (l.salida?.costoTotal ?? 0), 0);
-    const unidadesRotadas = lineas.reduce((sum, l) => sum + (l.salida?.cantidad ?? 0), 0);
+    // Cálculos financieros siempre sobre el total de líneas calculadas
+    const costoTotalVentas = useMemo(() => lineas.reduce((sum, l) => sum + (l.salida?.costoTotal ?? 0), 0), [lineas]);
+    const unidadesRotadas = useMemo(() => lineas.reduce((sum, l) => sum + (l.salida?.cantidad ?? 0), 0), [lineas]);
     const diasStock = 0; // Placeholder
+
+    // Segmentación visual de datos ya calculados
+    const totalPages = Math.ceil(lineas.length / itemsPerPage);
+    const paginatedLineas = useMemo(() => {
+        const startIndex = (currentPage - 1) * itemsPerPage;
+        return lineas.slice(startIndex, startIndex + itemsPerPage);
+    }, [lineas, currentPage]);
 
     return (
         <Card>
@@ -68,7 +83,7 @@ export default function KardexTabla({ items, calcularKardex }: KardexTablaProps)
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {lineas.length > 0 ? lineas.map((linea, index) => (
+                            {paginatedLineas.length > 0 ? paginatedLineas.map((linea, index) => (
                                 <TableRow key={index}>
                                     <TableCell>{linea.fecha}</TableCell>
                                     <TableCell className="capitalize">{linea.concepto}</TableCell>
@@ -84,12 +99,42 @@ export default function KardexTabla({ items, calcularKardex }: KardexTablaProps)
                                 </TableRow>
                             )) : (
                                 <TableRow>
-                                    <TableCell colSpan={11} className="h-24 text-center">No hay datos para mostrar. Selecciona un ítem y calcula.</TableCell>
+                                    <TableCell colSpan={11} className="h-24 text-center">No hay datos para mostrar. Selecciona un producto y calcula.</TableCell>
                                 </TableRow>
                             )}
                         </TableBody>
                     </Table>
                 </div>
+
+                {/* CONTROLES DE PAGINACIÓN */}
+                {totalPages > 1 && (
+                    <div className="flex items-center justify-between py-4 border-t mt-4">
+                        <div className="text-sm text-muted-foreground font-medium">
+                            Mostrando página {currentPage} de {totalPages} ({lineas.length} registros)
+                        </div>
+                        <div className="flex gap-2">
+                            <Button 
+                                variant="outline" 
+                                size="sm" 
+                                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                                disabled={currentPage === 1}
+                                className="font-bold"
+                            >
+                                <ChevronLeft className="mr-2 h-4 w-4" /> Anterior
+                            </Button>
+                            <Button 
+                                variant="outline" 
+                                size="sm" 
+                                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                                disabled={currentPage >= totalPages}
+                                className="font-bold"
+                            >
+                                Siguiente <ChevronRight className="ml-2 h-4 w-4" />
+                            </Button>
+                        </div>
+                    </div>
+                )}
+
                  <div className="grid grid-cols-3 gap-4 mt-6">
                     <Card><CardHeader><CardTitle>Costo de Ventas</CardTitle></CardHeader><CardContent><p className="text-2xl font-bold">{formatCurrency(costoTotalVentas)}</p></CardContent></Card>
                     <Card><CardHeader><CardTitle>Unidades Rotadas</CardTitle></CardHeader><CardContent><p className="text-2xl font-bold">{unidadesRotadas}</p></CardContent></Card>
@@ -99,4 +144,3 @@ export default function KardexTabla({ items, calcularKardex }: KardexTablaProps)
         </Card>
     );
 }
-
