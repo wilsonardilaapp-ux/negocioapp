@@ -11,7 +11,7 @@ import ProductViewModal from '@/components/catalogo/product-view-modal';
 import { PurchaseModal } from '@/components/catalogo/purchase-modal';
 import { CartDrawer } from '@/components/catalogo/cart-drawer';
 import { SuggestionModal } from '@/components/suggestions/suggestion-modal';
-import { Frown, Loader2, PackageSearch, Utensils, Star, Award } from 'lucide-react';
+import { Frown, Loader2, PackageSearch, Utensils, Star, Award, ChevronLeft, ChevronRight, LayoutGrid } from 'lucide-react';
 import type { LandingHeaderConfigData } from '@/models/landing-page';
 import type { Product } from '@/models/product';
 import type { Promotion } from '@/models/promotion';
@@ -32,6 +32,8 @@ import LoyaltyStatus from '@/components/loyalty/LoyaltyStatus';
 import RewardsCatalog from '@/components/loyalty/RewardsCatalog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import type { Business } from '@/models/business';
 import type { Reward } from '@/services/loyalty-service';
 
@@ -39,10 +41,13 @@ import type { Reward } from '@/services/loyalty-service';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
 import Autoplay from "embla-carousel-autoplay";
 import Image from 'next/image';
+import { cn } from '@/lib/utils';
 
 interface CatalogPageProps {
     params: { businessId: string };
 }
+
+const ITEMS_PER_PAGE = 20;
 
 function CatalogPageContent({ params }: CatalogPageProps) {
     const slug = decodeURIComponent(params.businessId);
@@ -70,6 +75,10 @@ function CatalogPageContent({ params }: CatalogPageProps) {
     const [cartItems, setCartItems] = useState<CartItem[]>([]);
     const [isCartOpen, setIsCartOpen] = useState(false);
     const [isPurchaseModalOpen, setIsPurchaseModalOpen] = useState(false);
+    
+    // --- ESTADOS DE PAGINACIÓN Y FILTRADO ---
+    const [currentPage, setCurrentPage] = useState(1);
+    const [selectedCategory, setSelectedCategory] = useState('Todas');
     
     // Estado para la sesión de fidelización del cliente
     const [loyaltySession, setLoyaltySession] = useState<{ balance: number; whatsapp: string } | null>(null);
@@ -120,6 +129,39 @@ function CatalogPageContent({ params }: CatalogPageProps) {
 
         fetchData();
     }, [slug, firestore, isNetworkEnabled]);
+
+    // --- LÓGICA DE FILTRADO Y PAGINACIÓN ---
+    
+    // Obtener lista única de categorías para el selector
+    const categoriesList = useMemo(() => {
+        if (!pageData.products) return ['Todas'];
+        const uniqueCats = Array.from(new Set(pageData.products.map(p => p.category).filter(Boolean)));
+        return ['Todas', ...uniqueCats.sort()];
+    }, [pageData.products]);
+
+    // Filtrar productos por categoría seleccionada
+    const filteredProducts = useMemo(() => {
+        if (!pageData.products) return [];
+        if (selectedCategory === 'Todas') return pageData.products;
+        return pageData.products.filter(p => p.category === selectedCategory);
+    }, [pageData.products, selectedCategory]);
+
+    // Aplicar paginación (Slicing) al array ya filtrado
+    const totalPages = Math.ceil(filteredProducts.length / ITEMS_PER_PAGE);
+    const paginatedProducts = useMemo(() => {
+        const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+        return filteredProducts.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+    }, [filteredProducts, currentPage]);
+
+    // Resetear a página 1 cuando cambia la categoría
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [selectedCategory]);
+
+    const handlePageChange = (newPage: number) => {
+        setCurrentPage(newPage);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
 
     // Suscripciones para Fidelización y Reseñas
     const businessRef = useMemoFirebase(() => 
@@ -323,9 +365,28 @@ function CatalogPageContent({ params }: CatalogPageProps) {
                         </TabsList>
                     </div>
 
-                    <TabsContent value="menu" className="animate-in fade-in duration-500 outline-none">
+                    <TabsContent value="menu" className="animate-in fade-in duration-500 outline-none space-y-8">
+                        {/* Selector de Categorías */}
+                        {categoriesList.length > 2 && (
+                            <div className="flex items-center gap-4 overflow-x-auto pb-4 no-scrollbar">
+                                {categoriesList.map((cat) => (
+                                    <Button
+                                        key={cat}
+                                        variant={selectedCategory === cat ? 'default' : 'outline'}
+                                        onClick={() => setSelectedCategory(cat)}
+                                        className={cn(
+                                            "rounded-full px-6 h-10 font-bold transition-all shrink-0",
+                                            selectedCategory === cat ? "shadow-md scale-105" : "text-muted-foreground"
+                                        )}
+                                    >
+                                        {cat}
+                                    </Button>
+                                ))}
+                            </div>
+                        )}
+
                         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                            {pageData.products?.map(product => (
+                            {paginatedProducts.map(product => (
                                 <PublicProductCard 
                                     key={product.id} 
                                     product={product} 
@@ -335,6 +396,59 @@ function CatalogPageContent({ params }: CatalogPageProps) {
                                 />
                             ))}
                         </div>
+
+                        {/* Controles de Paginación */}
+                        {totalPages > 1 && (
+                            <div className="flex flex-col items-center gap-4 mt-12 py-6 border-t">
+                                <p className="text-xs font-black uppercase tracking-widest text-muted-foreground">
+                                    Página {currentPage} de {totalPages}
+                                </p>
+                                <div className="flex items-center gap-2">
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => handlePageChange(currentPage - 1)}
+                                        disabled={currentPage === 1}
+                                        className="h-10 px-4 font-bold rounded-xl"
+                                    >
+                                        <ChevronLeft className="h-4 w-4 mr-2" /> Anterior
+                                    </Button>
+                                    <div className="flex items-center gap-1">
+                                        {Array.from({ length: totalPages }).map((_, i) => {
+                                            const pageNum = i + 1;
+                                            // Solo mostrar algunas páginas si hay demasiadas
+                                            if (totalPages > 5 && Math.abs(pageNum - currentPage) > 1 && pageNum !== 1 && pageNum !== totalPages) {
+                                                if (pageNum === 2 || pageNum === totalPages - 1) return <span key={pageNum} className="px-1">...</span>;
+                                                return null;
+                                            }
+                                            return (
+                                                <Button
+                                                    key={pageNum}
+                                                    variant={currentPage === pageNum ? 'default' : 'ghost'}
+                                                    size="sm"
+                                                    onClick={() => handlePageChange(pageNum)}
+                                                    className={cn(
+                                                        "h-8 w-8 p-0 font-bold rounded-lg",
+                                                        currentPage === pageNum && "shadow-sm"
+                                                    )}
+                                                >
+                                                    {pageNum}
+                                                </Button>
+                                            );
+                                        })}
+                                    </div>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => handlePageChange(currentPage + 1)}
+                                        disabled={currentPage === totalPages}
+                                        className="h-10 px-4 font-bold rounded-xl"
+                                    >
+                                        Siguiente <ChevronRight className="h-4 w-4 ml-2" />
+                                    </Button>
+                                </div>
+                            </div>
+                        )}
 
                         {(!pageData.products || pageData.products.length === 0) && (
                             <div className="flex flex-col items-center justify-center py-20 text-center text-muted-foreground">
