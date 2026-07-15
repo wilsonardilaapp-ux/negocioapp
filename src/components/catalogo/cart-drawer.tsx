@@ -11,7 +11,7 @@ import {
   SheetFooter 
 } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
-import { Minus, Plus, Trash2, ShoppingBag, ArrowRight } from 'lucide-react';
+import { Minus, Plus, Trash2, ShoppingBag, ArrowRight, ArrowLeft } from 'lucide-react';
 import type { CartItem } from '@/models/cart';
 
 interface CartDrawerProps {
@@ -69,9 +69,6 @@ export function CartDrawer({
             <div className="h-full flex flex-col items-center justify-center text-center space-y-4 opacity-40 py-20">
               <ShoppingBag className="h-16 w-16" />
               <p className="font-medium text-lg">Tu carrito está vacío</p>
-              <Button variant="outline" onClick={() => onOpenChange(false)}>
-                Ver Catálogo
-              </Button>
             </div>
           ) : (
             <div className="space-y-4">
@@ -139,24 +136,34 @@ export function CartDrawer({
           )}
         </div>
 
-        {!isEmpty && (
-          <SheetFooter className="p-6 border-t bg-muted/20 sm:flex-col gap-4">
-            <div className="flex justify-between items-center w-full">
-              <span className="text-muted-foreground font-medium">Subtotal aproximado</span>
-              <span className="text-2xl font-black text-primary">{formatCurrency(subtotalProducts)}</span>
-            </div>
-            <p className="text-[10px] text-muted-foreground italic text-center w-full">
-              * El costo de envío e impuestos se calcularán en el siguiente paso.
-            </p>
-            <Button 
-              className="w-full h-14 text-lg font-bold rounded-xl shadow-lg shadow-primary/20"
-              onClick={onCheckout}
-            >
-              Continuar al Pago
-              <ArrowRight className="ml-2 h-5 w-5" />
-            </Button>
-          </SheetFooter>
-        )}
+        <SheetFooter className="p-6 border-t bg-muted/20 sm:flex-col gap-4">
+          {!isEmpty && (
+            <>
+              <div className="flex justify-between items-center w-full">
+                <span className="text-muted-foreground font-medium">Subtotal aproximado</span>
+                <span className="text-2xl font-black text-primary">{formatCurrency(subtotalProducts)}</span>
+              </div>
+              <p className="text-[10px] text-muted-foreground italic text-center w-full">
+                * El costo de envío e impuestos se calcularán en el siguiente paso.
+              </p>
+              <Button 
+                className="w-full h-14 text-lg font-bold rounded-xl shadow-lg shadow-primary/20"
+                onClick={onCheckout}
+              >
+                Continuar al Pago
+                <ArrowRight className="ml-2 h-5 w-5" />
+              </Button>
+            </>
+          )}
+          <Button 
+            variant="outline"
+            className="w-full h-12 font-bold rounded-xl"
+            onClick={() => onOpenChange(false)}
+          >
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Continuar Comprando
+          </Button>
+        </SheetFooter>
       </SheetContent>
     </Sheet>
   );

@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { ShoppingBag, Minus, Plus, Tag, Trash2, Loader2, Ticket, X, CheckCircle, CreditCard, Building, Smartphone, Building2, HandCoins, Copy, Check } from 'lucide-react';
+import { ShoppingBag, Minus, Plus, Tag, Trash2, Loader2, Ticket, X, CheckCircle, CreditCard, Building, Smartphone, Building2, HandCoins, Copy, Check, ArrowLeft } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { PaymentSettings } from '@/models/payment-settings';
 import type { Order, OrderItem, OrderStatus, TipoEntrega } from '@/models/order';
@@ -528,8 +528,8 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
           </form>
         </div>
 
-        <div className="p-6 border-t bg-muted/20">
-            <div className="space-y-2 mb-6">
+        <div className="p-6 border-t bg-muted/20 space-y-4">
+            <div className="space-y-2">
                 <div className="flex justify-between text-sm">
                     <span>Subtotal:</span>
                     <span>{formatCurrency(subtotalProducts)}</span>
@@ -570,10 +570,20 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
                     <span>{formatCurrency(total)}</span>
                 </div>
             </div>
-            <button type="submit" form="purchase-form" className="w-full h-14 bg-primary text-white text-lg font-bold rounded-xl flex items-center justify-center gap-2 hover:bg-primary/90" disabled={isSubmitting}>
-                {isSubmitting ? <Loader2 className="animate-spin" /> : <WhatsAppIcon className="h-4 v-4" />}
-                Confirmar y Enviar Pedido
-            </button>
+            <div className="space-y-3">
+                <button type="submit" form="purchase-form" className="w-full h-14 bg-primary text-white text-lg font-bold rounded-xl flex items-center justify-center gap-2 hover:bg-primary/90" disabled={isSubmitting}>
+                    {isSubmitting ? <Loader2 className="animate-spin" /> : <WhatsAppIcon className="h-4 w-4" />}
+                    Confirmar y Enviar Pedido
+                </button>
+                <Button 
+                    variant="outline"
+                    className="w-full h-12 font-bold rounded-xl"
+                    onClick={() => onOpenChange(false)}
+                >
+                    <ArrowLeft className="mr-2 h-4 w-4" />
+                    Continuar Comprando
+                </Button>
+            </div>
         </div>
       </DialogContent>
     </Dialog>
