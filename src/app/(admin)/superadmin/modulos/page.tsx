@@ -107,6 +107,7 @@ export default function ModulesPage() {
 
   useEffect(() => {
     if (!isLoading && modules && firestore) {
+      // 1. Sincronización de módulos por defecto (Seeding)
       DEFAULT_MODULES.forEach(async (m) => {
         const moduleId = m.idOverride || m.name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, "");
         const exists = modules.some(existing => existing.id === moduleId);
@@ -125,8 +126,21 @@ export default function ModulesPage() {
           console.log(`[ModuleSeeder] Módulo ${m.name} sincronizado con éxito.`);
         }
       });
+
+      // 2. Limpieza de módulos huérfanos/legacy conocidos (Mantenimiento)
+      const legacyIds = ['kardex']; 
+      legacyIds.forEach(async (id) => {
+        const orphaned = modules.find(m => m.id === id);
+        if (orphaned) {
+          console.log(`[Cleanup] Eliminando módulo huérfano detectado: ${id}`);
+          const docRef = doc(firestore, 'modules', id);
+          // Eliminación física para limpiar la colección global y los paneles administrativos
+          await deleteDocumentNonBlocking(docRef);
+          toast({ title: "Limpieza de sistema", description: `Módulo duplicado "${id}" eliminado.` });
+        }
+      });
     }
-  }, [modules, isLoading, firestore]);
+  }, [modules, isLoading, firestore, toast]);
 
   const onSubmit = async (data: ModuleFormData) => {
     if (!firestore) return;
