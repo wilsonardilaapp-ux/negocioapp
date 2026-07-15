@@ -1,11 +1,11 @@
 
 'use client';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { PlusCircle, MoreHorizontal, Trash2, Loader2 } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, Trash2, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useAsientosContables } from '@/hooks/useAsientosContables';
 import { usePlanDeCuentas } from '@/hooks/usePlanDeCuentas';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from "@/components/ui/table";
@@ -159,6 +159,32 @@ export default function AsientosContables() {
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const { toast } = useToast();
     
+    // --- LÓGICA DE PAGINACIÓN VISUAL ---
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 20;
+    const [searchTerm, setSearchTerm] = useState('');
+
+    const filteredAsientos = useMemo(() => {
+        if (!asientos) return [];
+        if (!searchTerm) return asientos;
+        const lowTerm = searchTerm.toLowerCase();
+        return asientos.filter(a => 
+            a.concepto.toLowerCase().includes(lowTerm) || 
+            (a.documentoReferencia && a.documentoReferencia.toLowerCase().includes(lowTerm))
+        );
+    }, [asientos, searchTerm]);
+
+    // Resetear a la primera página cuando cambia la búsqueda
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchTerm]);
+
+    const totalPages = Math.ceil(filteredAsientos.length / itemsPerPage);
+    const paginatedAsientos = useMemo(() => {
+        const startIndex = (currentPage - 1) * itemsPerPage;
+        return filteredAsientos.slice(startIndex, startIndex + itemsPerPage);
+    }, [filteredAsientos, currentPage]);
+
     const formatCurrency = (value: number) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(value);
 
     return (
@@ -193,7 +219,12 @@ export default function AsientosContables() {
             </CardHeader>
             <CardContent>
                 <div className="flex items-center gap-4 mb-4">
-                    <Input placeholder="Buscar por concepto o referencia..." className="max-w-sm" />
+                    <Input 
+                        placeholder="Buscar por concepto o referencia..." 
+                        className="max-w-sm" 
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                    />
                 </div>
                 <div className="rounded-md border">
                     <Table>
@@ -214,8 +245,8 @@ export default function AsientosContables() {
                                         <Loader2 className="mx-auto h-6 w-6 animate-spin" />
                                     </TableCell>
                                 </TableRow>
-                            ) : asientos.length > 0 ? (
-                                asientos.map(asiento => (
+                            ) : paginatedAsientos.length > 0 ? (
+                                paginatedAsientos.map(asiento => (
                                     <TableRow key={asiento.id}>
                                         <TableCell>{new Date(asiento.fecha).toLocaleDateString()}</TableCell>
                                         <TableCell className="font-medium">{asiento.concepto}</TableCell>
@@ -244,6 +275,35 @@ export default function AsientosContables() {
                         </TableBody>
                     </Table>
                 </div>
+
+                {/* CONTROLES DE PAGINACIÓN */}
+                {totalPages > 1 && (
+                    <div className="flex items-center justify-between py-4 border-t mt-4">
+                        <div className="text-sm text-muted-foreground font-medium">
+                            Mostrando página {currentPage} de {totalPages} ({filteredAsientos.length} registros)
+                        </div>
+                        <div className="flex gap-2">
+                            <Button 
+                                variant="outline" 
+                                size="sm" 
+                                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                                disabled={currentPage === 1}
+                                className="font-bold"
+                            >
+                                <ChevronLeft className="mr-2 h-4 w-4" /> Anterior
+                            </Button>
+                            <Button 
+                                variant="outline" 
+                                size="sm" 
+                                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                                disabled={currentPage >= totalPages}
+                                className="font-bold"
+                            >
+                                Siguiente <ChevronRight className="ml-2 h-4 w-4" />
+                            </Button>
+                        </div>
+                    </div>
+                )}
             </CardContent>
         </Card>
     );
