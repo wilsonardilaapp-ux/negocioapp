@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -35,7 +35,9 @@ import {
   CheckCircle2, 
   Loader2, 
   Mail,
-  Trash2
+  Trash2,
+  ChevronLeft,
+  ChevronRight
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
@@ -155,10 +157,27 @@ export function ReviewModerationList({
   const [isGenerating, setIsGenerating] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
 
+  // --- LÓGICA DE PAGINACIÓN ---
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+
   const isAdmin = profile?.role === 'super_admin' || profile?.role === 'cliente_admin';
 
   // Filtrado de seguridad: No mostrar reseñas eliminadas
-  const visibleReviews = reviews.filter(r => r.status !== 'deleted');
+  const visibleReviews = useMemo(() => {
+    return reviews.filter(r => r.status !== 'deleted');
+  }, [reviews]);
+
+  // Resetear a página 1 si la cantidad total de reseñas cambia
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [visibleReviews.length]);
+
+  const totalPages = Math.ceil(visibleReviews.length / itemsPerPage);
+  const paginatedReviews = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    return visibleReviews.slice(startIndex, startIndex + itemsPerPage);
+  }, [visibleReviews, currentPage]);
 
   const handleRecoverClick = (review: Review) => {
     setRecoveryTarget(review);
@@ -244,7 +263,7 @@ export function ReviewModerationList({
         </div>
       )}
       
-      {visibleReviews.map((review) => (
+      {paginatedReviews.map((review) => (
         <Card key={review.id} className="overflow-hidden border-gray-100">
           <CardContent className="p-6">
             <div className="flex justify-between items-start mb-4">
@@ -333,6 +352,36 @@ export function ReviewModerationList({
           </CardContent>
         </Card>
       ))}
+
+      {/* CONTROLES DE PÁGINACIÓN */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between py-4 border-t mt-4">
+          <div className="text-sm text-muted-foreground font-medium">
+            Mostrando {paginatedReviews.length} de {visibleReviews.length} reseñas
+            (Página {currentPage} de {totalPages})
+          </div>
+          <div className="flex gap-2">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+              disabled={currentPage === 1 || isProcessing}
+              className="font-bold"
+            >
+              <ChevronLeft className="mr-2 h-4 w-4" /> Anterior
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+              disabled={currentPage >= totalPages || isProcessing}
+              className="font-bold"
+            >
+              Siguiente <ChevronRight className="ml-2 h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* MODAL DE RECUPERACIÓN */}
       <Dialog open={isRecovering} onOpenChange={setIsRecovering}>
