@@ -7,7 +7,7 @@ import DirectoryAdSlot from '@/components/directory/DirectoryAdSlot';
 import { DIRECTORY_CATEGORIES } from '@/models/business-directory';
 import type { Business } from '@/models/business';
 import { Button } from '@/components/ui/button';
-import { Filter, LayoutGrid } from 'lucide-react';
+import { Filter, LayoutGrid, ChevronLeft, ChevronRight } from 'lucide-react';
 import Link from 'next/link';
 import type { Metadata } from 'next';
 import SearchBar from './SearchBar';
@@ -54,7 +54,7 @@ async function getDirectoryBusinesses() {
         const snapshot = await db.collection('businesses')
             .where('status', '==', 'active')
             .where('directoryEnabled', '==', true)
-            .limit(100)
+            .limit(500) // Aumentado a 500 registros para mayor alcance de búsqueda
             .get();
 
         return snapshot.docs.map(doc => ({
@@ -80,9 +80,11 @@ async function getGlobalFavicon() {
 export default async function DirectoryPage({ 
   searchParams 
 }: { 
-  searchParams: { q?: string } 
+  searchParams: { q?: string; p?: string } 
 }) {
     const query = searchParams.q?.toLowerCase().trim() || '';
+    const currentPage = parseInt(searchParams.p || '1', 10);
+    const itemsPerPage = 20;
 
     const [allBusinesses, dynamicCategories, landingData] = await Promise.all([
         getDirectoryBusinesses(),
@@ -90,13 +92,27 @@ export default async function DirectoryPage({
         getLandingData()
     ]);
 
-    // Filtrado de negocios por nombre o categoría
+    // Filtrado de negocios por nombre o categoría (Operando sobre el total de 500 registros)
     const filteredBusinesses = query 
         ? allBusinesses.filter(b => 
             b.name.toLowerCase().includes(query) || 
             (b.category && b.category.toLowerCase().includes(query))
           )
         : allBusinesses;
+
+    // Lógica de Paginación Visual
+    const totalResults = filteredBusinesses.length;
+    const totalPages = Math.ceil(totalResults / itemsPerPage);
+    const safePage = Math.max(1, Math.min(currentPage, totalPages || 1));
+    const startIndex = (safePage - 1) * itemsPerPage;
+    const paginatedBusinesses = filteredBusinesses.slice(startIndex, startIndex + itemsPerPage);
+
+    const getPageLink = (page: number) => {
+        const params = new URLSearchParams();
+        if (query) params.set('q', query);
+        params.set('p', page.toString());
+        return `/directorio?${params.toString()}`;
+    };
 
     return (
         <div className="min-h-screen bg-gray-50/30 flex flex-col">
@@ -176,24 +192,71 @@ export default async function DirectoryPage({
                                         {query ? `Resultados para "${query}"` : 'Explorar Negocios'}
                                     </h2>
                                 </div>
-                                <span className="text-sm text-gray-500">
-                                    {filteredBusinesses.length} resultados encontrados
+                                <span className="text-sm text-gray-500 font-medium">
+                                    {totalResults} resultados encontrados
                                 </span>
                             </div>
 
-                            {filteredBusinesses.length > 0 ? (
-                                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                                    {filteredBusinesses.map((business, index) => (
-                                        <React.Fragment key={business.id}>
-                                            <BusinessCard entry={business} />
-                                            {index === 5 && (
-                                                <div className="col-span-full">
-                                                    <DirectoryAdSlot position="mid" format="google_display" />
-                                                </div>
-                                            )}
-                                        </React.Fragment>
-                                    ))}
-                                </div>
+                            {paginatedBusinesses.length > 0 ? (
+                                <>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                                        {paginatedBusinesses.map((business, index) => (
+                                            <React.Fragment key={business.id}>
+                                                <BusinessCard entry={business} />
+                                                {index === 5 && (
+                                                    <div className="col-span-full">
+                                                        <DirectoryAdSlot position="mid" format="google_display" />
+                                                    </div>
+                                                )}
+                                            </React.Fragment>
+                                        ))}
+                                    </div>
+
+                                    {/* Controles de Paginación */}
+                                    {totalPages > 1 && (
+                                        <div className="flex flex-col items-center gap-4 mt-12 py-6 border-t">
+                                            <p className="text-xs font-black uppercase tracking-widest text-muted-foreground">
+                                                Página {safePage} de {totalPages}
+                                            </p>
+                                            <div className="flex items-center gap-2">
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    asChild
+                                                    disabled={safePage === 1}
+                                                    className="h-10 px-4 font-bold rounded-xl"
+                                                >
+                                                    {safePage > 1 ? (
+                                                        <Link href={getPageLink(safePage - 1)}>
+                                                            <ChevronLeft className="h-4 w-4 mr-2" /> Anterior
+                                                        </Link>
+                                                    ) : (
+                                                        <div className="flex items-center opacity-50 cursor-not-allowed">
+                                                            <ChevronLeft className="h-4 w-4 mr-2" /> Anterior
+                                                        </div>
+                                                    )}
+                                                </Button>
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    asChild
+                                                    disabled={safePage >= totalPages}
+                                                    className="h-10 px-4 font-bold rounded-xl"
+                                                >
+                                                    {safePage < totalPages ? (
+                                                        <Link href={getPageLink(safePage + 1)}>
+                                                            Siguiente <ChevronRight className="ml-2 h-4 w-4" />
+                                                        </Link>
+                                                    ) : (
+                                                        <div className="flex items-center opacity-50 cursor-not-allowed">
+                                                            Siguiente <ChevronRight className="ml-2 h-4 w-4" />
+                                                        </div>
+                                                    )}
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    )}
+                                </>
                             ) : (
                                 <div className="text-center py-20 bg-white rounded-3xl border border-dashed">
                                     <p className="text-gray-400 font-medium">No se encontraron negocios que coincidan con tu búsqueda.</p>

@@ -5,7 +5,7 @@ import Footer from '@/components/layout/footer';
 import BusinessCard from '@/components/directory/BusinessCard';
 import type { Business } from '@/models/business';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft, Filter, LayoutGrid } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Filter, LayoutGrid } from 'lucide-react';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
@@ -77,6 +77,7 @@ async function getEntriesByCategory(categoryParam: string, subcategoryParam?: st
         const snapshot = await db.collection('businesses')
             .where('status', '==', 'active')
             .where('directoryEnabled', '==', true)
+            .limit(500) // Aumentado a 500 registros
             .get();
 
         const allBusinesses = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Business));
@@ -115,14 +116,16 @@ export async function generateMetadata({ params, searchParams }: { params: { cat
 
     const titleSuffix = searchParams?.sub ? ` - ${searchParams.sub}` : '';
     return {
-        title: `${data.category}${titleSuffix} | Directorio Zentry`,
+        title: `${data.category}${titleSuffix} | Directorio Markix`,
         description: `Explora negocios verificados en ${data.category}.`,
     };
 }
 
-export default async function CategoryPage({ params, searchParams }: { params: { categoria: string }, searchParams?: { sub?: string } }) {
+export default async function CategoryPage({ params, searchParams }: { params: { categoria: string }, searchParams?: { sub?: string; p?: string } }) {
     // Asegurar que searchParams no sea null
     const safeSearchParams = searchParams || {};
+    const currentPage = parseInt(safeSearchParams.p || '1', 10);
+    const itemsPerPage = 20;
     
     const [data, landingData] = await Promise.all([
         getEntriesByCategory(params.categoria, safeSearchParams.sub),
@@ -132,6 +135,20 @@ export default async function CategoryPage({ params, searchParams }: { params: {
     if (!data) {
         notFound();
     }
+
+    // Lógica de Paginación Visual
+    const totalResults = data.items.length;
+    const totalPages = Math.ceil(totalResults / itemsPerPage);
+    const safePage = Math.max(1, Math.min(currentPage, totalPages || 1));
+    const startIndex = (safePage - 1) * itemsPerPage;
+    const paginatedItems = data.items.slice(startIndex, startIndex + itemsPerPage);
+
+    const getPageLink = (page: number) => {
+        const urlParams = new URLSearchParams();
+        if (safeSearchParams.sub) urlParams.set('sub', safeSearchParams.sub);
+        urlParams.set('p', page.toString());
+        return `/directorio/${params.categoria}?${urlParams.toString()}`;
+    };
 
     return (
         <div className="min-h-screen bg-gray-50/30 flex flex-col">
@@ -253,16 +270,63 @@ export default async function CategoryPage({ params, searchParams }: { params: {
                                 </h2>
                             </div>
                             <span className="text-sm text-gray-500 font-medium">
-                                {data.items.length} negocios encontrados
+                                {totalResults} negocios encontrados
                             </span>
                         </div>
 
-                        {data.items.length > 0 ? (
-                            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                                {data.items.map(entry => (
-                                    <BusinessCard key={entry.id} entry={entry} />
-                                ))}
-                            </div>
+                        {paginatedItems.length > 0 ? (
+                            <>
+                                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                                    {paginatedItems.map(entry => (
+                                        <BusinessCard key={entry.id} entry={entry} />
+                                    ))}
+                                </div>
+
+                                {/* Controles de Paginación */}
+                                {totalPages > 1 && (
+                                    <div className="flex flex-col items-center gap-4 mt-12 py-6 border-t">
+                                        <p className="text-xs font-black uppercase tracking-widest text-muted-foreground">
+                                            Página {safePage} de {totalPages}
+                                        </p>
+                                        <div className="flex items-center gap-2">
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                asChild
+                                                disabled={safePage === 1}
+                                                className="h-10 px-4 font-bold rounded-xl"
+                                            >
+                                                {safePage > 1 ? (
+                                                    <Link href={getPageLink(safePage - 1)}>
+                                                        <ChevronLeft className="h-4 w-4 mr-2" /> Anterior
+                                                    </Link>
+                                                ) : (
+                                                    <div className="flex items-center opacity-50 cursor-not-allowed">
+                                                        <ChevronLeft className="h-4 w-4 mr-2" /> Anterior
+                                                    </div>
+                                                )}
+                                            </Button>
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                asChild
+                                                disabled={safePage >= totalPages}
+                                                className="h-10 px-4 font-bold rounded-xl"
+                                            >
+                                                {safePage < totalPages ? (
+                                                    <Link href={getPageLink(safePage + 1)}>
+                                                        Siguiente <ChevronRight className="ml-2 h-4 w-4" />
+                                                    </Link>
+                                                ) : (
+                                                    <div className="flex items-center opacity-50 cursor-not-allowed">
+                                                        Siguiente <ChevronRight className="ml-2 h-4 w-4" />
+                                                    </div>
+                                                )}
+                                            </Button>
+                                        </div>
+                                    </div>
+                                )}
+                            </>
                         ) : (
                             <div className="text-center py-32 bg-white rounded-3xl border border-dashed border-gray-200">
                                 <p className="text-gray-400 font-bold text-lg">No hay negocios registrados para esta selección.</p>
