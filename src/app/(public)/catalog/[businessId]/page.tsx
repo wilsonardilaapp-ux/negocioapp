@@ -11,7 +11,8 @@ import ProductViewModal from '@/components/catalogo/product-view-modal';
 import { PurchaseModal } from '@/components/catalogo/purchase-modal';
 import { CartDrawer } from '@/components/catalogo/cart-drawer';
 import { SuggestionModal } from '@/components/suggestions/suggestion-modal';
-import { Frown, Loader2, PackageSearch, Utensils, Star, Award, ChevronLeft, ChevronRight, LayoutGrid } from 'lucide-react';
+import { Frown, Loader2, PackageSearch, Utensils, Star, Award, ChevronLeft, ChevronRight, Search } from 'lucide-react';
+import { Input } from '@/components/ui/input';
 import type { LandingHeaderConfigData } from '@/models/landing-page';
 import type { Product } from '@/models/product';
 import type { Promotion } from '@/models/promotion';
@@ -31,14 +32,12 @@ import ReviewSummary from '@/components/reviews/ReviewSummary';
 import LoyaltyStatus from '@/components/loyalty/LoyaltyStatus';
 import RewardsCatalog from '@/components/loyalty/RewardsCatalog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import type { Business } from '@/models/business';
 import type { Reward } from '@/services/loyalty-service';
 
 // Carrusel
-import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
+import { Carousel, CarouselContent, CarouselItem } from '@/components/ui/carousel';
 import Autoplay from "embla-carousel-autoplay";
 import Image from 'next/image';
 import { cn } from '@/lib/utils';
@@ -76,9 +75,10 @@ function CatalogPageContent({ params }: CatalogPageProps) {
     const [isCartOpen, setIsCartOpen] = useState(false);
     const [isPurchaseModalOpen, setIsPurchaseModalOpen] = useState(false);
     
-    // --- ESTADOS DE PAGINACIÓN Y FILTRADO ---
+    // --- ESTADOS DE FILTRADO, BÚSQUEDA Y PAGINACIÓN ---
     const [currentPage, setCurrentPage] = useState(1);
     const [selectedCategory, setSelectedCategory] = useState('Todas');
+    const [searchTerm, setSearchTerm] = useState('');
     
     // Estado para la sesión de fidelización del cliente
     const [loyaltySession, setLoyaltySession] = useState<{ balance: number; whatsapp: string } | null>(null);
@@ -139,12 +139,15 @@ function CatalogPageContent({ params }: CatalogPageProps) {
         return ['Todas', ...uniqueCats.sort()];
     }, [pageData.products]);
 
-    // Filtrar productos por categoría seleccionada
+    // Filtrar productos por categoría seleccionada Y término de búsqueda
     const filteredProducts = useMemo(() => {
         if (!pageData.products) return [];
-        if (selectedCategory === 'Todas') return pageData.products;
-        return pageData.products.filter(p => p.category === selectedCategory);
-    }, [pageData.products, selectedCategory]);
+        return pageData.products.filter(p => {
+            const matchesCategory = selectedCategory === 'Todas' || p.category === selectedCategory;
+            const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase());
+            return matchesCategory && matchesSearch;
+        });
+    }, [pageData.products, selectedCategory, searchTerm]);
 
     // Aplicar paginación (Slicing) al array ya filtrado
     const totalPages = Math.ceil(filteredProducts.length / ITEMS_PER_PAGE);
@@ -153,10 +156,10 @@ function CatalogPageContent({ params }: CatalogPageProps) {
         return filteredProducts.slice(startIndex, startIndex + ITEMS_PER_PAGE);
     }, [filteredProducts, currentPage]);
 
-    // Resetear a página 1 cuando cambia la categoría
+    // Resetear a página 1 cuando cambia la categoría o el término de búsqueda
     useEffect(() => {
         setCurrentPage(1);
-    }, [selectedCategory]);
+    }, [selectedCategory, searchTerm]);
 
     const handlePageChange = (newPage: number) => {
         setCurrentPage(newPage);
@@ -348,6 +351,28 @@ function CatalogPageContent({ params }: CatalogPageProps) {
             )}
 
             <main className="container mx-auto px-4 py-8">
+                {/* --- BUSCADOR --- */}
+                <div className="max-w-md mx-auto mb-8 animate-in fade-in slide-in-from-top-2 duration-500">
+                    <div className="relative group">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground group-focus-within:text-primary transition-colors" />
+                        <Input 
+                            type="text"
+                            placeholder="Buscar productos por nombre..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="pl-10 h-12 bg-white rounded-2xl border-gray-200 shadow-sm focus-visible:ring-primary focus-visible:border-primary"
+                        />
+                        {searchTerm && (
+                            <button 
+                                onClick={() => setSearchTerm('')}
+                                className="absolute right-3 top-1/2 -translate-y-1/2 h-6 w-6 rounded-full bg-muted flex items-center justify-center hover:bg-muted-foreground/20 transition-colors"
+                            >
+                                <ChevronLeft className="h-3 w-3 rotate-45" />
+                            </button>
+                        )}
+                    </div>
+                </div>
+
                 <Tabs defaultValue="menu" className="w-full">
                     <div className="flex justify-center mb-8 sticky top-4 z-40">
                         <TabsList className="bg-white shadow-xl border rounded-full p-1 h-14">
@@ -370,17 +395,18 @@ function CatalogPageContent({ params }: CatalogPageProps) {
                         {categoriesList.length > 2 && (
                             <div className="flex items-center gap-4 overflow-x-auto pb-4 no-scrollbar">
                                 {categoriesList.map((cat) => (
-                                    <Button
+                                    <button
                                         key={cat}
-                                        variant={selectedCategory === cat ? 'default' : 'outline'}
                                         onClick={() => setSelectedCategory(cat)}
                                         className={cn(
-                                            "rounded-full px-6 h-10 font-bold transition-all shrink-0",
-                                            selectedCategory === cat ? "shadow-md scale-105" : "text-muted-foreground"
+                                            "rounded-full px-6 h-10 font-bold transition-all shrink-0 border",
+                                            selectedCategory === cat 
+                                                ? "bg-primary text-white border-primary shadow-md scale-105" 
+                                                : "bg-white text-muted-foreground border-gray-200 hover:bg-gray-50"
                                         )}
                                     >
                                         {cat}
-                                    </Button>
+                                    </button>
                                 ))}
                             </div>
                         )}
@@ -416,7 +442,6 @@ function CatalogPageContent({ params }: CatalogPageProps) {
                                     <div className="flex items-center gap-1">
                                         {Array.from({ length: totalPages }).map((_, i) => {
                                             const pageNum = i + 1;
-                                            // Solo mostrar algunas páginas si hay demasiadas
                                             if (totalPages > 5 && Math.abs(pageNum - currentPage) > 1 && pageNum !== 1 && pageNum !== totalPages) {
                                                 if (pageNum === 2 || pageNum === totalPages - 1) return <span key={pageNum} className="px-1">...</span>;
                                                 return null;
@@ -450,11 +475,11 @@ function CatalogPageContent({ params }: CatalogPageProps) {
                             </div>
                         )}
 
-                        {(!pageData.products || pageData.products.length === 0) && (
+                        {filteredProducts.length === 0 && (
                             <div className="flex flex-col items-center justify-center py-20 text-center text-muted-foreground">
                                 <PackageSearch className="h-16 w-16 mb-4 opacity-20" />
-                                <h3 className="text-xl font-semibold">No hay productos disponibles</h3>
-                                <p>El catálogo está vacío actualmente.</p>
+                                <h3 className="text-xl font-semibold">Sin resultados</h3>
+                                <p>No encontramos productos que coincidan con tu búsqueda en esta categoría.</p>
                             </div>
                         )}
                     </TabsContent>
