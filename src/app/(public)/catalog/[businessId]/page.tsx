@@ -354,7 +354,7 @@ function CatalogPageContent({ params }: CatalogPageProps) {
 
             <main className="container mx-auto px-4 py-8">
                 {/* --- BUSCADOR --- */}
-                <div className="max-w-md mx-auto mb-8 animate-in fade-in slide-in-from-top-2 duration-500">
+                <div className="max-w-2xl mx-auto mb-8 animate-in fade-in slide-in-from-top-2 duration-500">
                     <div className="relative group">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground group-focus-within:text-primary transition-colors" />
                         <Input 
