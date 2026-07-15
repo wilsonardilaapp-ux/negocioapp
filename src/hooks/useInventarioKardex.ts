@@ -85,8 +85,12 @@ export function useInventarioKardex() {
         await setDocumentNonBlocking(itemDocRef, itemToUpdate, { merge: true });
     } else { // Create
         const estado = determinarEstadoStock(0, data.stockMinimo, data.stockMaximo);
+        
+        // CORRECCIÓN: Extraer el id (que es undefined) para evitar error de Firestore data invalid
+        const { id, ...cleanData } = data;
+
         const nuevoItem: Omit<ItemInventario, 'id'> = {
-            ...data,
+            ...cleanData,
             stockActual: 0,
             estado,
             activo: true,
@@ -119,7 +123,7 @@ export function useInventarioKardex() {
 
     const nuevoStockActual = form.tipo.startsWith('entrada')
       ? item.stockActual + form.cantidad
-      : item.stockActual - form.cantidad;
+      : item.stockActual - find.cantidad;
       
     const nuevoEstado = determinarEstadoStock(nuevoStockActual, item.stockMinimo, item.stockMaximo);
     

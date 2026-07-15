@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useCallback, useEffect } from 'react';
@@ -84,8 +85,12 @@ export function useKardex() {
         await setDocumentNonBlocking(itemDocRef, itemToUpdate, { merge: true });
     } else { // Create
         const estado = determinarEstadoStock(0, data.stockMinimo, data.stockMaximo);
+
+        // CORRECCIÓN: Extraer el id (que es undefined) para evitar error de Firestore data invalid
+        const { id, ...cleanData } = data;
+
         const nuevoItem: Omit<ItemInventario, 'id'> = {
-            ...data,
+            ...cleanData,
             stockActual: 0,
             estado,
             activo: true,
