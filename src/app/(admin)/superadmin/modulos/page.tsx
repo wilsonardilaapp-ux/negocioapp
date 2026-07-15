@@ -68,6 +68,24 @@ const DEFAULT_MODULES = [
     limit: -1, 
     idOverride: 'loyalty' 
   },
+  { 
+    name: 'Contabilidad', 
+    description: 'Módulo integral de gestión contable, plan de cuentas y asientos para el negocio.', 
+    limit: -1, 
+    idOverride: 'contabilidad' 
+  },
+  { 
+    name: 'Inventario Kardex', 
+    description: 'Control detallado de inventario, movimientos de entrada/salida y valuación de stock.', 
+    limit: -1, 
+    idOverride: 'inventario-kardex' 
+  },
+  { 
+    name: 'Pistola Escáner', 
+    description: 'Configuración y gestión de lectores de códigos de barras para puntos de venta y bodega.', 
+    limit: -1, 
+    idOverride: 'pistola-escaner' 
+  },
 ];
 
 export default function ModulesPage() {
