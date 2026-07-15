@@ -11,7 +11,7 @@ import ProductViewModal from '@/components/catalogo/product-view-modal';
 import { PurchaseModal } from '@/components/catalogo/purchase-modal';
 import { CartDrawer } from '@/components/catalogo/cart-drawer';
 import { SuggestionModal } from '@/components/suggestions/suggestion-modal';
-import { Frown, Loader2, PackageSearch, Utensils, Star, Award, ChevronLeft, ChevronRight, Search } from 'lucide-react';
+import { Frown, Loader2, PackageSearch, LayoutGrid, Star, Award, ChevronLeft, ChevronRight, Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -39,7 +39,7 @@ import type { Business } from '@/models/business';
 import type { Reward } from '@/services/loyalty-service';
 
 // Carrusel
-import { Carousel, CarouselContent, CarouselItem } from '@/components/ui/carousel';
+import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
 import Autoplay from "embla-carousel-autoplay";
 import Image from 'next/image';
 import { cn } from '@/lib/utils';
@@ -379,7 +379,7 @@ function CatalogPageContent({ params }: CatalogPageProps) {
                     <div className="flex justify-center mb-8 sticky top-4 z-40">
                         <TabsList className="bg-white shadow-xl border rounded-full p-1 h-14">
                             <TabsTrigger value="menu" className="rounded-full px-6 gap-2 font-bold data-[state=active]:bg-primary data-[state=active]:text-white">
-                                <Utensils className="h-4 w-4" /> Menú
+                                <LayoutGrid className="h-4 w-4" /> Menú
                             </TabsTrigger>
                             <TabsTrigger value="reviews" className="rounded-full px-6 gap-2 font-bold data-[state=active]:bg-primary data-[state=active]:text-white">
                                 <Star className="h-4 w-4" /> Reseñas
