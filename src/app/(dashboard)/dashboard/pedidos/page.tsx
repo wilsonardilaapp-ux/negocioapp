@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import {
   useCollection,
   useFirestore,
@@ -19,7 +19,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
-import { Printer, FileDown, Trash2, Info } from 'lucide-react';
+import { Printer, FileDown, Trash2, Info, ChevronLeft, ChevronRight } from 'lucide-react';
 import { DataTable } from './data-table';
 import { columns } from './columns';
 import type { Order, OrderStatus } from '@/models/order';
@@ -54,6 +54,10 @@ export default function PedidosPage() {
   const [deleteProgress, setDeleteProgress] = useState(0);
   const [totalToDelete, setTotalToDelete] = useState(0);
 
+  // --- LÓGICA DE PAGINACIÓN VISUAL ---
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 20;
+
   const ordersQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
     const ordersRef = collection(firestore, `businesses/${user.uid}/orders`);
@@ -64,18 +68,46 @@ export default function PedidosPage() {
 
   const filteredOrders = useMemo(() => {
     if (!orders) return [];
-    if (!searchTerm) return orders;
+    
+    let result = orders;
 
-    return orders.filter(
-      (order) =>
-        order.customerName
-          .toLowerCase()
-          .includes(searchTerm.toLowerCase()) ||
-        // Búsqueda resiliente en items (nuevo formato) o productName (viejo formato)
-        (order.items?.some(i => i.productName.toLowerCase().includes(searchTerm.toLowerCase()))) ||
-        ((order as any).productName?.toLowerCase().includes(searchTerm.toLowerCase()))
-    );
-  }, [orders, searchTerm]);
+    if (searchTerm) {
+        result = result.filter(
+          (order) =>
+            order.customerName
+              .toLowerCase()
+              .includes(searchTerm.toLowerCase()) ||
+            (order.items?.some(i => i.productName.toLowerCase().includes(searchTerm.toLowerCase()))) ||
+            ((order as any).productName?.toLowerCase().includes(searchTerm.toLowerCase()))
+        );
+    }
+
+    if (dateFrom && dateTo) {
+        const from = new Date(dateFrom);
+        const to = new Date(dateTo);
+        from.setHours(0, 0, 0, 0);
+        to.setHours(23, 59, 59, 999);
+        
+        result = result.filter(order => {
+            const orderDate = new Date(order.orderDate);
+            return orderDate >= from && orderDate <= to;
+        });
+    }
+
+    return result;
+  }, [orders, searchTerm, dateFrom, dateTo]);
+
+  // Reiniciar a la primera página si cambian los filtros
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, dateFrom, dateTo]);
+
+  const totalPages = Math.ceil(filteredOrders.length / PAGE_SIZE);
+
+  const paginatedOrders = useMemo(() => {
+    const startIndex = (currentPage - 1) * PAGE_SIZE;
+    return filteredOrders.slice(startIndex, startIndex + PAGE_SIZE);
+  }, [filteredOrders, currentPage]);
   
   const handleSelectAll = (isChecked: boolean) => {
     if (isChecked) {
@@ -99,35 +131,17 @@ export default function PedidosPage() {
       toast({ variant: 'destructive', description: '⚠️ Debes seleccionar fecha inicio y fecha fin' });
       return;
     }
-    const from = new Date(dateFrom);
-    const to = new Date(dateTo);
-
-    if (from > to) {
-      toast({ variant: 'destructive', description: '⚠️ La fecha inicio no puede ser mayor a la fecha fin' });
-      return;
-    }
-    from.setHours(0, 0, 0, 0);
-    to.setHours(23, 59, 59, 999);
-
-    const ordersInRange = filteredOrders.filter(order => {
-      const orderDate = new Date(order.orderDate);
-      return orderDate >= from && orderDate <= to;
-    });
-
-    if (ordersInRange.length === 0) {
-      toast({ description: '📭 No se encontraron pedidos en ese rango' });
-      return;
-    }
-
-    const newIds = ordersInRange.map(o => o.id);
-    setSelectedOrders(prev => [...new Set([...prev, ...newIds])]);
-    toast({ description: `✅ ${ordersInRange.length} pedido(s) seleccionado(s)` });
+    // La lógica de filtrado ya está en el useMemo filteredOrders, 
+    // este botón ahora sirve para forzar la UI si fuera necesario, 
+    // pero el useMemo reacciona automáticamente.
+    toast({ description: `✅ Filtrado por fecha aplicado` });
   };
   
   const clearSelection = () => {
     setSelectedOrders([]);
     setDateFrom('');
     setDateTo('');
+    setSearchTerm('');
   };
   
   const chunkArray = <T,>(array: T[], size: number): T[][] => {
@@ -187,7 +201,6 @@ export default function PedidosPage() {
     const docRef = doc(firestore, `businesses/${user.uid}/orders`, orderId);
     await updateDocumentNonBlocking(docRef, { orderStatus: status });
 
-    // ACUMULACIÓN DE PUNTOS: Si el pedido se marca como Entregado, otorgamos puntos
     if (status === 'Entregado') {
         try {
             const orderSnap = await getDoc(docRef);
@@ -306,7 +319,7 @@ export default function PedidosPage() {
                       </div>
                   </div>
                   <div className="flex gap-2">
-                       <Button variant="outline" onClick={selectByDateRange} disabled={isDeleting}>Seleccionar</Button>
+                       <Button variant="outline" onClick={selectByDateRange} disabled={isDeleting}>Filtrar</Button>
                        <AlertDialog>
                           <AlertDialogTrigger asChild>
                               <Button variant="destructive" disabled={selectedOrders.length === 0 || isDeleting}>
@@ -354,10 +367,38 @@ export default function PedidosPage() {
 
           <DataTable
             columns={columns({ handleDeleteOrder, handleUpdateStatus, selectedOrders, onSelectAll: handleSelectAll, onSelectRow: handleSelectRow, isAllSelected, isSomeSelected })}
-            data={filteredOrders || []}
+            data={paginatedOrders}
             isLoading={isLoading}
             selectedOrderIds={selectedOrders}
           />
+
+          {/* CONTROLES DE PAGINACIÓN */}
+          <div className="flex items-center justify-between py-4 border-t mt-4">
+              <div className="text-sm text-muted-foreground font-medium">
+                  Mostrando {paginatedOrders.length} de {filteredOrders.length} pedidos 
+                  (Página {currentPage} de {totalPages || 1})
+              </div>
+              <div className="flex gap-2">
+                  <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                      disabled={currentPage === 1 || isDeleting || areOrdersLoading}
+                      className="font-bold"
+                  >
+                      <ChevronLeft className="mr-2 h-4 w-4" /> Anterior
+                  </Button>
+                  <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                      disabled={currentPage >= totalPages || isDeleting || areOrdersLoading}
+                      className="font-bold"
+                  >
+                      Siguiente <ChevronRight className="ml-2 h-4 w-4" />
+                  </Button>
+              </div>
+          </div>
         </CardContent>
       </Card>
     </div>
