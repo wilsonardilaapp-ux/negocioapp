@@ -1,5 +1,5 @@
 'use client';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { ItemInventario, EstadoStock, TipoItem, NuevoItemForm } from '@/types/kardex.types';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Edit } from 'lucide-react';
+import { PlusCircle, Edit, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import ItemForm from '../ItemForm';
 
@@ -26,16 +26,33 @@ export default function KardexProductos({ items, registrarOActualizarItem }: Kar
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [editingItem, setEditingItem] = useState<NuevoItemForm | null>(null);
 
+    // --- LÓGICA DE PAGINACIÓN ---
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 20;
+
     const categories = [...new Set(items.map(p => p.categoria))];
     const statuses: EstadoStock[] = ['normal', 'bajo', 'agotado', 'sobre_stock'];
     
-    const filteredItems = items.filter(p => {
-        const searchMatch = p.nombre.toLowerCase().includes(searchTerm.toLowerCase()) || p.codigo.toLowerCase().includes(searchTerm.toLowerCase());
-        const categoryMatch = filterCategory === 'all' || p.categoria === filterCategory;
-        const statusMatch = filterStatus === 'all' || p.estado === filterStatus;
-        const typeMatch = filterType === 'all' || p.tipoItem === filterType;
-        return searchMatch && categoryMatch && statusMatch && typeMatch;
-    });
+    const filteredItems = useMemo(() => {
+        return items.filter(p => {
+            const searchMatch = p.nombre.toLowerCase().includes(searchTerm.toLowerCase()) || p.codigo.toLowerCase().includes(searchTerm.toLowerCase());
+            const categoryMatch = filterCategory === 'all' || p.categoria === filterCategory;
+            const statusMatch = filterStatus === 'all' || p.estado === filterStatus;
+            const typeMatch = filterType === 'all' || p.tipoItem === filterType;
+            return searchMatch && categoryMatch && statusMatch && typeMatch;
+        });
+    }, [items, searchTerm, filterCategory, filterStatus, filterType]);
+
+    // Resetear a la primera página cuando cambian los filtros
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchTerm, filterCategory, filterStatus, filterType]);
+
+    const totalPages = Math.ceil(filteredItems.length / itemsPerPage);
+    const paginatedItems = useMemo(() => {
+        const startIndex = (currentPage - 1) * itemsPerPage;
+        return filteredItems.slice(startIndex, startIndex + itemsPerPage);
+    }, [filteredItems, currentPage]);
 
     const getStatusBadgeVariant = (status: EstadoStock): 'default' | 'secondary' | 'destructive' | 'outline' => {
         switch(status) {
@@ -78,7 +95,7 @@ export default function KardexProductos({ items, registrarOActualizarItem }: Kar
                     </div>
                     <div className="rounded-md border">
                         <Table><TableHeader><TableRow><TableHead>Código</TableHead><TableHead>Nombre</TableHead><TableHead>Tipo</TableHead><TableHead>Categoría</TableHead><TableHead>Unidad</TableHead><TableHead>Stock Actual</TableHead><TableHead>Stock Mín.</TableHead><TableHead>Costo Unit.</TableHead><TableHead>Valor Total</TableHead><TableHead>Estado</TableHead><TableHead className="text-right">Acciones</TableHead></TableRow></TableHeader><TableBody>
-                            {filteredItems.length > 0 ? filteredItems.map(p => (
+                            {paginatedItems.length > 0 ? paginatedItems.map(p => (
                                 <TableRow key={p.id}>
                                     <TableCell>{p.codigo}</TableCell><TableCell className="font-medium">{p.nombre}</TableCell><TableCell className="capitalize">{p.tipoItem}</TableCell><TableCell>{p.categoria}</TableCell><TableCell>{p.unidadMedida}</TableCell><TableCell>{p.stockActual}</TableCell><TableCell>{p.stockMinimo}</TableCell><TableCell>{formatCurrency(p.costoUnitario)}</TableCell><TableCell>{formatCurrency(p.stockActual * p.costoUnitario)}</TableCell><TableCell><Badge variant={getStatusBadgeVariant(p.estado)} className="capitalize">{p.estado.replace('_', ' ')}</Badge></TableCell>
                                     <TableCell className="text-right">
@@ -88,6 +105,36 @@ export default function KardexProductos({ items, registrarOActualizarItem }: Kar
                             )) : (<TableRow><TableCell colSpan={11} className="h-24 text-center">No se encontraron ítems.</TableCell></TableRow>)}
                         </TableBody></Table>
                     </div>
+
+                    {/* CONTROLES DE PAGINACIÓN */}
+                    {totalPages > 1 && (
+                        <div className="flex items-center justify-between py-4 border-t mt-4">
+                            <div className="text-sm text-muted-foreground font-medium">
+                                Mostrando {paginatedItems.length} de {filteredItems.length} ítems 
+                                (Página {currentPage} de {totalPages})
+                            </div>
+                            <div className="flex gap-2">
+                                <Button 
+                                    variant="outline" 
+                                    size="sm" 
+                                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                                    disabled={currentPage === 1}
+                                    className="font-bold"
+                                >
+                                    <ChevronLeft className="mr-2 h-4 w-4" /> Anterior
+                                </Button>
+                                <Button 
+                                    variant="outline" 
+                                    size="sm" 
+                                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                                    disabled={currentPage >= totalPages}
+                                    className="font-bold"
+                                >
+                                    Siguiente <ChevronRight className="ml-2 h-4 w-4" />
+                                </Button>
+                            </div>
+                        </div>
+                    )}
                 </CardContent>
             </Card>
 
