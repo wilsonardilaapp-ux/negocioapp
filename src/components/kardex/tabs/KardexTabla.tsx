@@ -5,7 +5,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { ItemInventario, LineaKardexCalculada, MetodoValuacion } from '@/types/kardex.types';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, FileSpreadsheet, Printer } from 'lucide-react';
+import * as XLSX from 'xlsx';
+import { cn } from '@/lib/utils';
 
 interface KardexTablaProps {
     items: ItemInventario[];
@@ -48,37 +50,103 @@ export default function KardexTabla({
         return lineas.slice(startIndex, startIndex + itemsPerPage);
     }, [lineas, currentPage]);
 
+    // --- FUNCIONES DE EXPORTACIÓN ---
+    const handleExportExcel = () => {
+        if (lineas.length === 0) return;
+
+        const item = items.find(i => i.id === selectedItemId);
+        
+        const exportData = lineas.map(linea => ({
+            "Fecha": linea.fecha,
+            "Concepto": linea.concepto,
+            "Documento": linea.documento,
+            "Entrada - Cant.": linea.entrada?.cantidad ?? 0,
+            "Entrada - C.Unit": linea.entrada?.costoUnitario ?? 0,
+            "Entrada - Total": linea.entrada?.costoTotal ?? 0,
+            "Salida - Cant.": linea.salida?.cantidad ?? 0,
+            "Salida - C.Unit": linea.salida?.costoUnitario ?? 0,
+            "Salida - Total": linea.salida?.costoTotal ?? 0,
+            "Saldo - Cant.": linea.saldo.cantidad,
+            "Saldo - C.Unit": linea.saldo.costoUnitario,
+            "Saldo - Total": linea.saldo.costoTotal,
+        }));
+
+        const ws = XLSX.utils.json_to_sheet(exportData);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Kardex por Ítem");
+        
+        const fileName = `Kardex_${item?.codigo || 'Item'}_${new Date().toISOString().split('T')[0]}.xlsx`;
+        XLSX.writeFile(wb, fileName);
+    };
+
+    const handlePrint = () => {
+        window.print();
+    };
+
     return (
         <Card>
             <CardHeader>
-                <CardTitle>Consulta de Kardex por Ítem</CardTitle>
-                <CardDescription>Selecciona un ítem y un método para ver su movimiento detallado.</CardDescription>
+                <div className="flex justify-between items-center">
+                    <div>
+                        <CardTitle>Consulta de Kardex por Ítem</CardTitle>
+                        <CardDescription className="print:hidden">Selecciona un ítem y un método para ver su movimiento detallado.</CardDescription>
+                    </div>
+                    {/* Encabezado visible solo al imprimir */}
+                    <div className="hidden print:block text-right">
+                        <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Reporte de Auditoría de Inventario</p>
+                        <p className="text-xs font-medium">{new Date().toLocaleString('es-CO')}</p>
+                    </div>
+                </div>
             </CardHeader>
             <CardContent>
-                <div className="flex flex-wrap items-end gap-4 mb-6">
-                    <div className="flex-1 min-w-[250px]">
-                        <label className="text-sm font-medium">Ítem de Inventario</label>
-                        <Select value={selectedItemId} onValueChange={setSelectedItemId}>
-                            <SelectTrigger>
-                                <SelectValue placeholder="Seleccionar ítem" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {items.map(p => <SelectItem key={p.id} value={p.id}>{p.codigo} - {p.nombre}</SelectItem>)}
-                            </SelectContent>
-                        </Select>
+                {/* Contenedor de filtros y acciones */}
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 mb-6">
+                    <div className="flex flex-wrap items-end gap-4 flex-1 print:hidden">
+                        <div className="min-w-[250px]">
+                            <label className="text-sm font-medium">Ítem de Inventario</label>
+                            <Select value={selectedItemId} onValueChange={setSelectedItemId}>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Seleccionar ítem" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {items.map(p => <SelectItem key={p.id} value={p.id}>{p.codigo} - {p.nombre}</SelectItem>)}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="min-w-[200px]">
+                            <label className="text-sm font-medium">Método de Valuación</label>
+                            <Select value={selectedMetodo} onValueChange={(v) => setSelectedMetodo(v as MetodoValuacion)}>
+                                <SelectTrigger>
+                                    <SelectValue/>
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="promedio_ponderado">Promedio Ponderado</SelectItem>
+                                    <SelectItem value="peps">PEPS</SelectItem>
+                                    <SelectItem value="ueps">UEPS</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
                     </div>
-                    <div className="flex-1 min-w-[200px]">
-                        <label className="text-sm font-medium">Método de Valuación</label>
-                        <Select value={selectedMetodo} onValueChange={(v) => setSelectedMetodo(v as MetodoValuacion)}>
-                            <SelectTrigger>
-                                <SelectValue/>
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="promedio_ponderado">Promedio Ponderado</SelectItem>
-                                <SelectItem value="peps">PEPS</SelectItem>
-                                <SelectItem value="ueps">UEPS</SelectItem>
-                            </SelectContent>
-                        </Select>
+
+                    <div className="flex gap-2 print:hidden">
+                        <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={handleExportExcel} 
+                            disabled={lineas.length === 0}
+                            className="font-bold border-green-200 text-green-700 hover:bg-green-50"
+                        >
+                            <FileSpreadsheet className="mr-2 h-4 w-4" /> Exportar Kardex
+                        </Button>
+                        <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={handlePrint}
+                            disabled={lineas.length === 0}
+                            className="font-bold"
+                        >
+                            <Printer className="mr-2 h-4 w-4" /> Imprimir Reporte
+                        </Button>
                     </div>
                 </div>
 
@@ -129,7 +197,7 @@ export default function KardexTabla({
                 </div>
 
                 {totalPages > 1 && (
-                    <div className="flex items-center justify-between py-4 border-t mt-4">
+                    <div className="flex items-center justify-between py-4 border-t mt-4 print:hidden">
                         <div className="text-sm text-muted-foreground font-medium">
                             Página {currentPage} de {totalPages} ({lineas.length} registros)
                         </div>
