@@ -2,14 +2,16 @@
 
 import React, { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { DollarSign, Package, Archive, ArrowDownUp, AlertCircle, FileSpreadsheet, Printer } from "lucide-react";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { DollarSign, Package, Archive, ArrowDownUp, AlertCircle, FileSpreadsheet, Printer, FileDown } from "lucide-react";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import type { ResumenKardex, MovimientoKardex, ItemInventario } from '@/types/kardex.types';
 import { Button } from '@/components/ui/button';
 import * as XLSX from 'xlsx';
+import { jsPDF } from "jspdf";
+import html2canvas from "html2canvas";
+import { useToast } from "@/hooks/use-toast";
 
 interface KardexResumenProps {
     resumen: ResumenKardex;
@@ -20,6 +22,7 @@ interface KardexResumenProps {
 const formatCurrency = (value: number) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(value);
 
 export default function KardexResumen({ resumen, movimientos, items }: KardexResumenProps) {
+    const { toast } = useToast();
     const kpis = [
         { title: "Total Ítems", value: resumen.totalItems, icon: Package },
         { title: "Valor Total Inventario", value: formatCurrency(resumen.valorTotalInventario), icon: DollarSign },
@@ -68,6 +71,32 @@ export default function KardexResumen({ resumen, movimientos, items }: KardexRes
       ];
 
       XLSX.writeFile(wb, "Kardex_Resumen_General.xlsx");
+    };
+
+    const handleExportPDF = async () => {
+        const element = document.getElementById('kardex-resumen-content');
+        if (!element) return;
+
+        try {
+            const canvas = await html2canvas(element, { 
+                scale: 2, 
+                useCORS: true, 
+                backgroundColor: '#ffffff' 
+            });
+            const imgData = canvas.toDataURL('image/png');
+            const pdf = new jsPDF('p', 'mm', 'a4');
+            const imgProps = pdf.getImageProperties(imgData);
+            const pdfWidth = pdf.internal.pageSize.getWidth();
+            const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+            
+            pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+            pdf.save('Reporte_Resumen_Kardex.pdf');
+            
+            toast({ title: 'Reporte PDF', description: 'El archivo se ha descargado correctamente.' });
+        } catch (error) {
+            console.error('Error al generar PDF:', error);
+            toast({ variant: 'destructive', title: 'Error', description: 'No se pudo generar el reporte PDF.' });
+        }
     };
 
     const handlePrint = () => {
@@ -127,16 +156,24 @@ export default function KardexResumen({ resumen, movimientos, items }: KardexRes
                         <Button 
                             variant="outline" 
                             size="sm" 
+                            onClick={handleExportPDF}
+                            className="font-bold"
+                        >
+                            <FileDown className="mr-2 h-4 w-4" /> Exportar PDF
+                        </Button>
+                        <Button 
+                            variant="outline" 
+                            size="sm" 
                             onClick={handlePrint}
                             className="font-bold"
                         >
-                            <Printer className="mr-2 h-4 w-4" /> Imprimir Dashboard
+                            <Printer className="mr-2 h-4 w-4" /> Imprimir
                         </Button>
                     </div>
                 </CardHeader>
             </Card>
 
-            <div className="space-y-6">
+            <div id="kardex-resumen-content" className="space-y-6 bg-white p-4 rounded-xl">
                 {itemsBajoMinimo.length > 0 && (
                     <Alert variant="destructive">
                         <AlertCircle className="h-4 w-4" />
