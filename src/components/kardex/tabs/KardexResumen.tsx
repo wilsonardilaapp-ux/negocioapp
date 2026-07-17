@@ -3,7 +3,7 @@
 import React, { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Alert, AlertDescription, AlertTitle } from "@/alert";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { DollarSign, Package, Archive, ArrowDownUp, AlertCircle, FileSpreadsheet, Printer } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
@@ -60,7 +60,6 @@ export default function KardexResumen({ resumen, movimientos, items }: KardexRes
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Resumen General");
       
-      // Auto-ajustar anchos de columna para profesionalismo
       ws['!cols'] = [
           {wch: 35},
           {wch: 25},
@@ -114,7 +113,7 @@ export default function KardexResumen({ resumen, movimientos, items }: KardexRes
                 <CardHeader className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                     <div>
                         <CardTitle>Resumen del Inventario</CardTitle>
-                        <CardDescription>Vista consolidada de métricas y alertas de stock.</CardDescription>
+                        <CardDescription className="print:hidden">Vista consolidada de métricas y alertas de stock.</CardDescription>
                     </div>
                     <div className="flex gap-2">
                         <Button 
