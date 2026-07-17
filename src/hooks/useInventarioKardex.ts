@@ -104,14 +104,10 @@ export function useInventarioKardex() {
       throw new Error('Servicios de inventario no listos.');
     }
 
-    // Resolver ID de producto con soporte para esquemas mixtos (itemId / productoId)
     const targetId = form.itemId || (form as any).productoId;
     const item = items.find(i => i.id === targetId);
     if (!item) throw new Error('El ítem seleccionado no existe.');
 
-    // --- FASE 1: RECONSTRUCCIÓN HISTÓRICA (LA VERDAD CONTABLE) ---
-    // Recalculamos el saldo y costo promedio real justo antes de este movimiento.
-    // El filtro es resiliente a itemId o productoId para capturar 100% de la historia.
     const historialPrevio = movimientos
       .filter(m => (m.itemId || (m as any).productoId) === targetId)
       .sort((a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime());
@@ -122,39 +118,40 @@ export function useInventarioKardex() {
     let saldoValorTotalAcumulado = 0;
 
     for (const m of historialPrevio) {
-      if (m.tipo.startsWith('entrada')) {
-        // En entradas usamos el costo unitario del registro
+      if (m.tipo.startsWith('entrada') || (m.tipo === 'ajuste_inventario_fisico' && m.cantidad > 0)) {
         saldoCantAcumulado += m.cantidad;
         saldoValorTotalAcumulado += (m.cantidad * m.costoUnitario);
       } else {
-        // En salidas/ajustes usamos el promedio acumulado hasta ese momento
         const promedioEnEsePunto = saldoCantAcumulado > 0 ? (saldoValorTotalAcumulado / saldoCantAcumulado) : m.costoUnitario;
-        saldoCantAcumulado -= m.cantidad;
-        saldoValorTotalAcumulado -= (m.cantidad * promedioEnEsePunto);
+        // La cantidad ya es negativa para ajustes de salida en el historial reconstruido, 
+        // pero m.cantidad en DB se guarda positiva para salidas normales, hay que ser cuidadoso.
+        const cantAbs = Math.abs(m.cantidad);
+        saldoCantAcumulado -= cantAbs;
+        saldoValorTotalAcumulado -= (cantAbs * promedioEnEsePunto);
       }
     }
 
     console.log('SALDO ACUMULADO:', saldoCantAcumulado, saldoValorTotalAcumulado);
 
-    // --- FASE 2: DETERMINAR VALORES DEL NUEVO MOVIMIENTO ---
-    const costoPromedioActual = saldoCantAcumulado > 0 ? (saldoValorTotalAcumulado / saldoCantAcumulado) : (item.costoUnitario || 0);
-    
-    // Si es entrada usamos lo que viene del form, si es salida usamos el promedio real calculado
-    const costoUnitarioFinal = form.tipo === 'entrada_compra' ? form.costoUnitario : costoPromedioActual;
-    const costoTotalFinal = form.cantidad * costoUnitarioFinal;
+    const isAjusteFisico = form.tipo === 'ajuste_inventario_fisico';
+    const cantidadParaKardex = isAjusteFisico ? (form.cantidad - saldoCantAcumulado) : form.cantidad;
 
-    console.log('COSTO FINAL CALCULADO:', costoUnitarioFinal, costoTotalFinal);
-
-    // Validación de stock si aplica
-    if (form.tipo.startsWith('salida') || form.tipo.startsWith('ajuste')) {
+    // Validación de stock: NO aplica para ajustes físicos (donde form.cantidad es el stock final)
+    if (!isAjusteFisico && (form.tipo.startsWith('salida') || form.tipo.startsWith('ajuste_danio'))) {
       if (!configuracion.permitirStockNegativo && form.cantidad > saldoCantAcumulado) {
         throw new Error(`Stock insuficiente. Disponible: ${saldoCantAcumulado}`);
       }
     }
 
-    // --- FASE 3: PERSISTENCIA DEL MOVIMIENTO ---
+    const costoPromedioActual = saldoCantAcumulado > 0 ? (saldoValorTotalAcumulado / saldoCantAcumulado) : (item.costoUnitario || 0);
+    const costoUnitarioFinal = form.tipo === 'entrada_compra' ? form.costoUnitario : costoPromedioActual;
+    const costoTotalFinal = Math.abs(cantidadParaKardex) * costoUnitarioFinal;
+
+    console.log('COSTO FINAL CALCULADO:', costoUnitarioFinal, costoTotalFinal);
+
     const nuevoMovimientoData: any = { 
         ...form, 
+        cantidad: cantidadParaKardex, // Guardamos el delta para ajustes físicos
         costoUnitario: costoUnitarioFinal,
         costoTotal: costoTotalFinal, 
         observaciones: form.observaciones || '' 
@@ -163,18 +160,15 @@ export function useInventarioKardex() {
     const movCollectionRef = collection(firestore, `businesses/${user.uid}/kardexMovimientos`);
     await addDocumentNonBlocking(movCollectionRef, nuevoMovimientoData);
 
-    // --- FASE 4: SINCRONIZACIÓN DEL MAESTRO DE PRODUCTOS ---
-    // Actualizamos el ítem basándonos en el nuevo estado tras el movimiento registrado
-    const nuevoSaldoCant = form.tipo.startsWith('entrada') ? saldoCantAcumulado + form.cantidad : saldoCantAcumulado - form.cantidad;
-    const nuevoSaldoValor = form.tipo.startsWith('entrada') ? saldoValorTotalAcumulado + costoTotalFinal : saldoValorTotalAcumulado - costoTotalFinal;
+    const stockFinalMaestro = isAjusteFisico ? form.cantidad : (form.tipo.startsWith('entrada') ? saldoCantAcumulado + form.cantidad : saldoCantAcumulado - form.cantidad);
+    const valorFinalMaestro = isAjusteFisico ? (saldoValorTotalAcumulado + (cantidadParaKardex * costoUnitarioFinal)) : (form.tipo.startsWith('entrada') ? saldoValorTotalAcumulado + costoTotalFinal : saldoValorTotalAcumulado - costoTotalFinal);
     
-    // El nuevo costo unitario del maestro es el promedio resultante
-    const nuevoCostoPromedioMaestro = nuevoSaldoCant > 0 ? (nuevoSaldoValor / nuevoSaldoCant) : costoUnitarioFinal;
-    const nuevoEstado = determinarEstadoStock(nuevoSaldoCant, item.stockMinimo, item.stockMaximo);
+    const nuevoCostoPromedioMaestro = stockFinalMaestro > 0 ? (valorFinalMaestro / stockFinalMaestro) : costoUnitarioFinal;
+    const nuevoEstado = determinarEstadoStock(stockFinalMaestro, item.stockMinimo, item.stockMaximo);
     
     const itemDocRef = doc(firestore, `businesses/${user.uid}/kardexItems`, item.id);
     await updateDocumentNonBlocking(itemDocRef, {
-        stockActual: nuevoSaldoCant,
+        stockActual: stockFinalMaestro,
         costoUnitario: nuevoCostoPromedioMaestro,
         estado: nuevoEstado,
         updatedAt: new Date().toISOString()
@@ -196,27 +190,32 @@ export function useInventarioKardex() {
       let entrada = null;
       let salida = null;
 
-      if (mov.tipo.startsWith('entrada')) {
+      const esEntrada = mov.tipo.startsWith('entrada') || (mov.tipo === 'ajuste_inventario_fisico' && mov.cantidad > 0);
+      const esSalida = mov.tipo.startsWith('salida') || mov.tipo.startsWith('ajuste_danio') || (mov.tipo === 'ajuste_inventario_fisico' && mov.cantidad < 0);
+
+      const cantidadAbs = Math.abs(mov.cantidad);
+
+      if (esEntrada) {
         entrada = {
-          cantidad: mov.cantidad,
+          cantidad: cantidadAbs,
           costoUnitario: mov.costoUnitario,
-          costoTotal: mov.cantidad * mov.costoUnitario,
+          costoTotal: cantidadAbs * mov.costoUnitario,
         };
-        saldoCantidad += mov.cantidad;
+        saldoCantidad += cantidadAbs;
         saldoValorTotal += entrada.costoTotal;
 
         if (metodo === 'peps' || metodo === 'ueps') {
-          capas.push({ cantidad: mov.cantidad, costoUnitario: mov.costoUnitario });
+          capas.push({ cantidad: cantidadAbs, costoUnitario: mov.costoUnitario });
         }
-      } else {
+      } else if (esSalida) {
         let costoSalidaTotal = 0;
         let costoUnitarioSalida = 0;
 
         if (metodo === 'promedio_ponderado') {
           costoUnitarioSalida = saldoCantidad > 0 ? (saldoValorTotal / saldoCantidad) : mov.costoUnitario;
-          costoSalidaTotal = mov.cantidad * costoUnitarioSalida;
+          costoSalidaTotal = cantidadAbs * costoUnitarioSalida;
         } else {
-          let cantidadSalidaRestante = mov.cantidad;
+          let cantidadSalidaRestante = cantidadAbs;
           let costoAcumulado = 0;
           const capasLocal = JSON.parse(JSON.stringify(capas));
 
@@ -235,16 +234,16 @@ export function useInventarioKardex() {
           }
           capas = capasLocal;
           costoSalidaTotal = costoAcumulado;
-          costoUnitarioSalida = mov.cantidad > 0 ? (costoSalidaTotal / mov.cantidad) : 0;
+          costoUnitarioSalida = cantidadAbs > 0 ? (costoSalidaTotal / cantidadAbs) : 0;
         }
         
         salida = {
-          cantidad: mov.cantidad,
+          cantidad: cantidadAbs,
           costoUnitario: costoUnitarioSalida,
           costoTotal: costoSalidaTotal,
         };
 
-        saldoCantidad -= mov.cantidad;
+        saldoCantidad -= cantidadAbs;
         saldoValorTotal -= costoSalidaTotal;
       }
       
