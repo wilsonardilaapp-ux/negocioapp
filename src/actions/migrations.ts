@@ -246,3 +246,64 @@ export async function syncHybridPlanKeys() {
     return { success: false, error: error.message };
   }
 }
+
+/**
+ * Elimina permanentemente el producto de prueba TEST-PROD-001 y todo su historial de movimientos.
+ * Mantiene la integridad referencial eliminando primero los movimientos.
+ */
+export async function cleanupKardexTestData(businessId: string): Promise<{ success: boolean; count?: number; error?: string }> {
+  if (!businessId) return { success: false, error: "Business ID requerido" };
+  
+  try {
+    const db = await getAdminFirestore();
+    const batch = db.batch();
+    
+    // 1. Localizar y preparar eliminación de movimientos (Subcolección del negocio)
+    const movsRef = db.collection(`businesses/${businessId}/kardexMovimientos`);
+    
+    // Búsqueda por ambos campos para asegurar limpieza total
+    const [q1, q2] = await Promise.all([
+      movsRef.where('itemId', '==', 'TEST-PROD-001').get(),
+      movsRef.where('productoId', '==', 'TEST-PROD-001').get()
+    ]);
+    
+    const deletedIds = new Set<string>();
+    
+    q1.docs.forEach(doc => { 
+      batch.delete(doc.ref); 
+      deletedIds.add(doc.id); 
+    });
+    
+    q2.docs.forEach(doc => { 
+      if (!deletedIds.has(doc.id)) {
+        batch.delete(doc.ref); 
+        deletedIds.add(doc.id); 
+      }
+    });
+    
+    // 2. Localizar y preparar eliminación del ítem maestro
+    const itemDirectRef = db.doc(`businesses/${businessId}/kardexItems/TEST-PROD-001`);
+    batch.delete(itemDirectRef);
+    
+    // Búsqueda extra por campo 'codigo' por si el ID del documento es aleatorio
+    const itemsRef = db.collection(`businesses/${businessId}/kardexItems`);
+    const qItemsByCode = await itemsRef.where('codigo', '==', 'TEST-PROD-001').get();
+    qItemsByCode.forEach(doc => batch.delete(doc.ref));
+    
+    // 3. Ejecutar operación atómica
+    await batch.commit();
+    
+    // 4. Invalidar cachés
+    revalidatePath('/dashboard/kardex');
+    revalidatePath('/dashboard/contabilidad');
+    
+    return { 
+      success: true, 
+      count: deletedIds.size 
+    };
+
+  } catch (error: any) {
+    console.error("[cleanupKardexTestData] Error crítico:", error);
+    return { success: false, error: error.message };
+  }
+}
