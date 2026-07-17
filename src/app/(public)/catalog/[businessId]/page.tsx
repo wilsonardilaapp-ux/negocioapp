@@ -11,15 +11,16 @@ import ProductViewModal from '@/components/catalogo/product-view-modal';
 import { PurchaseModal } from '@/components/catalogo/purchase-modal';
 import { CartDrawer } from '@/components/catalogo/cart-drawer';
 import { SuggestionModal } from '@/components/suggestions/suggestion-modal';
-import { Frown, Loader2, PackageSearch, LayoutGrid, Star, Award, ChevronLeft, ChevronRight, Search } from 'lucide-react';
+import { Frown, Loader2, PackageSearch, LayoutGrid, Star, Award, ChevronLeft, ChevronRight, Search, Ticket } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import type { LandingHeaderConfigData } from '@/models/landing-page';
 import type { Product } from '@/models/product';
 import type { Promotion } from '@/models/promotion';
+import type { Coupon } from '@/models/coupon';
 import type { PaymentSettings } from '@/models/payment-settings';
 import type { SuggestionOutput } from '@/models/suggestion-io';
 import type { CartItem } from '@/models/cart';
@@ -50,6 +51,14 @@ interface CatalogPageProps {
 
 const ITEMS_PER_PAGE = 20;
 
+const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('es-CO', {
+        style: 'currency',
+        currency: 'COP',
+        minimumFractionDigits: 0,
+    }).format(value);
+};
+
 function CatalogPageContent({ params }: CatalogPageProps) {
     const slug = decodeURIComponent(params.businessId);
     const { firestore, isNetworkEnabled } = useFirebase();
@@ -62,12 +71,14 @@ function CatalogPageContent({ params }: CatalogPageProps) {
         headerConfig: LandingHeaderConfigData | null;
         products: Product[] | null;
         promotions: Promotion[] | null;
+        coupons: Coupon[] | null;
         paymentSettings: PaymentSettings | null;
         resolvedBusinessId: string | null;
     }>({
         headerConfig: null,
         products: null,
         promotions: null,
+        coupons: null,
         paymentSettings: null,
         resolvedBusinessId: null,
     });
@@ -103,10 +114,16 @@ function CatalogPageContent({ params }: CatalogPageProps) {
 
                 const publicCatalogRef = doc(firestore, 'businesses', businessId, 'publicData', 'catalog');
                 const paymentSettingsRef = doc(firestore, 'paymentSettings', businessId);
+                const couponsQuery = query(
+                    collection(firestore, 'cupones'),
+                    where('businessId', '==', businessId),
+                    where('activo', '==', true)
+                );
                 
-                const [catalogSnap, paymentSnap] = await Promise.all([
+                const [catalogSnap, paymentSnap, couponsSnap] = await Promise.all([
                     getDoc(publicCatalogRef),
-                    getDoc(paymentSettingsRef)
+                    getDoc(paymentSettingsRef),
+                    getDocs(couponsQuery)
                 ]);
 
                 if (!catalogSnap.exists()) {
@@ -118,6 +135,7 @@ function CatalogPageContent({ params }: CatalogPageProps) {
                     headerConfig: data.headerConfig as LandingHeaderConfigData,
                     products: data.products as Product[],
                     promotions: (data.promotions as Promotion[]) || [],
+                    coupons: couponsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Coupon)),
                     paymentSettings: paymentSnap.exists() ? (paymentSnap.data() as PaymentSettings) : null,
                     resolvedBusinessId: businessId,
                 });
@@ -180,6 +198,7 @@ function CatalogPageContent({ params }: CatalogPageProps) {
     const { data: rewards } = useCollection<Reward>(rewardsQuery);
 
     const isLoyaltyActive = useMemo(() => isModuleAuthorized('loyalty'), [isModuleAuthorized]);
+    const isPromotionsActive = useMemo(() => isModuleAuthorized('promotions'), [isModuleAuthorized]);
 
     const handleAddToCart = (product: Product, quantity: number) => {
         const discountInfo = promotionService.calculateDiscountedPrice(product, pageData.promotions || []);
@@ -377,10 +396,15 @@ function CatalogPageContent({ params }: CatalogPageProps) {
 
                 <Tabs defaultValue="menu" className="w-full">
                     <div className="flex justify-center mb-8 sticky top-4 z-40">
-                        <TabsList className="bg-white shadow-xl border rounded-full p-1 h-14">
+                        <TabsList className="bg-white shadow-xl border rounded-full p-1 h-14 overflow-x-auto no-scrollbar max-w-full">
                             <TabsTrigger value="menu" className="rounded-full px-6 gap-2 font-bold data-[state=active]:bg-primary data-[state=active]:text-white">
                                 <LayoutGrid className="h-4 w-4" /> Menú
                             </TabsTrigger>
+                            {isPromotionsActive && (
+                                <TabsTrigger value="coupons" className="rounded-full px-6 gap-2 font-bold data-[state=active]:bg-primary data-[state=active]:text-white">
+                                    <Ticket className="h-4 w-4" /> Cupones
+                                </TabsTrigger>
+                            )}
                             <TabsTrigger value="reviews" className="rounded-full px-6 gap-2 font-bold data-[state=active]:bg-primary data-[state=active]:text-white">
                                 <Star className="h-4 w-4" /> Reseñas
                             </TabsTrigger>
@@ -485,6 +509,55 @@ function CatalogPageContent({ params }: CatalogPageProps) {
                             </div>
                         )}
                     </TabsContent>
+
+                    {isPromotionsActive && (
+                        <TabsContent value="coupons" className="max-w-4xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-500 outline-none">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                                {pageData.coupons?.map(coupon => (
+                                    <Card key={coupon.id} className="border-2 border-dashed border-primary/20 bg-white hover:border-primary/40 transition-colors shadow-sm overflow-hidden flex flex-col">
+                                        <CardHeader className="text-center pb-2">
+                                            <Badge variant="secondary" className="w-fit mx-auto mb-2 bg-primary/10 text-primary border-none font-black text-[10px] uppercase">
+                                                {coupon.tipo === 'porcentaje' ? `${coupon.valor}% DTO` : `${formatCurrency(coupon.valor)} DTO`}
+                                            </Badge>
+                                            <CardTitle className="text-2xl font-black tracking-tighter text-primary uppercase">{coupon.codigo}</CardTitle>
+                                        </CardHeader>
+                                        <CardContent className="text-center space-y-4 flex-grow">
+                                            <p className="text-xs text-muted-foreground font-medium italic">
+                                                {coupon.montoMinimo > 0 ? `En compras superiores a ${formatCurrency(coupon.montoMinimo)}` : 'Sin mínimo de compra'}
+                                            </p>
+                                            <div className="pt-2 border-t border-dashed">
+                                                <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Válido hasta</p>
+                                                <p className="text-sm font-black text-gray-700">{new Date(coupon.fechaVencimiento).toLocaleDateString('es-CO', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+                                            </div>
+                                        </CardContent>
+                                        <CardFooter className="bg-primary/5 p-4 border-t border-dashed border-primary/10">
+                                            <Button 
+                                                variant="outline" 
+                                                className="w-full font-black border-primary text-primary hover:bg-primary hover:text-white transition-all h-10 uppercase text-[10px] tracking-widest"
+                                                onClick={() => {
+                                                    navigator.clipboard.writeText(coupon.codigo);
+                                                    toast({ 
+                                                        title: "¡Código Copiado!", 
+                                                        description: "Pégalo en el checkout para aplicar tu descuento.",
+                                                        duration: 3000
+                                                    });
+                                                }}
+                                            >
+                                                Copiar Código
+                                            </Button>
+                                        </CardFooter>
+                                    </Card>
+                                ))}
+                            </div>
+                            {(!pageData.coupons || pageData.coupons.length === 0) && (
+                                <div className="text-center py-20 bg-white rounded-3xl border border-dashed text-muted-foreground">
+                                    <Ticket className="h-12 w-12 mx-auto mb-4 opacity-10" />
+                                    <h3 className="font-bold text-gray-400">Sin cupones vigentes</h3>
+                                    <p className="text-sm">Vuelve pronto para descubrir nuevas ofertas.</p>
+                                </div>
+                            )}
+                        </TabsContent>
+                    )}
 
                     <TabsContent value="reviews" className="max-w-4xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-500 outline-none">
                         <ReviewSummary 
