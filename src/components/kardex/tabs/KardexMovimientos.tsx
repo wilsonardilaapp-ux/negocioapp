@@ -12,9 +12,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import type { ItemInventario, MovimientoKardex, NuevoMovimientoForm, TipoMovimiento } from '@/types/kardex.types';
-import { Save, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Save, Loader2, ChevronLeft, ChevronRight, FileSpreadsheet, Printer } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useState, useMemo } from 'react';
+import * as XLSX from 'xlsx';
 
 interface KardexMovimientosProps {
     items: ItemInventario[];
@@ -55,8 +56,28 @@ export default function KardexMovimientos({ items, movimientos, registrarMovimie
         }
     });
 
-    // Vigilamos el tipo de movimiento para ocultar el costo si no es una compra
     const tipoMovimiento = watch('tipo');
+
+    const handleExportExcel = () => {
+        const dataToExport = sortedMovimientos.map(mov => ({
+            "Fecha": new Date(mov.fecha).toLocaleDateString(),
+            "Tipo": mov.tipo.replace(/_/g, ' '),
+            "Ítem": items.find(p => p.id === mov.itemId)?.nombre ?? 'N/A',
+            "Documento": mov.documento,
+            "Cantidad": mov.cantidad,
+            "Costo Unitario": mov.costoUnitario,
+            "Total": mov.costoTotal,
+        }));
+
+        const ws = XLSX.utils.json_to_sheet(dataToExport);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Movimientos");
+        XLSX.writeFile(wb, "Historial_Movimientos_Kardex.xlsx");
+    };
+
+    const handlePrint = () => {
+        window.print();
+    };
 
     const onSubmit = async (data: NuevoMovimientoForm) => {
         try {
@@ -78,7 +99,7 @@ export default function KardexMovimientos({ items, movimientos, registrarMovimie
 
     return (
         <div className="grid md:grid-cols-3 gap-6">
-            <div className="md:col-span-1">
+            <div className="md:col-span-1 print:hidden">
                 <Card><CardHeader><CardTitle>Registrar Movimiento</CardTitle><CardDescription>Añade una nueva entrada o salida al inventario.</CardDescription></CardHeader><CardContent>
                     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
                         <div><Label>Tipo de Movimiento</Label><Controller name="tipo" control={control} render={({ field }) => ( <Select onValueChange={field.onChange} defaultValue={field.value}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="entrada_compra">Entrada (Compra)</SelectItem><SelectItem value="entrada_devolucion_cliente">Entrada (Devolución Cliente)</SelectItem><SelectItem value="salida_venta">Salida (Venta)</SelectItem><SelectItem value="salida_devolucion_proveedor">Salida (Devolución Proveedor)</SelectItem><SelectItem value="ajuste_danio">Ajuste (Daño)</SelectItem><SelectItem value="ajuste_inventario_fisico">Ajuste (Inventario Físico)</SelectItem><SelectItem value="transferencia_bodega">Transferencia</SelectItem></SelectContent></Select> )}/></div>
@@ -86,7 +107,6 @@ export default function KardexMovimientos({ items, movimientos, registrarMovimie
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div><Label>Cantidad</Label><Input type="number" step="any" {...register('cantidad', { valueAsNumber: true })} /></div>
                             
-                            {/* EL COSTO SOLO SE PIDE EN COMPRAS (PROMEDIO PONDERADO) */}
                             {tipoMovimiento === 'entrada_compra' && (
                                 <div className="animate-in fade-in duration-300">
                                     <Label>Costo Unitario ($)</Label>
@@ -101,11 +121,21 @@ export default function KardexMovimientos({ items, movimientos, registrarMovimie
                     </form>
                 </CardContent></Card>
             </div>
-            <div className="md:col-span-2">
+            <div className="md:col-span-2 print:col-span-3">
                 <Card>
-                    <CardHeader>
-                        <CardTitle>Historial de Movimientos</CardTitle>
-                        <CardDescription>Mostrando {paginatedMovimientos.length} de {movimientos.length} registros totales.</CardDescription>
+                    <CardHeader className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                        <div className="space-y-1">
+                            <CardTitle>Historial de Movimientos</CardTitle>
+                            <CardDescription>Mostrando {paginatedMovimientos.length} de {movimientos.length} registros totales.</CardDescription>
+                        </div>
+                        <div className="flex items-center gap-2 print:hidden">
+                            <Button variant="outline" size="sm" onClick={handleExportExcel} className="font-bold border-green-200 text-green-700 hover:bg-green-50">
+                                <FileSpreadsheet className="mr-2 h-4 w-4" /> Exportar Excel
+                            </Button>
+                            <Button variant="outline" size="sm" onClick={handlePrint} className="font-bold">
+                                <Printer className="mr-2 h-4 w-4" /> Imprimir
+                            </Button>
+                        </div>
                     </CardHeader>
                     <CardContent>
                         <div className="rounded-md border">
@@ -142,7 +172,7 @@ export default function KardexMovimientos({ items, movimientos, registrarMovimie
                         </div>
 
                         {totalPages > 1 && (
-                            <div className="flex items-center justify-between py-4 border-t mt-4">
+                            <div className="flex items-center justify-between py-4 border-t mt-4 print:hidden">
                                 <div className="text-sm text-muted-foreground font-medium">
                                     Página {currentPage} de {totalPages}
                                 </div>
