@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useKardex } from '@/hooks/useKardex';
+import { useInventarioKardex } from '@/hooks/useInventarioKardex';
 import type { TabKardex } from '@/types/kardex.types';
 
 // Import tab components from their new location
@@ -15,7 +15,7 @@ import KardexConfiguracion from '@/components/kardex/tabs/KardexConfiguracion';
 
 export default function KardexPage() {
     const [activeTab, setActiveTab] = useState<TabKardex>('resumen');
-    const kardexData = useKardex();
+    const kardexData = useInventarioKardex();
 
     return (
         <div className="space-y-6">
