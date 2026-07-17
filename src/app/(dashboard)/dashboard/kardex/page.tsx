@@ -1,12 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useInventarioKardex } from '@/hooks/useInventarioKardex';
-import type { TabKardex } from '@/types/kardex.types';
+import type { TabKardex, MetodoValuacion } from '@/types/kardex.types';
 
-// Import tab components from their new location
+// Import tab components using relative paths
 import KardexResumen from '@/components/kardex/tabs/KardexResumen';
 import KardexTabla from '@/components/kardex/tabs/KardexTabla';
 import KardexProductos from '@/components/kardex/tabs/KardexProductos';
@@ -16,6 +16,17 @@ import KardexConfiguracion from '@/components/kardex/tabs/KardexConfiguracion';
 export default function KardexPage() {
     const [activeTab, setActiveTab] = useState<TabKardex>('resumen');
     const kardexData = useInventarioKardex();
+
+    // --- ESTADO ELEVADO PARA PERSISTENCIA ---
+    const [selectedItemId, setSelectedItemId] = useState<string>('');
+    const [selectedMetodo, setSelectedMetodo] = useState<MetodoValuacion>('promedio_ponderado');
+
+    // Sincronizar el ítem inicial cuando se cargan los productos si no hay uno seleccionado
+    useEffect(() => {
+        if (!selectedItemId && kardexData.items.length > 0) {
+            setSelectedItemId(kardexData.items[0].id);
+        }
+    }, [kardexData.items, selectedItemId]);
 
     return (
         <div className="space-y-6">
@@ -41,6 +52,10 @@ export default function KardexPage() {
                     <KardexTabla 
                         items={kardexData.items}
                         calcularKardex={kardexData.calcularKardex}
+                        selectedItemId={selectedItemId}
+                        setSelectedItemId={setSelectedItemId}
+                        selectedMetodo={selectedMetodo}
+                        setSelectedMetodo={setSelectedMetodo}
                     />
                 </TabsContent>
                 <TabsContent value="productos">
