@@ -39,7 +39,7 @@ export default function KardexTabla({
 
     // Cálculos financieros derivados siempre sobre el total de líneas calculadas
     const costoTotalVentas = useMemo(() => lineas.reduce((sum, l) => sum + (l.salida?.costoTotal ?? 0), 0), [lineas]);
-    const unidadesRotadas = useMemo(() => lineas.reduce((sum, l) => sum + (l.salida?.quantity ?? l.salida?.cantidad ?? 0), 0), [lineas]);
+    const unidadesRotadas = useMemo(() => lineas.reduce((sum, l) => sum + (l.salida?.cantidad ?? 0), 0), [lineas]);
 
     // Segmentación visual de datos ya calculados
     const totalPages = Math.ceil(lineas.length / itemsPerPage);
@@ -86,44 +86,42 @@ export default function KardexTabla({
                     <Table>
                         <TableHeader>
                             <TableRow>
-                                <TableHead rowSpan={2}>Fecha</TableHead>
-                                <TableHead rowSpan={2}>Concepto</TableHead>
+                                <TableHead rowSpan={2} className="align-bottom">Fecha</TableHead>
+                                <TableHead rowSpan={2} className="align-bottom">Concepto</TableHead>
                                 <TableHead colSpan={3} className="text-center border-l">Entrada</TableHead>
                                 <TableHead colSpan={3} className="text-center border-l">Salida</TableHead>
                                 <TableHead colSpan={3} className="text-center border-l">Saldo</TableHead>
                             </TableRow>
                              <TableRow>
-                                <TableHead className="border-l">Cant.</TableHead>
-                                <TableHead>C. Unit</TableHead>
-                                <TableHead>C. Total</TableHead>
-                                <TableHead className="border-l">Cant.</TableHead>
-                                <TableHead>C. Unit</TableHead>
-                                <TableHead>C. Total</TableHead>
-                                <TableHead className="border-l">Cant.</TableHead>
-                                <TableHead>C. Unit</TableHead>
-                                <TableHead>C. Total</TableHead>
+                                <TableHead className="text-center border-l">Cant.</TableHead>
+                                <TableHead className="text-right">C. Unit</TableHead>
+                                <TableHead className="text-right">C. Total</TableHead>
+                                <TableHead className="text-center border-l">Cant.</TableHead>
+                                <TableHead className="text-right">C. Unit</TableHead>
+                                <TableHead className="text-right">C. Total</TableHead>
+                                <TableHead className="text-center border-l">Cant.</TableHead>
+                                <TableHead className="text-right">C. Unit</TableHead>
+                                <TableHead className="text-right">C. Total</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {paginatedLineas.length > 0 ? paginatedLineas.map((linea, index) => (
                                 <TableRow key={index}>
                                     <TableCell>{linea.fecha}</TableCell>
-                                    <TableCell className="capitalize">{linea.concepto}</TableCell>
-                                    <TableCell className="border-l">{linea.entrada?.cantidad ?? ''}</TableCell>
-                                    <TableCell>{linea.entrada ? formatCurrency(linea.entrada.costoUnitario) : ''}</TableCell>
-                                    <TableCell>{linea.entrada ? formatCurrency(linea.entrada.costoTotal) : ''}</TableCell>
-                                    <TableCell className="border-l">{linea.salida?.cantidad ?? ''}</TableCell>
-                                    <TableCell>{linea.salida ? formatCurrency(linea.salida.costoUnitario) : ''}</TableCell>
-                                    <TableCell>{linea.salida ? formatCurrency(linea.salida.costoTotal) : ''}</TableCell>
-                                    <TableCell className="border-l font-semibold">{linea.saldo.cantidad}</TableCell>
-                                    <TableCell>{formatCurrency(linea.saldo.costoUnitario)}</TableCell>
-                                    <TableCell className="font-bold text-primary">{formatCurrency(linea.saldo.costoTotal)}</TableCell>
+                                    <TableCell>{linea.concepto}</TableCell>
+                                    <TableCell className="text-center border-l">{linea.entrada?.cantidad ?? ''}</TableCell>
+                                    <TableCell className="text-right">{linea.entrada ? formatCurrency(linea.entrada.costoUnitario) : ''}</TableCell>
+                                    <TableCell className="text-right">{linea.entrada ? formatCurrency(linea.entrada.costoTotal) : ''}</TableCell>
+                                    <TableCell className="text-center border-l">{linea.salida?.cantidad ?? ''}</TableCell>
+                                    <TableCell className="text-right">{linea.salida ? formatCurrency(linea.salida.costoUnitario) : ''}</TableCell>
+                                    <TableCell className="text-right">{linea.salida ? formatCurrency(linea.salida.costoTotal) : ''}</TableCell>
+                                    <TableCell className="text-center border-l font-semibold">{linea.saldo.cantidad}</TableCell>
+                                    <TableCell className="text-right font-semibold">{formatCurrency(linea.saldo.costoUnitario)}</TableCell>
+                                    <TableCell className="text-right font-bold">{formatCurrency(linea.saldo.costoTotal)}</TableCell>
                                 </TableRow>
                             )) : (
                                 <TableRow>
-                                    <TableCell colSpan={11} className="h-24 text-center text-muted-foreground italic">
-                                        {selectedItemId ? 'No hay movimientos registrados para este ítem.' : 'Por favor, selecciona un ítem para visualizar su historial.'}
-                                    </TableCell>
+                                    <TableCell colSpan={11} className="h-24 text-center">No hay datos para mostrar. Selecciona un producto y calcula.</TableCell>
                                 </TableRow>
                             )}
                         </TableBody>
@@ -158,7 +156,7 @@ export default function KardexTabla({
                     </div>
                 )}
 
-                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+                 <div className="grid grid-cols-3 gap-4 mt-6">
                     <Card><CardHeader><CardTitle>Costo de Ventas</CardTitle></CardHeader><CardContent><p className="text-2xl font-bold">{formatCurrency(costoTotalVentas)}</p></CardContent></Card>
                     <Card><CardHeader><CardTitle>Unidades Rotadas</CardTitle></CardHeader><CardContent><p className="text-2xl font-bold">{unidadesRotadas}</p></CardContent></Card>
                     <Card><CardHeader><CardTitle>Días de Stock</CardTitle></CardHeader><CardContent><p className="text-2xl font-bold">N/A</p></CardContent></Card>
