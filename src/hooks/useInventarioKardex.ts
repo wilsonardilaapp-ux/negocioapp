@@ -101,6 +101,8 @@ export function useInventarioKardex() {
    * Resiliente a variaciones de nombres de campo (itemId / productoId).
    */
   const registrarMovimiento = useCallback(async (form: NuevoMovimientoForm) => {
+    console.log('FORM RECIBIDO:', form);
+
     if (!user?.uid || !firestore || !items || !movimientos) {
       throw new Error('Servicios de inventario no listos.');
     }
@@ -116,6 +118,8 @@ export function useInventarioKardex() {
     const historialPrevio = movimientos
       .filter(m => (m.itemId || (m as any).productoId) === targetId)
       .sort((a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime());
+
+    console.log('HISTORIAL ENCONTRADO:', historialPrevio.length, historialPrevio);
 
     let saldoCantAcumulado = 0;
     let saldoValorTotalAcumulado = 0;
@@ -133,12 +137,16 @@ export function useInventarioKardex() {
       }
     }
 
+    console.log('SALDO ACUMULADO:', saldoCantAcumulado, saldoValorTotalAcumulado);
+
     // --- FASE 2: DETERMINAR VALORES DEL NUEVO MOVIMIENTO ---
     const costoPromedioActual = saldoCantAcumulado > 0 ? (saldoValorTotalAcumulado / saldoCantAcumulado) : (item.costoUnitario || 0);
     
     // Si es entrada usamos lo que viene del form, si es salida usamos el promedio real calculado
     const costoUnitarioFinal = form.tipo === 'entrada_compra' ? form.costoUnitario : costoPromedioActual;
     const costoTotalFinal = form.cantidad * costoUnitarioFinal;
+
+    console.log('COSTO FINAL CALCULADO:', costoUnitarioFinal, costoTotalFinal);
 
     // Validación de stock si aplica
     if (form.tipo.startsWith('salida') || form.tipo.startsWith('ajuste')) {
