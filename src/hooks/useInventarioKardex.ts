@@ -3,7 +3,7 @@
 
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useUser, useFirebase, useDoc, useCollection, useMemoFirebase, setDocumentNonBlocking, addDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase';
-import { doc, collection, query, orderBy, getDocs, where } from 'firebase/firestore';
+import { doc, collection, query, orderBy, getDocs, where, runTransaction } from 'firebase/firestore';
 import type {
   ItemInventario,
   MovimientoKardex,
@@ -100,81 +100,86 @@ export function useInventarioKardex() {
     console.log('BUSINESS ID REAL:', user?.uid);
     console.log('FORM RECIBIDO:', form);
 
-    if (!user?.uid || !firestore || !items || !movimientos) {
+    if (!user?.uid || !firestore) {
       throw new Error('Servicios de inventario no listos.');
     }
 
-    const targetId = form.itemId || (form as any).productoId;
-    const item = items.find(i => i.id === targetId);
-    if (!item) throw new Error('El ítem seleccionado no existe.');
+    await runTransaction(firestore, async (transaction) => {
+      // 1. LECTURA: Obtener el estado más fresco del ítem desde el servidor
+      const targetId = form.itemId || (form as any).productoId;
+      const itemDocRef = doc(firestore, `businesses/${user.uid}/kardexItems`, targetId);
+      const itemSnap = await transaction.get(itemDocRef);
 
-    const historialPrevio = movimientos
-      .filter(m => (m.itemId || (m as any).productoId) === targetId)
-      .sort((a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime());
+      if (!itemSnap.exists()) {
+        throw new Error('El ítem seleccionado no existe en el servidor.');
+      }
 
-    console.log('HISTORIAL ENCONTRADO:', historialPrevio.length, historialPrevio);
+      const itemData = itemSnap.data() as ItemInventario;
+      console.log('SALDO ACTUAL (SERVIDOR):', itemData.stockActual, itemData.costoUnitario);
 
-    let saldoCantAcumulado = 0;
-    let saldoValorTotalAcumulado = 0;
+      // --- FASE 1: CÁLCULO DE CANTIDADES Y VALIDACIÓN ---
+      let cantidadParaMovimiento = form.cantidad;
+      let stockFinal = 0;
+      const isAjusteFisico = form.tipo === 'ajuste_inventario_fisico';
 
-    for (const m of historialPrevio) {
-      if (m.tipo.startsWith('entrada') || (m.tipo === 'ajuste_inventario_fisico' && m.cantidad > 0)) {
-        saldoCantAcumulado += m.cantidad;
-        saldoValorTotalAcumulado += (m.cantidad * m.costoUnitario);
+      if (isAjusteFisico) {
+        // Delta = Conteo Físico - Stock en Sistema
+        cantidadParaMovimiento = form.cantidad - itemData.stockActual;
+        stockFinal = form.cantidad;
+      } else if (form.tipo.startsWith('entrada')) {
+        stockFinal = itemData.stockActual + form.cantidad;
       } else {
-        const promedioEnEsePunto = saldoCantAcumulado > 0 ? (saldoValorTotalAcumulado / saldoCantAcumulado) : m.costoUnitario;
-        // La cantidad ya es negativa para ajustes de salida en el historial reconstruido, 
-        // pero m.cantidad en DB se guarda positiva para salidas normales, hay que ser cuidadoso.
-        const cantAbs = Math.abs(m.cantidad);
-        saldoCantAcumulado -= cantAbs;
-        saldoValorTotalAcumulado -= (cantAbs * promedioEnEsePunto);
+        stockFinal = itemData.stockActual - form.cantidad;
       }
-    }
 
-    console.log('SALDO ACUMULADO:', saldoCantAcumulado, saldoValorTotalAcumulado);
-
-    const isAjusteFisico = form.tipo === 'ajuste_inventario_fisico';
-    const cantidadParaKardex = isAjusteFisico ? (form.cantidad - saldoCantAcumulado) : form.cantidad;
-
-    // Validación de stock: NO aplica para ajustes físicos (donde form.cantidad es el stock final)
-    if (!isAjusteFisico && (form.tipo.startsWith('salida') || form.tipo.startsWith('ajuste_danio'))) {
-      if (!configuracion.permitirStockNegativo && form.cantidad > saldoCantAcumulado) {
-        throw new Error(`Stock insuficiente. Disponible: ${saldoCantAcumulado}`);
+      // Validación de stock insuficiente (solo para salidas reales, no ajustes físicos)
+      if (!isAjusteFisico && (form.tipo.startsWith('salida') || form.tipo.startsWith('ajuste_danio'))) {
+        if (!configuracion.permitirStockNegativo && form.cantidad > itemData.stockActual) {
+          throw new Error(`Stock insuficiente. Disponible: ${itemData.stockActual}`);
+        }
       }
-    }
 
-    const costoPromedioActual = saldoCantAcumulado > 0 ? (saldoValorTotalAcumulado / saldoCantAcumulado) : (item.costoUnitario || 0);
-    const costoUnitarioFinal = form.tipo === 'entrada_compra' ? form.costoUnitario : costoPromedioActual;
-    const costoTotalFinal = Math.abs(cantidadParaKardex) * costoUnitarioFinal;
+      // --- FASE 2: CÁLCULO DE COSTOS (PROMEDIO PONDERADO) ---
+      const costoUnitarioActual = itemData.costoUnitario || 0;
+      let costoUnitarioParaMovimiento = costoUnitarioActual;
+      let nuevoCostoPromedioMaestro = costoUnitarioActual;
 
-    console.log('COSTO FINAL CALCULADO:', costoUnitarioFinal, costoTotalFinal);
+      if (form.tipo === 'entrada_compra') {
+        costoUnitarioParaMovimiento = form.costoUnitario;
+        const valorInventarioActual = itemData.stockActual * costoUnitarioActual;
+        const valorNuevaEntrada = form.cantidad * form.costoUnitario;
+        nuevoCostoPromedioMaestro = stockFinal > 0 ? (valorInventarioActual + valorNuevaEntrada) / stockFinal : form.costoUnitario;
+      }
 
-    const nuevoMovimientoData: any = { 
-        ...form, 
-        cantidad: cantidadParaKardex, // Guardamos el delta para ajustes físicos
-        costoUnitario: costoUnitarioFinal,
-        costoTotal: costoTotalFinal, 
-        observaciones: form.observaciones || '' 
-    };
-    
-    const movCollectionRef = collection(firestore, `businesses/${user.uid}/kardexMovimientos`);
-    await addDocumentNonBlocking(movCollectionRef, nuevoMovimientoData);
+      const costoTotalMovimiento = Math.abs(cantidadParaMovimiento) * costoUnitarioParaMovimiento;
+      console.log('COSTO FINAL CALCULADO:', costoUnitarioParaMovimiento, costoTotalMovimiento);
 
-    const stockFinalMaestro = isAjusteFisico ? form.cantidad : (form.tipo.startsWith('entrada') ? saldoCantAcumulado + form.cantidad : saldoCantAcumulado - form.cantidad);
-    const valorFinalMaestro = isAjusteFisico ? (saldoValorTotalAcumulado + (cantidadParaKardex * costoUnitarioFinal)) : (form.tipo.startsWith('entrada') ? saldoValorTotalAcumulado + costoTotalFinal : saldoValorTotalAcumulado - costoTotalFinal);
-    
-    const nuevoCostoPromedioMaestro = stockFinalMaestro > 0 ? (valorFinalMaestro / stockFinalMaestro) : costoUnitarioFinal;
-    const nuevoEstado = determinarEstadoStock(stockFinalMaestro, item.stockMinimo, item.stockMaximo);
-    
-    const itemDocRef = doc(firestore, `businesses/${user.uid}/kardexItems`, item.id);
-    await updateDocumentNonBlocking(itemDocRef, {
-        stockActual: stockFinalMaestro,
+      // --- FASE 3: DETERMINAR NUEVO ESTADO ---
+      const nuevoEstado = determinarEstadoStock(stockFinal, itemData.stockMinimo, itemData.stockMaximo);
+
+      // --- FASE 4: ESCRITURA ATÓMICA ---
+      // A. Registrar Movimiento
+      const movCollectionRef = collection(firestore, `businesses/${user.uid}/kardexMovimientos`);
+      const newMovRef = doc(movCollectionRef);
+      transaction.set(newMovRef, {
+        ...form,
+        cantidad: cantidadParaMovimiento,
+        costoUnitario: costoUnitarioParaMovimiento,
+        costoTotal: costoTotalMovimiento,
+        observaciones: form.observaciones || '',
+        createdAt: new Date().toISOString()
+      });
+
+      // B. Actualizar Maestro de Ítems
+      transaction.update(itemDocRef, {
+        stockActual: stockFinal,
         costoUnitario: nuevoCostoPromedioMaestro,
         estado: nuevoEstado,
         updatedAt: new Date().toISOString()
+      });
     });
 
-  }, [user?.uid, firestore, items, movimientos, configuracion]);
+  }, [user?.uid, firestore, configuracion]);
 
   const calcularKardex = useCallback((itemId: string, metodo: MetodoValuacion): LineaKardexCalculada[] => {
     const movimientosProducto = movimientos
