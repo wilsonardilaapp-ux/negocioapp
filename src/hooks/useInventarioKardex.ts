@@ -96,12 +96,8 @@ export function useInventarioKardex() {
     }
   }, [user?.uid, firestore]);
 
-  /**
-   * Registra un nuevo movimiento reconstruyendo la historia para garantizar precisión.
-   * Implementa la misma lógica de calcularKardex para evitar depender de datos corruptos guardados.
-   * Resiliente a variaciones de nombres de campo (itemId / productoId).
-   */
   const registrarMovimiento = useCallback(async (form: NuevoMovimientoForm) => {
+    console.log('BUSINESS ID REAL:', user?.uid);
     console.log('FORM RECIBIDO:', form);
 
     if (!user?.uid || !firestore || !items || !movimientos) {
@@ -186,11 +182,6 @@ export function useInventarioKardex() {
 
   }, [user?.uid, firestore, items, movimientos, configuracion]);
 
-  /**
-   * Calcula las líneas del Kardex para visualización.
-   * Utiliza la misma lógica de reconstrucción desde cero para garantizar consistencia.
-   * Resiliente a variaciones de nombres de campo (itemId / productoId).
-   */
   const calcularKardex = useCallback((itemId: string, metodo: MetodoValuacion): LineaKardexCalculada[] => {
     const movimientosProducto = movimientos
       .filter(m => (m.itemId || (m as any).productoId) === itemId)
@@ -280,17 +271,12 @@ export function useInventarioKardex() {
     const totalItems = items.length;
     const totalProductos = items.filter(i => i.tipoItem === 'producto').length;
     const totalInsumos = items.filter(i => i.tipoItem === 'insumo').length;
-    
-    // El resumen ahora es mucho más preciso porque depende de items que se sincronizan por recálculo histórico
     const valorTotalInventario = items.reduce((sum, i) => sum + (i.stockActual * i.costoUnitario), 0);
-    
     const ahora = new Date();
     const inicioMes = new Date(ahora.getFullYear(), ahora.getMonth(), 1);
-    
     const costoVentasMes = movimientos
         .filter(m => (m.tipo === 'salida_venta' || m.tipo === 'ajuste_danio') && new Date(m.fecha) >= inicioMes)
         .reduce((sum, m) => sum + m.costoTotal, 0);
-
     const itemsBajoMinimo = items.filter(i => i.estado === 'bajo').length;
     const itemsAgotados = items.filter(i => i.estado === 'agotado').length;
     const movimientosMes = movimientos.filter(m => new Date(m.fecha) >= inicioMes).length;
