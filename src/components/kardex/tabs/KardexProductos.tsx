@@ -7,9 +7,10 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { ItemInventario, EstadoStock, TipoItem, NuevoItemForm } from '@/types/kardex.types';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Edit, ChevronLeft, ChevronRight } from 'lucide-react';
+import { PlusCircle, Edit, ChevronLeft, ChevronRight, FileSpreadsheet, Printer } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import ItemForm from '../ItemForm';
+import * as XLSX from 'xlsx';
 
 const formatCurrency = (value: number) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(value);
 
@@ -74,6 +75,30 @@ export default function KardexProductos({ items, registrarOActualizarItem }: Kar
         setIsDialogOpen(false);
     };
 
+    // --- FUNCIONES DE EXPORTACIÓN E IMPRESIÓN ---
+    const handleExportExcel = () => {
+        const dataToExport = filteredItems.map(item => ({
+            "Código": item.codigo,
+            "Nombre": item.nombre,
+            "Tipo": item.tipoItem,
+            "Categoría": item.categoria,
+            "Unidad": item.unidadMedida,
+            "Stock Actual": item.stockActual,
+            "Stock Mínimo": item.stockMinimo,
+            "Costo Unitario": item.costoUnitario,
+            "Valor Total": item.stockActual * item.costoUnitario,
+            "Estado": item.estado
+        }));
+        const ws = XLSX.utils.json_to_sheet(dataToExport);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Productos");
+        XLSX.writeFile(wb, "Inventario_Productos.xlsx");
+    };
+
+    const handlePrint = () => {
+        window.print();
+    };
+
     return (
         <>
             <Card>
@@ -81,24 +106,34 @@ export default function KardexProductos({ items, registrarOActualizarItem }: Kar
                     <div className="flex justify-between items-center">
                         <div>
                             <CardTitle>Listado de Ítems de Inventario</CardTitle>
-                            <CardDescription>Consulta y gestiona todos tus productos e insumos.</CardDescription>
+                            <CardDescription className="print:hidden">Consulta y gestiona todos tus productos e insumos.</CardDescription>
                         </div>
-                        <Button onClick={() => handleOpenDialog(null)}><PlusCircle className="mr-2 h-4 w-4" /> Nuevo Ítem</Button>
+                        <div className="flex items-center gap-2 print:hidden">
+                            <Button variant="outline" size="sm" onClick={handleExportExcel} className="font-bold border-green-200 text-green-700 hover:bg-green-50">
+                                <FileSpreadsheet className="mr-2 h-4 w-4" /> Exportar Excel
+                            </Button>
+                            <Button variant="outline" size="sm" onClick={handlePrint} className="font-bold">
+                                <Printer className="mr-2 h-4 w-4" /> Imprimir
+                            </Button>
+                            <Button onClick={() => handleOpenDialog(null)} size="sm">
+                                <PlusCircle className="mr-2 h-4 w-4" /> Nuevo Ítem
+                            </Button>
+                        </div>
                     </div>
                 </CardHeader>
                 <CardContent>
-                    <div className="flex flex-wrap gap-4 mb-4">
+                    <div className="flex flex-wrap gap-4 mb-4 print:hidden">
                         <Input placeholder="Buscar por nombre o código..." className="max-w-sm" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
                         <Select value={filterType} onValueChange={(v) => setFilterType(v as TipoItem | 'all')}><SelectTrigger className="w-[180px]"><SelectValue placeholder="Tipo" /></SelectTrigger><SelectContent><SelectItem value="all">Todos los Tipos</SelectItem><SelectItem value="producto">Producto</SelectItem><SelectItem value="insumo">Insumo</SelectItem></SelectContent></Select>
                         <Select value={filterCategory} onValueChange={setFilterCategory}><SelectTrigger className="w-[180px]"><SelectValue placeholder="Categoría" /></SelectTrigger><SelectContent><SelectItem value="all">Todas las categorías</SelectItem>{categories.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent></Select>
                         <Select value={filterStatus} onValueChange={setFilterStatus}><SelectTrigger className="w-[180px]"><SelectValue placeholder="Estado" /></SelectTrigger><SelectContent><SelectItem value="all">Todos los estados</SelectItem>{statuses.map(s => <SelectItem key={s} value={s} className="capitalize">{s.replace('_', ' ')}</SelectItem>)}</SelectContent></Select>
                     </div>
-                    <div className="rounded-md border">
-                        <Table><TableHeader><TableRow><TableHead>Código</TableHead><TableHead>Nombre</TableHead><TableHead>Tipo</TableHead><TableHead>Categoría</TableHead><TableHead>Unidad</TableHead><TableHead>Stock Actual</TableHead><TableHead>Stock Mín.</TableHead><TableHead>Costo Unit.</TableHead><TableHead>Valor Total</TableHead><TableHead>Estado</TableHead><TableHead className="text-right">Acciones</TableHead></TableRow></TableHeader><TableBody>
+                    <div className="rounded-md border overflow-hidden">
+                        <Table><TableHeader><TableRow><TableHead>Código</TableHead><TableHead>Nombre</TableHead><TableHead>Tipo</TableHead><TableHead>Categoría</TableHead><TableHead>Unidad</TableHead><TableHead>Stock Actual</TableHead><TableHead>Stock Mín.</TableHead><TableHead>Costo Unit.</TableHead><TableHead>Valor Total</TableHead><TableHead>Estado</TableHead><TableHead className="text-right print:hidden">Acciones</TableHead></TableRow></TableHeader><TableBody>
                             {paginatedItems.length > 0 ? paginatedItems.map(p => (
                                 <TableRow key={p.id}>
                                     <TableCell>{p.codigo}</TableCell><TableCell className="font-medium">{p.nombre}</TableCell><TableCell className="capitalize">{p.tipoItem}</TableCell><TableCell>{p.categoria}</TableCell><TableCell>{p.unidadMedida}</TableCell><TableCell>{p.stockActual}</TableCell><TableCell>{p.stockMinimo}</TableCell><TableCell>{formatCurrency(p.costoUnitario)}</TableCell><TableCell>{formatCurrency(p.stockActual * p.costoUnitario)}</TableCell><TableCell><Badge variant={getStatusBadgeVariant(p.estado)} className="capitalize">{p.estado.replace('_', ' ')}</Badge></TableCell>
-                                    <TableCell className="text-right">
+                                    <TableCell className="text-right print:hidden">
                                         <Button variant="ghost" size="icon" onClick={() => handleOpenDialog(p)}><Edit className="h-4 w-4" /></Button>
                                     </TableCell>
                                 </TableRow>
@@ -108,7 +143,7 @@ export default function KardexProductos({ items, registrarOActualizarItem }: Kar
 
                     {/* CONTROLES DE PAGINACIÓN */}
                     {totalPages > 1 && (
-                        <div className="flex items-center justify-between py-4 border-t mt-4">
+                        <div className="flex items-center justify-between py-4 border-t mt-4 print:hidden">
                             <div className="text-sm text-muted-foreground font-medium">
                                 Mostrando {paginatedItems.length} de {filteredItems.length} ítems 
                                 (Página {currentPage} de {totalPages})
