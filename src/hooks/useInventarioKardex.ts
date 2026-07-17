@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useCallback, useEffect } from 'react';
@@ -99,20 +98,23 @@ export function useInventarioKardex() {
   /**
    * Registra un nuevo movimiento reconstruyendo la historia para garantizar precisión.
    * Implementa la misma lógica de calcularKardex para evitar depender de datos corruptos guardados.
+   * Resiliente a variaciones de nombres de campo (itemId / productoId).
    */
   const registrarMovimiento = useCallback(async (form: NuevoMovimientoForm) => {
     if (!user?.uid || !firestore || !items || !movimientos) {
       throw new Error('Servicios de inventario no listos.');
     }
 
-    const item = items.find(i => i.id === form.itemId);
+    // Resolver ID de producto con soporte para esquemas mixtos (itemId / productoId)
+    const targetId = form.itemId || (form as any).productoId;
+    const item = items.find(i => i.id === targetId);
     if (!item) throw new Error('El ítem seleccionado no existe.');
 
     // --- FASE 1: RECONSTRUCCIÓN HISTÓRICA (LA VERDAD CONTABLE) ---
     // Recalculamos el saldo y costo promedio real justo antes de este movimiento.
-    // IMPORTANTE: NO usamos m.costoTotal guardado, lo recalculamos desde cero.
+    // El filtro es resiliente a itemId o productoId para capturar 100% de la historia.
     const historialPrevio = movimientos
-      .filter(m => m.itemId === form.itemId)
+      .filter(m => (m.itemId || (m as any).productoId) === targetId)
       .sort((a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime());
 
     let saldoCantAcumulado = 0;
@@ -146,7 +148,7 @@ export function useInventarioKardex() {
     }
 
     // --- FASE 3: PERSISTENCIA DEL MOVIMIENTO ---
-    const nuevoMovimientoData: Omit<MovimientoKardex, 'id'> = { 
+    const nuevoMovimientoData: any = { 
         ...form, 
         costoUnitario: costoUnitarioFinal,
         costoTotal: costoTotalFinal, 
@@ -178,10 +180,11 @@ export function useInventarioKardex() {
   /**
    * Calcula las líneas del Kardex para visualización.
    * Utiliza la misma lógica de reconstrucción desde cero para garantizar consistencia.
+   * Resiliente a variaciones de nombres de campo (itemId / productoId).
    */
   const calcularKardex = useCallback((itemId: string, metodo: MetodoValuacion): LineaKardexCalculada[] => {
     const movimientosProducto = movimientos
-      .filter(m => m.itemId === itemId)
+      .filter(m => (m.itemId || (m as any).productoId) === itemId)
       .sort((a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime());
 
     const lineas: LineaKardexCalculada[] = [];
