@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useCallback, useEffect } from 'react';
@@ -97,9 +96,6 @@ export function useInventarioKardex() {
   }, [user?.uid, firestore]);
 
   const registrarMovimiento = useCallback(async (form: NuevoMovimientoForm) => {
-    console.log('BUSINESS ID REAL:', user?.uid);
-    console.log('FORM RECIBIDO:', form);
-
     if (!user?.uid || !firestore) {
       throw new Error('Servicios de inventario no listos.');
     }
@@ -115,7 +111,6 @@ export function useInventarioKardex() {
       }
 
       const itemData = itemSnap.data() as ItemInventario;
-      console.log('SALDO ACTUAL (SERVIDOR):', itemData.stockActual, itemData.costoUnitario);
 
       // --- FASE 1: CÁLCULO DE CANTIDADES Y VALIDACIÓN ---
       let cantidadParaMovimiento = form.cantidad;
@@ -152,7 +147,6 @@ export function useInventarioKardex() {
       }
 
       const costoTotalMovimiento = Math.abs(cantidadParaMovimiento) * costoUnitarioParaMovimiento;
-      console.log('COSTO FINAL CALCULADO:', costoUnitarioParaMovimiento, costoTotalMovimiento);
 
       // --- FASE 3: DETERMINAR NUEVO ESTADO ---
       const nuevoEstado = determinarEstadoStock(stockFinal, itemData.stockMinimo, itemData.stockMaximo);
