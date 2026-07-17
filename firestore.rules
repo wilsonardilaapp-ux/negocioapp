@@ -68,13 +68,13 @@ service cloud.firestore {
       allow read, list: if true;
       // Corregido: Separar create/update de delete para evitar error de resource null
       allow create, update: if isSuperAdmin() || isOwner(request.resource.data.businessId);
-      allow delete: if isSuperAdmin() || isOwner(request.resource.data.businessId);
+      allow delete: if isSuperAdmin() || isOwner(resource.data.businessId);
     }
 
     match /blog_posts/{postId} {
       allow read, list: if true;
       allow create, update: if isSuperAdmin() || isOwner(request.resource.data.businessId);
-      allow delete: if isSuperAdmin() || isOwner(request.resource.data.businessId);
+      allow delete: if isSuperAdmin() || isOwner(resource.data.businessId);
     }
 
     // --- PROGRAMA DE SOCIOS (REFERIDOS) ---
