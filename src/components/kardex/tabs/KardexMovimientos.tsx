@@ -1,3 +1,4 @@
+
 'use client';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -13,7 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import type { ItemInventario, MovimientoKardex, NuevoMovimientoForm, TipoMovimiento } from '@/types/kardex.types';
 import { Save, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 
 interface KardexMovimientosProps {
     items: ItemInventario[];
@@ -27,7 +28,7 @@ const movimientoSchema = z.object({
   tipo: z.enum(['entrada_compra', 'entrada_devolucion_cliente', 'salida_venta', 'salida_devolucion_proveedor', 'ajuste_danio', 'ajuste_inventario_fisico', 'transferencia_bodega']),
   itemId: z.string().min(1, 'Debe seleccionar un ítem'),
   cantidad: z.preprocess(val => Number(val), z.number().min(0.01, 'La cantidad debe ser mayor a cero')),
-  costoUnitario: z.preprocess(val => Number(val), z.number().min(0, 'El costo no puede ser negativo')),
+  costoUnitario: z.preprocess(val => Number(val) || 0, z.number().min(0, 'El costo no puede ser negativo')),
   documento: z.string().min(1, 'El documento es requerido'),
   fecha: z.string().min(1, 'La fecha es requerida'),
   observaciones: z.string().optional(),
@@ -41,7 +42,7 @@ export default function KardexMovimientos({ items, movimientos, registrarMovimie
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 20;
 
-    const { register, handleSubmit, control, reset, formState: { errors, isSubmitting } } = useForm<NuevoMovimientoForm>({
+    const { register, handleSubmit, control, reset, watch, formState: { errors, isSubmitting } } = useForm<NuevoMovimientoForm>({
         resolver: zodResolver(movimientoSchema),
         defaultValues: {
             tipo: 'entrada_compra',
@@ -54,18 +55,20 @@ export default function KardexMovimientos({ items, movimientos, registrarMovimie
         }
     });
 
+    // Vigilamos el tipo de movimiento para ocultar el costo si no es una compra
+    const tipoMovimiento = watch('tipo');
+
     const onSubmit = async (data: NuevoMovimientoForm) => {
         try {
             await registrarMovimiento(data);
             toast({ title: 'Movimiento Registrado', description: 'El nuevo movimiento se ha guardado en el kardex.' });
             reset();
-            setCurrentPage(1); // Reset a página 1 tras nuevo registro
+            setCurrentPage(1);
         } catch (error: any) {
             toast({ variant: 'destructive', title: 'Error al registrar', description: error.message });
         }
     };
 
-    // Lógica de Paginación Visual
     const sortedMovimientos = [...movimientos].reverse();
     const totalPages = Math.ceil(sortedMovimientos.length / itemsPerPage);
     const paginatedMovimientos = sortedMovimientos.slice(
@@ -80,9 +83,16 @@ export default function KardexMovimientos({ items, movimientos, registrarMovimie
                     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
                         <div><Label>Tipo de Movimiento</Label><Controller name="tipo" control={control} render={({ field }) => ( <Select onValueChange={field.onChange} defaultValue={field.value}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="entrada_compra">Entrada (Compra)</SelectItem><SelectItem value="entrada_devolucion_cliente">Entrada (Devolución Cliente)</SelectItem><SelectItem value="salida_venta">Salida (Venta)</SelectItem><SelectItem value="salida_devolucion_proveedor">Salida (Devolución Proveedor)</SelectItem><SelectItem value="ajuste_danio">Ajuste (Daño)</SelectItem><SelectItem value="ajuste_inventario_fisico">Ajuste (Inventario Físico)</SelectItem><SelectItem value="transferencia_bodega">Transferencia</SelectItem></SelectContent></Select> )}/></div>
                         <div><Label>Ítem</Label><Controller name="itemId" control={control} render={({ field }) => (<Select onValueChange={field.onChange} value={field.value}><SelectTrigger><SelectValue placeholder="Seleccione un ítem" /></SelectTrigger><SelectContent>{items.map(p => <SelectItem key={p.id} value={p.id}>{p.nombre}</SelectItem>)}</SelectContent></Select>)} />{errors.itemId && <p className="text-sm text-destructive mt-1">{errors.itemId.message}</p>}</div>
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div><Label>Cantidad</Label><Input type="number" step="any" {...register('cantidad', { valueAsNumber: true })} /></div>
-                            <div><Label>Costo Unitario</Label><Input type="number" step="any" {...register('costoUnitario', { valueAsNumber: true })} /></div>
+                            
+                            {/* EL COSTO SOLO SE PIDE EN COMPRAS (PROMEDIO PONDERADO) */}
+                            {tipoMovimiento === 'entrada_compra' && (
+                                <div className="animate-in fade-in duration-300">
+                                    <Label>Costo Unitario ($)</Label>
+                                    <Input type="number" step="any" {...register('costoUnitario', { valueAsNumber: true })} />
+                                </div>
+                            )}
                         </div>
                         <div><Label>Documento (Factura/Remisión)</Label><Input {...register('documento')} />{errors.documento && <p className="text-sm text-destructive mt-1">{errors.documento.message}</p>}</div>
                         <div><Label>Fecha</Label><Input type="date" {...register('fecha')} /></div>
@@ -131,7 +141,6 @@ export default function KardexMovimientos({ items, movimientos, registrarMovimie
                             </Table>
                         </div>
 
-                        {/* Controles de Paginación */}
                         {totalPages > 1 && (
                             <div className="flex items-center justify-between py-4 border-t mt-4">
                                 <div className="text-sm text-muted-foreground font-medium">

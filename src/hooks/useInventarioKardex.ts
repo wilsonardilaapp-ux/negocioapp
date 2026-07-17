@@ -33,7 +33,7 @@ const initialBodegas: Bodega[] = [
 
 export function useInventarioKardex() {
   const { user } = useUser();
-  const firestore = useFirestore();
+  const firestore = useFirebase().firestore;
 
   // Firestore References
   const configDocRef = useMemoFirebase(
@@ -86,7 +86,6 @@ export function useInventarioKardex() {
     } else { // Create
         const estado = determinarEstadoStock(0, data.stockMinimo, data.stockMaximo);
         
-        // CORRECCIÓN: Extraer el id (que es undefined) para evitar error de Firestore data invalid
         const { id, ...cleanData } = data;
 
         const nuevoItem: Omit<ItemInventario, 'id'> = {
@@ -109,21 +108,33 @@ export function useInventarioKardex() {
       throw new Error('El ítem seleccionado no existe.');
     }
 
-    const costoTotal = form.cantidad * form.costoUnitario;
+    // LÓGICA DE COSTEO AUTOMÁTICO PARA SALIDAS/AJUSTES
+    // En un sistema de Promedio Ponderado, las salidas usan el costo promedio actual del maestro.
+    const costoUnitarioTransaccion = form.tipo === 'entrada_compra' 
+        ? form.costoUnitario 
+        : item.costoUnitario;
 
-    if (form.tipo.startsWith('salida')) {
+    const costoTotal = form.cantidad * costoUnitarioTransaccion;
+
+    if (form.tipo.startsWith('salida') || form.tipo.startsWith('ajuste')) {
       if (!configuracion.permitirStockNegativo && form.cantidad > item.stockActual) {
-        throw new Error('Stock insuficiente para la salida.');
+        throw new Error('Stock insuficiente para realizar el movimiento.');
       }
     }
     
-    const nuevoMovimientoData: Omit<MovimientoKardex, 'id'> = { ...form, costoTotal, observaciones: form.observaciones || '' };
+    const nuevoMovimientoData: Omit<MovimientoKardex, 'id'> = { 
+        ...form, 
+        costoUnitario: costoUnitarioTransaccion,
+        costoTotal, 
+        observaciones: form.observaciones || '' 
+    };
     const movCollectionRef = collection(firestore, `businesses/${user.uid}/kardexMovimientos`);
     await addDocumentNonBlocking(movCollectionRef, nuevoMovimientoData);
 
+    // CORRECCIÓN DE TYPO: find -> form
     const nuevoStockActual = form.tipo.startsWith('entrada')
       ? item.stockActual + form.cantidad
-      : item.stockActual - find.cantidad;
+      : item.stockActual - form.cantidad;
       
     const nuevoEstado = determinarEstadoStock(nuevoStockActual, item.stockMinimo, item.stockMaximo);
     
@@ -132,6 +143,7 @@ export function useInventarioKardex() {
         estado: nuevoEstado,
     };
 
+    // Actualización de costo promedio ponderado solo en compras
     if (form.tipo === 'entrada_compra') {
         if (configuracion.metodoValuacion === 'promedio_ponderado') {
             const valorTotalAnterior = item.stockActual * item.costoUnitario;
@@ -173,7 +185,7 @@ export function useInventarioKardex() {
         if (metodo === 'peps' || metodo === 'ueps') {
           capas.push({ cantidad: mov.cantidad, costoUnitario: mov.costoUnitario });
         }
-      } else if (mov.tipo.startsWith('salida')) {
+      } else if (mov.tipo.startsWith('salida') || mov.tipo.startsWith('ajuste')) {
         let costoSalidaTotal = 0;
         let costoUnitarioSalida = 0;
 
@@ -238,7 +250,7 @@ export function useInventarioKardex() {
     const ahora = new Date();
     const inicioMes = new Date(ahora.getFullYear(), ahora.getMonth(), 1);
     const costoVentasMes = movimientos
-        .filter(m => m.tipo === 'salida_venta' && new Date(m.fecha) >= inicioMes)
+        .filter(m => (m.tipo === 'salida_venta' || m.tipo === 'ajuste_danio') && new Date(m.fecha) >= inicioMes)
         .reduce((sum, m) => sum + m.costoTotal, 0);
     const itemsBajoMinimo = items.filter(i => i.estado === 'bajo').length;
     const itemsAgotados = items.filter(i => i.estado === 'agotado').length;
@@ -250,7 +262,7 @@ export function useInventarioKardex() {
   const actualizarConfiguracion = useCallback((config: ConfiguracionKardex) => {
     if (!configDocRef) return;
     setDocumentNonBlocking(configDocRef, config, { merge: true });
-    setConfiguracion(config); // Update local state optimistically
+    setConfiguracion(config);
   }, [configDocRef]);
   
   const isLoading = isConfigLoading || areItemsLoading || areMovimientosLoading;
