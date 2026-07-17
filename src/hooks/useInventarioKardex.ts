@@ -3,7 +3,7 @@
 
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useUser, useFirestore, useDoc, useCollection, useMemoFirebase, setDocumentNonBlocking, addDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase';
-import { doc, collection, query, orderBy } from 'firebase/firestore';
+import { doc, collection, query, orderBy, getDocs, where } from 'firebase/firestore';
 import type {
   ItemInventario,
   MovimientoKardex,
@@ -33,7 +33,7 @@ const initialBodegas: Bodega[] = [
 
 export function useInventarioKardex() {
   const { user } = useUser();
-  const firestore = useFirebase().firestore;
+  const { firestore } = useFirebase();
 
   // Firestore References
   const configDocRef = useMemoFirebase(
@@ -80,12 +80,10 @@ export function useInventarioKardex() {
 
     if (data.id) { // Update
         const itemDocRef = doc(itemCollectionRef, data.id);
-        const itemToUpdate = { ...data };
-        delete itemToUpdate.id;
+        const { id, ...itemToUpdate } = data;
         await setDocumentNonBlocking(itemDocRef, itemToUpdate, { merge: true });
     } else { // Create
         const estado = determinarEstadoStock(0, data.stockMinimo, data.stockMaximo);
-        
         const { id, ...cleanData } = data;
 
         const nuevoItem: Omit<ItemInventario, 'id'> = {
@@ -108,8 +106,7 @@ export function useInventarioKardex() {
       throw new Error('El ítem seleccionado no existe.');
     }
 
-    // LÓGICA DE COSTEO AUTOMÁTICO PARA SALIDAS/AJUSTES
-    // En un sistema de Promedio Ponderado, las salidas usan el costo promedio actual del maestro.
+    // LÓGICA DE COSTEO AUTOMÁTICO PARA SALIDAS/AJUSTES (PROMEDIO PONDERADO)
     const costoUnitarioTransaccion = form.tipo === 'entrada_compra' 
         ? form.costoUnitario 
         : item.costoUnitario;
@@ -122,40 +119,48 @@ export function useInventarioKardex() {
       }
     }
     
+    // GUARDADO DEL MOVIMIENTO: Usamos la variable costoTotal calculada para evitar el bug del $0
     const nuevoMovimientoData: Omit<MovimientoKardex, 'id'> = { 
         ...form, 
         costoUnitario: costoUnitarioTransaccion,
         costoTotal, 
         observaciones: form.observaciones || '' 
     };
+    
     const movCollectionRef = collection(firestore, `businesses/${user.uid}/kardexMovimientos`);
     await addDocumentNonBlocking(movCollectionRef, nuevoMovimientoData);
 
-    // CORRECCIÓN DE TYPO: find -> form
-    const nuevoStockActual = form.tipo.startsWith('entrada')
-      ? item.stockActual + form.cantidad
-      : item.stockActual - form.cantidad;
-      
-    const nuevoEstado = determinarEstadoStock(nuevoStockActual, item.stockMinimo, item.stockMaximo);
+    // --- SINCRONIZACIÓN TOTAL (RECALCULO DESDE HISTORIAL) ---
+    // Después de guardar el nuevo movimiento, recalculamos el estado del ítem desde cero
+    // para garantizar consistencia absoluta entre la pestaña Productos y Kardex.
     
-    const updatedItemData: Partial<ItemInventario> = {
-        stockActual: nuevoStockActual,
-        estado: nuevoEstado,
-    };
+    const movsSnap = await getDocs(query(movCollectionRef, where('itemId', '==', item.id), orderBy('fecha', 'asc')));
+    const allMovs = movsSnap.docs.map(d => d.data() as MovimientoKardex);
 
-    // Actualización de costo promedio ponderado solo en compras
-    if (form.tipo === 'entrada_compra') {
-        if (configuracion.metodoValuacion === 'promedio_ponderado') {
-            const valorTotalAnterior = item.stockActual * item.costoUnitario;
-            const nuevoValorTotal = valorTotalAnterior + costoTotal;
-            updatedItemData.costoUnitario = nuevoStockActual > 0 ? nuevoValorTotal / nuevoStockActual : form.costoUnitario;
-        } else {
-            updatedItemData.costoUnitario = form.costoUnitario;
-        }
+    let finalCantidad = 0;
+    let finalValorTotal = 0;
+
+    for (const m of allMovs) {
+      if (m.tipo.startsWith('entrada')) {
+        finalCantidad += m.cantidad;
+        finalValorTotal += m.costoTotal;
+      } else {
+        // Salidas y Ajustes restan cantidad y valor proporcional (según el costoTotal registrado)
+        finalCantidad -= m.cantidad;
+        finalValorTotal -= m.costoTotal;
+      }
     }
+
+    const finalCostoUnitario = finalCantidad > 0 ? (finalValorTotal / finalCantidad) : costoUnitarioTransaccion;
+    const nuevoEstado = determinarEstadoStock(finalCantidad, item.stockMinimo, item.stockMaximo);
     
     const itemDocRef = doc(firestore, `businesses/${user.uid}/kardexItems`, item.id);
-    await updateDocumentNonBlocking(itemDocRef, updatedItemData);
+    await updateDocumentNonBlocking(itemDocRef, {
+        stockActual: finalCantidad,
+        costoUnitario: finalCostoUnitario,
+        estado: nuevoEstado,
+        updatedAt: new Date().toISOString()
+    });
 
   }, [user?.uid, firestore, items, configuracion]);
 
