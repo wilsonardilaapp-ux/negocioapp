@@ -1,10 +1,10 @@
 'use client';
 import { useState, useMemo } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import type { ItemInventario, LineaKardexCalculada, MetodoValuacion } from '@/types/kardex.types';
-import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../../ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../ui/table";
+import type { ItemInventario, LineaKardexCalculada, MetodoValuacion } from '../../../types/kardex.types';
+import { Button } from '../../ui/button';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface KardexTablaProps {
@@ -108,7 +108,7 @@ export default function KardexTabla({
                             {paginatedLineas.length > 0 ? paginatedLineas.map((linea, index) => (
                                 <TableRow key={index}>
                                     <TableCell>{linea.fecha}</TableCell>
-                                    <TableCell>{linea.concepto}</TableCell>
+                                    <TableCell className="capitalize">{linea.concepto}</TableCell>
                                     <TableCell className="text-center border-l">{linea.entrada?.cantidad ?? ''}</TableCell>
                                     <TableCell className="text-right">{linea.entrada ? formatCurrency(linea.entrada.costoUnitario) : ''}</TableCell>
                                     <TableCell className="text-right">{linea.entrada ? formatCurrency(linea.entrada.costoTotal) : ''}</TableCell>
@@ -121,7 +121,7 @@ export default function KardexTabla({
                                 </TableRow>
                             )) : (
                                 <TableRow>
-                                    <TableCell colSpan={11} className="h-24 text-center">No hay datos para mostrar. Selecciona un producto y calcula.</TableCell>
+                                    <TableCell colSpan={11} className="h-24 text-center">No hay datos para mostrar. Selecciona un producto para ver su historial.</TableCell>
                                 </TableRow>
                             )}
                         </TableBody>
