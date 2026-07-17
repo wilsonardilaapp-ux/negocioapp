@@ -6,7 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useInventarioKardex } from '@/hooks/useInventarioKardex';
 import type { TabKardex, MetodoValuacion } from '@/types/kardex.types';
 
-// Import tab components using relative paths
+// Import tab components
 import KardexResumen from '@/components/kardex/tabs/KardexResumen';
 import KardexTabla from '@/components/kardex/tabs/KardexTabla';
 import KardexProductos from '@/components/kardex/tabs/KardexProductos';
