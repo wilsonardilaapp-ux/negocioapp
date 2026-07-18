@@ -1,4 +1,3 @@
-
 'use server';
 
 /**
@@ -47,6 +46,7 @@ export const publicMenuChatbotFlow = ai.defineFlow(
     // --- PASO 2: INFORMACIÓN DEL NEGOCIO ---
     const businessSnap = await db.collection('businesses').doc(businessId).get();
     const businessData = businessSnap.exists ? businessSnap.data() : null;
+    const isPlatformBot = businessData?.isPlatformBot === true;
 
     if (businessData) {
       const infoTriggers = ['donde queda', 'ubicación', 'direccion', 'teléfono', 'contacto', 'whatsapp', 'horario', 'redes'];
@@ -66,7 +66,7 @@ export const publicMenuChatbotFlow = ai.defineFlow(
     // --- PASO 4: IA GENERATIVA (USANDO MOTOR GLOBAL) ---
     const aiConfigSnap = await db.doc('integrations/chatbot-integrado-con-whatsapp-para-soporte-y-ventas').get();
     
-    if (!aiConfigSnap.exists || aiConfigSnap.data()?.status !== 'active') {
+    if (!isPlatformBot && (!aiConfigSnap.exists || aiConfigSnap.data()?.status !== 'active')) {
       return { 
         answer: `Lo siento, el asistente no está disponible en este momento.`, 
         source: 'fallback' 
@@ -104,10 +104,14 @@ export const publicMenuChatbotFlow = ai.defineFlow(
       PRODUCTOS: ${JSON.stringify(catalogData?.products || [])}
     `;
 
+    const systemPrompt = isPlatformBot 
+      ? "Eres el asistente de Markix, una plataforma SaaS. Responde con el contexto entregado (planes, precios, funciones). No inventes precios ni funciones que no estén en el contexto."
+      : `Eres el asistente de ${businessData?.name || 'este establecimiento'}. Responde con el contexto. No inventes precios.`;
+
     try {
       const response = await ai.generate({
         model: `${activeProvider}/${modelName}`,
-        system: `Eres el asistente de ${businessData?.name || 'este establecimiento'}. Responde con el contexto. No inventes precios.`,
+        system: systemPrompt,
         prompt: `Contexto: ${context}\n\nPregunta: ${question}`,
         config: { temperature: 0.2 }
       });
