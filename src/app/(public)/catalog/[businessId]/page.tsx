@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useCallback, Suspense } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
 import { useFirebase, useCollection, useDoc, useMemoFirebase } from '@/firebase';
 import { doc, getDoc, collectionGroup, query, where, getDocs, limit, collection } from 'firebase/firestore';
 
@@ -51,16 +51,9 @@ interface CatalogPageProps {
 
 const ITEMS_PER_PAGE = 20;
 
-const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('es-CO', {
-        style: 'currency',
-        currency: 'COP',
-        minimumFractionDigits: 0,
-    }).format(value);
-};
-
 function CatalogPageContent({ params }: CatalogPageProps) {
     const slug = decodeURIComponent(params.businessId);
+    const searchParams = useSearchParams();
     const { firestore, isNetworkEnabled } = useFirebase();
     const { toast } = useToast();
     const { isModuleAuthorized } = useSubscription();
@@ -93,6 +86,11 @@ function CatalogPageContent({ params }: CatalogPageProps) {
     const [selectedCategory, setSelectedCategory] = useState('Todas');
     const [searchTerm, setSearchTerm] = useState('');
     
+    // Captura de origen de la URL (ej. ?ref=qr)
+    const orderOrigin = useMemo(() => {
+        return searchParams.get('ref') || 'web';
+    }, [searchParams]);
+
     // Estado para la sesión de fidelización del cliente
     const [loyaltySession, setLoyaltySession] = useState<{ balance: number; whatsapp: string } | null>(null);
     const [activeSuggestion, setActiveSuggestion] = useState<{ original: Product, suggestion: SuggestionOutput } | null>(null);
@@ -150,16 +148,12 @@ function CatalogPageContent({ params }: CatalogPageProps) {
         fetchData();
     }, [slug, firestore, isNetworkEnabled]);
 
-    // --- LÓGICA DE FILTRADO Y PAGINACIÓN ---
-    
-    // Obtener lista única de categorías para el selector
     const categoriesList = useMemo(() => {
         if (!pageData.products) return ['Todas'];
         const uniqueCats = Array.from(new Set(pageData.products.map(p => p.category).filter(Boolean)));
         return ['Todas', ...uniqueCats.sort()];
     }, [pageData.products]);
 
-    // Filtrar productos por categoría seleccionada Y término de búsqueda
     const filteredProducts = useMemo(() => {
         if (!pageData.products) return [];
         return pageData.products.filter(p => {
@@ -169,14 +163,12 @@ function CatalogPageContent({ params }: CatalogPageProps) {
         });
     }, [pageData.products, selectedCategory, searchTerm]);
 
-    // Aplicar paginación (Slicing) al array ya filtrado
     const totalPages = Math.ceil(filteredProducts.length / ITEMS_PER_PAGE);
     const paginatedProducts = useMemo(() => {
         const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
         return filteredProducts.slice(startIndex, startIndex + ITEMS_PER_PAGE);
     }, [filteredProducts, currentPage]);
 
-    // Resetear a página 1 cuando cambia la categoría o el término de búsqueda
     useEffect(() => {
         setCurrentPage(1);
     }, [selectedCategory, searchTerm]);
@@ -186,7 +178,6 @@ function CatalogPageContent({ params }: CatalogPageProps) {
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
-    // Suscripciones para Fidelización y Reseñas
     const businessRef = useMemoFirebase(() => 
         pageData.resolvedBusinessId ? doc(firestore, 'businesses', pageData.resolvedBusinessId) : null,
     [firestore, pageData.resolvedBusinessId]);
@@ -321,7 +312,6 @@ function CatalogPageContent({ params }: CatalogPageProps) {
                 />
             )}
 
-            {/* --- CARRUSEL PROMOCIONAL --- */}
             {pageData.headerConfig?.carouselItems && pageData.headerConfig.carouselItems.some(item => item.mediaUrl) && (
                 <div className="w-full bg-white border-b overflow-hidden">
                     <Carousel 
@@ -372,7 +362,6 @@ function CatalogPageContent({ params }: CatalogPageProps) {
             )}
 
             <main className="container mx-auto px-4 py-8">
-                {/* --- BUSCADOR --- */}
                 <div className="max-w-2xl mx-auto mb-8 animate-in fade-in slide-in-from-top-2 duration-500">
                     <div className="relative group">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground group-focus-within:text-primary transition-colors" />
@@ -383,14 +372,6 @@ function CatalogPageContent({ params }: CatalogPageProps) {
                             onChange={(e) => setSearchTerm(e.target.value)}
                             className="pl-10 h-12 bg-white rounded-2xl border-gray-200 shadow-sm focus-visible:ring-primary focus-visible:border-primary"
                         />
-                        {searchTerm && (
-                            <button 
-                                onClick={() => setSearchTerm('')}
-                                className="absolute right-3 top-1/2 -translate-y-1/2 h-6 w-6 rounded-full bg-muted flex items-center justify-center hover:bg-muted-foreground/20 transition-colors"
-                            >
-                                <ChevronLeft className="h-3 w-3 rotate-45" />
-                            </button>
-                        )}
                     </div>
                 </div>
 
@@ -417,7 +398,6 @@ function CatalogPageContent({ params }: CatalogPageProps) {
                     </div>
 
                     <TabsContent value="menu" className="animate-in fade-in duration-500 outline-none space-y-8">
-                        {/* Selector de Categorías */}
                         {categoriesList.length > 2 && (
                             <div className="flex items-center gap-4 overflow-x-auto pb-4 no-scrollbar">
                                 {categoriesList.map((cat) => (
@@ -449,7 +429,6 @@ function CatalogPageContent({ params }: CatalogPageProps) {
                             ))}
                         </div>
 
-                        {/* Controles de Paginación */}
                         {totalPages > 1 && (
                             <div className="flex flex-col items-center gap-4 mt-12 py-6 border-t">
                                 <p className="text-xs font-black uppercase tracking-widest text-muted-foreground">
@@ -465,29 +444,6 @@ function CatalogPageContent({ params }: CatalogPageProps) {
                                     >
                                         <ChevronLeft className="h-4 w-4 mr-2" /> Anterior
                                     </Button>
-                                    <div className="flex items-center gap-1">
-                                        {Array.from({ length: totalPages }).map((_, i) => {
-                                            const pageNum = i + 1;
-                                            if (totalPages > 5 && Math.abs(pageNum - currentPage) > 1 && pageNum !== 1 && pageNum !== totalPages) {
-                                                if (pageNum === 2 || pageNum === totalPages - 1) return <span key={pageNum} className="px-1">...</span>;
-                                                return null;
-                                            }
-                                            return (
-                                                <Button
-                                                    key={pageNum}
-                                                    variant={currentPage === pageNum ? 'default' : 'ghost'}
-                                                    size="sm"
-                                                    onClick={() => handlePageChange(pageNum)}
-                                                    className={cn(
-                                                        "h-8 w-8 p-0 font-bold rounded-lg",
-                                                        currentPage === pageNum && "shadow-sm"
-                                                    )}
-                                                >
-                                                    {pageNum}
-                                                </Button>
-                                            );
-                                        })}
-                                    </div>
                                     <Button
                                         variant="outline"
                                         size="sm"
@@ -517,18 +473,14 @@ function CatalogPageContent({ params }: CatalogPageProps) {
                                     <Card key={coupon.id} className="border-2 border-dashed border-primary/20 bg-white hover:border-primary/40 transition-colors shadow-sm overflow-hidden flex flex-col">
                                         <CardHeader className="text-center pb-2">
                                             <Badge variant="secondary" className="w-fit mx-auto mb-2 bg-primary/10 text-primary border-none font-black text-[10px] uppercase">
-                                                {coupon.tipo === 'porcentaje' ? `${coupon.valor}% DTO` : `${formatCurrency(coupon.valor)} DTO`}
+                                                {coupon.tipo === 'porcentaje' ? `${coupon.valor}% DTO` : `${coupon.valor.toLocaleString()} DTO`}
                                             </Badge>
                                             <CardTitle className="text-2xl font-black tracking-tighter text-primary uppercase">{coupon.codigo}</CardTitle>
                                         </CardHeader>
                                         <CardContent className="text-center space-y-4 flex-grow">
                                             <p className="text-xs text-muted-foreground font-medium italic">
-                                                {coupon.montoMinimo > 0 ? `En compras superiores a ${formatCurrency(coupon.montoMinimo)}` : 'Sin mínimo de compra'}
+                                                {coupon.montoMinimo > 0 ? `En compras superiores a $${coupon.montoMinimo.toLocaleString()}` : 'Sin mínimo de compra'}
                                             </p>
-                                            <div className="pt-2 border-t border-dashed">
-                                                <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Válido hasta</p>
-                                                <p className="text-sm font-black text-gray-700">{new Date(coupon.fechaVencimiento).toLocaleDateString('es-CO', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
-                                            </div>
                                         </CardContent>
                                         <CardFooter className="bg-primary/5 p-4 border-t border-dashed border-primary/10">
                                             <Button 
@@ -632,6 +584,7 @@ function CatalogPageContent({ params }: CatalogPageProps) {
                 businessId={pageData.resolvedBusinessId!}
                 businessInfo={pageData.headerConfig?.businessInfo || null}
                 paymentSettings={pageData.paymentSettings}
+                origin={orderOrigin}
             />
 
             {activeSuggestion && (
@@ -655,20 +608,6 @@ function CatalogPageContent({ params }: CatalogPageProps) {
 }
 
 export default function CatalogPage(props: CatalogPageProps) {
-  const [mounted, setMounted] = useState(false);
-  
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  if (!mounted) {
-    return (
-        <div className="flex h-screen w-full items-center justify-center bg-gray-50 p-4 text-center">
-            <Loader2 className="h-12 w-12 animate-spin text-primary" />
-        </div>
-    );
-  }
-
   return (
     <Suspense fallback={
         <div className="flex h-screen w-full items-center justify-center bg-gray-50 p-4 text-center">

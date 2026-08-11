@@ -169,6 +169,40 @@ export class MetricsService {
     };
   }
 
+  /**
+   * Analiza la distribución de pedidos por canal.
+   */
+  static analyzeOrdersByChannel(orders: Order[], days: number = 30) {
+    const end = new Date();
+    const start = startOfDay(subDays(end, days));
+
+    const currentPeriodOrders = orders.filter(o => {
+      const date = new Date(o.orderDate);
+      return isWithinInterval(date, { start, end });
+    });
+
+    const channelCounts: Record<string, number> = {};
+    
+    currentPeriodOrders.forEach(order => {
+      // Fallback a "Web/Catálogo" si no existe metadata de origen
+      const channel = order.origin || 'web';
+      channelCounts[channel] = (channelCounts[channel] || 0) + 1;
+    });
+
+    // Mapeo amigable para el gráfico
+    const channelLabels: Record<string, string> = {
+      'qr': 'Código QR (Mesa/Local)',
+      'whatsapp': 'Link WhatsApp',
+      'web': 'Catálogo Web',
+      'link': 'Link Directo',
+    };
+
+    return Object.entries(channelCounts).map(([id, count]) => ({
+      name: channelLabels[id] || id.toUpperCase(),
+      value: count,
+    }));
+  }
+
   private static generateCountHistory(periodOrders: Order[], start: Date, end: Date): DataPoint[] {
     return eachDayOfInterval({ start, end }).map(day => {
       const dayStr = format(day, 'yyyy-MM-dd');

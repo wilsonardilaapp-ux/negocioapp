@@ -32,6 +32,7 @@ import {
   Sparkles,
   UserPlus,
   DollarSign,
+  PieChart,
 } from "lucide-react";
 
 import { SidebarMenu, SidebarMenuItem, SidebarMenuButton, useSidebar } from "@/components/ui/sidebar";
@@ -47,6 +48,7 @@ const allNavItems = [
   { href: "/dashboard/medicion/ticket-promedio", icon: DollarSign, label: "Ticket Promedio", moduleId: 'catalogo' },
   { href: "/dashboard/medicion/clientes-nuevos", icon: UserPlus, label: "Clientes Nuevos", moduleId: 'catalogo' },
   { href: "/dashboard/medicion/clientes-recurrentes", icon: Users, label: "Retención Clientes", moduleId: 'catalogo' },
+  { href: "/dashboard/medicion/pedidos-por-canal", icon: PieChart, label: "Canales de Venta", moduleId: 'catalogo' },
   // ------------------------------------
   { href: "/dashboard/loyalty", icon: Sparkles, label: "Fidelización", moduleId: 'loyalty' },
   { href: "/dashboard/share", icon: Share2, label: "Compartir Menú", moduleId: 'catalogo' },

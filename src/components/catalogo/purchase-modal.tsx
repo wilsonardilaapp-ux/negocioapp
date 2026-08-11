@@ -46,6 +46,7 @@ interface PurchaseModalProps {
   businessId: string;
   businessInfo: LandingHeaderConfigData['businessInfo'] | null;
   paymentSettings: PaymentSettings | null;
+  origin?: string; // Nuevo: El canal de tráfico (ej: 'qr', 'whatsapp')
 }
 
 const formatCurrency = (value: number) => {
@@ -64,7 +65,7 @@ const PAYMENT_METHOD_LABELS: Record<string, string> = {
     pagoContraEntrega: 'Pago contra entrega',
 };
 
-export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, onUpdateQuantity, onClearCart, businessId, businessInfo, paymentSettings }: PurchaseModalProps) {
+export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, onUpdateQuantity, onClearCart, businessId, businessInfo, paymentSettings, origin = 'web' }: PurchaseModalProps) {
   const { toast } = useToast();
   const firestore = useFirestore();
   const [tipoEntrega, setTipoEntrega] = useState<TipoEntrega>('domicilio');
@@ -120,7 +121,6 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
     ) ?? null;
   }, [activePromos, totalQuantity]);
 
-  // Cálculos de descuento
   const couponDiscountAmount = useMemo(() => {
     if (!appliedCoupon) return 0;
     if (appliedCoupon.tipo === 'porcentaje') {
@@ -140,7 +140,6 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
     return 0;
   }, [applicableGlobalPromo, subtotalProducts]);
 
-  // Selección del mejor descuento
   const { finalDiscountAmount, discountLabel } = useMemo(() => {
     if (couponDiscountAmount >= orderDiscountAmount && couponDiscountAmount > 0) {
       return { 
@@ -197,7 +196,7 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
         const emoCard = "\uD83D\uDCB3";    
         const emoThanks = "\uD83D\uDE4F";  
 
-        let orderSummary = "```\n"; // Inicio de bloque monoespaciado
+        let orderSummary = "```\n";
 
         if (tipoEntrega === 'domicilio') {
             orderSummary += `${emoScooter} NUEVO PEDIDO A DOMICILIO\n`;
@@ -221,7 +220,6 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
 
         let totalPromoSavings = 0;
 
-        // 1. Mapear cartItems a OrderItem[] para el guardado único
         const orderItems: OrderItem[] = cartItems.map(item => {
             const itemUnitPrice = item.appliedPromotion?.discountedPrice ?? item.price;
             const itemSubtotal = itemUnitPrice * item.quantity;
@@ -247,7 +245,6 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
             };
         });
 
-        // 2. Guardar UN solo documento por pedido con todos los ítems y totales
         const orderData = {
             businessId,
             customerName: data.fullName,
@@ -266,11 +263,10 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
             orderDate: now,
             orderStatus: 'Pendiente' as OrderStatus,
             tipoEntrega,
+            origin: origin, // Persistimos el canal de origen capturado de la URL
         };
 
-        // LIMPIEZA CRÍTICA: Eliminar undefined para evitar errores de Firestore
         const cleanOrderData = JSON.parse(JSON.stringify(orderData));
-
         await addDocumentNonBlocking(ordersCollectionRef, cleanOrderData);
 
         const paymentLabel = PAYMENT_METHOD_LABELS[selectedPaymentMethod] ?? selectedPaymentMethod;
@@ -412,7 +408,6 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
                 {tipoEntrega === 'domicilio' && <div className="space-y-2"><Label>Dirección *</Label><Textarea {...register('address')} /></div>}
             </div>
 
-            {/* SECTOR DE MÉTODO DE PAGO */}
             <div className="space-y-4">
                 <h4 className="font-bold text-lg">Método de Pago</h4>
                 <RadioGroup
@@ -467,7 +462,6 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
                     )}
                 </RadioGroup>
 
-                {/* BLOQUE DE DETALLES DE CUENTA */}
                 {selectedPaymentMethod && selectedPaymentMethod !== 'pagoContraEntrega' && (
                     <div className="p-4 bg-muted/50 rounded-xl border-2 border-dashed border-muted space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
                         {(() => {

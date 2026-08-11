@@ -64,6 +64,7 @@ export type Order = {
   orderDate: string;
   orderStatus: OrderStatus;
   tipoEntrega: TipoEntrega;
+  origin?: string;              // Canal de origen (ej. 'qr', 'whatsapp', 'web')
   // --- Campos de Atribución ROI (Fase 4.1) ---
   isRecovered?: boolean;
   recoverySourceId?: string;
