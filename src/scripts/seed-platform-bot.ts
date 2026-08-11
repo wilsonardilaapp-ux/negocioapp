@@ -1,33 +1,42 @@
-
-import { getAdminFirestore } from '../firebase/server-init';
-
 /**
- * Script de inicialización para el Bot de Plataforma (__platform__).
- * Ejecutar con: npx tsx src/scripts/seed-platform-bot.ts
+ * Script de UNA SOLA EJECUCIÓN (seed) para crear businesses/__platform__.
+ *
+ * Uso: ejecutar una vez con acceso a las credenciales de Firebase Admin
+ * (las mismas que usa el proyecto en server-init.ts), luego eliminar o
+ * mover este archivo fuera del build de producción. No es un endpoint
+ * ni un componente de la app — es una herramienta de una sola vez.
+ *
+ * ANTES DE EJECUTAR:
+ * - Reemplaza TODOS los valores marcados con TODO por tu información real.
+ * - Revisa los precios de los planes: están en 0 como placeholder.
+ *
+ * Es idempotente: si __platform__ ya existe con isPlatformBot=true,
+ * no lo sobreescribe (para no borrar datos que hayas cargado a mano después).
  */
+
+import { getAdminFirestore } from '@/firebase/server-init';
+
 async function seedPlatformBot() {
   const db = await getAdminFirestore();
-  const platformRef = db.collection('businesses').doc('__platform__');
+  const platformRef = db.collection('businesses').doc('platform-bot');
 
   const existing = await platformRef.get();
   if (existing.exists && existing.data()?.isPlatformBot === true) {
-    console.log('__platform__ ya existe y está marcado. No se sobreescribe. Saliendo.');
+    console.log('platform-bot ya existe y está marcado. No se sobreescribe. Saliendo.');
     return;
   }
-
-  console.log('Iniciando creación de businesses/__platform__...');
 
   // --- 1. Documento raíz (Capa 2: datos del negocio) ---
   await platformRef.set({
     name: 'Markix',
     phone: '+57 322 883 1634',
-    email: 'allseosoporte@gmail.com',
+    email: 'aliseosoporte@gmail.com',
     description: 'El Empleado Digital con IA que trabaja por tu negocio las 24 horas',
     isPlatformBot: true,
     createdAt: new Date().toISOString(),
   });
 
-  // --- 2. FAQs (Capa 1: respuestas manuales) ---
+  // --- 2. FAQs (Capa 1: responses) ---
   const responsesRef = platformRef
     .collection('publicMenuChatbot')
     .doc('main')
@@ -36,92 +45,64 @@ async function seedPlatformBot() {
   const faqs = [
     {
       question: 'cuanto cuesta',
-      answer: 'Ofrecemos tres planes principales: Plan Crecimiento (Gratis), Plan Profesional ($29 USD/mes) y Plan Empresarial ($99 USD/mes). También contamos con planes híbridos con comisión por venta según el volumen de tu negocio.',
+      answer:
+        'Tenemos planes Starter, Pro y Enterprise. TODO: resume aquí los precios reales o dirige al usuario a tu página de precios.',
       isActive: true,
     },
     {
       question: 'prueba gratis',
-      answer: '¡Claro que sí! Puedes empezar hoy mismo con nuestro Plan Crecimiento totalmente gratis. No requiere tarjeta de crédito y te permite explorar las funcionalidades básicas de catálogos y pedidos.',
+      answer: 'TODO: confirma tu política real de prueba gratuita (días, requiere tarjeta, etc).',
       isActive: true,
     },
     {
       question: 'como funciona',
-      answer: 'Markix es tu Empleado Digital con IA que centraliza tu operación: atiende consultas en tu catálogo, recibe pedidos por WhatsApp, recomienda productos inteligentes, publica artículos en tu blog y gestiona tu inventario 24/7.',
+      answer:
+        'Markix es tu Empleado Digital con IA: atiende consultas, recibe pedidos, recomienda productos, publica contenido y trabaja 24/7 en tu catálogo.',
       isActive: true,
     },
     {
       question: 'cancelar',
-      answer: 'La flexibilidad es parte de nuestro servicio. Puedes cancelar tu suscripción en cualquier momento desde el panel de facturación en tu dashboard, sin multas ni contratos de permanencia.',
+      answer: 'TODO: agrega tu política real de cancelación de suscripción.',
       isActive: true,
     },
     {
       question: 'contacto',
-      answer: 'Estamos para ayudarte. Puedes escribirnos a nuestro WhatsApp de soporte +57 322 883 1634 o al correo oficial allseosoporte@gmail.com.',
+      answer: 'Puedes escribirnos a aliseosoporte@gmail.com o al +57 322 883 1634.',
       isActive: true,
     },
   ];
 
   for (const faq of faqs) {
-    await responsesRef.add({
-        ...faq,
-        updatedAt: new Date().toISOString()
-    });
+    await responsesRef.add(faq);
   }
 
-  // --- 3. Catálogo (Capa 3: planes presentados como productos) ---
+  // --- 3. Catálogo (Capa 3: planes como "productos") ---
   await platformRef.collection('publicData').doc('catalog').set({
     products: [
       {
-        id: 'plan-free',
-        name: 'Plan Crecimiento',
-        price: 0,
-        description: 'Ideal para emprendedores y nuevos negocios. Incluye catálogo digital básico, blog profesional y gestión centralizada de pedidos por WhatsApp.',
-        category: 'Planes SaaS',
-        images: ['https://images.unsplash.com/photo-1460925895917-afdab827c52f?q=80&w=2026&auto=format&fit=crop'],
-        rating: 5,
-        ratingCount: 1,
+        name: 'Starter',
+        price: 0, // TODO: precio real
+        description: 'TODO: qué incluye el plan Starter',
       },
       {
-        id: 'plan-pro',
-        name: 'Plan Profesional',
-        price: 29,
-        description: 'Potencia tu negocio con Inteligencia Artificial. Incluye Asistente Virtual 24/7, Motor de sugerencias (Upsell/Cross-sell) y analíticas de tráfico detalladas.',
-        category: 'Planes SaaS',
-        images: ['https://images.unsplash.com/photo-1551288049-bebda4e38f71?q=80&w=2070&auto=format&fit=crop'],
-        rating: 5,
-        ratingCount: 1,
+        name: 'Pro',
+        price: 0, // TODO: precio real
+        description: 'TODO: qué incluye el plan Pro',
       },
       {
-        id: 'plan-enterprise',
-        name: 'Plan Empresarial',
-        price: 99,
-        description: 'Control total y escalabilidad para grandes empresas. Incluye módulos de contabilidad, inventario Kardex, soporte dedicado 24/7 y acceso a la API.',
-        category: 'Planes SaaS',
-        images: ['https://images.unsplash.com/photo-1454165833767-027508658d61?q=80&w=2070&auto=format&fit=crop'],
-        rating: 5,
-        ratingCount: 1,
+        name: 'Enterprise',
+        price: null,
+        description: 'Plan a medida — contactar a ventas',
       },
     ],
-    headerConfig: {
-      businessInfo: {
-        name: 'Markix Platform',
-        address: 'Soporte Global Digital',
-        phone: '+57 322 883 1634',
-        email: 'allseosoporte@gmail.com'
-      }
-    },
-    updatedAt: new Date().toISOString()
   });
 
-  console.log('✅ Documento businesses/__platform__ y subcolecciones creados correctamente.');
+  console.log('businesses/platform-bot creado correctamente.');
 }
 
 seedPlatformBot()
-  .then(() => {
-    console.log('🚀 Seed exitoso.');
-    process.exit(0);
-  })
+  .then(() => process.exit(0))
   .catch((err) => {
-    console.error('❌ Error durante la ejecución del seed:', err);
+    console.error(err);
     process.exit(1);
   });

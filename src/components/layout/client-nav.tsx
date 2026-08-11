@@ -30,6 +30,8 @@ import {
   Star,
   Users,
   Sparkles,
+  UserPlus,
+  DollarSign,
 } from "lucide-react";
 
 import { SidebarMenu, SidebarMenuItem, SidebarMenuButton, useSidebar } from "@/components/ui/sidebar";
@@ -40,6 +42,12 @@ const allNavItems = [
   { href: "/dashboard/share-landing", icon: Share2, label: "Compartir Landing Page" },
   { href: "/dashboard/catalogo", icon: ShoppingCart, label: "Catálogo", moduleId: 'catalogo' },
   { href: "/dashboard/catalogo/estadisticas", icon: BarChart, label: "Estadísticas de Productos", moduleId: 'catalogo' },
+  // --- MÓDULO DE MEDICIÓN (ADITIVO) ---
+  { href: "/dashboard/medicion/numero-pedidos", icon: ShoppingBag, label: "N° Pedidos", moduleId: 'catalogo' },
+  { href: "/dashboard/medicion/ticket-promedio", icon: DollarSign, label: "Ticket Promedio", moduleId: 'catalogo' },
+  { href: "/dashboard/medicion/clientes-nuevos", icon: UserPlus, label: "Clientes Nuevos", moduleId: 'catalogo' },
+  { href: "/dashboard/medicion/clientes-recurrentes", icon: Users, label: "Retención Clientes", moduleId: 'catalogo' },
+  // ------------------------------------
   { href: "/dashboard/loyalty", icon: Sparkles, label: "Fidelización", moduleId: 'loyalty' },
   { href: "/dashboard/share", icon: Share2, label: "Compartir Menú", moduleId: 'catalogo' },
   { href: "/dashboard/blog", icon: FileText, label: "Blog", moduleId: 'blog' },
