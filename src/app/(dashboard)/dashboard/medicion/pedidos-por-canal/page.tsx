@@ -4,11 +4,20 @@ import { useMemo } from 'react';
 import { useMetricAnalysis } from '../hooks/useMetricAnalysis';
 import { MetricsService } from '../services/metrics.service';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
-import { PieChart, Pie, Cell, ResponsiveContainer, Legend } from 'recharts';
+import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart';
+import { PieChart, Pie, Cell, Legend } from 'recharts';
 import { ShoppingBag, Loader2, Info } from 'lucide-react';
 
 const COLORS = ['#16a34a', '#3b82f6', '#f59e0b', '#8b5cf6', '#ef4444'];
+
+/**
+ * Configuración para el componente ChartContainer.
+ */
+const chartConfig = {
+  value: {
+    label: "Pedidos",
+  },
+} satisfies ChartConfig;
 
 /**
  * @fileOverview Vista de análisis de pedidos segmentados por canal de entrada.
@@ -48,7 +57,7 @@ export default function PedidosPorCanalPage() {
           </CardHeader>
           <CardContent className="h-[400px]">
             {totalOrders > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
+              <ChartContainer config={chartConfig} className="h-full w-full">
                 <PieChart>
                   <Pie
                     data={channelData}
@@ -66,7 +75,7 @@ export default function PedidosPorCanalPage() {
                   <ChartTooltip content={<ChartTooltipContent nameKey="name" />} />
                   <Legend verticalAlign="bottom" align="center" iconType="circle" />
                 </PieChart>
-              </ResponsiveContainer>
+              </ChartContainer>
             ) : (
               <div className="h-full flex flex-col items-center justify-center text-muted-foreground gap-2">
                 <ShoppingBag className="h-10 w-10 opacity-20" />
