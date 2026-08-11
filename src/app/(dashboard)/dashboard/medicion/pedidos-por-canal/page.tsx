@@ -11,6 +11,7 @@ import { useUser } from '@/firebase';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import QRCode from "react-qr-code";
 import html2canvas from "html2canvas";
@@ -96,7 +97,7 @@ export default function PedidosPorCanalPage() {
         <p className="text-muted-foreground">Analiza y genera herramientas de difusión con rastreo inteligente.</p>
       </header>
 
-      {/* --- SECCIÓN 1: ANALÍTICA (MANTENIDA) --- */}
+      {/* --- SECCIÓN 1: ANALÍTICA --- */}
       <div className="grid gap-6 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <CardHeader>
@@ -140,7 +141,7 @@ export default function PedidosPorCanalPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             {channelData.map((channel, i) => {
-              const percentage = ((channel.value / totalOrders) * 100).toFixed(1);
+              const percentage = totalOrders > 0 ? ((channel.value / totalOrders) * 100).toFixed(1) : "0";
               return (
                 <div key={channel.name} className="flex items-center justify-between p-3 rounded-xl border bg-muted/30">
                   <div className="flex items-center gap-3">
@@ -165,7 +166,7 @@ export default function PedidosPorCanalPage() {
         </Card>
       </div>
 
-      {/* --- SECCIÓN 2: GENERADOR DE ENLACES (NUEVA ADITIVA) --- */}
+      {/* --- SECCIÓN 2: GENERADOR DE ENLACES --- */}
       <Card className="border-2 border-primary/10 shadow-lg overflow-hidden">
         <CardHeader className="bg-primary/5 border-b">
           <div className="flex items-center gap-3">
@@ -218,7 +219,7 @@ export default function PedidosPorCanalPage() {
         </CardContent>
       </Card>
 
-      {/* --- SECCIÓN 3: GENERADOR QR PARA MESAS (NUEVA ADITIVA) --- */}
+      {/* --- SECCIÓN 3: GENERADOR QR PARA MESAS --- */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <Card className="border-2 border-primary/10 shadow-lg">
               <CardHeader>
@@ -276,7 +277,7 @@ export default function PedidosPorCanalPage() {
                 <div className="space-y-2">
                     <h3 className="text-2xl font-black text-gray-900 leading-tight">¿Cómo usar el Tracking?</h3>
                     <p className="text-muted-foreground leading-relaxed">
-                        Al usar el parámetro <code>?ref=</code> en tus enlaces, Markix &quot;marca&quot; el pedido del cliente en la base de datos.
+                        Al usar el parámetro <code>?ref=</code> en tus enlaces, Markix "marca" el pedido del cliente en la base de datos.
                     </p>
                 </div>
                 
@@ -290,7 +291,7 @@ export default function PedidosPorCanalPage() {
                     <div className="flex gap-4 p-4 bg-white rounded-2xl border shadow-sm">
                         <div className="h-10 w-10 shrink-0 bg-blue-50 rounded-full flex items-center justify-center text-blue-600 font-black">2</div>
                         <p className="text-sm text-gray-600">
-                            <strong>Operación Local:</strong> Imprime los códigos QR por mesa. Al recibir el pedido, verás la etiqueta &quot;Mesa X&quot; para saber a dónde llevar el despacho.
+                            <strong>Operación Local:</strong> Imprime los códigos QR por mesa. Al recibir el pedido, verás la etiqueta "Mesa X" para saber a dónde llevar el despacho.
                         </p>
                     </div>
                     <div className="flex gap-4 p-4 bg-white rounded-2xl border shadow-sm">
