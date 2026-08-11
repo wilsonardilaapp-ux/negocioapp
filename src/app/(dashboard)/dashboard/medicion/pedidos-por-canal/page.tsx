@@ -27,7 +27,7 @@ const chartConfig = {
 
 /**
  * @fileOverview Vista de análisis de pedidos segmentados por canal de entrada
- * y generador de enlaces de difusión con tracking.
+ * y generador de enlaces de difusión con tracking y códigos QR descargables.
  */
 export default function PedidosPorCanalPage() {
   const { user } = useUser();
@@ -66,6 +66,30 @@ export default function PedidosPorCanalPage() {
     setCopiedKey(key);
     toast({ title: "Enlace copiado", description: `El enlace con tracking para ${key} está en tu portapapeles.` });
     setTimeout(() => setCopiedKey(null), 2000);
+  };
+
+  /**
+   * Función universal para descargar códigos QR capturando el elemento por ID.
+   */
+  const handleDownloadSpecificQR = async (containerId: string, label: string) => {
+    const element = document.getElementById(containerId);
+    if (!element) return;
+    
+    try {
+      const canvas = await html2canvas(element, { 
+        backgroundColor: '#ffffff', 
+        scale: 3, // Mayor resolución para impresión
+        logging: false,
+        useCORS: true 
+      });
+      const link = document.createElement('a');
+      link.download = `QR_Markix_${label.replace(/\s+/g, '_')}.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+      toast({ title: "QR Descargado", description: `Imagen para ${label} guardada correctamente.` });
+    } catch (err) {
+      toast({ variant: 'destructive', title: 'Error', description: 'No se pudo generar la imagen del QR.' });
+    }
   };
 
   const handleDownloadQR = async () => {
@@ -175,42 +199,69 @@ export default function PedidosPorCanalPage() {
             </div>
             <div>
                 <CardTitle className="text-xl font-black">Generador de Enlaces con Tracking</CardTitle>
-                <CardDescription>Copia estos enlaces para usarlos en tus campañas de marketing.</CardDescription>
+                <CardDescription>Copia estos enlaces o descarga los códigos QR para tus campañas de marketing.</CardDescription>
             </div>
           </div>
         </CardHeader>
         <CardContent className="p-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                 {channels.map((channel) => {
                     const trackedUrl = `${baseUrl}?ref=${channel.ref}`;
                     const isCopied = copiedKey === channel.id;
+                    const qrContainerId = `qr-wrap-${channel.id}`;
 
                     return (
-                        <div key={channel.id} className="p-4 border rounded-2xl bg-white shadow-sm hover:border-primary/30 transition-all group">
-                            <div className="flex items-center justify-between mb-3">
-                                <div className="flex items-center gap-2">
-                                    <div className="p-1.5 bg-muted rounded-md text-muted-foreground group-hover:text-primary group-hover:bg-primary/5 transition-colors">
-                                        <channel.icon className="h-4 w-4" />
+                        <div key={channel.id} className="p-5 border rounded-[2rem] bg-white shadow-sm hover:border-primary/30 transition-all group flex flex-col h-full">
+                            <div className="flex items-center justify-between mb-4">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 bg-muted rounded-xl text-muted-foreground group-hover:text-primary group-hover:bg-primary/5 transition-colors">
+                                        <channel.icon className="h-5 w-5" />
                                     </div>
-                                    <Label className="font-bold text-sm">{channel.label}</Label>
+                                    <Label className="font-bold text-base">{channel.label}</Label>
                                 </div>
-                                <Badge variant="outline" className="text-[9px] font-black uppercase tracking-tighter">?ref={channel.ref}</Badge>
+                                <Badge variant="outline" className="text-[10px] font-black uppercase tracking-tighter bg-primary/5">?ref={channel.ref}</Badge>
                             </div>
-                            <div className="flex gap-2">
-                                <Input 
-                                    readOnly 
-                                    value={trackedUrl} 
-                                    className="bg-muted/50 border-none h-9 text-[11px] font-mono focus-visible:ring-0"
-                                />
-                                <Button 
-                                    size="sm" 
-                                    variant={isCopied ? "default" : "outline"}
-                                    className={cn("h-9 font-bold px-3 transition-all", isCopied && "bg-green-600 hover:bg-green-600")}
-                                    onClick={() => handleCopy(trackedUrl, channel.id)}
+
+                            {/* Área del Código QR (Visualizador) */}
+                            <div className="flex-1 flex flex-col items-center justify-center py-4 space-y-4">
+                                <div 
+                                    id={qrContainerId}
+                                    className="p-3 bg-white rounded-2xl border-2 border-gray-50 shadow-sm group-hover:shadow-md transition-shadow"
                                 >
-                                    {isCopied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                                    <span className="ml-2 hidden sm:inline">{isCopied ? 'Copiado' : 'Copiar'}</span>
+                                    <QRCode 
+                                        value={trackedUrl}
+                                        size={120}
+                                        level="M"
+                                    />
+                                </div>
+                                <Button 
+                                    variant="ghost" 
+                                    size="sm" 
+                                    className="h-8 text-[10px] font-black uppercase tracking-widest text-muted-foreground hover:text-primary gap-1.5"
+                                    onClick={() => handleDownloadSpecificQR(qrContainerId, channel.label)}
+                                >
+                                    <Download className="h-3.5 w-3.5" />
+                                    Descargar PNG
                                 </Button>
+                            </div>
+
+                            <div className="flex flex-col gap-2 mt-auto border-t pt-4">
+                                <Label className="text-[10px] font-bold text-muted-foreground uppercase ml-1">Enlace rastreable</Label>
+                                <div className="flex gap-2">
+                                    <Input 
+                                        readOnly 
+                                        value={trackedUrl} 
+                                        className="bg-muted/50 border-none h-10 text-[10px] font-mono focus-visible:ring-0"
+                                    />
+                                    <Button 
+                                        size="sm" 
+                                        variant={isCopied ? "default" : "outline"}
+                                        className={cn("h-10 font-bold px-4 transition-all rounded-xl", isCopied && "bg-green-600 hover:bg-green-600")}
+                                        onClick={() => handleCopy(trackedUrl, channel.id)}
+                                    >
+                                        {isCopied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                                    </Button>
+                                </div>
                             </div>
                         </div>
                     );
