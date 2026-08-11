@@ -17,10 +17,3 @@ export interface MetricAnalysis {
   growth: number;
   history: DataPoint[];
 }
-
-export interface RetentionData {
-  newClients: number;
-  returningClients: number;
-  totalClients: number;
-  retentionRate: number;
-}

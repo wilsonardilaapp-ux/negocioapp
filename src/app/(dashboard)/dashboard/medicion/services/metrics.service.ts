@@ -86,7 +86,6 @@ export class MetricsService {
     const start = startOfDay(subDays(end, days));
     const prevStart = startOfDay(subDays(start, days));
 
-    // Identificar la primera orden de cada cliente (por email)
     const firstOrdersMap = new Map<string, Date>();
     orders.forEach(o => {
       const date = new Date(o.orderDate);

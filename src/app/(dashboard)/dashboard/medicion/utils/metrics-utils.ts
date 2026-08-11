@@ -2,8 +2,7 @@
  * @fileOverview Utilidades matemáticas para el cálculo de indicadores.
  */
 
-import { format, subDays, startOfDay, isWithinInterval } from 'date-fns';
-import { es } from 'date-fns/locale';
+import { subDays, startOfDay } from 'date-fns';
 
 /**
  * Calcula el porcentaje de crecimiento entre dos valores.
