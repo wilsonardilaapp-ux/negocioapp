@@ -451,7 +451,7 @@ function CatalogPageContent({ params }: CatalogPageProps) {
                                         disabled={currentPage === totalPages}
                                         className="h-10 px-4 font-bold rounded-xl"
                                     >
-                                        Siguiente <ChevronRight className="h-4 w-4 ml-2" />
+                                        Siguiente <ChevronRight className="ml-2 h-4 w-4 ml-2" />
                                     </Button>
                                 </div>
                             </div>
