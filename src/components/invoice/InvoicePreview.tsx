@@ -19,9 +19,10 @@ import { useToast } from '@/hooks/use-toast';
 interface InvoicePreviewProps {
   settings: InvoiceSettings;
   setSettings: React.Dispatch<React.SetStateAction<InvoiceSettings>>;
+  businessId?: string | null;
 }
 
-export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSettings }) => {
+export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSettings, businessId }) => {
   const { toast } = useToast();
   const [isPreparingPrint, setIsPreparingPrint] = useState(false);
   
@@ -141,7 +142,7 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({ settings, setSet
         </div>
         <div className="bg-gray-200 p-4 rounded-md overflow-x-auto flex justify-center">
             <div id="invoice-preview-wrapper" className="origin-top">
-                <InvoiceTemplate config={settings} order={mockOrder} />
+                <InvoiceTemplate config={settings} order={mockOrder} businessId={businessId} />
             </div>
         </div>
         <Button onClick={handlePrint} className="w-full" disabled={isPreparingPrint}>

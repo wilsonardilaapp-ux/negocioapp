@@ -88,7 +88,7 @@ export default function InvoiceConfigPage() {
             </div>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
                 <InvoiceEditor settings={settings} setSettings={setSettings} />
-                <InvoicePreview settings={settings} setSettings={setSettings} />
+                <InvoicePreview settings={settings} setSettings={setSettings} businessId={user?.uid} />
             </div>
         </div>
     );

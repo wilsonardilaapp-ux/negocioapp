@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import type { InvoiceSettings } from '@/models/invoice-settings';
 import { cn } from '@/lib/utils';
 import QRCode from 'react-qr-code';
@@ -10,8 +10,6 @@ import { Youtube, Linkedin } from 'lucide-react';
 
 
 // Mock order data for preview
-// FIX: Using a static date string instead of new Date().toLocaleString() 
-// to prevent hydration errors (server/client mismatch).
 export const mockOrder = {
   invoiceNumber: 'FC-00123',
   dateTime: '27/03/2024, 10:00:00 AM',
@@ -39,6 +37,7 @@ export type OrderType = typeof mockOrder;
 interface InvoiceTemplateProps {
   config: InvoiceSettings;
   order: OrderType;
+  businessId?: string | null;
   className?: string;
 }
 
@@ -77,20 +76,52 @@ const Separator = ({ style }: { style: 'dashed' | 'solid' | 'none' }) => {
   return <div className={`w-full border-t border-black ${style === 'dashed' ? 'border-dashed' : 'border-solid'}`} />;
 };
 
-export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ config, order, className }) => {
+export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ config, order, businessId, className }) => {
+  const [baseUrl, setBaseUrl] = useState('');
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setBaseUrl(window.location.origin);
+    }
+  }, []);
+
   const isBold = (zone: keyof InvoiceSettings['bold']['zones']) => config.bold.allBold || config.bold.zones[zone];
 
   const fontClasses = {
     monospace: 'font-mono',
-    arial: 'font-sans', // Approx
+    arial: 'font-sans',
     'sans-serif': 'font-sans',
   };
 
   const paperWidthClasses = {
-    '58mm': 'w-[48mm]', // Usamos 48mm que es el área real imprimible de las impresoras de 58mm
+    '58mm': 'w-[48mm]',
     '80mm': 'w-[80mm]',
     'A4': 'w-[210mm]',
   };
+
+  // --- LÓGICA DE GENERACIÓN DE URL CON TRACKING ---
+  const qrValue = useMemo(() => {
+    const trackingParam = "ref=factura";
+    
+    // Si no hay base URL (SSR), retornamos temporalmente vacío
+    if (!baseUrl) return "";
+
+    // 1. Priorizar redirección al Catálogo si el tipo es 'menu'
+    if (config.qr.linkType === 'menu' && businessId) {
+      return `${baseUrl}/catalog/${businessId}?${trackingParam}`;
+    }
+
+    // 2. Si es reseña o link custom, inyectar el parámetro al final
+    const sourceUrl = config.qr.url || baseUrl;
+    const separator = sourceUrl.includes('?') ? '&' : '?';
+    
+    // Solo inyectar si el link parece ser interno o si se desea trackear explícitamente
+    if (config.qr.linkType === 'review' || config.qr.linkType === 'custom') {
+      return `${sourceUrl}${separator}${trackingParam}`;
+    }
+
+    return sourceUrl;
+  }, [config.qr, businessId, baseUrl]);
 
   const barcodeElement = (
     <div className="text-center my-2" style={{ transform: `scale(${config.style.textScale ?? 1})`, transformOrigin: 'center top' }}>
@@ -98,8 +129,7 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ config, order,
     </div>
   );
 
-  // Ajuste proporcional de caracteres para evitar recortes en el área de 48mm
-  const LINE_CHARS = config.style.paperSize === '80mm' ? 42 : 30; // Reducido de 32 a 30 para margen de seguridad
+  const LINE_CHARS = config.style.paperSize === '80mm' ? 42 : 30;
   const CANT_W = 3;
   const PRICE_W = 9;
   const PROD_W = LINE_CHARS - CANT_W - PRICE_W - 2;
@@ -214,9 +244,9 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ config, order,
         <div className="qr-container flex flex-col items-center my-2 space-y-1" style={{ transform: `scale(${config.style.textScale ?? 1})`, transformOrigin: 'center top' }}>
           {config.qr.qrImageUrl ? (
              <img src={config.qr.qrImageUrl} alt="QR Code" style={{ width: '100px', height: '100px' }} className="object-contain bg-white rounded-sm p-1" />
-          ) : (
+          ) : qrValue && (
             <div className="bg-white p-1 rounded-sm">
-                <QRCode value={config.qr.url || 'https://www.google.com'} size={100} />
+                <QRCode value={qrValue} size={100} />
             </div>
           )}
            <div style={{ transform: `scaleX(${1 / (config.style.textScale ?? 1)})` }}>

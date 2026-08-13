@@ -126,7 +126,7 @@ const PrintInvoicePage = () => {
                 }
             `}
             </style>
-            <InvoiceTemplate config={settings} order={adaptedOrder} />
+            <InvoiceTemplate config={settings} order={adaptedOrder} businessId={user?.uid} />
         </div>
     );
 };
