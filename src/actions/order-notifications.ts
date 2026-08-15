@@ -24,7 +24,7 @@ const formatCurrency = (value: number) => {
 
 /**
  * Orquesta el envío de notificaciones por WhatsApp tras un pedido exitoso.
- * Realiza dos envíos: uno al dueño del negocio y otro al cliente.
+ * Realiza dos envíos independientes: uno al dueño del negocio y otro al cliente.
  */
 export async function sendOrderConfirmation({ businessId, orderId }: OrderNotificationParams): Promise<void> {
   if (!businessId || !orderId) return;
@@ -48,14 +48,14 @@ export async function sendOrderConfirmation({ businessId, orderId }: OrderNotifi
     const token = config?.whatsApp?.token;
     const businessName = config?.business?.name || 'nuestro negocio';
     
-    // Identificación de destinatarios
+    // Identificación de destinatarios (Normalización estricta)
     const businessPhone = normalizePhoneNumber(config?.whatsApp?.number || '3228831634');
     const customerPhone = normalizePhoneNumber(order.customerPhone);
 
     if (!token) return;
 
     // --- PROCESO 1: NOTIFICACIÓN INTERNA PARA EL NEGOCIO ---
-    // Mantiene el formato de alerta interna reportado como funcional
+    // Envío dirigido al número registrado del negocio (autoalerta)
     (async () => {
       try {
         const orderShortId = orderId.slice(-7).toUpperCase();
@@ -85,7 +85,7 @@ export async function sendOrderConfirmation({ businessId, orderId }: OrderNotifi
     })();
 
     // --- PROCESO 2: CONFIRMACIÓN PARA EL CLIENTE ---
-    // Nuevo envío con tono cercano y resumen simplificado
+    // Envío dirigido al número del cliente (customerPhone) con tono cercano
     if (customerPhone && customerPhone.length >= 10) {
       (async () => {
         try {
