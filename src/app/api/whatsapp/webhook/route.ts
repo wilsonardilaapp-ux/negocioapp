@@ -4,12 +4,21 @@ import { chat } from '@/ai/flows/chat-flow';
 import { v4 as uuidv4 } from "uuid";
 
 /**
- * @fileOverview Webhook receptor para WHAPI.cloud.
+ * @fileOverview Webhook receptor robusto para WHAPI.cloud.
  */
 
-function normalize(phone: string | undefined | null): string {
+/**
+ * Normaliza un número de teléfono eliminando sufijos de red, espacios, guiones
+ * y prefijos de país para una comparación segura.
+ */
+function normalizePhoneNumber(phone: string | undefined | null): string {
   if (!phone) return '';
-  return phone.split('@')[0].replace(/\D/g, '');
+  // 1. Quitar sufijos de red (@s.whatsapp.net, @g.us, etc)
+  const cleanBase = phone.split('@')[0];
+  // 2. Quitar todo lo que no sea dígito (espacios, guiones, +, etc)
+  const digits = cleanBase.replace(/\D/g, '');
+  // 3. Retornamos los últimos 10 dígitos para máxima compatibilidad en comparaciones locales/regionales
+  return digits.length >= 10 ? digits.slice(-10) : digits;
 }
 
 /**
@@ -45,7 +54,7 @@ export async function POST(req: NextRequest) {
 
     const incomingText = message.text?.body;
     const rawSender = message.chat_id || message.from;
-    const senderNumber = normalize(rawSender);
+    const senderNumber = normalizePhoneNumber(rawSender);
 
     if (!incomingText) {
       return NextResponse.json({ status: 'ignored', reason: 'no_text_content' }, { status: 200 });
@@ -55,14 +64,12 @@ export async function POST(req: NextRequest) {
     let businessId: string | null = null;
     let businessToken: string | null = null;
 
-    // Buscar negocio por número normalizado
+    // Buscar negocio por número normalizado (comparando los últimos 10 dígitos)
     const configSnapshot = await db.collectionGroup('chatbotConfig').get();
     const targetConfigDoc = configSnapshot.docs.find(doc => {
         const data = doc.data();
-        const storedNumber = normalize(data.whatsApp?.number);
-        return storedNumber === senderNumber || 
-               (storedNumber && senderNumber.endsWith(storedNumber)) || 
-               (senderNumber && storedNumber.endsWith(senderNumber));
+        const storedNumber = normalizePhoneNumber(data.whatsApp?.number);
+        return storedNumber !== '' && storedNumber === senderNumber;
     });
 
     const urlBusinessId = req.nextUrl.searchParams.get('businessId');
@@ -85,7 +92,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ status: 'error', reason: 'token_missing' }, { status: 200 });
     }
 
-    // Registro en analíticas
+    // Registro en analíticas para persistencia del canal WhatsApp
     try {
       const conversationId = uuidv4();
       await db.collection('businesses').doc(businessId).collection('chatConversations').doc(conversationId).set({
@@ -100,7 +107,7 @@ export async function POST(req: NextRequest) {
       console.error('[WHAPI-WEBHOOK] Error en registro de analíticas:', regError);
     }
 
-    // Procesamiento con IA (Asíncrono)
+    // Procesamiento con IA (Asíncrono para respuesta inmediata 200 OK)
     (async () => {
         try {
             const aiResponse = await chat({

@@ -21,7 +21,8 @@ const testWhapiConnectionFlow = ai.defineFlow(
   },
   async ({ apiKey, instanceId }) => {
     try {
-      const whapiUrl = `https://gate.whapi.cloud/instances/${instanceId}/status`;
+      // Usamos el endpoint del recurso directo para mayor compatibilidad entre tipos de instancia (FALCON/Standard)
+      const whapiUrl = `https://gate.whapi.cloud/instances/${instanceId}`;
       
       const response = await fetch(whapiUrl, {
         method: 'GET',
@@ -32,13 +33,12 @@ const testWhapiConnectionFlow = ai.defineFlow(
       });
 
       if (!response.ok) {
-        let detail = 'Error desconocido';
+        let detail = `Error HTTP ${response.status}`;
         try {
             const errorBody = await response.text();
             if (errorBody) {
                 try {
                     const errorJson = JSON.parse(errorBody);
-                    // Extracción agresiva para evitar [object Object]
                     const extracted = errorJson.error?.message || errorJson.message || errorJson.error || errorBody;
                     detail = typeof extracted === 'object' ? JSON.stringify(extracted) : String(extracted);
                 } catch (jsonError) {
@@ -46,22 +46,25 @@ const testWhapiConnectionFlow = ai.defineFlow(
                 }
             }
         } catch (readError) {
-            detail = `HTTP ${response.status}`;
+            // ignore
         }
 
-        if (detail.toLowerCase().includes('not found')) {
+        if (response.status === 404 || detail.toLowerCase().includes('not found')) {
             throw new Error('Instancia/Canal no encontrado (404). Por favor, verifica tu "Instance ID" y "API Key".');
         }
         
-        throw new Error(`Detalle: ${detail}`);
+        throw new Error(detail);
       }
 
       const data = await response.json();
 
-      if (data?.account_status === 'authenticated') {
-        return { success: true, message: `¡Conexión exitosa! Estado: ${data.account_status}.` };
+      // Normalizamos la lectura del estado según la versión de la API
+      const accountStatus = data?.account_status || data?.status?.status;
+
+      if (accountStatus === 'authenticated' || accountStatus === 'connected') {
+        return { success: true, message: `¡Conexión exitosa! Estado: ${accountStatus}.` };
       } else {
-        throw new Error(`Estado de la cuenta: ${data.account_status || 'no autenticado'}.`);
+        return { success: false, message: `Instancia encontrada pero no autenticada. Estado: ${accountStatus || 'desconocido'}.` };
       }
 
     } catch (error: any) {
