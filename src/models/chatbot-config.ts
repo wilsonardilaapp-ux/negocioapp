@@ -1,6 +1,7 @@
 export type ChatbotConfig = {
   id: string;
   businessId: string;
+  whapiChannelId?: string; // Nuevo campo para resolución de inquilino (Tenant ID)
   whatsApp: {
     connected: boolean;
     number: string;

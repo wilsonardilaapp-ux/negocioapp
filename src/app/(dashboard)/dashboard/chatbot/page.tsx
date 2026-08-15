@@ -40,6 +40,7 @@ const initialChatbotConfig: Partial<ChatbotConfig> = {
     number: '',
     token: ''
   },
+  whapiChannelId: '',
   business: {
     name: '',
     type: 'Otro',
@@ -566,6 +567,7 @@ export default function ChatbotPage() {
             const testConfig: ChatbotConfig = {
                 id: 'main',
                 businessId: user.uid,
+                whapiChannelId: 'TEST-CHANNEL-ID',
                 whatsApp: {
                     connected: false,
                     number: '573228831634',
@@ -737,40 +739,58 @@ export default function ChatbotPage() {
                                 </Button>
                             </div>
                             
-                            <div className="space-y-2">
-                                <Label htmlFor="whatsapp-number">Número de WhatsApp</Label>
-                                <div className="flex gap-2">
-                                    <Select value={countryCode} onValueChange={setCountryCode}>
-                                        <SelectTrigger className="w-28">
-                                            <SelectValue placeholder="+57" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="57">🇨🇴 +57</SelectItem>
-                                            <SelectItem value="1">🇺🇸 +1</SelectItem>
-                                            <SelectItem value="52">🇲🇽 +52</SelectItem>
-                                            <SelectItem value="34">🇪🇸 +34</SelectItem>
-                                            <SelectItem value="54">🇦🇷 +54</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                    <Controller
-                                        name="whatsApp.number"
-                                        control={control}
-                                        render={({ field }) => (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="space-y-2">
+                                    <Label htmlFor="whatsapp-number">Número de WhatsApp</Label>
+                                    <div className="flex gap-2">
+                                        <Select value={countryCode} onValueChange={setCountryCode}>
+                                            <SelectTrigger className="w-28">
+                                                <SelectValue placeholder="+57" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="57">🇨🇴 +57</SelectItem>
+                                                <SelectItem value="1">🇺🇸 +1</SelectItem>
+                                                <SelectItem value="52">🇲🇽 +52</SelectItem>
+                                                <SelectItem value="34">🇪🇸 +34</SelectItem>
+                                                <SelectItem value="54">🇦🇷 +54</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                        <Controller
+                                            name="whatsApp.number"
+                                            control={control}
+                                            render={({ field }) => (
+                                                <Input
+                                                    id="whatsapp-number"
+                                                    placeholder="300 123 4567"
+                                                    className="flex-1"
+                                                    value={field.value || ''}
+                                                    onChange={field.onChange}
+                                                    onBlur={field.onBlur}
+                                                    name={field.name}
+                                                />
+                                            )}
+                                        />
+                                    </div>
+                                </div>
+
+                                <Controller
+                                    name="whapiChannelId"
+                                    control={control}
+                                    render={({ field }) => (
+                                        <div className="space-y-2">
+                                            <Label htmlFor="whapi-channel-id">ID del Canal (Channel ID / Instance ID)</Label>
                                             <Input
-                                                id="whatsapp-number"
-                                                placeholder="300 123 4567"
-                                                className="flex-1"
+                                                id="whapi-channel-id"
+                                                placeholder="Ej: FALCON-3VQP6"
                                                 value={field.value || ''}
                                                 onChange={field.onChange}
                                                 onBlur={field.onBlur}
                                                 name={field.name}
                                             />
-                                        )}
-                                    />
-                                </div>
-                                <p className="text-[10px] text-muted-foreground mt-1 italic">
-                                    El sistema normalizará el número automáticamente al guardar (código + dígitos).
-                                </p>
+                                            <p className="text-[10px] text-muted-foreground italic">Copia este ID desde el panel de WHAPI.cloud para que el sistema identifique tu negocio.</p>
+                                        </div>
+                                    )}
+                                />
                             </div>
 
                             <Controller

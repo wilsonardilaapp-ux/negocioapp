@@ -16,7 +16,6 @@ function normalizePhoneNumber(phone: string | undefined | null): string {
 
 /**
  * Endpoint GET para verificación de disponibilidad del Webhook.
- * Útil para pruebas rápidas desde el navegador.
  */
 export async function GET() {
     return NextResponse.json({ 
@@ -30,15 +29,21 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     
-    // Log estructurado para depuración en Cloud Logging
+    // Log estructurado para depuración
     console.log('--- [WHAPI-WEBHOOK INCOMING] ---');
     console.log(JSON.stringify(body, null, 2));
 
     const message = body.messages?.[0];
+    const channelId = body.channel_id; // Fuente de verdad del payload de WHAPI
     
     // Ignorar eventos que no sean mensajes o mensajes salientes
     if (!message || message.from_me) {
       return NextResponse.json({ status: 'ignored', reason: 'not_a_customer_message' }, { status: 200 });
+    }
+
+    if (!channelId) {
+      console.warn('[WHAPI-WEBHOOK] Missing channel_id in payload.');
+      return NextResponse.json({ status: 'error', reason: 'missing_channel_id' }, { status: 200 });
     }
 
     const incomingText = message.text?.body;
@@ -53,39 +58,30 @@ export async function POST(req: NextRequest) {
     let businessId: string | null = null;
     let businessToken: string | null = null;
 
-    // 1. Resolución de Identidad: Buscar el negocio dueño de este número
-    const configSnapshot = await db.collectionGroup('chatbotConfig').get();
-    const targetConfigDoc = configSnapshot.docs.find(doc => {
-        const data = doc.data();
-        const storedNumber = normalizePhoneNumber(data.whatsApp?.number);
-        return storedNumber !== '' && storedNumber === senderNumber;
-    });
+    // 1. Resolución de Identidad: Query indexada por whapiChannelId (Multi-tenant)
+    const configSnapshot = await db.collectionGroup('chatbotConfig')
+      .where('whapiChannelId', '==', channelId)
+      .limit(1)
+      .get();
 
-    // 2. Prioridad de identificación: Parámetro URL > Documento encontrado (Data) > Documento encontrado (Path)
-    const urlBusinessId = req.nextUrl.searchParams.get('businessId');
+    if (configSnapshot.empty) {
+      console.warn(`[WHAPI-WEBHOOK] Negocio no identificado para el canal: ${channelId}`);
+      return NextResponse.json({ status: 'error', reason: 'business_not_found_for_channel' }, { status: 200 });
+    }
+
+    const configDoc = configSnapshot.docs[0];
+    const configData = configDoc.data();
     
-    if (urlBusinessId) {
-        businessId = urlBusinessId;
-    } else if (targetConfigDoc) {
-        // Fallback: Si el documento no tiene el campo businessId, lo extraemos de su ruta (businesses/ID/chatbotConfig/main)
-        businessId = targetConfigDoc.data().businessId || targetConfigDoc.ref.parent.parent?.id || null;
+    // Extraer businessId del path (businesses/{businessId}/chatbotConfig/main)
+    businessId = configData.businessId || configDoc.ref.parent.parent?.id || null;
+    businessToken = configData.whatsApp?.token;
+
+    if (!businessId || !businessToken) {
+      console.error(`[WHAPI-WEBHOOK] Configuración incompleta para el negocio: ${businessId}`);
+      return NextResponse.json({ status: 'error', reason: 'token_or_id_missing' }, { status: 200 });
     }
 
-    if (!businessId) {
-      console.warn(`[WHAPI-WEBHOOK] Negocio no identificado para el remitente: ${senderNumber}`);
-      return NextResponse.json({ status: 'error', reason: 'business_not_found' }, { status: 200 });
-    }
-
-    // 3. Obtener credenciales de envío del negocio
-    const businessConfigSnap = await db.doc(`businesses/${businessId}/chatbotConfig/main`).get();
-    businessToken = businessConfigSnap.data()?.whatsApp?.token;
-
-    if (!businessToken) {
-      console.error(`[WHAPI-WEBHOOK] Token faltante para el negocio: ${businessId}`);
-      return NextResponse.json({ status: 'error', reason: 'token_missing' }, { status: 200 });
-    }
-
-    // 4. Registro en analíticas (Persistencia del canal WhatsApp)
+    // 2. Registro en analíticas (Persistencia del canal WhatsApp en la ruta original)
     try {
       const conversationId = uuidv4();
       await db.collection('businesses').doc(businessId).collection('chatConversations').doc(conversationId).set({
@@ -97,16 +93,16 @@ export async function POST(req: NextRequest) {
         channel: 'whatsapp',
       });
     } catch (regError) {
-      console.error('[WHAPI-WEBHOOK] Fallo al registrar conversación en analíticas:', regError);
+      console.error('[WHAPI-WEBHOOK] Fallo al registrar conversación:', regError);
     }
 
-    // 5. Procesamiento con IA (Asíncrono para evitar timeouts del webhook)
+    // 3. Procesamiento asíncrono con IA
     (async () => {
         try {
             const aiResponse = await chat({
                 businessId: businessId!,
                 message: incomingText,
-                history: [] // Podrías implementar recuperación de historial aquí
+                history: [] 
             });
 
             await fetch('https://gate.whapi.cloud/messages/text', {
@@ -121,11 +117,10 @@ export async function POST(req: NextRequest) {
                 })
             });
         } catch (aiError: any) {
-            console.error(`[WHAPI-IA-ERROR] Error procesando respuesta para ${businessId}:`, aiError.message);
+            console.error(`[WHAPI-IA-ERROR] Error para ${businessId}:`, aiError.message);
         }
     })();
 
-    // Siempre retornamos 200 OK inmediatamente a WHAPI
     return NextResponse.json({ status: 'received', businessId }, { status: 200 });
 
   } catch (error: any) {
