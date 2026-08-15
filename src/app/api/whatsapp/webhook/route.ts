@@ -25,15 +25,16 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     
     // [WEBHOOK-DEBUG] Inspección total del evento recibido de WHAPI
-    console.log(`[WEBHOOK-DEBUG] Evento recibido:`, JSON.stringify(body, null, 2));
+    console.log('[WEBHOOK-RAW-DATA]', JSON.stringify(body, null, 2));
 
     const message = body.messages?.[0];
     
     // Normalización estricta del ID del Canal (Tenant ID)
     const channelId = body.channel_id?.toString().trim().toUpperCase(); 
     
+    // Filtro de seguridad: ignorar mensajes propios o eventos vacíos
     if (!message || message.from_me) {
-      console.log(`[WEBHOOK-DEBUG] Evento ignorado (sin mensajes o mensaje propio).`);
+      console.log(`[WEBHOOK-DEBUG] Evento ignorado (mensaje propio o sin contenido).`);
       return NextResponse.json({ status: 'ignored' }, { status: 200 });
     }
 
@@ -42,28 +43,27 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ status: 'error', message: 'missing_channel_id' }, { status: 200 });
     }
 
-    const incomingText = message.text?.body;
+    // Aceptar múltiples formatos de mensaje (texto plano o subtítulo de media)
+    const incomingText = message.text?.body || message.caption || '';
     const rawSender = message.chat_id || message.from;
 
     if (!incomingText) {
+      console.log(`[WEBHOOK-DEBUG] Mensaje sin texto legible. Ignorado.`);
       return NextResponse.json({ status: 'ignored' }, { status: 200 });
     }
 
     const db = await getAdminFirestore();
     
-    // 1. Resolución de Identidad (Multi-tenant) con Fallback
+    // --- [PASO 1] RESOLUCIÓN DE IDENTIDAD ---
     let businessId: string | null = null;
     let businessToken: string | null = null;
 
-    console.log(`[WHAPI-DEBUG] Buscando negocio para channelId: "${channelId}"`);
-
-    // Nivel 1: Búsqueda en configuraciones de chatbot
+    // Búsqueda multinivel (Fallback)
     let configSnapshot = await db.collectionGroup('chatbotConfig')
       .where('whapiChannelId', '==', channelId)
       .limit(1)
       .get();
 
-    // Nivel 2: Fallback - Búsqueda en el maestro de negocios
     if (configSnapshot.empty) {
       configSnapshot = await db.collection('businesses')
         .where('whapiChannelId', '==', channelId)
@@ -79,7 +79,6 @@ export async function POST(req: NextRequest) {
     const configDoc = configSnapshot.docs[0];
     const configData = configDoc.data();
     
-    // Resolución resiliente del ID de negocio
     businessId = configData.businessId || configData.business?.businessId || (configDoc.ref.parent.id === 'businesses' ? configDoc.id : configDoc.ref.parent.parent?.id) || null;
     businessToken = configData.whatsApp?.token;
 
@@ -88,12 +87,30 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ status: 'error', reason: 'incomplete_config' }, { status: 200 });
     }
 
-    console.log(`[WHAPI-SUCCESS] Negocio identificado: ${businessId}`);
+    console.log(`[PASO 1] Identificado: ${businessId}`);
 
-    // 2. Ejecución asíncrona de IA y respuesta
+    // --- [PASO 2, 3 y 4] EJECUCIÓN ASÍNCRONA ---
     (async () => {
+        const fallbackMessage = 'Hola, soy el asistente del Salón de Belleza Natural. Estoy teniendo un problema técnico momentáneo para leer mis manuales. Por favor, deja tu duda y un humano te atenderá pronto.';
+        let responseSent = false;
+
         try {
-            console.log(`[AI-DEBUG] Iniciando generación de respuesta para: ${businessId}`);
+            // Monitor de Timeout (8 segundos)
+            const timeoutMonitor = setTimeout(async () => {
+                if (!responseSent) {
+                    console.log(`[TIMEOUT-ALERTA] Generación lenta para ${businessId}. Enviando aviso...`);
+                    await fetch('https://gate.whapi.cloud/messages/text', {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${businessToken?.trim()}`,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ to: rawSender, body: 'Estamos procesando tu solicitud, un momento por favor...' })
+                    }).catch(() => {});
+                }
+            }, 8000);
+
+            console.log(`[PASO 2] Buscando en Documentos (RAG)...`);
             
             // Registro en analíticas
             const senderNumber = normalizePhoneNumber(rawSender);
@@ -107,49 +124,57 @@ export async function POST(req: NextRequest) {
                 channel: 'whatsapp',
             }).catch(e => console.error("[ANALYTICS-ERROR]", e.message));
 
+            console.log(`[PASO 3] Llamando a IA...`);
             const aiResponse = await chat({
                 businessId: businessId!,
                 message: incomingText,
                 history: [] 
             });
 
-            console.log(`[AI-DEBUG] Respuesta generada: "${aiResponse ? aiResponse.substring(0, 100) : 'VACÍO'}..."`);
+            clearTimeout(timeoutMonitor);
+            const finalMessage = aiResponse?.trim() || fallbackMessage;
 
-            if (!aiResponse) {
-              console.warn(`[AI-DEBUG] El motor de IA devolvió una respuesta vacía para ${businessId}.`);
-              return;
-            }
-
-            const businessTokenPrefix = businessToken ? businessToken.substring(0, 5) : 'MISSING';
-            console.log(`[WHAPI-DEBUG] Intentando enviar mensaje con Token: ${businessTokenPrefix}... a chat: ${rawSender}`);
-
-            // Envío utilizando el token específico del negocio identificado con encabezados robustos
+            console.log(`[PASO 4] Enviando a Whapi...`);
             const whapiResponse = await fetch('https://gate.whapi.cloud/messages/text', {
                 method: 'POST',
                 headers: {
-                    'Authorization': `Bearer ${businessToken.trim()}`,
+                    'Authorization': `Bearer ${businessToken!.trim()}`,
                     'Content-Type': 'application/json',
                     'Accept': 'application/json'
                 },
                 body: JSON.stringify({
                     to: rawSender,
-                    body: aiResponse
+                    body: finalMessage
                 })
             });
+
+            responseSent = true;
 
             if (!whapiResponse.ok) {
                 const errorBody = await whapiResponse.text();
                 console.error(`[WHAPI-FATAL] Fallo al enviar. Status: ${whapiResponse.status}. Body: ${errorBody}`);
             } else {
-                console.log(`[WHAPI-SUCCESS] Mensaje enviado correctamente al remitente.`);
+                console.log(`[WHAPI-SUCCESS] Mensaje entregado correctamente.`);
             }
 
         } catch (error: any) {
-            console.error(`[WHAPI-NETWORK-ERROR] Error en el proceso asíncrono para ${businessId}:`, error.message);
+            console.error(`[WHAPI-NETWORK-ERROR] Error crítico en el proceso asíncrono:`, error.message);
+            
+            // Envío forzado de fallback en caso de error catastrófico
+            if (!responseSent) {
+                await fetch('https://gate.whapi.cloud/messages/text', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${businessToken!.trim()}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ to: rawSender, body: fallbackMessage })
+                }).catch(() => {});
+            }
         }
     })();
 
-    return NextResponse.json({ status: 'received' }, { status: 200 });
+    return NextResponse.json({ status: 'received', businessId }, { status: 200 });
 
   } catch (error: any) {
     console.error(`[WHAPI-WEBHOOK-FATAL]:`, error.message);
