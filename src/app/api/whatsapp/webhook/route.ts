@@ -63,15 +63,25 @@ export async function POST(req: NextRequest) {
     let businessId: string | null = null;
     let businessToken: string | null = null;
 
-    // Resolución de Identidad: Query indexada por whapiChannelId (Multi-tenant)
-    const configSnapshot = await db.collectionGroup('chatbotConfig')
+    // Resolución de Identidad: Búsqueda multinivel (Multi-tenant)
+    // Nivel 1: Búsqueda en sub-colecciones chatbotConfig (Estandar)
+    let configSnapshot = await db.collectionGroup('chatbotConfig')
       .where('whapiChannelId', '==', channelId)
       .limit(1)
       .get();
 
+    // Nivel 2: Fallback - Búsqueda en colección raíz de negocios
+    if (configSnapshot.empty) {
+      console.log(`[WHAPI-DEBUG] No encontrado en collectionGroup. Intentando en 'businesses'...`);
+      configSnapshot = await db.collection('businesses')
+        .where('whapiChannelId', '==', channelId)
+        .limit(1)
+        .get();
+    }
+
     if (configSnapshot.empty) {
       // Log detallado para diagnóstico en Vercel
-      console.warn(`[WHAPI-WEBHOOK] Negocio no identificado. No existe 'whapiChannelId' con valor "${channelId}" en ninguna sub-colección 'chatbotConfig'.`);
+      console.warn(`[WHAPI-WEBHOOK] Negocio no identificado. No existe 'whapiChannelId' con valor "${channelId}" en ninguna sub-colección 'chatbotConfig' ni en raíz de 'businesses'.`);
       return NextResponse.json({ status: 'error', reason: 'business_not_found_for_channel' }, { status: 200 });
     }
 
@@ -79,9 +89,22 @@ export async function POST(req: NextRequest) {
     const configData = configDoc.data();
     
     // 3. Resolución de ID Resiliente
-    // Buscamos en raíz, en el objeto 'business' (detectado en captura) o en el path del doc
-    businessId = configData.businessId || configData.business?.businessId || configDoc.ref.parent.parent?.id || null;
+    // Detectamos si el documento encontrado es un negocio raíz o una configuración
+    if (configDoc.ref.parent.id === 'businesses') {
+        businessId = configDoc.id;
+    } else {
+        businessId = configData.businessId || configData.business?.businessId || configDoc.ref.parent.parent?.id || null;
+    }
+    
     businessToken = configData.whatsApp?.token;
+
+    // Si encontramos el ID pero no el token (posible en el fallback de raíz), buscamos la config
+    if (businessId && !businessToken) {
+        const subConfig = await db.collection('businesses').doc(businessId).collection('chatbotConfig').doc('main').get();
+        if (subConfig.exists) {
+            businessToken = subConfig.data()?.whatsApp?.token;
+        }
+    }
 
     if (!businessId || !businessToken) {
       console.error(`[WHAPI-WEBHOOK] Configuración incompleta para el negocio: ${businessId}`);

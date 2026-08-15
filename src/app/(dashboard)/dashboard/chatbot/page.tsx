@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Loader2, Save, Wifi, WifiOff, UploadCloud, FileText, Trash2, CheckCircle, AlertTriangle, MessageSquare, BadgePercent, Smile, Frown } from "lucide-react";
+import { Loader2, Save, Wifi, WifiOff, UploadCloud, FileText, Trash2, CheckCircle, AlertTriangle, MessageSquare, BadgePercent, Smile, Frown, Wrench } from "lucide-react";
 import Image from "next/image";
 import { useToast } from "@/hooks/use-toast";
 import { useUser, useFirestore, useDoc, useCollection, useMemoFirebase, setDocumentNonBlocking, updateDocumentNonBlocking, deleteDocumentNonBlocking } from "@/firebase";
@@ -507,6 +507,11 @@ export default function ChatbotPage() {
         if (!configDocRef || !user || !firestore) return;
         const currentData = getValues();
         
+        // Sanitización preventiva: Eliminar espacios en el Channel ID para evitar fallos de resolución
+        if (currentData.whapiChannelId) {
+            currentData.whapiChannelId = currentData.whapiChannelId.trim();
+        }
+
         // Normalización estricta del número de WhatsApp
         if (currentData.whatsApp && currentData.whatsApp.number) {
             const rawNumber = currentData.whatsApp.number;
@@ -550,6 +555,39 @@ export default function ChatbotPage() {
                 variant: "destructive",
                 title: "Error al guardar",
                 description: "No se pudieron guardar los cambios. Intenta de nuevo.",
+            });
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    /**
+     * Parche manual para forzar el Channel ID correcto solicitado por el usuario.
+     * Solo asigna el valor al campo whapiChannelId de forma case-sensitive.
+     */
+    const handleFixChannelId = async () => {
+        if (!configDocRef || !user || !firestore) return;
+        
+        setIsSaving(true);
+        try {
+            const FIXED_ID = "FALCON-3VQP6";
+            await setDoc(configDocRef, {
+                whapiChannelId: FIXED_ID,
+                updatedAt: new Date().toISOString()
+            }, { merge: true });
+
+            toast({
+                title: "ID de Canal Reparado",
+                description: `Se ha asignado manualmente: ${FIXED_ID}`,
+            });
+
+            // Actualizar el valor en el formulario local
+            setValue('whapiChannelId', FIXED_ID);
+        } catch (error: any) {
+            toast({
+                variant: "destructive",
+                title: "Fallo en la reparación",
+                description: error.message || "No se pudo actualizar el campo."
             });
         } finally {
             setIsSaving(false);
@@ -733,10 +771,15 @@ export default function ChatbotPage() {
                                         {isConnected ? 'Conectado' : 'Desconectado'}
                                     </p>
                                 </div>
-                                <Button variant="outline" className="ml-auto" onClick={handleVerifyConnection} disabled={isVerifying}>
-                                     {isVerifying && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                     {isVerifying ? 'Verificando...' : 'Verificar Conexión'}
-                                </Button>
+                                <div className="ml-auto flex gap-2">
+                                    <Button variant="outline" onClick={handleFixChannelId} disabled={isSaving}>
+                                        <Wrench className="mr-2 h-4 w-4" /> Reparar ID de Canal
+                                    </Button>
+                                    <Button variant="outline" onClick={handleVerifyConnection} disabled={isVerifying}>
+                                        {isVerifying && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                        {isVerifying ? 'Verificando...' : 'Verificar Conexión'}
+                                    </Button>
+                                </div>
                             </div>
                             
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -779,14 +822,17 @@ export default function ChatbotPage() {
                                     render={({ field }) => (
                                         <div className="space-y-2">
                                             <Label htmlFor="whapi-channel-id">ID del Canal (Channel ID / Instance ID)</Label>
-                                            <Input
-                                                id="whapi-channel-id"
-                                                placeholder="Ej: FALCON-3VQP6"
-                                                value={field.value || ''}
-                                                onChange={field.onChange}
-                                                onBlur={field.onBlur}
-                                                name={field.name}
-                                            />
+                                            <div className="flex gap-2">
+                                                <Input
+                                                    id="whapi-channel-id"
+                                                    placeholder="Ej: FALCON-3VQP6"
+                                                    value={field.value || ''}
+                                                    onChange={field.onChange}
+                                                    onBlur={field.onBlur}
+                                                    name={field.name}
+                                                    className="flex-1"
+                                                />
+                                            </div>
                                             <p className="text-[10px] text-muted-foreground italic">Copia este ID desde el panel de WHAPI.cloud para que el sistema identifique tu negocio.</p>
                                         </div>
                                     )}
