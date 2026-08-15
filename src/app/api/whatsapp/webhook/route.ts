@@ -86,7 +86,6 @@ export async function POST(req: NextRequest) {
     // 2. Ejecución asíncrona de IA y respuesta
     (async () => {
         try {
-            // FORZAR LOG INICIAL
             console.log(`[AI-DEBUG] Iniciando generación de respuesta para: ${businessId}`);
             
             const aiResponse = await chat({
@@ -105,12 +104,13 @@ export async function POST(req: NextRequest) {
             const businessTokenPrefix = businessToken ? businessToken.substring(0, 5) : 'MISSING';
             console.log(`[WHAPI-DEBUG] Intentando enviar mensaje con Token: ${businessTokenPrefix}... a chat: ${rawSender}`);
 
-            // Envío utilizando el token específico del negocio identificado
+            // Envío utilizando el token específico del negocio identificado con encabezados robustos
             const whapiResponse = await fetch('https://gate.whapi.cloud/messages/text', {
                 method: 'POST',
                 headers: {
-                    'Authorization': `Bearer ${businessToken}`,
-                    'Content-Type': 'application/json'
+                    'Authorization': `Bearer ${businessToken.trim()}`,
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
                 },
                 body: JSON.stringify({
                     to: rawSender,
@@ -122,11 +122,12 @@ export async function POST(req: NextRequest) {
                 const errorBody = await whapiResponse.text();
                 console.error(`[WHAPI-FATAL] Fallo al enviar. Status: ${whapiResponse.status}. Body: ${errorBody}`);
             } else {
-                console.log(`[WHAPI-SUCCESS] Mensaje enviado correctamente al remitente vía WHAPI.`);
+                console.log(`[WHAPI-SUCCESS] Mensaje enviado correctamente al remitente.`);
             }
 
-        } catch (aiError: any) {
-            console.error(`[WHAPI-IA-CRITICAL] Error en procesamiento para ${businessId}:`, aiError.message);
+        } catch (error: any) {
+            // Log específico solicitado para fallos de red
+            console.error(`[WHAPI-NETWORK-ERROR] Error de red en el proceso asíncrono para ${businessId}:`, error.message);
         }
     })();
 
