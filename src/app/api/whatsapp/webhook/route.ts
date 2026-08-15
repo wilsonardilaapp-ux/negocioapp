@@ -86,6 +86,7 @@ export async function POST(req: NextRequest) {
     // 2. Ejecución asíncrona de IA y respuesta
     (async () => {
         try {
+            // FORZAR LOG INICIAL
             console.log(`[AI-DEBUG] Iniciando generación de respuesta para: ${businessId}`);
             
             const aiResponse = await chat({
@@ -94,10 +95,14 @@ export async function POST(req: NextRequest) {
                 history: [] 
             });
 
-            console.log(`[AI-DEBUG] Respuesta generada: "${aiResponse.substring(0, 50)}..."`);
+            console.log(`[AI-DEBUG] Respuesta generada: "${aiResponse ? aiResponse.substring(0, 50) : 'VACÍO'}..."`);
 
-            if (!aiResponse) return;
+            if (!aiResponse) {
+              console.warn(`[AI-DEBUG] El motor de IA devolvió una respuesta vacía para ${businessId}.`);
+              return;
+            }
 
+            // Envío utilizando el token específico del negocio identificado
             const whapiResponse = await fetch('https://gate.whapi.cloud/messages/text', {
                 method: 'POST',
                 headers: {
@@ -113,6 +118,8 @@ export async function POST(req: NextRequest) {
             if (!whapiResponse.ok) {
                 const errorBody = await whapiResponse.text();
                 console.error(`[WHAPI-ERROR] Fallo al enviar a WhatsApp: ${whapiResponse.status} - ${errorBody}`);
+            } else {
+                console.log(`[WHAPI-SUCCESS] Mensaje enviado correctamente al remitente vía WHAPI.`);
             }
 
         } catch (aiError: any) {

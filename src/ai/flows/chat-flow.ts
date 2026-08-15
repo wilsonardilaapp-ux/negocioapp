@@ -23,8 +23,8 @@ export type ChatInput = z.infer<typeof ChatInputSchema>;
 export async function chat(input: ChatInput): Promise<string> {
   try {
     return await chatFlow(input);
-  } catch (error) {
-    console.error("Error técnico en chatFlow:", error);
+  } catch (error: any) {
+    console.error("Error técnico en chatFlow:", error.message);
     return "Lo siento, estoy teniendo problemas técnicos. Por favor, intenta de nuevo en unos minutos.";
   }
 }
@@ -91,6 +91,7 @@ export async function getAIConfig(businessId?: string): Promise<{ provider: stri
     const configDoc = globalConfigSnap.exists ? globalConfigSnap : integrationSnap;
 
     if (!configDoc.exists) {
+      console.error("[AI-ERROR] No hay motor de IA activo en el panel de Super Admin.");
       return { provider: 'openai', apiKey: '', model: 'gpt-4o-mini' };
     }
 
@@ -102,14 +103,16 @@ export async function getAIConfig(businessId?: string): Promise<{ provider: stri
       fields = data?.fields || {};
     }
 
-    // Identificar motor 'Activo' (Selección dinámica)
+    // Identificar motor 'Activo' (Selección dinámica basada en la presencia de API Key)
     if (fields.google?.apiKey) return { provider: 'googleai', apiKey: fields.google.apiKey, model: 'gemini-1.5-flash' };
     if (fields.openai?.apiKey) return { provider: 'openai', apiKey: fields.openai.apiKey, model: 'gpt-4o-mini' };
     if (fields.groq?.apiKey) return { provider: 'groq', apiKey: fields.groq.apiKey, model: 'llama-3.1-8b-instant' };
     if (fields.deepseek?.apiKey) return { provider: 'deepseek', apiKey: fields.deepseek.apiKey, model: 'deepseek-chat' };
 
+    console.error("[AI-ERROR] No se encontró ninguna API Key configurada en el motor global.");
+
   } catch (e: any) {
-    console.error("Error obteniendo config de IA:", e.message);
+    console.error("[AI-ERROR] Fallo al intentar leer la configuración global:", e.message);
   }
 
   return { provider: 'openai', apiKey: '', model: 'gpt-4o-mini' };
