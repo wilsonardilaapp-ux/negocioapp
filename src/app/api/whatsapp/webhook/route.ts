@@ -132,13 +132,22 @@ export async function POST(req: NextRequest) {
     // 3. Procesamiento asíncrono con IA
     (async () => {
         try {
+            console.log(`[AI-DEBUG] Iniciando generación de respuesta para el negocio: ${businessId}`);
+            
             const aiResponse = await chat({
                 businessId: businessId!,
                 message: incomingText,
                 history: [] 
             });
 
-            await fetch('https://gate.whapi.cloud/messages/text', {
+            console.log(`[AI-DEBUG] Respuesta generada: "${aiResponse}"`);
+
+            if (!aiResponse || aiResponse.trim() === '') {
+                console.warn(`[AI-DEBUG] La IA devolvió una respuesta vacía para el negocio: ${businessId}`);
+                return;
+            }
+
+            const whapiResponse = await fetch('https://gate.whapi.cloud/messages/text', {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${businessToken}`,
@@ -149,8 +158,17 @@ export async function POST(req: NextRequest) {
                     body: aiResponse
                 })
             });
+
+            if (!whapiResponse.ok) {
+                const errorBody = await whapiResponse.text();
+                console.error(`[WHAPI-ERROR] Falló el envío del mensaje a Whapi: ${whapiResponse.status} - ${errorBody}`);
+            } else {
+                console.log(`[WHAPI-SUCCESS] Respuesta enviada correctamente a ${rawSender}`);
+            }
+
         } catch (aiError: any) {
-            console.error(`[WHAPI-IA-ERROR] Error para ${businessId}:`, aiError.message);
+            console.error(`[WHAPI-IA-ERROR] Error crítico en el procesamiento de respuesta para ${businessId}:`, aiError.message);
+            // Capturamos cualquier fallo de Google AI o de la lógica del chat-flow aquí.
         }
     })();
 
