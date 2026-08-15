@@ -48,7 +48,6 @@ export async function POST(req: NextRequest) {
 
     const incomingText = message.text?.body;
     const rawSender = message.chat_id || message.from;
-    const senderNumber = normalizePhoneNumber(rawSender);
 
     if (!incomingText) {
       return NextResponse.json({ status: 'ignored', reason: 'no_text_content' }, { status: 200 });
@@ -83,6 +82,7 @@ export async function POST(req: NextRequest) {
 
     // 2. Registro en analíticas (Persistencia del canal WhatsApp en la ruta original)
     try {
+      const senderNumber = normalizePhoneNumber(rawSender);
       const conversationId = uuidv4();
       await db.collection('businesses').doc(businessId).collection('chatConversations').doc(conversationId).set({
         businessId: String(businessId),
