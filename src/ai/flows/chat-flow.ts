@@ -42,14 +42,14 @@ async function getBusinessContext(businessId: string, userMessage: string): Prom
     const businessName = businessDoc.exists ? businessDoc.data()?.name : "Salón de Belleza Natural";
 
     // 2. Base de Conocimiento (Documentos PDF y Manuales)
-    let knowledgeContent = "";
+    let knowledgeBaseContent = "";
     try {
       const knowledgeQuery = firestore.collection(`businesses/${businessId}/chatbotConfig/main/knowledgeBase`);
       const knowledgeSnap = await knowledgeQuery.get();
       
       console.log(`[RAG-DEBUG] Fragmentos encontrados en Base de Conocimientos: ${knowledgeSnap.size}`);
 
-      knowledgeContent = knowledgeSnap.docs.map(d => {
+      knowledgeBaseContent = knowledgeSnap.docs.map(d => {
         const data = d.data();
         const content = data.extractedText || data.content || "";
         const title = data.fileName || data.title || "Información";
@@ -72,7 +72,7 @@ async function getBusinessContext(businessId: string, userMessage: string): Prom
 INFORMACIÓN DEL NEGOCIO: ${businessName}
 
 [BASE DE CONOCIMIENTOS]
-${knowledgeContent || "No hay manuales cargados actualmente."}
+${knowledgeBaseContent || "No hay manuales cargados actualmente."}
 
 [SERVICIOS Y PRODUCTOS DISPONIBLES]
 ${productsContent || "Catálogo no disponible."}
@@ -85,6 +85,7 @@ ${productsContent || "Catálogo no disponible."}
 
 /**
  * Obtiene la configuración de IA activa desde el panel global.
+ * PRIORIDAD ABSOLUTA: DeepSeek para ahorro de costos.
  */
 export async function getAIConfig(businessId?: string): Promise<{ provider: string; apiKey: string; model: string }> {
   try {
@@ -92,8 +93,6 @@ export async function getAIConfig(businessId?: string): Promise<{ provider: stri
     
     // Consulta a la configuración global del Super Admin
     const globalConfigSnap = await firestore.doc('globalConfig/config_ia').get();
-    
-    // Fallback a la integración estándar
     const integrationSnap = await firestore.doc('integrations/chatbot-integrado-con-whatsapp-para-soporte-y-ventas').get();
 
     const configDoc = globalConfigSnap.exists ? globalConfigSnap : integrationSnap;
@@ -106,16 +105,34 @@ export async function getAIConfig(businessId?: string): Promise<{ provider: stri
     const data = configDoc.data();
     let fields: any = {};
     if (typeof data?.fields === 'string') {
-      fields = JSON.parse(data.fields);
+      try {
+        fields = JSON.parse(data.fields);
+      } catch (e) {
+        fields = {};
+      }
     } else {
       fields = data?.fields || {};
     }
 
-    if (fields.google?.apiKey) return { provider: 'googleai', apiKey: fields.google.apiKey, model: 'gemini-1.5-flash' };
-    if (fields.openai?.apiKey) return { provider: 'openai', apiKey: fields.openai.apiKey, model: 'gpt-4o-mini' };
-    if (fields.groq?.apiKey) return { provider: 'groq', apiKey: fields.groq.apiKey, model: 'llama-3.1-8b-instant' };
+    // --- REGLA DE PRIORIDAD: DeepSeek primero para ahorro de costos ---
+    if (fields.deepseek?.apiKey) {
+      return { provider: 'deepseek', apiKey: fields.deepseek.apiKey, model: 'deepseek-chat' };
+    }
+    
+    // Fallbacks
+    if (fields.google?.apiKey) {
+      return { provider: 'googleai', apiKey: fields.google.apiKey, model: 'gemini-1.5-flash' };
+    }
+    
+    if (fields.openai?.apiKey) {
+      return { provider: 'openai', apiKey: fields.openai.apiKey, model: 'gpt-4o-mini' };
+    }
+    
+    if (fields.groq?.apiKey) {
+      return { provider: 'groq', apiKey: fields.groq.apiKey, model: 'llama-3.1-8b-instant' };
+    }
 
-    console.error("[AI-ERROR] No se encontró ninguna API Key configurada en el motor global.");
+    console.error("[AI-ERROR] No se encontró ninguna API Key configurada (DeepSeek, Gemini, etc.)");
 
   } catch (e: any) {
     console.error("[AI-ERROR] Fallo al leer configuración IA:", e.message);
@@ -144,7 +161,7 @@ Responde ÚNICAMENTE basándote en el CONTEXTO proporcionado.
 
 REGLAS CRÍTICAS:
 1. Si el mensaje del usuario es un simple saludo (hola, buenos días, buenas tardes), responde amablemente presentándote como el Asistente del Salón de Belleza Natural y pregúntale en qué puedes ayudarle. Para responder a los saludos, NO necesitas buscar en el contexto.
-2. Para cualquier otra pregunta sobre el negocio, usa ESTRICTAMENTE el contexto de la base de conocimientos proporcionada.
+2. Para cualquier otra pregunta sobre el negocio, usa ESTRICTAMENTE el contexto de la base de conocimientos proporcionada en el bloque CONTEXTO ACTUAL DEL NEGOCIO.
 3. Si la información solicitada no está explícitamente en el CONTEXTO y no es un saludo, responde EXACTAMENTE: "Hola, soy el asistente del Salón de Belleza Natural. No encontré esa info en mis manuales, ¿en qué más te ayudo?"
 4. NO uses tu conocimiento general para inventar respuestas sobre el negocio.
 5. NO inventes precios ni servicios que no aparezcan en el CONTEXTO.
@@ -155,6 +172,7 @@ CONTEXTO ACTUAL DEL NEGOCIO:
 ${contextData}
 """`;
 
+    // Caso Google AI
     if (aiConfig.provider === 'googleai') {
       const response = await ai.generate({
         model: `googleai/${aiConfig.model}`,
@@ -168,10 +186,11 @@ ${contextData}
       return response.text ?? "Hola, soy el asistente del Salón de Belleza Natural. No encontré esa info en mis manuales, ¿en qué más te ayudo?";
     }
 
-    // Fallback para otros proveedores (OpenAI compatible)
+    // Fallback para otros proveedores (DeepSeek, OpenAI, Groq)
     try {
       let endpoint = 'https://api.openai.com/v1/chat/completions';
       if (aiConfig.provider === 'groq') endpoint = 'https://api.groq.com/openai/v1/chat/completions';
+      if (aiConfig.provider === 'deepseek') endpoint = 'https://api.deepseek.com/v1/chat/completions';
 
       const response = await fetch(endpoint, {
         method: 'POST',

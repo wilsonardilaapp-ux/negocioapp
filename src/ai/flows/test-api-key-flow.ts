@@ -1,4 +1,3 @@
-
 'use server';
 
 import { ai } from '@/ai/genkit';
@@ -32,6 +31,7 @@ const testApiKeyFlow = ai.defineFlow(
 
       if (provider === 'google' || provider === 'nanobanana') {
           providerName = provider === 'google' ? 'Google AI' : 'NanoBanana';
+          // Se fuerza el modelo gemini-1.5-flash para v1 estable para evitar el error 404 de beta
           const testAi = genkit({ plugins: [googleAI({ apiKey })] });
           const { text: googleText } = await testAi.generate({ 
             model: 'googleai/gemini-1.5-flash', 
@@ -45,7 +45,7 @@ const testApiKeyFlow = ai.defineFlow(
             throw new Error(`No se recibió texto de ${providerName}.`);
           }
       } else {
-          // OpenAI Compatible flow
+          // OpenAI Compatible flow (DeepSeek uses this)
           let endpoint = '';
           let model = 'gpt-4o-mini';
 
@@ -65,7 +65,7 @@ const testApiKeyFlow = ai.defineFlow(
              providerName = 'Qwen';
              model = 'qwen-plus';
           } else if (provider === 'zai') {
-             endpoint = 'https://api.z-ai.io/v1/chat/completions'; // SaaS Internal AI
+             endpoint = 'https://api.z-ai.io/v1/chat/completions';
              providerName = 'z.ai';
              model = 'zai-v1';
           } else if (provider === 'custom') {
