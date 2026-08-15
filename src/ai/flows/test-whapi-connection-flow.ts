@@ -1,4 +1,3 @@
-
 'use server';
 
 import { ai } from '@/ai/genkit';
@@ -33,39 +32,31 @@ const testWhapiConnectionFlow = ai.defineFlow(
       });
 
       if (!response.ok) {
-        let errorMessage = `La API de WHAPI devolvió un error ${response.status}.`;
+        let detail = 'Error desconocido';
         try {
-            // Attempt to get more details from the response body by reading it as text first
             const errorBody = await response.text();
             if (errorBody) {
                 try {
-                    // Try to parse the text as JSON
                     const errorJson = JSON.parse(errorBody);
+                    // Extracción robusta de mensaje para evitar [object Object]
+                    detail = errorJson.error?.message || errorJson.message || errorJson.error || errorBody;
                     
-                    if (errorJson.error) {
-                        // Extract error detail safely, avoiding [object Object]
-                        const errorDetail = typeof errorJson.error === 'object'
-                            ? (errorJson.error.message || JSON.stringify(errorJson.error))
-                            : errorJson.error;
-
-                        if (errorDetail === 'Channel not found') {
-                            errorMessage = 'Instancia/Canal no encontrado (404). Por favor, verifica que tu "Instance ID" y "API Key" sean correctos.';
-                        } else {
-                            errorMessage = `Error de WHAPI: ${errorDetail}`;
-                        }
-                    } else {
-                        // It's JSON but not the expected format, show the raw JSON or body
-                        errorMessage += ` Detalles: ${errorBody}`;
+                    if (typeof detail === 'object') {
+                        detail = JSON.stringify(detail);
                     }
                 } catch (jsonError) {
-                    // If parsing as JSON fails, it's likely plain text.
-                    errorMessage += ` Detalles: ${errorBody}`;
+                    detail = errorBody;
                 }
             }
         } catch (readError) {
-            // If reading the body fails, we stick with the original generic message.
+            detail = `HTTP ${response.status}`;
         }
-        throw new Error(errorMessage);
+
+        if (detail === 'Channel not found') {
+            throw new Error('Instancia/Canal no encontrado (404). Por favor, verifica que tu "Instance ID" y "API Key" sean correctos.');
+        }
+        
+        throw new Error(`Error de WHAPI: ${detail}`);
       }
 
       const data = await response.json();
@@ -82,7 +73,7 @@ const testWhapiConnectionFlow = ai.defineFlow(
       const errorMsg = error.message || 'Error desconocido';
       
       if (errorMsg.includes('fetch failed') || errorMsg.includes('ENOTFOUND')) {
-         return { success: false, message: `Error de RED: El servidor no pudo contactar la API de WHAPI.` };
+         return { success: false, message: `Error de RED: El servidor no pudo contactar a la API de WHAPI.` };
       }
       
       return { success: false, message: `Error de conexión: ${errorMsg}` };
