@@ -21,7 +21,7 @@ const testWhapiConnectionFlow = ai.defineFlow(
   },
   async ({ apiKey, instanceId }) => {
     try {
-      // Usamos el endpoint del recurso directo para mayor compatibilidad entre tipos de instancia (FALCON/Standard)
+      // Usamos el endpoint raíz de la instancia para mayor compatibilidad con instancias FALCON
       const whapiUrl = `https://gate.whapi.cloud/instances/${instanceId}`;
       
       const response = await fetch(whapiUrl, {
@@ -39,10 +39,9 @@ const testWhapiConnectionFlow = ai.defineFlow(
             if (errorBody) {
                 try {
                     const errorJson = JSON.parse(errorBody);
-                    // Extraer mensaje específico del servidor de WHAPI
-                    detail = errorJson.error?.message || errorJson.message || errorJson.error || errorBody;
-                    // Si el detalle sigue siendo un objeto, convertirlo a string
-                    if (typeof detail === 'object') detail = JSON.stringify(detail);
+                    // Búsqueda exhaustiva del mensaje de error para evitar [object Object]
+                    const rawError = errorJson.error?.message || errorJson.message || errorJson.error || errorBody;
+                    detail = typeof rawError === 'object' ? JSON.stringify(rawError) : String(rawError);
                 } catch (jsonError) {
                     detail = errorBody;
                 }
@@ -52,11 +51,11 @@ const testWhapiConnectionFlow = ai.defineFlow(
         }
 
         if (response.status === 401) {
-            throw new Error(`No autorizado (401): ${detail}. Verifica que el Token pertenezca a la instancia ${instanceId}.`);
+            throw new Error(`No autorizado (401): ${detail}. Revisa tu API Key.`);
         }
         
-        if (response.status === 404 || detail.toLowerCase().includes('not found')) {
-            throw new Error(`Instancia no encontrada (404). Verifica tu "Instance ID".`);
+        if (response.status === 404) {
+            throw new Error(`Instancia no encontrada (404). Revisa tu "Instance ID".`);
         }
         
         throw new Error(detail);
@@ -64,18 +63,21 @@ const testWhapiConnectionFlow = ai.defineFlow(
 
       const data = await response.json();
 
-      // Normalizamos la lectura del estado según la versión de la API
+      // Normalizamos el estado de la cuenta según la versión de la API (FALCON vs Standard)
       const accountStatus = data?.account_status || data?.status?.status;
 
       if (accountStatus === 'authenticated' || accountStatus === 'connected') {
         return { success: true, message: `¡Conexión exitosa! Estado: ${accountStatus}.` };
       } else {
-        return { success: false, message: `Instancia encontrada pero no autenticada. Estado: ${accountStatus || 'desconocido'}. Por favor, vincula el QR en el panel de WHAPI.` };
+        return { 
+          success: false, 
+          message: `Instancia encontrada pero no vinculada. Estado: ${accountStatus || 'desconocido'}. Por favor, escanea el QR en WHAPI.cloud.` 
+        };
       }
 
     } catch (error: any) {
-      console.error(`[WHAPI Test Error] Instance: ${instanceId}:`, error);
-      const errorMsg = error.message || 'Error desconocido';
+      console.error(`[WHAPI-TEST-ERROR] Instance: ${instanceId}:`, error);
+      const errorMsg = error.message || 'Error de conexión desconocido.';
       return { success: false, message: errorMsg };
     }
   }

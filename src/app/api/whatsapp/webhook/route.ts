@@ -5,7 +5,7 @@ import { v4 as uuidv4 } from "uuid";
 
 /**
  * Normaliza un número de teléfono eliminando sufijos de red, espacios, guiones
- * y prefijos de país para una comparación segura.
+ * y devolviendo solo los últimos 10 dígitos para comparación segura.
  */
 function normalizePhoneNumber(phone: string | undefined | null): string {
   if (!phone) return '';
@@ -15,7 +15,8 @@ function normalizePhoneNumber(phone: string | undefined | null): string {
 }
 
 /**
- * Endpoint GET para verificación de disponibilidad y conectividad manual.
+ * Endpoint GET para verificación de disponibilidad del Webhook.
+ * Útil para pruebas rápidas desde el navegador.
  */
 export async function GET() {
     return NextResponse.json({ 
@@ -27,22 +28,17 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
-    let body;
-    try {
-        body = await req.json();
-    } catch (e) {
-        console.error('[WHAPI-WEBHOOK] Error parseando JSON entrante');
-        return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
-    }
-
+    const body = await req.json();
+    
+    // Log estructurado para depuración en Cloud Logging
     console.log('--- [WHAPI-WEBHOOK INCOMING] ---');
     console.log(JSON.stringify(body, null, 2));
 
     const message = body.messages?.[0];
     
-    // Ignorar si no hay mensaje o si es un mensaje enviado por nosotros
+    // Ignorar eventos que no sean mensajes o mensajes salientes
     if (!message || message.from_me) {
-      return NextResponse.json({ status: 'ignored' }, { status: 200 });
+      return NextResponse.json({ status: 'ignored', reason: 'not_a_customer_message' }, { status: 200 });
     }
 
     const incomingText = message.text?.body;
@@ -57,7 +53,7 @@ export async function POST(req: NextRequest) {
     let businessId: string | null = null;
     let businessToken: string | null = null;
 
-    // Buscar negocio por número normalizado (comparando los últimos 10 dígitos)
+    // 1. Resolución de Identidad: Buscar el negocio dueño de este número
     const configSnapshot = await db.collectionGroup('chatbotConfig').get();
     const targetConfigDoc = configSnapshot.docs.find(doc => {
         const data = doc.data();
@@ -65,27 +61,31 @@ export async function POST(req: NextRequest) {
         return storedNumber !== '' && storedNumber === senderNumber;
     });
 
+    // 2. Prioridad de identificación: Parámetro URL > Documento encontrado (Data) > Documento encontrado (Path)
     const urlBusinessId = req.nextUrl.searchParams.get('businessId');
     
     if (urlBusinessId) {
         businessId = urlBusinessId;
     } else if (targetConfigDoc) {
-        businessId = targetConfigDoc.data().businessId;
+        // Fallback: Si el documento no tiene el campo businessId, lo extraemos de su ruta (businesses/ID/chatbotConfig/main)
+        businessId = targetConfigDoc.data().businessId || targetConfigDoc.ref.parent.parent?.id || null;
     }
 
     if (!businessId) {
-      console.warn(`[WHAPI-WEBHOOK] Negocio no identificado para: ${senderNumber}`);
+      console.warn(`[WHAPI-WEBHOOK] Negocio no identificado para el remitente: ${senderNumber}`);
       return NextResponse.json({ status: 'error', reason: 'business_not_found' }, { status: 200 });
     }
 
+    // 3. Obtener credenciales de envío del negocio
     const businessConfigSnap = await db.doc(`businesses/${businessId}/chatbotConfig/main`).get();
     businessToken = businessConfigSnap.data()?.whatsApp?.token;
 
     if (!businessToken) {
+      console.error(`[WHAPI-WEBHOOK] Token faltante para el negocio: ${businessId}`);
       return NextResponse.json({ status: 'error', reason: 'token_missing' }, { status: 200 });
     }
 
-    // Registro en analíticas para persistencia del canal WhatsApp
+    // 4. Registro en analíticas (Persistencia del canal WhatsApp)
     try {
       const conversationId = uuidv4();
       await db.collection('businesses').doc(businessId).collection('chatConversations').doc(conversationId).set({
@@ -97,16 +97,16 @@ export async function POST(req: NextRequest) {
         channel: 'whatsapp',
       });
     } catch (regError) {
-      console.error('[WHAPI-WEBHOOK] Error en registro de analíticas:', regError);
+      console.error('[WHAPI-WEBHOOK] Fallo al registrar conversación en analíticas:', regError);
     }
 
-    // Procesamiento con IA (Asíncrono para respuesta inmediata 200 OK)
+    // 5. Procesamiento con IA (Asíncrono para evitar timeouts del webhook)
     (async () => {
         try {
             const aiResponse = await chat({
                 businessId: businessId!,
                 message: incomingText,
-                history: []
+                history: [] // Podrías implementar recuperación de historial aquí
             });
 
             await fetch('https://gate.whapi.cloud/messages/text', {
@@ -121,11 +121,12 @@ export async function POST(req: NextRequest) {
                 })
             });
         } catch (aiError: any) {
-            console.error(`[WHAPI-IA-ERROR] Business: ${businessId}:`, aiError.message);
+            console.error(`[WHAPI-IA-ERROR] Error procesando respuesta para ${businessId}:`, aiError.message);
         }
     })();
 
-    return NextResponse.json({ status: 'received' }, { status: 200 });
+    // Siempre retornamos 200 OK inmediatamente a WHAPI
+    return NextResponse.json({ status: 'received', businessId }, { status: 200 });
 
   } catch (error: any) {
     console.error(`[WHAPI-WEBHOOK-CRITICAL]:`, error.message);
