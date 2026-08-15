@@ -13,8 +13,8 @@ import { ShoppingBag, Minus, Plus, Tag, Trash2, Loader2, Ticket, X, CheckCircle,
 import { useToast } from '@/hooks/use-toast';
 import type { PaymentSettings } from '@/models/payment-settings';
 import type { Order, OrderItem, OrderStatus, TipoEntrega } from '@/models/order';
-import { useFirestore, addDocumentNonBlocking } from '@/firebase';
-import { collection } from 'firebase/firestore';
+import { useFirestore, setDocumentNonBlocking } from '@/firebase';
+import { collection, doc } from 'firebase/firestore';
 import { cn, normalizePhoneNumber } from '@/lib/utils';
 import type { LandingHeaderConfigData } from '@/models/landing-page';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
@@ -27,6 +27,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Image from 'next/image';
 import type { CartItem } from '@/models/cart';
+import { sendOrderConfirmation } from '@/actions/order-notifications';
 
 const purchaseSchema = z.object({
   fullName: z.string().min(3, { message: 'El nombre es requerido.' }),
@@ -216,6 +217,10 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
         orderSummary += `${emoCart} PRODUCTOS\n`;
 
         const ordersCollectionRef = collection(firestore, `businesses/${businessId}/orders`);
+        
+        // REQUISITO 1: Pre-generar ID síncronamente para obtener orderId sin bloquear
+        const newOrderRef = doc(ordersCollectionRef);
+        const orderId = newOrderRef.id;
         const now = new Date().toISOString();
 
         let totalPromoSavings = 0;
@@ -246,6 +251,7 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
         });
 
         const orderData = {
+            id: orderId, // Mantenemos ID consistente
             businessId,
             customerName: data.fullName,
             customerEmail: data.email,
@@ -267,7 +273,12 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
         };
 
         const cleanOrderData = JSON.parse(JSON.stringify(orderData));
-        await addDocumentNonBlocking(ordersCollectionRef, cleanOrderData);
+        
+        // Ejecutamos la escritura
+        await setDocumentNonBlocking(newOrderRef, cleanOrderData);
+
+        // REQUISITO 5: Disparar notificación automática (Fire and forget)
+        sendOrderConfirmation({ businessId, orderId }).catch(e => console.error("[OrderNotification Trigger Failure]:", e.message));
 
         const paymentLabel = PAYMENT_METHOD_LABELS[selectedPaymentMethod] ?? selectedPaymentMethod;
         
