@@ -30,56 +30,73 @@ export async function chat(input: ChatInput): Promise<string> {
   }
 }
 
-// --- RECUPERACIÓN DE DATOS (RAG) CON TIMEOUT Y LOGS DETALLADOS ---
+/**
+ * Recuperación de datos (RAG) con TIMEOUT de 4 segundos para evitar bloqueos.
+ */
 async function getBusinessContext(businessId: string, userMessage: string): Promise<string> {
-  console.log(`[PASO 3] [RAG-DEBUG] Iniciando búsqueda para el negocio ${businessId} con el mensaje: ${userMessage}`);
+  console.log(`[PASO 3] [RAG-DEBUG] Iniciando búsqueda para el negocio ${businessId}`);
   
-  try {
-    const firestore = await getAdminFirestore();
+  const timeoutPromise = new Promise<string>((_, reject) =>
+    setTimeout(() => reject(new Error('TIMEOUT_RAG')), 4000)
+  );
 
-    // 1. Obtener Nombre Real del Negocio desde el Perfil
-    const businessDoc = await firestore.collection('businesses').doc(businessId).get();
-    const businessName = businessDoc.exists ? businessDoc.data()?.name : "Salón de Belleza Natural";
-
-    // 2. Base de Conocimiento (Documentos PDF y Manuales)
-    let knowledgeBaseContent = "";
+  const fetchPromise = (async () => {
     try {
-      const knowledgeQuery = firestore.collection(`businesses/${businessId}/chatbotConfig/main/knowledgeBase`);
-      const knowledgeSnap = await knowledgeQuery.get();
-      
-      console.log(`[RAG-DEBUG] Fragmentos encontrados en Base de Conocimientos: ${knowledgeSnap.size}`);
+      const firestore = await getAdminFirestore();
 
-      knowledgeBaseContent = knowledgeSnap.docs.map(d => {
-        const data = d.data();
-        const content = data.extractedText || data.content || "";
-        const title = data.fileName || data.title || "Información";
-        return `--- TEMA: ${title} ---\n${content}\n`;
-      }).join('\n');
-    } catch (innerError: any) {
-      console.error(`[RAG-ERROR] Error buscando en documentos: ${innerError.message}`);
-    }
+      // 1. Obtener Nombre Real del Negocio (Operación rápida)
+      const businessDoc = await firestore.collection('businesses').doc(businessId).get();
+      const businessName = businessDoc.exists ? businessDoc.data()?.name : "Salón de Belleza Natural";
 
-    // 3. Catálogo de Productos y Servicios
-    const productsQuery = firestore.collection(`businesses/${businessId}/products`).limit(30);
-    const productsSnap = await productsQuery.get();
+      // 2. Base de Conocimiento y Catálogo
+      let knowledgeBaseContent = "";
+      let productsContent = "";
 
-    const productsContent = productsSnap.docs.map(d => {
-      const p = d.data();
-      return `- ${p.name || 'Producto'}: $${p.price || 'Consultar'} - ${p.description || ''}`;
-    }).join('\n');
+      try {
+        // Ejecutamos búsquedas en paralelo para optimizar tiempo
+        const [knowledgeSnap, productsSnap] = await Promise.all([
+          firestore.collection(`businesses/${businessId}/chatbotConfig/main/knowledgeBase`).get(),
+          firestore.collection(`businesses/${businessId}/products`).limit(20).get()
+        ]);
 
-    return `
+        console.log(`[RAG-DEBUG] Documentos: ${knowledgeSnap.size}, Productos: ${productsSnap.size}`);
+
+        knowledgeBaseContent = knowledgeSnap.docs.map(d => {
+          const data = d.data();
+          return `--- TEMA: ${data.fileName || "Info"} ---\n${data.extractedText || data.content || ""}\n`;
+        }).join('\n');
+
+        productsContent = productsSnap.docs.map(d => {
+          const p = d.data();
+          return `- ${p.name}: $${p.price || 'Consultar'} - ${p.description || ''}`;
+        }).join('\n');
+
+      } catch (innerError: any) {
+        console.warn(`[RAG-ERROR-INTERNAL] Fallo en sub-consultas: ${innerError.message}`);
+      }
+
+      return `
 INFORMACIÓN DEL NEGOCIO: ${businessName}
 
 [BASE DE CONOCIMIENTOS]
-${knowledgeBaseContent || "No hay manuales cargados actualmente."}
+${knowledgeBaseContent || "No hay manuales cargados."}
 
-[SERVICIOS Y PRODUCTOS DISPONIBLES]
+[CATÁLOGO]
 ${productsContent || "Catálogo no disponible."}
 `;
+    } catch (error: any) {
+      throw error;
+    }
+  })();
+
+  try {
+    const context = await Promise.race([fetchPromise, timeoutPromise]);
+    console.log(`[PASO 3.5] [RAG-SUCCESS] Contexto recuperado correctamente.`);
+    return context;
   } catch (error: any) {
-    console.error(`[RAG-ERROR] Error fatal en recuperación de contexto: ${error.message}`);
-    return "";
+    console.error(`[RAG-FATAL] Error o timeout buscando en documentos: ${error.message || error}`);
+    // Ante fallo, devolvemos contexto vacío para que la IA maneje el saludo o el fallback
+    return "Información del negocio: Salón de Belleza Natural.";
   }
 }
 
@@ -91,7 +108,7 @@ export async function getAIConfig(businessId?: string): Promise<{ provider: stri
   try {
     const firestore = await getAdminFirestore();
     
-    // Consulta a la configuración global del Super Admin
+    // Consulta a la configuración global
     const globalConfigSnap = await firestore.doc('globalConfig/config_ia').get();
     const integrationSnap = await firestore.doc('integrations/chatbot-integrado-con-whatsapp-para-soporte-y-ventas').get();
 
@@ -114,12 +131,11 @@ export async function getAIConfig(businessId?: string): Promise<{ provider: stri
       fields = data?.fields || {};
     }
 
-    // --- REGLA DE PRIORIDAD: DeepSeek primero para ahorro de costos ---
+    // --- REGLA DE PRIORIDAD: DeepSeek primero ---
     if (fields.deepseek?.apiKey) {
       return { provider: 'deepseek', apiKey: fields.deepseek.apiKey, model: 'deepseek-chat' };
     }
     
-    // Fallbacks
     if (fields.google?.apiKey) {
       return { provider: 'googleai', apiKey: fields.google.apiKey, model: 'gemini-1.5-flash' };
     }
@@ -127,12 +143,8 @@ export async function getAIConfig(businessId?: string): Promise<{ provider: stri
     if (fields.openai?.apiKey) {
       return { provider: 'openai', apiKey: fields.openai.apiKey, model: 'gpt-4o-mini' };
     }
-    
-    if (fields.groq?.apiKey) {
-      return { provider: 'groq', apiKey: fields.groq.apiKey, model: 'llama-3.1-8b-instant' };
-    }
 
-    console.error("[AI-ERROR] No se encontró ninguna API Key configurada (DeepSeek, Gemini, etc.)");
+    console.error("[AI-ERROR] No se encontró ninguna API Key configurada.");
 
   } catch (e: any) {
     console.error("[AI-ERROR] Fallo al leer configuración IA:", e.message);
@@ -155,17 +167,14 @@ const chatFlow = ai.defineFlow(
       return "Lo siento, el servicio de asistencia no está configurado correctamente.";
     }
 
-    // [POLÍTICA DE NO ALUCINACIÓN Y RESPUESTA OBLIGATORIA]
     const systemPrompt = `Eres un asistente profesional del Salón de Belleza Natural. 
 Responde ÚNICAMENTE basándote en el CONTEXTO proporcionado.
 
 REGLAS CRÍTICAS:
-1. Si el mensaje del usuario es un simple saludo (hola, buenos días, buenas tardes), responde amablemente presentándote como el Asistente del Salón de Belleza Natural y pregúntale en qué puedes ayudarle. Para responder a los saludos, NO necesitas buscar en el contexto.
-2. Para cualquier otra pregunta sobre el negocio, usa ESTRICTAMENTE el contexto de la base de conocimientos proporcionada en el bloque CONTEXTO ACTUAL DEL NEGOCIO.
-3. Si la información solicitada no está explícitamente en el CONTEXTO y no es un saludo, responde EXACTAMENTE: "Hola, soy el asistente del Salón de Belleza Natural. No encontré esa info en mis manuales, ¿en qué más te ayudo?"
-4. NO uses tu conocimiento general para inventar respuestas sobre el negocio.
-5. NO inventes precios ni servicios que no aparezcan en el CONTEXTO.
-6. Si el CONTEXTO está vacío o es insuficiente para una respuesta veraz y no es un saludo, aplica la Regla 3.
+1. Si el mensaje del usuario es un saludo (hola, buenos días), preséntate como el Asistente del Salón de Belleza Natural y pregunta en qué puedes ayudar. No necesitas buscar en el contexto para saludar.
+2. Para preguntas sobre el negocio, usa ESTRICTAMENTE el contexto proporcionado.
+3. Si la información no está en el CONTEXTO y no es un saludo, responde: "Hola, soy el asistente del Salón de Belleza Natural. No encontré esa info en mis manuales, ¿en qué más te ayudo?"
+4. NO uses conocimiento general para inventar precios o servicios.
 
 CONTEXTO ACTUAL DEL NEGOCIO:
 """
@@ -174,7 +183,6 @@ ${contextData}
 
     console.log(`[PASO 4] Generando respuesta con motor: ${aiConfig.provider}`);
 
-    // Caso Google AI
     if (aiConfig.provider === 'googleai') {
       const response = await ai.generate({
         model: `googleai/${aiConfig.model}`,
@@ -185,13 +193,12 @@ ${contextData}
         ],
         config: { temperature: 0.1, apiKey: aiConfig.apiKey }
       });
-      return response.text ?? "Hola, soy el asistente del Salón de Belleza Natural. No encontré esa info en mis manuales, ¿en qué más te ayudo?";
+      return response.text ?? "Hola, soy el asistente del Salón de Belleza Natural. ¿En qué puedo ayudarte?";
     }
 
-    // Fallback para otros proveedores (DeepSeek, OpenAI, Groq)
+    // Fallback compatible con OpenAI (DeepSeek, Groq, etc.)
     try {
       let endpoint = 'https://api.openai.com/v1/chat/completions';
-      if (aiConfig.provider === 'groq') endpoint = 'https://api.groq.com/openai/v1/chat/completions';
       if (aiConfig.provider === 'deepseek') endpoint = 'https://api.deepseek.com/v1/chat/completions';
 
       const response = await fetch(endpoint, {
@@ -212,9 +219,9 @@ ${contextData}
       });
 
       const data = await response.json();
-      return data.choices?.[0]?.message?.content || "Hola, soy el asistente del Salón de Belleza Natural. No encontré esa info en mis manuales, ¿en qué más te ayudo?";
+      return data.choices?.[0]?.message?.content || "Hola, ¿en qué puedo ayudarte?";
     } catch (e) {
-      return "Hola, soy el asistente del Salón de Belleza Natural. No encontré esa info en mis manuales, ¿en qué más te ayudo?";
+      return "Hola, soy el asistente del Salón de Belleza Natural. No pude procesar tu duda, ¿en qué más te ayudo?";
     }
   }
 );

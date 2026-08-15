@@ -1,4 +1,6 @@
 
-// This file was misplaced and is now deprecated.
-// All configuration logic is handled in the root next.config.js.
+/**
+ * Archivo de configuración fuera de lugar desactivado. 
+ * La configuración real reside en la raíz del proyecto.
+ */
 export default {};

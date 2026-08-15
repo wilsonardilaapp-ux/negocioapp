@@ -1,18 +1,14 @@
 
-'use client';
-
 import React from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { Frown, ArrowLeft, Home } from 'lucide-react';
+import { Frown, Home } from 'lucide-react';
 
 /**
- * Página 404 personalizada para Markix.
+ * Página 404 simplificada como Server Component para maximizar la resiliencia del build
+ * y evitar errores de resolución de módulos cliente durante estados de error.
  */
 export default function NotFound() {
-  const router = useRouter();
-
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 p-4 text-center">
       <div className="bg-white p-10 rounded-3xl shadow-xl max-w-md w-full border border-gray-100 animate-in fade-in zoom-in duration-300">
@@ -34,10 +30,6 @@ export default function NotFound() {
             <Link href="/">
               <Home className="mr-2 h-5 w-5" /> Ir al Inicio
             </Link>
-          </Button>
-          
-          <Button variant="outline" onClick={() => router.back()} className="w-full font-bold h-12">
-            <ArrowLeft className="mr-2 h-4 w-4" /> Volver Atrás
           </Button>
         </div>
       </div>
