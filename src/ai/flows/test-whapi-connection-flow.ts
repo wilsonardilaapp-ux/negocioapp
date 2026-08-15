@@ -19,10 +19,10 @@ const testWhapiConnectionFlow = ai.defineFlow(
     inputSchema: TestWhapiConnectionInputSchema,
     outputSchema: z.object({ success: z.boolean(), message: z.string() }),
   },
-  async ({ apiKey, instanceId }) => {
+  async ({ apiKey }) => {
     try {
-      // Usamos el endpoint raíz de la instancia para mayor compatibilidad con instancias FALCON
-      const whapiUrl = `https://gate.whapi.cloud/instances/${instanceId}`;
+      // Endpoint global de WHAPI para validar el Token sin depender del ID de instancia (evita Error 404)
+      const whapiUrl = `https://gate.whapi.cloud/health`;
       
       const response = await fetch(whapiUrl, {
         method: 'GET',
@@ -39,7 +39,7 @@ const testWhapiConnectionFlow = ai.defineFlow(
             if (errorBody) {
                 try {
                     const errorJson = JSON.parse(errorBody);
-                    // Búsqueda exhaustiva del mensaje de error para evitar [object Object]
+                    // Extracción profunda del mensaje de error para evitar [object Object]
                     const rawError = errorJson.error?.message || errorJson.message || errorJson.error || errorBody;
                     detail = typeof rawError === 'object' ? JSON.stringify(rawError) : String(rawError);
                 } catch (jsonError) {
@@ -51,11 +51,7 @@ const testWhapiConnectionFlow = ai.defineFlow(
         }
 
         if (response.status === 401) {
-            throw new Error(`No autorizado (401): ${detail}. Revisa tu API Key.`);
-        }
-        
-        if (response.status === 404) {
-            throw new Error(`Instancia no encontrada (404). Revisa tu "Instance ID".`);
+            throw new Error(`Token no autorizado (401): ${detail}.`);
         }
         
         throw new Error(detail);
@@ -63,20 +59,14 @@ const testWhapiConnectionFlow = ai.defineFlow(
 
       const data = await response.json();
 
-      // Normalizamos el estado de la cuenta según la versión de la API (FALCON vs Standard)
-      const accountStatus = data?.account_status || data?.status?.status;
-
-      if (accountStatus === 'authenticated' || accountStatus === 'connected') {
-        return { success: true, message: `¡Conexión exitosa! Estado: ${accountStatus}.` };
-      } else {
-        return { 
-          success: false, 
-          message: `Instancia encontrada pero no vinculada. Estado: ${accountStatus || 'desconocido'}. Por favor, escanea el QR en WHAPI.cloud.` 
-        };
-      }
+      // Si el endpoint /health responde 200 OK con el token, la conexión es exitosa
+      return { 
+        success: true, 
+        message: `¡Conexión exitosa! El token es válido y está vinculado a la cuenta: ${data.account?.email || 'Principal'}.` 
+      };
 
     } catch (error: any) {
-      console.error(`[WHAPI-TEST-ERROR] Instance: ${instanceId}:`, error);
+      console.error(`[WHAPI-TOKEN-TEST-ERROR]:`, error);
       const errorMsg = error.message || 'Error de conexión desconocido.';
       return { success: false, message: errorMsg };
     }
