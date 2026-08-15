@@ -35,7 +35,8 @@ export async function POST(req: NextRequest) {
 
     const message = body.messages?.[0];
     
-    // Sanitización y Normalización total del Channel ID
+    // 1. Extracción y Normalización Total
+    // Normalización: String + Trim + UpperCase para evitar fallos de comparación
     const channelId = body.channel_id?.toString().trim().toUpperCase(); 
     
     // Ignorar eventos que no sean mensajes o mensajes salientes
@@ -55,28 +56,30 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ status: 'ignored', reason: 'no_text_content' }, { status: 200 });
     }
 
+    // 2. Log de Inspección y Consulta
     const db = await getAdminFirestore();
+    console.log(`[WHAPI-DEBUG] Iniciando búsqueda en Firestore para channelId: "${channelId}"`);
+
     let businessId: string | null = null;
     let businessToken: string | null = null;
 
-    // 1. Resolución de Identidad: Query indexada por whapiChannelId (Multi-tenant)
-    // Log de inspección para Vercel Logs
-    console.log(`--- [QUERYING FIRESTORE] --- looking for whapiChannelId: [${channelId}]`);
-
+    // Resolución de Identidad: Query indexada por whapiChannelId (Multi-tenant)
     const configSnapshot = await db.collectionGroup('chatbotConfig')
       .where('whapiChannelId', '==', channelId)
       .limit(1)
       .get();
 
     if (configSnapshot.empty) {
-      console.warn(`[WHAPI-WEBHOOK] Negocio no identificado para el canal: ${channelId}`);
+      // Log detallado para diagnóstico en Vercel
+      console.warn(`[WHAPI-WEBHOOK] Negocio no identificado. No existe 'whapiChannelId' con valor "${channelId}" en ninguna sub-colección 'chatbotConfig'.`);
       return NextResponse.json({ status: 'error', reason: 'business_not_found_for_channel' }, { status: 200 });
     }
 
     const configDoc = configSnapshot.docs[0];
     const configData = configDoc.data();
     
-    // Resolución resiliente de businessId buscando en raíz y en objeto anidado 'business'
+    // 3. Resolución de ID Resiliente
+    // Buscamos en raíz, en el objeto 'business' (detectado en captura) o en el path del doc
     businessId = configData.businessId || configData.business?.businessId || configDoc.ref.parent.parent?.id || null;
     businessToken = configData.whatsApp?.token;
 
@@ -84,6 +87,8 @@ export async function POST(req: NextRequest) {
       console.error(`[WHAPI-WEBHOOK] Configuración incompleta para el negocio: ${businessId}`);
       return NextResponse.json({ status: 'error', reason: 'token_or_id_missing' }, { status: 200 });
     }
+
+    console.log(`[WHAPI-SUCCESS] Negocio identificado: ${businessId}`);
 
     // 2. Registro en analíticas (Persistencia del canal WhatsApp en la ruta original)
     try {
