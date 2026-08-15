@@ -21,35 +21,37 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  try {
-    const body = await req.json();
-    
-    // [WEBHOOK-DEBUG] Inspección total del evento recibido de WHAPI
-    console.log('[WEBHOOK-RAW-DATA]', JSON.stringify(body, null, 2));
+  // REGLA 1: LOG ABSOLUTO EN LÍNEA 1
+  const body = await req.json().catch(() => ({}));
+  console.log('[PAYLOAD-ENTRANTE]', JSON.stringify(body));
 
+  try {
     const message = body.messages?.[0];
-    
-    // Normalización estricta del ID del Canal (Tenant ID)
     const channelId = body.channel_id?.toString().trim().toUpperCase(); 
     
-    // Filtro de seguridad: ignorar mensajes propios o eventos vacíos
-    if (!message || message.from_me) {
-      console.log(`[WEBHOOK-DEBUG] Evento ignorado (mensaje propio o sin contenido).`);
-      return NextResponse.json({ status: 'ignored' }, { status: 200 });
+    // REGLA 2: CERO SILENCIOS EN FILTROS
+    if (!message) {
+      console.log('[FILTRO-ACTIVADO] Mensaje ignorado por: No existe objeto messages en el payload');
+      return NextResponse.json({ status: 'ignored', reason: 'no_message' }, { status: 200 });
+    }
+
+    if (message.from_me) {
+      console.log('[FILTRO-ACTIVADO] Mensaje ignorado por: Mensaje saliente (from_me: true)');
+      return NextResponse.json({ status: 'ignored', reason: 'sent_by_me' }, { status: 200 });
     }
 
     if (!channelId) {
-      console.warn('[WHAPI-WEBHOOK] Petición recibida sin channel_id.');
+      console.log('[FILTRO-ACTIVADO] Mensaje ignorado por: Petición sin channel_id');
       return NextResponse.json({ status: 'error', message: 'missing_channel_id' }, { status: 200 });
     }
 
     // Aceptar múltiples formatos de mensaje (texto plano o subtítulo de media)
     const incomingText = message.text?.body || message.caption || '';
-    const rawSender = message.chat_id || message.from;
+    const incomingChatId = message.chat_id || message.from;
 
     if (!incomingText) {
-      console.log(`[WEBHOOK-DEBUG] Mensaje sin texto legible. Ignorado.`);
-      return NextResponse.json({ status: 'ignored' }, { status: 200 });
+      console.log('[FILTRO-ACTIVADO] Mensaje ignorado por: No contiene texto legible');
+      return NextResponse.json({ status: 'ignored', reason: 'no_text' }, { status: 200 });
     }
 
     const db = await getAdminFirestore();
@@ -87,9 +89,29 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ status: 'error', reason: 'incomplete_config' }, { status: 200 });
     }
 
-    console.log(`[PASO 1] Identificado: ${businessId}`);
+    console.log(`[WHAPI-SUCCESS] Negocio identificado: ${businessId}`);
 
-    // --- [PASO 2, 3 y 4] EJECUCIÓN ASÍNCRONA ---
+    // REGLA 3: BYPASS DE PRUEBA (FORZAR ENVÍO)
+    // Probamos la conexión de salida inmediatamente
+    try {
+        const testResponse = await fetch('https://gate.whapi.cloud/messages/text', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${businessToken.trim()}`,
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ 
+                to: incomingChatId, 
+                body: '¡Sistema conectado! El webhook ya puede enviar mensajes.' 
+            })
+        });
+        console.log('[PRUEBA-FORZADA] Resultado:', testResponse.status);
+    } catch (testError: any) {
+        console.error('[PRUEBA-FORZADA-ERROR] Fallo crítico de red:', testError.message);
+    }
+
+    // --- [EJECUCIÓN ASÍNCRONA DE LA IA] ---
     (async () => {
         const fallbackMessage = 'Hola, soy el asistente del Salón de Belleza Natural. Estoy teniendo un problema técnico momentáneo para leer mis manuales. Por favor, deja tu duda y un humano te atenderá pronto.';
         let responseSent = false;
@@ -105,15 +127,13 @@ export async function POST(req: NextRequest) {
                             'Authorization': `Bearer ${businessToken?.trim()}`,
                             'Content-Type': 'application/json'
                         },
-                        body: JSON.stringify({ to: rawSender, body: 'Estamos procesando tu solicitud, un momento por favor...' })
+                        body: JSON.stringify({ to: incomingChatId, body: 'Estamos procesando tu solicitud, un momento por favor...' })
                     }).catch(() => {});
                 }
             }, 8000);
 
-            console.log(`[PASO 2] Buscando en Documentos (RAG)...`);
-            
-            // Registro en analíticas
-            const senderNumber = normalizePhoneNumber(rawSender);
+            console.log(`[PASO 2] Registrando Analíticas...`);
+            const senderNumber = normalizePhoneNumber(incomingChatId);
             const conversationId = uuidv4();
             await db.collection('businesses').doc(businessId!).collection('chatConversations').doc(conversationId).set({
                 businessId: String(businessId),
@@ -134,7 +154,7 @@ export async function POST(req: NextRequest) {
             clearTimeout(timeoutMonitor);
             const finalMessage = aiResponse?.trim() || fallbackMessage;
 
-            console.log(`[PASO 4] Enviando a Whapi...`);
+            console.log(`[PASO 4] Enviando Respuesta Final a Whapi...`);
             const whapiResponse = await fetch('https://gate.whapi.cloud/messages/text', {
                 method: 'POST',
                 headers: {
@@ -143,7 +163,7 @@ export async function POST(req: NextRequest) {
                     'Accept': 'application/json'
                 },
                 body: JSON.stringify({
-                    to: rawSender,
+                    to: incomingChatId,
                     body: finalMessage
                 })
             });
@@ -152,9 +172,9 @@ export async function POST(req: NextRequest) {
 
             if (!whapiResponse.ok) {
                 const errorBody = await whapiResponse.text();
-                console.error(`[WHAPI-FATAL] Fallo al enviar. Status: ${whapiResponse.status}. Body: ${errorBody}`);
+                console.error(`[WHAPI-FATAL] Fallo al enviar respuesta final. Status: ${whapiResponse.status}. Body: ${errorBody}`);
             } else {
-                console.log(`[WHAPI-SUCCESS] Mensaje entregado correctamente.`);
+                console.log(`[WHAPI-SUCCESS] Respuesta final entregada correctamente.`);
             }
 
         } catch (error: any) {
@@ -168,7 +188,7 @@ export async function POST(req: NextRequest) {
                         'Authorization': `Bearer ${businessToken!.trim()}`,
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ to: rawSender, body: fallbackMessage })
+                    body: JSON.stringify({ to: incomingChatId, body: fallbackMessage })
                 }).catch(() => {});
             }
         }
