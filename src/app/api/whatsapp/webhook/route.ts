@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ status: 'error', message: 'missing_channel_id' }, { status: 200 });
     }
 
-    // Aceptar múltiples formatos de mensaje (texto plano o subtítulo de media)
+    // RESOLUCIÓN DE DESTINATARIO: Usar chat_id exacto para evitar 404
     const incomingText = message.text?.body || message.caption || '';
     const incomingChatId = message.chat_id || message.from;
 
@@ -91,8 +91,7 @@ export async function POST(req: NextRequest) {
 
     console.log(`[WHAPI-SUCCESS] Negocio identificado: ${businessId}`);
 
-    // REGLA 3: BYPASS DE PRUEBA (FORZAR ENVÍO)
-    // Probamos la conexión de salida inmediatamente
+    // REGLA 3: BYPASS DE PRUEBA (FORZAR ENVÍO CON CHAT_ID EXACTO)
     try {
         const testResponse = await fetch('https://gate.whapi.cloud/messages/text', {
             method: 'POST',
@@ -154,7 +153,7 @@ export async function POST(req: NextRequest) {
             clearTimeout(timeoutMonitor);
             const finalMessage = aiResponse?.trim() || fallbackMessage;
 
-            console.log(`[PASO 4] Enviando Respuesta Final a Whapi...`);
+            console.log(`[PASO 4] Enviando Respuesta Final a Whapi a: ${incomingChatId}`);
             const whapiResponse = await fetch('https://gate.whapi.cloud/messages/text', {
                 method: 'POST',
                 headers: {
