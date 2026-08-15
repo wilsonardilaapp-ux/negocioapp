@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ status: 'error', message: 'missing_channel_id' }, { status: 200 });
     }
 
-    // RESOLUCIÓN DE DESTINATARIO: Usar chat_id exacto para evitar 404
+    // RESOLUCIÓN DE DESTINATARIO: Priorizar chat_id para evitar error 404 (Chat not found)
     const incomingText = message.text?.body || message.caption || '';
     const incomingChatId = message.chat_id || message.from;
 
@@ -90,25 +90,6 @@ export async function POST(req: NextRequest) {
     }
 
     console.log(`[WHAPI-SUCCESS] Negocio identificado: ${businessId}`);
-
-    // REGLA 3: BYPASS DE PRUEBA (FORZAR ENVÍO CON CHAT_ID EXACTO)
-    try {
-        const testResponse = await fetch('https://gate.whapi.cloud/messages/text', {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${businessToken.trim()}`,
-                'Accept': 'application/json',
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ 
-                to: incomingChatId, 
-                body: '¡Sistema conectado! El webhook ya puede enviar mensajes.' 
-            })
-        });
-        console.log('[PRUEBA-FORZADA] Resultado:', testResponse.status);
-    } catch (testError: any) {
-        console.error('[PRUEBA-FORZADA-ERROR] Fallo crítico de red:', testError.message);
-    }
 
     // --- [EJECUCIÓN ASÍNCRONA DE LA IA] ---
     (async () => {
@@ -179,13 +160,14 @@ export async function POST(req: NextRequest) {
         } catch (error: any) {
             console.error(`[WHAPI-NETWORK-ERROR] Error crítico en el proceso asíncrono:`, error.message);
             
-            // Envío forzado de fallback en caso de error catastrófico
+            // Envío forzado de fallback en caso de error catastrófico usando chat_id correcto
             if (!responseSent) {
                 await fetch('https://gate.whapi.cloud/messages/text', {
                     method: 'POST',
                     headers: {
                         'Authorization': `Bearer ${businessToken!.trim()}`,
-                        'Content-Type': 'application/json'
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
                     },
                     body: JSON.stringify({ to: incomingChatId, body: fallbackMessage })
                 }).catch(() => {});

@@ -42,7 +42,6 @@ async function getBusinessContext(businessId: string, userMessage: string): Prom
     const businessName = businessDoc.exists ? businessDoc.data()?.name : "Salón de Belleza Natural";
 
     // 2. Base de Conocimiento (Documentos PDF y Manuales)
-    // Envolvemos en try/catch específico para reportar errores de colección
     let knowledgeContent = "";
     try {
       const knowledgeQuery = firestore.collection(`businesses/${businessId}/chatbotConfig/main/knowledgeBase`);
@@ -144,10 +143,12 @@ const chatFlow = ai.defineFlow(
 Responde ÚNICAMENTE basándote en el CONTEXTO proporcionado.
 
 REGLAS CRÍTICAS:
-1. Si la información solicitada no está explícitamente en el CONTEXTO, responde EXACTAMENTE: "Hola, soy el asistente del Salón de Belleza Natural. No encontré esa info en mis manuales, ¿en qué más te ayudo?"
-2. NO uses tu conocimiento general para inventar respuestas sobre el negocio.
-3. NO inventes precios ni servicios que no aparezcan en el CONTEXTO.
-4. Si el CONTEXTO está vacío o es insuficiente para una respuesta veraz, aplica la Regla 1.
+1. Si el mensaje del usuario es un simple saludo (hola, buenos días, buenas tardes), responde amablemente presentándote como el Asistente del Salón de Belleza Natural y pregúntale en qué puedes ayudarle. Para responder a los saludos, NO necesitas buscar en el contexto.
+2. Para cualquier otra pregunta sobre el negocio, usa ESTRICTAMENTE el contexto de la base de conocimientos proporcionada.
+3. Si la información solicitada no está explícitamente en el CONTEXTO y no es un saludo, responde EXACTAMENTE: "Hola, soy el asistente del Salón de Belleza Natural. No encontré esa info en mis manuales, ¿en qué más te ayudo?"
+4. NO uses tu conocimiento general para inventar respuestas sobre el negocio.
+5. NO inventes precios ni servicios que no aparezcan en el CONTEXTO.
+6. Si el CONTEXTO está vacío o es insuficiente para una respuesta veraz y no es un saludo, aplica la Regla 3.
 
 CONTEXTO ACTUAL DEL NEGOCIO:
 """
