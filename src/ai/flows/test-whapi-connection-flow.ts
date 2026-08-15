@@ -41,13 +41,21 @@ const testWhapiConnectionFlow = ai.defineFlow(
                 try {
                     // Try to parse the text as JSON
                     const errorJson = JSON.parse(errorBody);
-                    if (errorJson.error === 'Channel not found') {
-                        errorMessage = 'Instancia/Canal no encontrado (404). Por favor, verifica que tu "Instance ID" y "API Key" sean correctos.';
-                    } else if (errorJson.error) {
-                        errorMessage = `Error de WHAPI: ${errorJson.error}`;
+                    
+                    if (errorJson.error) {
+                        // Extract error detail safely, avoiding [object Object]
+                        const errorDetail = typeof errorJson.error === 'object'
+                            ? (errorJson.error.message || JSON.stringify(errorJson.error))
+                            : errorJson.error;
+
+                        if (errorDetail === 'Channel not found') {
+                            errorMessage = 'Instancia/Canal no encontrado (404). Por favor, verifica que tu "Instance ID" y "API Key" sean correctos.';
+                        } else {
+                            errorMessage = `Error de WHAPI: ${errorDetail}`;
+                        }
                     } else {
-                        // It's JSON but not the expected format, show the raw JSON
-                        errorMessage += ` Respuesta: ${errorBody}`;
+                        // It's JSON but not the expected format, show the raw JSON or body
+                        errorMessage += ` Detalles: ${errorBody}`;
                     }
                 } catch (jsonError) {
                     // If parsing as JSON fails, it's likely plain text.
@@ -69,7 +77,7 @@ const testWhapiConnectionFlow = ai.defineFlow(
       }
 
     } catch (error: any) {
-      console.error(`Error detallado al probar WHAPI:`, error);
+      console.error(`Error detallado al probar ${instanceId}:`, error);
       
       const errorMsg = error.message || 'Error desconocido';
       
