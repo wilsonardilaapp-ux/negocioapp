@@ -34,8 +34,9 @@ export async function POST(req: NextRequest) {
     console.log(JSON.stringify(body, null, 2));
 
     const message = body.messages?.[0];
-    // Sanitización preventiva: asegurar que no haya espacios ni inconsistencias de tipo
-    const channelId = body.channel_id?.toString().trim(); 
+    
+    // Sanitización y Normalización total del Channel ID
+    const channelId = body.channel_id?.toString().trim().toUpperCase(); 
     
     // Ignorar eventos que no sean mensajes o mensajes salientes
     if (!message || message.from_me) {
@@ -59,6 +60,9 @@ export async function POST(req: NextRequest) {
     let businessToken: string | null = null;
 
     // 1. Resolución de Identidad: Query indexada por whapiChannelId (Multi-tenant)
+    // Log de inspección para Vercel Logs
+    console.log(`--- [QUERYING FIRESTORE] --- looking for whapiChannelId: [${channelId}]`);
+
     const configSnapshot = await db.collectionGroup('chatbotConfig')
       .where('whapiChannelId', '==', channelId)
       .limit(1)
