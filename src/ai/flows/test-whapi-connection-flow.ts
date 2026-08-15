@@ -38,12 +38,9 @@ const testWhapiConnectionFlow = ai.defineFlow(
             if (errorBody) {
                 try {
                     const errorJson = JSON.parse(errorBody);
-                    // Extracción robusta de mensaje para evitar [object Object]
-                    detail = errorJson.error?.message || errorJson.message || errorJson.error || errorBody;
-                    
-                    if (typeof detail === 'object') {
-                        detail = JSON.stringify(detail);
-                    }
+                    // Extracción agresiva para evitar [object Object]
+                    const extracted = errorJson.error?.message || errorJson.message || errorJson.error || errorBody;
+                    detail = typeof extracted === 'object' ? JSON.stringify(extracted) : String(extracted);
                 } catch (jsonError) {
                     detail = errorBody;
                 }
@@ -52,28 +49,28 @@ const testWhapiConnectionFlow = ai.defineFlow(
             detail = `HTTP ${response.status}`;
         }
 
-        if (detail === 'Channel not found') {
-            throw new Error('Instancia/Canal no encontrado (404). Por favor, verifica que tu "Instance ID" y "API Key" sean correctos.');
+        if (detail.toLowerCase().includes('not found')) {
+            throw new Error('Instancia/Canal no encontrado (404). Por favor, verifica tu "Instance ID" y "API Key".');
         }
         
-        throw new Error(`Error de WHAPI: ${detail}`);
+        throw new Error(`Detalle: ${detail}`);
       }
 
       const data = await response.json();
 
       if (data?.account_status === 'authenticated') {
-        return { success: true, message: `¡Conexión exitosa! Estado de la cuenta: ${data.account_status}.` };
+        return { success: true, message: `¡Conexión exitosa! Estado: ${data.account_status}.` };
       } else {
-        throw new Error(`Conexión fallida. Estado de la cuenta: ${data.account_status || 'desconocido'}.`);
+        throw new Error(`Estado de la cuenta: ${data.account_status || 'no autenticado'}.`);
       }
 
     } catch (error: any) {
-      console.error(`Error detallado al probar ${instanceId}:`, error);
+      console.error(`[WHAPI Test Error] Instance: ${instanceId}:`, error);
       
       const errorMsg = error.message || 'Error desconocido';
       
       if (errorMsg.includes('fetch failed') || errorMsg.includes('ENOTFOUND')) {
-         return { success: false, message: `Error de RED: El servidor no pudo contactar a la API de WHAPI.` };
+         return { success: false, message: `Error de RED: El servidor no pudo contactar a WHAPI.` };
       }
       
       return { success: false, message: `Error de conexión: ${errorMsg}` };
