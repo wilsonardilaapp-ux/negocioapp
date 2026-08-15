@@ -1,20 +1,31 @@
+
 'use server';
 
 /**
  * @fileOverview Acción de servidor para enviar notificaciones automáticas de pedidos vía WhatsApp.
+ * Envía una alerta interna al negocio y una confirmación cordial al cliente.
  */
 
 import { getAdminFirestore } from '../firebase/server-init';
 import { normalizePhoneNumber } from '../lib/utils';
+import type { Order } from '../models/order';
 
 interface OrderNotificationParams {
   businessId: string;
   orderId: string;
 }
 
+const formatCurrency = (value: number) => {
+  return new Intl.NumberFormat('es-CO', {
+    style: 'currency',
+    currency: 'COP',
+    minimumFractionDigits: 0,
+  }).format(value);
+};
+
 /**
- * Envía un mensaje de confirmación al cliente cuando realiza un pedido.
- * Diseñado para fallar silenciosamente y no bloquear el flujo principal.
+ * Orquesta el envío de notificaciones por WhatsApp tras un pedido exitoso.
+ * Realiza dos envíos: uno al dueño del negocio y otro al cliente.
  */
 export async function sendOrderConfirmation({ businessId, orderId }: OrderNotificationParams): Promise<void> {
   if (!businessId || !orderId) return;
@@ -29,54 +40,82 @@ export async function sendOrderConfirmation({ businessId, orderId }: OrderNotifi
     ]);
 
     if (!configSnap.exists || !orderSnap.exists) {
-      return; // El negocio no tiene configurado el bot o el pedido desapareció
+      return;
     }
 
     const config = configSnap.data();
-    const order = orderSnap.data();
+    const order = orderSnap.data() as Order;
 
     const token = config?.whatsApp?.token;
-    const channelId = config?.whapiChannelId;
-    const rawPhone = order?.customerPhone;
     const businessName = config?.business?.name || 'nuestro negocio';
+    
+    // Identificación de destinatarios
+    const businessPhone = normalizePhoneNumber(config?.whatsApp?.number || '3228831634');
+    const customerPhone = normalizePhoneNumber(order.customerPhone);
 
-    // 2. Guardias de seguridad: salir temprano si falta información crítica
-    if (!token || !channelId || !rawPhone) {
-      return;
-    }
+    if (!token) return;
 
-    // 3. Normalizar el número del cliente usando la utilidad global
-    const cleanPhone = normalizePhoneNumber(rawPhone);
-    if (!cleanPhone || cleanPhone.length < 10) {
-      return;
-    }
+    // --- PROCESO 1: NOTIFICACIÓN INTERNA PARA EL NEGOCIO ---
+    // Mantiene el formato de alerta interna reportado como funcional
+    (async () => {
+      try {
+        const orderShortId = orderId.slice(-7).toUpperCase();
+        const itemLines = order.items.map(i => `- ${i.quantity} x ${i.productName}`).join('\n');
+        
+        const businessMessage = `🛵 *NUEVO PEDIDO RECIBIDO (#${orderShortId})*\n\n` +
+          `👤 *Cliente:* ${order.customerName}\n` +
+          `📍 *Entrega:* ${order.customerAddress}\n` +
+          `📦 *Productos:*\n${itemLines}\n\n` +
+          `💰 *Total:* ${formatCurrency(order.total)}\n` +
+          `💳 *Pago:* ${order.paymentMethod.replace('_', ' ')}`;
 
-    // 4. Construir el mensaje de confirmación
-    const orderShortId = orderId.slice(-7).toUpperCase();
-    const message = `¡Hola *${order?.customerName || 'cliente'}*! 👋\n\nConfirmamos que hemos recibido tu pedido *#${orderShortId}* en *${businessName}*.\n\nEstamos procesándolo y te avisaremos ante cualquier novedad. ¡Gracias por tu compra! 🚀`;
+        await fetch('https://gate.whapi.cloud/messages/text', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            to: `${businessPhone}@s.whatsapp.net`,
+            body: businessMessage,
+          }),
+        });
+      } catch (err) {
+        console.error(`[OrderNotification] Falló envío interno al negocio ${businessId}`);
+      }
+    })();
 
-    // 5. Envío vía WHAPI API (POST)
-    const response = await fetch('https://gate.whapi.cloud/messages/text', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        to: `${cleanPhone}@s.whatsapp.net`,
-        body: message,
-      }),
-    });
+    // --- PROCESO 2: CONFIRMACIÓN PARA EL CLIENTE ---
+    // Nuevo envío con tono cercano y resumen simplificado
+    if (customerPhone && customerPhone.length >= 10) {
+      (async () => {
+        try {
+          const customerItemLines = order.items.map(i => `- ${i.productName} × ${i.quantity}`).join('\n');
+          
+          const customerMessage = `¡Hola *${order.customerName}*! 🎉 Tu pedido en *${businessName}* fue recibido.\n\n` +
+            `🧾 *Resumen:*\n${customerItemLines}\n\n` +
+            `💰 *Total:* ${formatCurrency(order.total)}\n` +
+            `💳 *Método de pago:* ${order.paymentMethod.replace('_', ' ')}\n\n` +
+            `Te avisaremos cuando esté en camino. ¡Muchas gracias por tu compra! 🚀`;
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`[OrderNotification] WHAPI Error for ${businessId}:`, errorText);
-    } else {
-      console.log(`[OrderNotification] Confirmación enviada para pedido ${orderShortId}`);
+          await fetch('https://gate.whapi.cloud/messages/text', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              to: `${customerPhone}@s.whatsapp.net`,
+              body: customerMessage,
+            }),
+          });
+        } catch (err) {
+          console.error(`[OrderNotification] Falló envío de confirmación al cliente del pedido ${orderId}`);
+        }
+      })();
     }
 
   } catch (error: any) {
-    // Requisito: Silencio de fallos. Solo logueamos el error para auditoría técnica.
-    console.error(`[OrderNotification] Critical error for business ${businessId}:`, error.message);
+    console.error(`[OrderNotification] Error crítico en la acción de servidor:`, error.message);
   }
 }
