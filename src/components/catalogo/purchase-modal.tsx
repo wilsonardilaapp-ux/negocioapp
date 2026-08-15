@@ -47,7 +47,7 @@ interface PurchaseModalProps {
   businessId: string;
   businessInfo: LandingHeaderConfigData['businessInfo'] | null;
   paymentSettings: PaymentSettings | null;
-  origin?: string; // Nuevo: El canal de tráfico (ej: 'qr', 'whatsapp')
+  origin?: string;
 }
 
 const formatCurrency = (value: number) => {
@@ -269,7 +269,7 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
             orderDate: now,
             orderStatus: 'Pendiente' as OrderStatus,
             tipoEntrega,
-            origin: origin, // Persistimos el canal de origen capturado de la URL
+            origin: origin,
         };
 
         const cleanOrderData = JSON.parse(JSON.stringify(orderData));

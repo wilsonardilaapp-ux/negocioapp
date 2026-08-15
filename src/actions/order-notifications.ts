@@ -45,7 +45,7 @@ export async function sendOrderConfirmation({ businessId, orderId }: OrderNotifi
       return;
     }
 
-    // 3. Normalizar el número del cliente
+    // 3. Normalizar el número del cliente usando la utilidad global
     const cleanPhone = normalizePhoneNumber(rawPhone);
     if (!cleanPhone || cleanPhone.length < 10) {
       return;
@@ -76,7 +76,7 @@ export async function sendOrderConfirmation({ businessId, orderId }: OrderNotifi
     }
 
   } catch (error: any) {
-    // Requisito 3: Silencio de fallos. Solo logueamos el error para auditoría técnica.
+    // Requisito: Silencio de fallos. Solo logueamos el error para auditoría técnica.
     console.error(`[OrderNotification] Critical error for business ${businessId}:`, error.message);
   }
 }
