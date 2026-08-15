@@ -32,7 +32,7 @@ export async function chat(input: ChatInput): Promise<string> {
 
 // --- RECUPERACIÓN DE DATOS (RAG) CON TIMEOUT Y LOGS DETALLADOS ---
 async function getBusinessContext(businessId: string, userMessage: string): Promise<string> {
-  console.log(`[RAG-DEBUG] Iniciando búsqueda para el negocio ${businessId} con el mensaje: ${userMessage}`);
+  console.log(`[PASO 3] [RAG-DEBUG] Iniciando búsqueda para el negocio ${businessId} con el mensaje: ${userMessage}`);
   
   try {
     const firestore = await getAdminFirestore();
@@ -171,6 +171,8 @@ CONTEXTO ACTUAL DEL NEGOCIO:
 """
 ${contextData}
 """`;
+
+    console.log(`[PASO 4] Generando respuesta con motor: ${aiConfig.provider}`);
 
     // Caso Google AI
     if (aiConfig.provider === 'googleai') {

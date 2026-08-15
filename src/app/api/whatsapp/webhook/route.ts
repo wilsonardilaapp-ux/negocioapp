@@ -89,7 +89,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ status: 'error', reason: 'incomplete_config' }, { status: 200 });
     }
 
-    console.log(`[WHAPI-SUCCESS] Negocio identificado: ${businessId}`);
+    console.log(`[WHAPI-SUCCESS] [PASO 1] Negocio identificado: ${businessId}`);
 
     // --- [EJECUCIÓN ASÍNCRONA DE LA IA] ---
     (async () => {
@@ -112,19 +112,34 @@ export async function POST(req: NextRequest) {
                 }
             }, 8000);
 
-            console.log(`[PASO 2] Registrando Analíticas...`);
-            const senderNumber = normalizePhoneNumber(incomingChatId);
-            const conversationId = uuidv4();
-            await db.collection('businesses').doc(businessId!).collection('chatConversations').doc(conversationId).set({
-                businessId: String(businessId),
-                userIdentifier: senderNumber,
-                startTime: new Date().toISOString(),
-                status: 'active',
-                messagesCount: 1, 
-                channel: 'whatsapp',
-            }).catch(e => console.error("[ANALYTICS-ERROR]", e.message));
+            // --- [PASO 2] REGISTRO DE ANALÍTICAS (AISLADO) ---
+            try {
+                console.log(`[PASO 2] Registrando Analíticas...`);
+                const senderNumber = normalizePhoneNumber(incomingChatId);
+                const conversationId = uuidv4();
+                
+                // Operación no bloqueante: lanzamos y manejamos el error internamente
+                db.collection('businesses')
+                  .doc(businessId!)
+                  .collection('chatConversations')
+                  .doc(conversationId)
+                  .set({
+                    businessId: String(businessId),
+                    userIdentifier: senderNumber,
+                    startTime: new Date().toISOString(),
+                    status: 'active',
+                    messagesCount: 1, 
+                    channel: 'whatsapp',
+                }).catch(e => console.error("[ANALITICAS-ERROR]", e.message));
+                
+            } catch (error: any) {
+                console.error('[ANALITICAS-ERROR-CATÁSTROFE]', error.message);
+            }
+            
+            console.log(`[PASO 2.5] Analíticas superadas. Pasando a RAG e IA...`);
 
-            console.log(`[PASO 3] Llamando a IA...`);
+            // --- [PASO 3] GENERACIÓN CON IA ---
+            console.log(`[AI-DEBUG] Iniciando generación con IA para: ${incomingText}`);
             const aiResponse = await chat({
                 businessId: businessId!,
                 message: incomingText,
@@ -134,13 +149,14 @@ export async function POST(req: NextRequest) {
             clearTimeout(timeoutMonitor);
             const finalMessage = aiResponse?.trim() || fallbackMessage;
 
+            // --- [PASO 4] DESPACHO FINAL ---
             console.log(`[PASO 4] Enviando Respuesta Final a Whapi a: ${incomingChatId}`);
             const whapiResponse = await fetch('https://gate.whapi.cloud/messages/text', {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${businessToken!.trim()}`,
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json'
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
                     to: incomingChatId,
@@ -160,14 +176,14 @@ export async function POST(req: NextRequest) {
         } catch (error: any) {
             console.error(`[WHAPI-NETWORK-ERROR] Error crítico en el proceso asíncrono:`, error.message);
             
-            // Envío forzado de fallback en caso de error catastrófico usando chat_id correcto
+            // Envío forzado de fallback en caso de error catastrófico
             if (!responseSent) {
                 await fetch('https://gate.whapi.cloud/messages/text', {
                     method: 'POST',
                     headers: {
                         'Authorization': `Bearer ${businessToken!.trim()}`,
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json'
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({ to: incomingChatId, body: fallbackMessage })
                 }).catch(() => {});
