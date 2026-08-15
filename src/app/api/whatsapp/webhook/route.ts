@@ -4,20 +4,13 @@ import { chat } from '@/ai/flows/chat-flow';
 import { v4 as uuidv4 } from "uuid";
 
 /**
- * @fileOverview Webhook receptor robusto para WHAPI.cloud.
- */
-
-/**
  * Normaliza un número de teléfono eliminando sufijos de red, espacios, guiones
  * y prefijos de país para una comparación segura.
  */
 function normalizePhoneNumber(phone: string | undefined | null): string {
   if (!phone) return '';
-  // 1. Quitar sufijos de red (@s.whatsapp.net, @g.us, etc)
   const cleanBase = phone.split('@')[0];
-  // 2. Quitar todo lo que no sea dígito (espacios, guiones, +, etc)
   const digits = cleanBase.replace(/\D/g, '');
-  // 3. Retornamos los últimos 10 dígitos para máxima compatibilidad en comparaciones locales/regionales
   return digits.length >= 10 ? digits.slice(-10) : digits;
 }
 

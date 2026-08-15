@@ -28,7 +28,7 @@ const testWhapiConnectionFlow = ai.defineFlow(
         method: 'GET',
         headers: {
           'Accept': 'application/json',
-          'Authorization': `Bearer ${apiKey}`,
+          'Authorization': `Bearer ${apiKey.trim()}`,
         },
       });
 
@@ -39,8 +39,10 @@ const testWhapiConnectionFlow = ai.defineFlow(
             if (errorBody) {
                 try {
                     const errorJson = JSON.parse(errorBody);
-                    const extracted = errorJson.error?.message || errorJson.message || errorJson.error || errorBody;
-                    detail = typeof extracted === 'object' ? JSON.stringify(extracted) : String(extracted);
+                    // Extraer mensaje específico del servidor de WHAPI
+                    detail = errorJson.error?.message || errorJson.message || errorJson.error || errorBody;
+                    // Si el detalle sigue siendo un objeto, convertirlo a string
+                    if (typeof detail === 'object') detail = JSON.stringify(detail);
                 } catch (jsonError) {
                     detail = errorBody;
                 }
@@ -49,8 +51,12 @@ const testWhapiConnectionFlow = ai.defineFlow(
             // ignore
         }
 
+        if (response.status === 401) {
+            throw new Error(`No autorizado (401): ${detail}. Verifica que el Token pertenezca a la instancia ${instanceId}.`);
+        }
+        
         if (response.status === 404 || detail.toLowerCase().includes('not found')) {
-            throw new Error('Instancia/Canal no encontrado (404). Por favor, verifica tu "Instance ID" y "API Key".');
+            throw new Error(`Instancia no encontrada (404). Verifica tu "Instance ID".`);
         }
         
         throw new Error(detail);
@@ -64,19 +70,13 @@ const testWhapiConnectionFlow = ai.defineFlow(
       if (accountStatus === 'authenticated' || accountStatus === 'connected') {
         return { success: true, message: `¡Conexión exitosa! Estado: ${accountStatus}.` };
       } else {
-        return { success: false, message: `Instancia encontrada pero no autenticada. Estado: ${accountStatus || 'desconocido'}.` };
+        return { success: false, message: `Instancia encontrada pero no autenticada. Estado: ${accountStatus || 'desconocido'}. Por favor, vincula el QR en el panel de WHAPI.` };
       }
 
     } catch (error: any) {
       console.error(`[WHAPI Test Error] Instance: ${instanceId}:`, error);
-      
       const errorMsg = error.message || 'Error desconocido';
-      
-      if (errorMsg.includes('fetch failed') || errorMsg.includes('ENOTFOUND')) {
-         return { success: false, message: `Error de RED: El servidor no pudo contactar a WHAPI.` };
-      }
-      
-      return { success: false, message: `Error de conexión: ${errorMsg}` };
+      return { success: false, message: errorMsg };
     }
   }
 );
