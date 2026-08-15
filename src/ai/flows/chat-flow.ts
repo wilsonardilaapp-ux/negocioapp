@@ -42,6 +42,8 @@ async function getBusinessContext(businessId: string): Promise<string> {
     const knowledgeQuery = firestore.collection(`businesses/${businessId}/chatbotConfig/main/knowledgeBase`);
     const knowledgeSnap = await knowledgeQuery.get();
 
+    console.log(`[RAG-DEBUG] Encontrados ${knowledgeSnap.size} fragmentos de conocimiento para el negocio ${businessId}`);
+
     const knowledgeContent = knowledgeSnap.docs.map(d => {
       const data = d.data();
       const content = data.extractedText || data.content || "";
@@ -125,6 +127,7 @@ const chatFlow = ai.defineFlow(
     outputSchema: z.string(),
   },
   async (input) => {
+    console.log(`[RAG-DEBUG] Iniciando búsqueda para el negocio ${input.businessId} con el mensaje: ${input.message}`);
     const contextData = await getBusinessContext(input.businessId);
     const aiConfig = await getAIConfig(input.businessId);
 
@@ -132,8 +135,15 @@ const chatFlow = ai.defineFlow(
       return "Lo siento, el servicio de asistencia no está configurado. Por favor, contacta al administrador.";
     }
 
-    // POLÍTICA DE NO ALUCINACIÓN ESTRICTA
-    const systemPrompt = `Eres un asistente profesional del Salón de Belleza Natural. Responde ÚNICAMENTE basándote en la base de conocimientos proporcionada. Si la respuesta no está en los documentos, indica amablemente que no tienes esa información y ofrece comunicar al cliente con un humano. NO inventes precios ni servicios.
+    // POLÍTICA DE NO ALUCINACIÓN ESTRICTA (REFORZADA)
+    const systemPrompt = `Eres un asistente profesional del Salón de Belleza Natural. 
+Responde ÚNICAMENTE basándote en el CONTEXTO proporcionado.
+
+REGLAS CRÍTICAS:
+1. Si la información solicitada no está explícitamente en el CONTEXTO (Base de Conocimiento o Catálogo), responde EXACTAMENTE: "Lo siento, no tengo esa información en mis registros. ¿Te gustaría que te comunique con un asesor humano?"
+2. NO uses tu conocimiento general para inventar respuestas sobre el negocio.
+3. NO inventes precios, horarios, promociones ni servicios que no aparezcan en el CONTEXTO.
+4. Si el CONTEXTO está vacío, aplica la Regla 1.
 
 CONTEXTO ACTUAL DEL NEGOCIO:
 """

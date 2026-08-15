@@ -102,6 +102,9 @@ export async function POST(req: NextRequest) {
               return;
             }
 
+            const businessTokenPrefix = businessToken ? businessToken.substring(0, 5) : 'MISSING';
+            console.log(`[WHAPI-DEBUG] Intentando enviar mensaje con Token: ${businessTokenPrefix}... a chat: ${rawSender}`);
+
             // Envío utilizando el token específico del negocio identificado
             const whapiResponse = await fetch('https://gate.whapi.cloud/messages/text', {
                 method: 'POST',
@@ -117,7 +120,7 @@ export async function POST(req: NextRequest) {
 
             if (!whapiResponse.ok) {
                 const errorBody = await whapiResponse.text();
-                console.error(`[WHAPI-ERROR] Fallo al enviar a WhatsApp: ${whapiResponse.status} - ${errorBody}`);
+                console.error(`[WHAPI-FATAL] Fallo al enviar. Status: ${whapiResponse.status}. Body: ${errorBody}`);
             } else {
                 console.log(`[WHAPI-SUCCESS] Mensaje enviado correctamente al remitente vía WHAPI.`);
             }
