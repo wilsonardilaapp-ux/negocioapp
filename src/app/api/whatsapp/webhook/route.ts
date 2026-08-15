@@ -23,12 +23,17 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
+    
+    // [WEBHOOK-DEBUG] Inspección total del evento recibido de WHAPI
+    console.log(`[WEBHOOK-DEBUG] Evento recibido:`, JSON.stringify(body, null, 2));
+
     const message = body.messages?.[0];
     
     // Normalización estricta del ID del Canal (Tenant ID)
     const channelId = body.channel_id?.toString().trim().toUpperCase(); 
     
     if (!message || message.from_me) {
+      console.log(`[WEBHOOK-DEBUG] Evento ignorado (sin mensajes o mensaje propio).`);
       return NextResponse.json({ status: 'ignored' }, { status: 200 });
     }
 
@@ -49,6 +54,8 @@ export async function POST(req: NextRequest) {
     // 1. Resolución de Identidad (Multi-tenant) con Fallback
     let businessId: string | null = null;
     let businessToken: string | null = null;
+
+    console.log(`[WHAPI-DEBUG] Buscando negocio para channelId: "${channelId}"`);
 
     // Nivel 1: Búsqueda en configuraciones de chatbot
     let configSnapshot = await db.collectionGroup('chatbotConfig')
@@ -81,20 +88,32 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ status: 'error', reason: 'incomplete_config' }, { status: 200 });
     }
 
-    console.log(`[WHAPI-SUCCESS] Procesando mensaje para negocio: ${businessId}`);
+    console.log(`[WHAPI-SUCCESS] Negocio identificado: ${businessId}`);
 
     // 2. Ejecución asíncrona de IA y respuesta
     (async () => {
         try {
             console.log(`[AI-DEBUG] Iniciando generación de respuesta para: ${businessId}`);
             
+            // Registro en analíticas
+            const senderNumber = normalizePhoneNumber(rawSender);
+            const conversationId = uuidv4();
+            await db.collection('businesses').doc(businessId!).collection('chatConversations').doc(conversationId).set({
+                businessId: String(businessId),
+                userIdentifier: senderNumber,
+                startTime: new Date().toISOString(),
+                status: 'active',
+                messagesCount: 1, 
+                channel: 'whatsapp',
+            }).catch(e => console.error("[ANALYTICS-ERROR]", e.message));
+
             const aiResponse = await chat({
                 businessId: businessId!,
                 message: incomingText,
                 history: [] 
             });
 
-            console.log(`[AI-DEBUG] Respuesta generada: "${aiResponse ? aiResponse.substring(0, 50) : 'VACÍO'}..."`);
+            console.log(`[AI-DEBUG] Respuesta generada: "${aiResponse ? aiResponse.substring(0, 100) : 'VACÍO'}..."`);
 
             if (!aiResponse) {
               console.warn(`[AI-DEBUG] El motor de IA devolvió una respuesta vacía para ${businessId}.`);
@@ -126,8 +145,7 @@ export async function POST(req: NextRequest) {
             }
 
         } catch (error: any) {
-            // Log específico solicitado para fallos de red
-            console.error(`[WHAPI-NETWORK-ERROR] Error de red en el proceso asíncrono para ${businessId}:`, error.message);
+            console.error(`[WHAPI-NETWORK-ERROR] Error en el proceso asíncrono para ${businessId}:`, error.message);
         }
     })();
 

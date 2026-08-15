@@ -24,13 +24,16 @@ export async function chat(input: ChatInput): Promise<string> {
   try {
     return await chatFlow(input);
   } catch (error: any) {
-    console.error("Error técnico en chatFlow:", error.message);
-    return "Lo siento, estoy teniendo problemas técnicos. Por favor, intenta de nuevo en unos minutos.";
+    console.error("Error crítico en chatFlow:", error.message);
+    // [BOT-MUST-SPEAK] Fallback de emergencia si todo falla
+    return "Hola, soy el asistente del Salón de Belleza Natural. Estoy teniendo unos problemas técnicos momentáneos, pero puedes escribirnos directamente por este medio y un asesor te atenderá pronto.";
   }
 }
 
-// --- RECUPERACIÓN DE DATOS (RAG) ---
-async function getBusinessContext(businessId: string): Promise<string> {
+// --- RECUPERACIÓN DE DATOS (RAG) CON TIMEOUT Y LOGS DETALLADOS ---
+async function getBusinessContext(businessId: string, userMessage: string): Promise<string> {
+  console.log(`[RAG-DEBUG] Iniciando búsqueda para el negocio ${businessId} con el mensaje: ${userMessage}`);
+  
   try {
     const firestore = await getAdminFirestore();
 
@@ -39,18 +42,23 @@ async function getBusinessContext(businessId: string): Promise<string> {
     const businessName = businessDoc.exists ? businessDoc.data()?.name : "Salón de Belleza Natural";
 
     // 2. Base de Conocimiento (Documentos PDF y Manuales)
-    const knowledgeQuery = firestore.collection(`businesses/${businessId}/chatbotConfig/main/knowledgeBase`);
-    const knowledgeSnap = await knowledgeQuery.get();
+    // Envolvemos en try/catch específico para reportar errores de colección
+    let knowledgeContent = "";
+    try {
+      const knowledgeQuery = firestore.collection(`businesses/${businessId}/chatbotConfig/main/knowledgeBase`);
+      const knowledgeSnap = await knowledgeQuery.get();
+      
+      console.log(`[RAG-DEBUG] Fragmentos encontrados en Base de Conocimientos: ${knowledgeSnap.size}`);
 
-    console.log(`[RAG-DEBUG] Encontrados ${knowledgeSnap.size} fragmentos de conocimiento para el negocio ${businessId}`);
-
-    const knowledgeContent = knowledgeSnap.docs.map(d => {
-      const data = d.data();
-      const content = data.extractedText || data.content || "";
-      const title = data.fileName || data.title || "Información";
-      const imageInfo = data.fileUrl ? `\n[LINK DE IMAGEN/DOCUMENTO: ${data.fileUrl}]` : "";
-      return `--- TEMA: ${title} ---\n${content}${imageInfo}\n`;
-    }).join('\n');
+      knowledgeContent = knowledgeSnap.docs.map(d => {
+        const data = d.data();
+        const content = data.extractedText || data.content || "";
+        const title = data.fileName || data.title || "Información";
+        return `--- TEMA: ${title} ---\n${content}\n`;
+      }).join('\n');
+    } catch (innerError: any) {
+      console.error(`[RAG-ERROR] Error buscando en documentos: ${innerError.message}`);
+    }
 
     // 3. Catálogo de Productos y Servicios
     const productsQuery = firestore.collection(`businesses/${businessId}/products`).limit(30);
@@ -65,20 +73,19 @@ async function getBusinessContext(businessId: string): Promise<string> {
 INFORMACIÓN DEL NEGOCIO: ${businessName}
 
 [BASE DE CONOCIMIENTOS]
-${knowledgeContent}
+${knowledgeContent || "No hay manuales cargados actualmente."}
 
 [SERVICIOS Y PRODUCTOS DISPONIBLES]
-${productsContent}
+${productsContent || "Catálogo no disponible."}
 `;
-  } catch (error) {
-    console.error("Error recuperando contexto DB:", error);
+  } catch (error: any) {
+    console.error(`[RAG-ERROR] Error fatal en recuperación de contexto: ${error.message}`);
     return "";
   }
 }
 
 /**
  * Obtiene la configuración de IA activa desde el panel global.
- * Prioriza la colección indicada por el usuario para control de Super Admin.
  */
 export async function getAIConfig(businessId?: string): Promise<{ provider: string; apiKey: string; model: string }> {
   try {
@@ -87,14 +94,14 @@ export async function getAIConfig(businessId?: string): Promise<{ provider: stri
     // Consulta a la configuración global del Super Admin
     const globalConfigSnap = await firestore.doc('globalConfig/config_ia').get();
     
-    // Fallback a la integración estándar si no existe la global
+    // Fallback a la integración estándar
     const integrationSnap = await firestore.doc('integrations/chatbot-integrado-con-whatsapp-para-soporte-y-ventas').get();
 
     const configDoc = globalConfigSnap.exists ? globalConfigSnap : integrationSnap;
 
     if (!configDoc.exists) {
       console.error("[AI-ERROR] No hay motor de IA activo en el panel de Super Admin.");
-      return { provider: 'openai', apiKey: '', model: 'gpt-4o-mini' };
+      return { provider: 'googleai', apiKey: '', model: 'gemini-1.5-flash' };
     }
 
     const data = configDoc.data();
@@ -105,19 +112,17 @@ export async function getAIConfig(businessId?: string): Promise<{ provider: stri
       fields = data?.fields || {};
     }
 
-    // Identificar motor 'Activo' (Selección dinámica basada en la presencia de API Key)
     if (fields.google?.apiKey) return { provider: 'googleai', apiKey: fields.google.apiKey, model: 'gemini-1.5-flash' };
     if (fields.openai?.apiKey) return { provider: 'openai', apiKey: fields.openai.apiKey, model: 'gpt-4o-mini' };
     if (fields.groq?.apiKey) return { provider: 'groq', apiKey: fields.groq.apiKey, model: 'llama-3.1-8b-instant' };
-    if (fields.deepseek?.apiKey) return { provider: 'deepseek', apiKey: fields.deepseek.apiKey, model: 'deepseek-chat' };
 
     console.error("[AI-ERROR] No se encontró ninguna API Key configurada en el motor global.");
 
   } catch (e: any) {
-    console.error("[AI-ERROR] Fallo al intentar leer la configuración global:", e.message);
+    console.error("[AI-ERROR] Fallo al leer configuración IA:", e.message);
   }
 
-  return { provider: 'openai', apiKey: '', model: 'gpt-4o-mini' };
+  return { provider: 'googleai', apiKey: '', model: 'gemini-1.5-flash' };
 }
 
 const chatFlow = ai.defineFlow(
@@ -127,30 +132,28 @@ const chatFlow = ai.defineFlow(
     outputSchema: z.string(),
   },
   async (input) => {
-    console.log(`[RAG-DEBUG] Iniciando búsqueda para el negocio ${input.businessId} con el mensaje: ${input.message}`);
-    const contextData = await getBusinessContext(input.businessId);
+    const contextData = await getBusinessContext(input.businessId, input.message);
     const aiConfig = await getAIConfig(input.businessId);
 
     if (!aiConfig.apiKey) {
-      return "Lo siento, el servicio de asistencia no está configurado. Por favor, contacta al administrador.";
+      return "Lo siento, el servicio de asistencia no está configurado correctamente.";
     }
 
-    // POLÍTICA DE NO ALUCINACIÓN ESTRICTA (REFORZADA)
+    // [POLÍTICA DE NO ALUCINACIÓN Y RESPUESTA OBLIGATORIA]
     const systemPrompt = `Eres un asistente profesional del Salón de Belleza Natural. 
 Responde ÚNICAMENTE basándote en el CONTEXTO proporcionado.
 
 REGLAS CRÍTICAS:
-1. Si la información solicitada no está explícitamente en el CONTEXTO (Base de Conocimiento o Catálogo), responde EXACTAMENTE: "Lo siento, no tengo esa información en mis registros. ¿Te gustaría que te comunique con un asesor humano?"
+1. Si la información solicitada no está explícitamente en el CONTEXTO, responde EXACTAMENTE: "Hola, soy el asistente del Salón de Belleza Natural. No encontré esa info en mis manuales, ¿en qué más te ayudo?"
 2. NO uses tu conocimiento general para inventar respuestas sobre el negocio.
-3. NO inventes precios, horarios, promociones ni servicios que no aparezcan en el CONTEXTO.
-4. Si el CONTEXTO está vacío, aplica la Regla 1.
+3. NO inventes precios ni servicios que no aparezcan en el CONTEXTO.
+4. Si el CONTEXTO está vacío o es insuficiente para una respuesta veraz, aplica la Regla 1.
 
 CONTEXTO ACTUAL DEL NEGOCIO:
 """
 ${contextData}
 """`;
 
-    // Implementación dinámica según proveedor
     if (aiConfig.provider === 'googleai') {
       const response = await ai.generate({
         model: `googleai/${aiConfig.model}`,
@@ -161,14 +164,13 @@ ${contextData}
         ],
         config: { temperature: 0.1, apiKey: aiConfig.apiKey }
       });
-      return response.text ?? 'No pude generar una respuesta.';
+      return response.text ?? "Hola, soy el asistente del Salón de Belleza Natural. No encontré esa info en mis manuales, ¿en qué más te ayudo?";
     }
 
-    // Fallback para proveedores compatibles con OpenAI (OpenAI, Groq, DeepSeek)
+    // Fallback para otros proveedores (OpenAI compatible)
     try {
       let endpoint = 'https://api.openai.com/v1/chat/completions';
       if (aiConfig.provider === 'groq') endpoint = 'https://api.groq.com/openai/v1/chat/completions';
-      else if (aiConfig.provider === 'deepseek') endpoint = 'https://api.deepseek.com/v1/chat/completions';
 
       const response = await fetch(endpoint, {
         method: 'POST',
@@ -188,10 +190,9 @@ ${contextData}
       });
 
       const data = await response.json();
-      return data.choices?.[0]?.message?.content || 'No pude generar una respuesta.';
+      return data.choices?.[0]?.message?.content || "Hola, soy el asistente del Salón de Belleza Natural. No encontré esa info en mis manuales, ¿en qué más te ayudo?";
     } catch (e) {
-      console.error("Fallo en fetch de IA:", e);
-      return "Hubo un error al conectar con el motor de inteligencia.";
+      return "Hola, soy el asistente del Salón de Belleza Natural. No encontré esa info en mis manuales, ¿en qué más te ayudo?";
     }
   }
 );
