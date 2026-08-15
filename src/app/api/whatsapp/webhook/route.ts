@@ -34,7 +34,8 @@ export async function POST(req: NextRequest) {
     console.log(JSON.stringify(body, null, 2));
 
     const message = body.messages?.[0];
-    const channelId = body.channel_id; // Fuente de verdad del payload de WHAPI
+    // Sanitización preventiva: asegurar que no haya espacios ni inconsistencias de tipo
+    const channelId = body.channel_id?.toString().trim(); 
     
     // Ignorar eventos que no sean mensajes o mensajes salientes
     if (!message || message.from_me) {
@@ -71,8 +72,8 @@ export async function POST(req: NextRequest) {
     const configDoc = configSnapshot.docs[0];
     const configData = configDoc.data();
     
-    // Extraer businessId del path (businesses/{businessId}/chatbotConfig/main)
-    businessId = configData.businessId || configDoc.ref.parent.parent?.id || null;
+    // Resolución resiliente de businessId buscando en raíz y en objeto anidado 'business'
+    businessId = configData.businessId || configData.business?.businessId || configDoc.ref.parent.parent?.id || null;
     businessToken = configData.whatsApp?.token;
 
     if (!businessId || !businessToken) {
