@@ -374,6 +374,9 @@ export default function BusinessesPage() {
     try {
         const batch = writeBatch(firestore);
 
+        const currentPlan = allPlans.find(p => p.name === selectedBusiness.planName || p.id === selectedBusiness.planName || ('slug' in p && p.slug === selectedBusiness.planName));
+        const planModules = (currentPlan as any)?.includedModuleKeys?.map((k: string) => normalizeModuleId(k)) || [];
+
         for (const moduleId of assignedModules) {
           const extra = moduleExtras[moduleId] || 0;
           const validation = validateModuleExtra(selectedBusiness.planName, extra);
@@ -393,9 +396,7 @@ export default function BusinessesPage() {
         };
         batch.update(businessRef, businessUpdateData);
 
-        const targetPlan = allPlans.find(p => p.name === selectedBusiness.planName || p.id === selectedBusiness.planName || ('slug' in p && p.slug === selectedBusiness.planName));
-        const planIdToSync = targetPlan?.id || 'WxZYuL7JwmkSKBXGn1QZ';
-        const planModules = (targetPlan as any)?.includedModuleKeys?.map((k: string) => normalizeModuleId(k)) || [];
+        const planIdToSync = currentPlan?.id || 'WxZYuL7JwmkSKBXGn1QZ';
         
         const subscriptionRef = doc(firestore, `businesses/${selectedBusiness.id}/subscription`, 'current');
         batch.set(subscriptionRef, {
@@ -415,6 +416,7 @@ export default function BusinessesPage() {
           if (isCurrentlyActive !== isDefaultInPlan || extra > 0) {
             batch.set(doc(firestore, `businesses/${selectedBusiness.id}/modules`, cleanId), { 
               status: isCurrentlyActive ? 'active' : 'inactive', 
+              isAddon: isCurrentlyActive && !isDefaultInPlan, // Flag de Add-on FASE 3
               extra 
             }, { merge: true });
           } else {
@@ -761,7 +763,7 @@ export default function BusinessesPage() {
                 <div className="flex items-center justify-between mb-3">
                     <h4 className="font-bold flex items-center gap-2 text-gray-800">
                         <Puzzle className="h-4 w-4 text-primary" />
-                        Módulos y Herramientas
+                        Módulos y Herramientas (Fase 3: Add-ons)
                     </h4>
                     <span className="text-[10px] text-muted-foreground italic">Valida que coincidan con el plan contratado</span>
                 </div>
@@ -789,7 +791,7 @@ export default function BusinessesPage() {
                             'flex flex-col p-3 border rounded-lg transition-all', 
                             isActive ? 'border-primary bg-primary/5 shadow-sm' : 'hover:bg-muted/30', 
                             moduleItem.status === 'inactive' && 'opacity-60',
-                            isActive && !isIncludedInPlan && 'border-yellow-500 bg-yellow-50/30'
+                            isActive && !isIncludedInPlan && 'border-blue-500 bg-blue-50/30'
                         )}>
                           <div className="flex items-center justify-between cursor-pointer" onClick={() => moduleItem.status !== 'inactive' && toggleModuleAssignment(moduleItem.id)}>
                             <div className="flex items-center gap-3">
@@ -800,7 +802,8 @@ export default function BusinessesPage() {
                                   <div className="flex items-center gap-2">
                                       <p className="text-sm font-bold">{moduleItem.name}</p>
                                       {isIncludedInPlan && <Badge className="text-[8px] h-4 bg-green-600">Incluido en Plan</Badge>}
-                                      {isActive && !isIncludedInPlan && <Badge variant="outline" className="text-[8px] h-4 border-yellow-500 text-yellow-700">Extra</Badge>}
+                                      {isActive && !isIncludedInPlan && <Badge className="text-[8px] h-4 bg-blue-600 text-white border-none shadow-sm">Add-on Activo</Badge>}
+                                      {!isActive && !isIncludedInPlan && <Badge variant="outline" className="text-[8px] h-4 border-gray-300 text-gray-500">No Incluido</Badge>}
                                   </div>
                                   <p className="text-[10px] font-medium text-muted-foreground uppercase">{moduleItem.status}</p>
                               </div>
