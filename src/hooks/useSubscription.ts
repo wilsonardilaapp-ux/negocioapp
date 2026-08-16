@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useMemo, useState, useEffect, useCallback } from 'react';
@@ -147,7 +146,6 @@ export function useSubscription() {
     const extras = (businessData as any)?.limitesExtra || {};
     const baseLimits = details?.limits ?? defaultLimits;
 
-    // FÓRMULA MAESTRA: Límite Base + Extra = Total Real
     const mergedLimits: PlanLimits = {
         products: baseLimits.products === -1 ? -1 : (baseLimits.products + (extras.products || 0)),
         blogPosts: baseLimits.blogPosts === -1 ? -1 : (baseLimits.blogPosts + (extras.blogPosts || 0)),
@@ -160,11 +158,12 @@ export function useSubscription() {
 
     const activeModuleIds = new Set<string>();
     
-    // JERARQUÍA DE RESOLUCIÓN DE MÓDULOS:
-    // 1. Prioridad 2: Módulos incluidos por defecto en el Plan asignado (Normalizados)
+    // JERARQUÍA DE RESOLUCIÓN DE MÓDULOS (BLINDAJE DE REACTIVIDAD):
+    // 1. Cargamos módulos incluidos por defecto en el Plan (Prioridad 2)
     details?.includedModuleKeys?.forEach(key => activeModuleIds.add(normalizeModuleId(key)));
 
-    // 2. Prioridad 1 (Override): Sobre-escritura explícita desde la subcolección del negocio
+    // 2. Sobre-escribimos con estados explícitos de la subcolección (Prioridad 1: Add-ons y Bloqueos)
+    // Usamos el ID del documento para máxima precisión en la búsqueda
     dbModules?.forEach(m => {
         const cleanId = normalizeModuleId(m.id);
         if (m.status === 'active') {
@@ -218,7 +217,8 @@ export function useSubscription() {
   }, [memoizedSubscriptionValues.limits.suggestions]);
 
   const isModuleAuthorized = useCallback((moduleId: string): boolean => {
-      return memoizedSubscriptionValues.activeModuleIds.has(normalizeModuleId(moduleId));
+      const cleanId = normalizeModuleId(moduleId);
+      return memoizedSubscriptionValues.activeModuleIds.has(cleanId);
   }, [memoizedSubscriptionValues.activeModuleIds]);
 
   return {

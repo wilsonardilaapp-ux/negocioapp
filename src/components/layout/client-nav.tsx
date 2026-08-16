@@ -6,6 +6,7 @@ import { useMemo } from 'react';
 import { useSubscription } from "@/hooks/useSubscription";
 import { useUser } from "@/firebase";
 import { PUBLIC_MENU_CHATBOT_MODULE_ID } from "@/models/public-menu-chatbot";
+import { normalizeModuleId } from "@/lib/utils";
 import {
   LayoutDashboard,
   FileText,
@@ -43,18 +44,16 @@ const allNavItems = [
   { href: "/dashboard/share-landing", icon: Share2, label: "Compartir Landing Page" },
   { href: "/dashboard/catalogo", icon: ShoppingCart, label: "Catálogo", moduleId: 'catalogo' },
   { href: "/dashboard/catalogo/estadisticas", icon: BarChart, label: "Estadísticas de Productos", moduleId: 'catalogo' },
-  // --- MÓDULO DE MEDICIÓN (ADITIVO) ---
   { href: "/dashboard/medicion/numero-pedidos", icon: ShoppingBag, label: "N° Pedidos", moduleId: 'catalogo' },
   { href: "/dashboard/medicion/ticket-promedio", icon: DollarSign, label: "Ticket Promedio", moduleId: 'catalogo' },
   { href: "/dashboard/medicion/clientes-nuevos", icon: UserPlus, label: "Clientes Nuevos", moduleId: 'catalogo' },
   { href: "/dashboard/medicion/clientes-recurrentes", icon: Users, label: "Retención Clientes", moduleId: 'catalogo' },
   { href: "/dashboard/medicion/pedidos-por-canal", icon: PieChart, label: "Canales de Venta", moduleId: 'catalogo' },
-  // ------------------------------------
   { href: "/dashboard/loyalty", icon: Sparkles, label: "Fidelización", moduleId: 'loyalty' },
   { href: "/dashboard/share", icon: Share2, label: "Compartir Menú", moduleId: 'catalogo' },
   { href: "/dashboard/blog", icon: FileText, label: "Blog", moduleId: 'blog' },
   { href: "/dashboard/valoraciones-directorio", icon: Star, label: "Valoraciones del Directorio" },
-  { href: "/dashboard/chatbot", icon: Bot, label: "Asistente IA", moduleId: 'chatbot-integrado-con-whatsapp-para-soporte-y-ventas'},
+  { href: "/dashboard/chatbot", icon: Bot, label: "Asistente IA", moduleId: 'chatbot-de-soporte-whatsapp' },
   { href: "/dashboard/messages", icon: Bell, label: "Notificaciones" },
   { href: "/dashboard/mensajes-clientes", icon: Mail, label: "Messages de Clientes" },
   { href: "/dashboard/referidos", icon: Users, label: "Programa de Socios" },
@@ -87,7 +86,10 @@ export function ClientNav() {
     return allNavItems.filter(item => {
       if (!item.moduleId) return true;
       if (profile?.role === 'super_admin') return true;
-      return isModuleAuthorized(item.moduleId);
+      
+      // Aplicamos normalización estricta para la validación del Sidebar
+      const cleanModuleId = normalizeModuleId(item.moduleId);
+      return isModuleAuthorized(cleanModuleId);
     });
   }, [isModuleAuthorized, profile?.role]);
 
