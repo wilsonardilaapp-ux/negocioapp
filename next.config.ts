@@ -1,22 +1,13 @@
+
 import type { NextConfig } from 'next';
 
 /**
- * Configuración maestra de Next.js optimizada para el entorno de producción.
- * Se han eliminado los overrides de webpack que causaban errores de resolución de chunks (Cannot find module).
+ * Configuración maestra de Next.js.
+ * Se eliminan configuraciones experimentales que causaban inestabilidad en los chunks.
  */
 const nextConfig: NextConfig = {
-    transpilePackages: [
-        'lucide-react', 
-        'recharts', 
-        'date-fns', 
-        'embla-carousel-react', 
-        'embla-carousel-autoplay',
-        'react-quill'
-    ],
     experimental: {
         serverComponentsExternalPackages: [
-            '@opentelemetry/api', 
-            '@opentelemetry/instrumentation', 
             'firebase-admin', 
             'cloudinary', 
             'pdf-parse',
@@ -36,14 +27,7 @@ const nextConfig: NextConfig = {
             { protocol: 'https', hostname: 'res.cloudinary.com' },
             { protocol: 'https', hostname: 'picsum.photos' },
             { protocol: 'https', hostname: 'images.unsplash.com' },
-            { protocol: 'https', hostname: 'seeklogo.com' },
-            { protocol: 'https', hostname: 'via.placeholder.com' },
-            { protocol: 'https', hostname: 'i.pravatar.cc' },
-            { protocol: 'https', hostname: 'img.freepik.com' },
-            { protocol: 'https', hostname: 'ing.freepik.com' },
             { protocol: 'https', hostname: 'firebasestorage.googleapis.com' },
-            { protocol: 'https', hostname: 'lh3.googleusercontent.com' },
-            { protocol: 'https', hostname: 'storage.googleapis.com' },
         ],
     },
 };
