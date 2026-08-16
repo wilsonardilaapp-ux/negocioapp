@@ -2,9 +2,8 @@
 import type { NextConfig } from 'next';
 
 /**
- * Configuración maestra de Next.js.
- * Se han consolidado aquí todas las opciones de transpilación y configuración experimental
- * para evitar errores de módulos no encontrados debido a la coexistencia de archivos .js y .ts.
+ * Configuración maestra de Next.js optimizada.
+ * Se eliminan configuraciones redundantes de Webpack que causaban fallos en la generación de manifiestos.
  */
 const nextConfig: NextConfig = {
     transpilePackages: [
@@ -41,14 +40,6 @@ const nextConfig: NextConfig = {
         serverActions: {
             bodySizeLimit: '50mb',
         },
-    },
-    webpack: (config, { isServer }) => {
-        if (isServer) {
-          config.externals.push('require-in-the-middle');
-          config.externals.push('@opentelemetry/instrumentation');
-          config.externals.push('@opentelemetry/api');
-        }
-        return config;
     },
     images: {
         remotePatterns: [

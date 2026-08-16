@@ -1,6 +1,6 @@
 
 /**
- * Archivo de configuración fuera de lugar desactivado. 
- * La configuración real reside en la raíz del proyecto.
+ * ARCHIVO ELIMINADO LÓGICAMENTE
+ * Este archivo en src/ causaba conflictos con la configuración de la raíz.
  */
 export default {};
