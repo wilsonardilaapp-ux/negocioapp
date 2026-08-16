@@ -1,6 +1,1 @@
-{
-  "name": "nextn-src",
-  "version": "0.1.0",
-  "private": true,
-  "description": "Archivo neutralizado para evitar conflictos de dependencias en el build."
-}
+{}
