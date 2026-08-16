@@ -1,11 +1,9 @@
 import type { NextConfig } from 'next';
 
 /**
- * Configuración maestra de Next.js optimizada.
- * Se eliminan configuraciones redundantes de Webpack que causaban fallos en la generación de manifiestos.
+ * Configuración maestra de Next.js optimizada para el entorno de build.
  */
 const nextConfig: NextConfig = {
-    // Reducimos la transpilación a lo estrictamente necesario para evitar errores de chunks
     transpilePackages: [
         'lucide-react', 
         'recharts', 

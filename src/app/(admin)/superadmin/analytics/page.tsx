@@ -48,7 +48,7 @@ export default function AnalyticsPage() {
     products: [],
     orders: [],
   });
-  const [isAggregating, setIsAggregating] = useState(true);
+  const [isAggregating, setIsAggregating] = useState(false);
 
   // Queries for top-level collections
   const usersQuery = useMemoFirebase(() => firestore ? collection(firestore, 'users') : null, [firestore]);
@@ -63,7 +63,7 @@ export default function AnalyticsPage() {
 
   // Effect to fetch and aggregate sub-collection data
   useEffect(() => {
-    if (!firestore || !businesses) return;
+    if (!mounted || !firestore || !businesses) return;
 
     const aggregateSubcollections = async () => {
         setIsAggregating(true);
@@ -106,7 +106,7 @@ export default function AnalyticsPage() {
     };
 
     aggregateSubcollections();
-  }, [firestore, businesses]);
+  }, [mounted, firestore, businesses]);
 
   const isLoading = !mounted || usersLoading || businessesLoading || isAggregating;
 
@@ -115,14 +115,14 @@ export default function AnalyticsPage() {
     return aggregatedData.orders.reduce((acc, order) => acc + (order.total || order.subtotal || 0), 0);
   }, [aggregatedData.orders]);
 
-  const kpiData = [
+  const kpiData = useMemo(() => [
       { title: "Empresas Registradas", value: (businesses?.length || 0).toString(), icon: Building, change: "+15.2%", period: "el último mes" },
       { title: "Landing Pages", value: (aggregatedData.landingPages?.length || 0).toString(), icon: TestTube, change: "+8.9%", period: "esta semana" },
       { title: "Envíos de Formularios", value: (aggregatedData.submissions?.length || 0).toString(), icon: FileText, change: "+112", period: "hoy" },
       { title: "Productos en Catálogo", value: (aggregatedData.products?.length || 0).toString(), icon: ShoppingCart, change: "+0", period: "esta semana" },
       { title: "Nuevos Usuarios", value: (users?.length || 0).toString(), icon: Users, change: "+22.5%", period: "el último mes" },
       { title: "Ventas Totales", value: formatCurrency(totalSales), icon: DollarSign, change: "+12%", period: "el último mes" },
-  ];
+  ], [businesses, aggregatedData, users, totalSales]);
 
   // --- Chart Data Processing ---
   const userGrowthData = useMemo(() => {
@@ -189,7 +189,7 @@ export default function AnalyticsPage() {
             <CardHeader>
                 <CardTitle>Métricas y Analíticas</CardTitle>
                 <CardDescription>
-                Visualiza los indicadores clave de rendimiento (KPIs) de la plataforma Zentry.
+                Visualiza los indicadores clave de rendimiento (KPIs) de la plataforma Markix.
                 </CardDescription>
             </CardHeader>
         </Card>
