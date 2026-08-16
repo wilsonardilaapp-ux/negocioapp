@@ -1,6 +1,9 @@
 'use server';
 /**
- * @fileOverview Chatbot flow with RAG Absolute Blindage and detailed logging.
+ * @fileOverview Chatbot flow with RAG Priority, hierarchical prompting and detailed source logging.
+ * 
+ * - Prioritizes Knowledge Base (RAG) over general AI knowledge.
+ * - Implements a 4s timeout for database queries to prevent server freezes.
  */
 
 import { ai } from '../genkit';
@@ -20,7 +23,7 @@ const ChatInputSchema = z.object({
 export type ChatInput = z.infer<typeof ChatInputSchema>;
 
 /**
- * Función principal para generar respuestas del asistente.
+ * Main wrapper to handle the assistant response generation.
  */
 export async function chat(input: ChatInput): Promise<string> {
   console.log(`[CHAT-FLOW] Llamada recibida para businessId: ${input.businessId}`);
@@ -33,23 +36,55 @@ export async function chat(input: ChatInput): Promise<string> {
 }
 
 /**
- * Obtiene el contexto del negocio con blindaje total y timeout de 1s.
- * Retorna un string vacío si falla o excede el tiempo para no bloquear el flujo.
+ * Retrieves business context (Knowledge Base + Catalog) from Firestore with a safety timeout.
  */
 async function getBusinessContext(businessId: string, userMessage: string): Promise<string> {
   try {
-    console.log(`[PASO 3] [RAG-DEBUG] Iniciando búsqueda blindada (1s)...`);
+    console.log(`[PASO 3] [RAG-DEBUG] Iniciando búsqueda blindada (4s)...`);
     
     const result = await Promise.race([
       (async () => {
-        // Bypass temporal del RAG para evitar bloqueos por latencia en Firestore
-        // Si se desea restaurar, implementar consultas indexadas ultra-rápidas aquí.
-        return ""; 
+        const db = await getAdminFirestore();
+        
+        // Parallel fetching for performance
+        const [kbSnap, catalogSnap] = await Promise.all([
+          db.collection('businesses')
+            .doc(businessId)
+            .collection('chatbotConfig')
+            .doc('main')
+            .collection('knowledgeBase')
+            .where('status', '==', 'ready')
+            .get(),
+          db.collection('businesses')
+            .doc(businessId)
+            .collection('publicData')
+            .doc('catalog')
+            .get()
+        ]);
+
+        let context = "";
+
+        // 1. Add Catalog Data (Products, Prices)
+        if (catalogSnap.exists) {
+          const catData = catalogSnap.data();
+          context += "CATÁLOGO DE PRODUCTOS:\n" + JSON.stringify(catData?.products || []) + "\n\n";
+        }
+
+        // 2. Add Knowledge Base (Manual entries and PDF extractions)
+        if (!kbSnap.empty) {
+          context += "BASE DE CONOCIMIENTO:\n";
+          kbSnap.forEach(doc => {
+            const data = doc.data();
+            context += `TEMA: ${data.fileName}\nCONTENIDO: ${data.extractedText || data.content || ""}\n\n`;
+          });
+        }
+
+        return context;
       })(),
-      new Promise<string>((_, reject) => setTimeout(() => reject(new Error('TIMEOUT_RAG')), 1000))
+      new Promise<string>((_, reject) => setTimeout(() => reject(new Error('TIMEOUT_RAG')), 4000))
     ]);
 
-    console.log(`[PASO 3.5] Búsqueda finalizada.`);
+    console.log(`[PASO 3.5] [RAG-DEBUG] Contexto construido exitosamente (${result.length} bytes)`);
     return result;
 
   } catch (error: any) {
@@ -59,44 +94,34 @@ async function getBusinessContext(businessId: string, userMessage: string): Prom
 }
 
 /**
- * Obtiene la configuración de IA activa desde el panel global.
+ * Fetches active AI configuration from the global integration panel.
  */
 export async function getAIConfig(businessId?: string): Promise<{ provider: string; apiKey: string; model: string }> {
-  console.log(`[AI-CONFIG] Recuperando motor global...`);
   try {
     const firestore = await getAdminFirestore();
     const integrationSnap = await firestore.doc('integrations/chatbot-integrado-con-whatsapp-para-soporte-y-ventas').get();
 
     if (!integrationSnap.exists) {
-      console.warn(`[AI-CONFIG] Integración no encontrada. Usando fallback.`);
       return { provider: 'googleai', apiKey: '', model: 'gemini-1.5-flash' };
     }
 
     const data = integrationSnap.data();
     let fields: any = {};
-    if (typeof data?.fields === 'string') {
-      try {
-        fields = JSON.parse(data.fields);
-      } catch (e) {
-        fields = {};
-      }
-    } else {
-      fields = data?.fields || {};
+    try {
+      fields = typeof data?.fields === 'string' ? JSON.parse(data.fields) : (data?.fields || {});
+    } catch (e) {
+      fields = {};
     }
 
-    // Prioridad DeepSeek por costos y velocidad
     if (fields.deepseek?.apiKey) {
-      console.log(`[AI-CONFIG] Proveedor: DeepSeek`);
       return { provider: 'deepseek', apiKey: fields.deepseek.apiKey, model: 'deepseek-chat' };
     }
     
     if (fields.google?.apiKey) {
-      console.log(`[AI-CONFIG] Proveedor: Google AI`);
       return { provider: 'googleai', apiKey: fields.google.apiKey, model: 'gemini-1.5-flash' };
     }
     
     if (fields.openai?.apiKey) {
-      console.log(`[AI-CONFIG] Proveedor: OpenAI`);
       return { provider: 'openai', apiKey: fields.openai.apiKey, model: 'gpt-4o-mini' };
     }
   } catch (e: any) {
@@ -113,10 +138,17 @@ const chatFlow = ai.defineFlow(
     outputSchema: z.string(),
   },
   async (input) => {
-    // Paso 3 blindado: Garantiza que no se detenga el servidor
-    await getBusinessContext(input.businessId, input.message);
+    // Step 3: Hierarchical Context Building
+    const businessContext = await getBusinessContext(input.businessId, input.message);
+    const hasKnowledge = businessContext && businessContext.trim().length > 0;
+
+    // Logging the selected source for verification
+    if (hasKnowledge) {
+      console.log("[PASO 4] Fuente de respuesta: Base de Conocimiento");
+    } else {
+      console.log("[PASO 4] Fuente de respuesta: IA general (sin match en Base de Conocimiento)");
+    }
     
-    console.log(`[PASO 4] Resolviendo configuración de IA...`);
     const aiConfig = await getAIConfig(input.businessId);
 
     if (!aiConfig.apiKey) {
@@ -124,11 +156,18 @@ const chatFlow = ai.defineFlow(
         return "Hola, no tengo acceso al cerebro de IA en este momento. Por favor, intenta más tarde.";
     }
 
-    const systemPrompt = `Eres un asistente profesional. Responde de forma amable y concisa.
-REGLAS:
-1. Identifícate como el asistente oficial.
-2. Si no sabes algo, pide al usuario esperar por un humano.
-3. Responde siempre en español.`;
+    const systemPrompt = `Eres el asistente virtual oficial del negocio. 
+Tu objetivo es ayudar a los clientes con respuestas precisas, amables y profesionales.
+
+REGLAS DE PRIORIDAD:
+1. **FUENTE PRIORITARIA (Base de Conocimiento)**: Analiza el contexto proporcionado en la 'Base de Conocimiento' para responder. Si la respuesta se encuentra allí, utilízala como fuente única y obligatoria.
+2. **RESPALDO (Conocimiento General)**: Solo si la información NO está presente en la Base de Conocimiento o esta se encuentra vacía, utiliza tu conocimiento general para dar una respuesta útil.
+3. **TRANSPARENCIA**: Si respondes basándote en conocimiento general para una pregunta específica del negocio (como precios, políticas o stock) que no está en la base, indícalo amablemente ("Basado en información general...") y sugiere contactar a un humano para detalles exactos.
+4. **TONO**: Profesional, empático y conciso.
+5. **IDIOMA**: Responde siempre en español.
+
+Base de Conocimiento:
+${businessContext}`;
 
     try {
       console.log(`[PASO 4.1] Generando texto con ${aiConfig.provider}...`);
@@ -141,14 +180,15 @@ REGLAS:
             ...input.history.map(h => ({ role: h.role, content: [{ text: h.content }] })),
             { role: 'user', content: [{ text: input.message }] }
           ],
-          config: { temperature: 0.1, apiKey: aiConfig.apiKey }
+          config: { temperature: 0.2, apiKey: aiConfig.apiKey }
         });
         return response.text ?? "Hola, ¿en qué puedo ayudarte?";
       }
 
-      // OpenAI / DeepSeek
-      let endpoint = 'https://api.openai.com/v1/chat/completions';
-      if (aiConfig.provider === 'deepseek') endpoint = 'https://api.deepseek.com/v1/chat/completions';
+      // Fallback for OpenAI / DeepSeek
+      const endpoint = aiConfig.provider === 'deepseek' 
+        ? 'https://api.deepseek.com/v1/chat/completions' 
+        : 'https://api.openai.com/v1/chat/completions';
 
       const response = await fetch(endpoint, {
         method: 'POST',
@@ -163,7 +203,7 @@ REGLAS:
             ...input.history.map(h => ({ role: h.role === 'model' ? 'assistant' : 'user', content: h.content })),
             { role: 'user', content: input.message }
           ],
-          temperature: 0.1,
+          temperature: 0.2,
         }),
       });
 
@@ -173,7 +213,9 @@ REGLAS:
       }
 
       const data = await response.json();
-      return data.choices?.[0]?.message?.content || "Hola, ¿cómo puedo ayudarte hoy?";
+      const aiResponse = data.choices?.[0]?.message?.content || "Hola, ¿cómo puedo ayudarte hoy?";
+      console.log(`[PASO 4.5] Respuesta generada con éxito.`);
+      return aiResponse;
       
     } catch (e: any) {
       console.error(`[PASO 4-ERROR]:`, e.message);
