@@ -51,6 +51,8 @@ import type { Module } from '@/models/module';
 import type { HybridPlan } from '@/models/hybrid-plan';
 import { useToast } from '@/hooks/use-toast';
 
+type ModuleState = { active: boolean; isAddon: boolean; isPlanDefault: boolean };
+
 const iconMap: { [key: string]: React.ReactNode } = {
   catalogo: <Building2 className="w-4 h-4" />,
   'chatbot-integrado-con-whatsapp-para-soporte-y-ventas': <Building2 className="w-4 h-4" />,
@@ -158,8 +160,8 @@ export default function BusinessesPage() {
   const [businessToDeactivate, setBusinessToDeactivate] = useState<Business | null>(null);
   const [isStatusDialogOpen, setIsStatusDialogOpen] = useState(false);
 
-  // Modules State
-  const [assignedModules, setAssignedModules] = useState<string[]>([]);
+  // Modules Enriched State
+  const [businessModulesState, setBusinessModulesState] = useState<Record<string, ModuleState>>({});
   const [moduleExtras, setModuleExtras] = useState<Record<string, number>>({});
   const [assignedServices, setAssignedServices] = useState<string[]>([]);
 
@@ -305,21 +307,33 @@ export default function BusinessesPage() {
         });
         
         const modulesSnapshot = await getDocs(collection(firestore, `businesses/${business.id}/modules`));
-        const activeModuleIds = new Set<string>(planModules); // Base: Módulos del Plan
         const extras: Record<string, number> = {};
         
+        // Inicializar con el Plan
+        const initialState: Record<string, ModuleState> = {};
+        planModules.forEach((id: string) => {
+          initialState[id] = { active: true, isAddon: false, isPlanDefault: true };
+        });
+
+        // Corregir con la subcolección
         modulesSnapshot.docs.forEach(doc => {
             const data = doc.data();
             const cleanId = normalizeModuleId(doc.id);
-            if (data.status === 'active') {
-                activeModuleIds.add(cleanId);
-                extras[cleanId] = data.extra || 0;
-            } else if (data.status === 'inactive') {
-                activeModuleIds.delete(cleanId); // Sobre-escritura OFF
+            const isAddon = data.isAddon === true;
+            const isPlanDefault = planModules.includes(cleanId);
+            
+            initialState[cleanId] = {
+              active: data.status === 'active',
+              isAddon: isAddon,
+              isPlanDefault: isPlanDefault
+            };
+            
+            if (data.extra !== undefined) {
+              extras[cleanId] = data.extra;
             }
         });
         
-        setAssignedModules(Array.from(activeModuleIds));
+        setBusinessModulesState(initialState);
         setModuleExtras(extras);
 
         const servicesSnapshot = await getDocs(collection(firestore, `businesses/${business.id}/services`));
@@ -375,10 +389,9 @@ export default function BusinessesPage() {
     try {
         const batch = writeBatch(firestore);
 
-        const currentPlan = allPlans.find(p => p.name === selectedBusiness.planName || p.id === selectedBusiness.planName || ('slug' in p && p.slug === selectedBusiness.planName));
-        const planModules = (currentPlan as any)?.includedModuleKeys?.map((k: string) => normalizeModuleId(k)) || [];
-
-        for (const moduleId of assignedModules) {
+        // Validar límites extras
+        for (const [moduleId, state] of Object.entries(businessModulesState)) {
+          if (!state.active) continue;
           const extra = moduleExtras[moduleId] || 0;
           const validation = validateModuleExtra(selectedBusiness.planName, extra);
           if (!validation.valid) throw new Error(`Error en módulo ${moduleId}: ${validation.error}`);
@@ -397,6 +410,7 @@ export default function BusinessesPage() {
         };
         batch.update(businessRef, businessUpdateData);
 
+        const currentPlan = allPlans.find(p => p.name === selectedBusiness.planName || p.id === selectedBusiness.planName || ('slug' in p && p.slug === selectedBusiness.planName));
         const planIdToSync = currentPlan?.id || 'WxZYuL7JwmkSKBXGn1QZ';
         
         const subscriptionRef = doc(firestore, `businesses/${selectedBusiness.id}/subscription`, 'current');
@@ -406,26 +420,16 @@ export default function BusinessesPage() {
             updatedAt: Timestamp.now()
         }, { merge: true });
         
-        // UNIFICAR FUENTES DE ITERACIÓN: Garantizar cobertura total para persistir desactivaciones
-        const unifiedModuleIds = new Set<string>();
-        (modules || []).forEach(m => unifiedModuleIds.add(normalizeModuleId(m.id)));
-        planModules.forEach(id => unifiedModuleIds.add(normalizeModuleId(id)));
-        assignedModules.forEach(id => unifiedModuleIds.add(normalizeModuleId(id)));
-
-        unifiedModuleIds.forEach(cleanId => {
-          const isCurrentlyActive = assignedModules.includes(cleanId);
-          const isDefaultInPlan = planModules.includes(cleanId);
-          const extra = moduleExtras[cleanId] || 0;
-
-          // Si el estado es diferente al del plan, o si tiene extras, persistimos obligatoriamente en la subcolección
-          if (isCurrentlyActive !== isDefaultInPlan || extra > 0) {
-            batch.set(doc(firestore, `businesses/${selectedBusiness.id}/modules`, cleanId), { 
-              status: isCurrentlyActive ? 'active' : 'inactive', 
-              isAddon: isCurrentlyActive && !isDefaultInPlan,
-              extra,
-              updatedAt: new Date().toISOString()
-            }, { merge: true });
-          }
+        // PERSISTENCIA DE ESTADOS DE MÓDULOS (ESTADO ENRIQUECIDO)
+        Object.entries(businessModulesState).forEach(([moduleId, state]) => {
+          const extra = moduleExtras[moduleId] || 0;
+          
+          batch.set(doc(firestore, `businesses/${selectedBusiness.id}/modules`, moduleId), { 
+            status: state.active ? 'active' : 'inactive', 
+            isAddon: state.isAddon,
+            extra,
+            updatedAt: new Date().toISOString()
+          }, { merge: true });
         });
         
         const currentServices = await getDocs(collection(firestore, `businesses/${selectedBusiness.id}/services`));
@@ -447,17 +451,27 @@ export default function BusinessesPage() {
   
   const toggleModuleAssignment = (moduleId: string) => {
     const cleanId = normalizeModuleId(moduleId);
-    setAssignedModules(prev => prev.includes(cleanId) ? prev.filter(id => id !== cleanId) : [...prev, cleanId]);
-    
-    if (assignedModules.includes(cleanId)) {
-      setModuleExtras(prev => {
-        const newExtras = { ...prev };
-        delete newExtras[cleanId];
-        return newExtras;
-      });
-    } else {
-      setModuleExtras(prev => ({ ...prev, [cleanId]: 0 }));
-    }
+    setBusinessModulesState(prev => {
+        if (!selectedBusiness) return prev;
+        
+        const currentPlan = allPlans.find(p => p.name === selectedBusiness.planName || p.id === selectedBusiness.planName || ('slug' in p && p.slug === selectedBusiness.planName));
+        const planModules = (currentPlan as any)?.includedModuleKeys?.map((k: string) => normalizeModuleId(k)) || [];
+        const isIncludedInPlan = planModules.includes(cleanId);
+
+        const current = prev[cleanId] || { 
+            active: false, 
+            isAddon: !isIncludedInPlan, 
+            isPlanDefault: isIncludedInPlan 
+        };
+        
+        return {
+            ...prev,
+            [cleanId]: {
+                ...current,
+                active: !current.active
+            }
+        };
+    });
   };
 
   const handleExtraChange = (moduleId: string, value: string) => {
@@ -766,7 +780,7 @@ export default function BusinessesPage() {
                 <div className="flex items-center justify-between mb-3">
                     <h4 className="font-bold flex items-center gap-2 text-gray-800">
                         <Puzzle className="h-4 w-4 text-primary" />
-                        Módulos y Herramientas (Fase 3: Add-ons)
+                        Módulos y Herramientas
                     </h4>
                     <span className="text-[10px] text-muted-foreground italic">Valida que coincidan con el plan contratado</span>
                 </div>
@@ -785,15 +799,23 @@ export default function BusinessesPage() {
 
                     return displayedModules.map(moduleItem => {
                       const cleanId = normalizeModuleId(moduleItem.id);
-                      const isActive = assignedModules.includes(cleanId);
-                      const isIncludedInPlan = planModules.includes(cleanId);
+                      const itemState = businessModulesState[cleanId] || { 
+                          active: false, 
+                          isAddon: false, 
+                          isPlanDefault: planModules.includes(cleanId) 
+                      };
+                      
+                      const isActive = itemState.active;
+                      const isPlanDefault = itemState.isPlanDefault;
+                      const isAddon = itemState.isAddon;
+                      
                       const validation = validateModuleExtra(selectedBusiness.planName, moduleExtras[cleanId] || 0);
                       
                       return (
                         <div key={moduleItem.id} className={cn(
                             'flex flex-col p-3 border rounded-lg transition-all cursor-pointer', 
                             isActive ? 'border-primary bg-primary/5 shadow-sm' : 'hover:bg-muted/30', 
-                            isActive && !isIncludedInPlan && 'border-blue-500 bg-blue-50/30'
+                            isActive && !isPlanDefault && 'border-blue-500 bg-blue-50/30'
                         )} onClick={() => toggleModuleAssignment(moduleItem.id)}>
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-3">
@@ -803,11 +825,17 @@ export default function BusinessesPage() {
                               <div>
                                   <div className="flex items-center gap-2">
                                       <p className="text-sm font-bold">{moduleItem.name}</p>
-                                      {isIncludedInPlan && <Badge className="text-[8px] h-4 bg-green-600">Incluido en Plan</Badge>}
-                                      {isActive && !isIncludedInPlan && <Badge className="text-[8px] h-4 bg-blue-600 text-white border-none shadow-sm">Add-on Activo</Badge>}
-                                      {!isActive && !isIncludedInPlan && <Badge variant="outline" className="text-[8px] h-4 border-gray-300 text-gray-500">No Incluido</Badge>}
+                                      {isPlanDefault && <Badge className="text-[8px] h-4 bg-green-600">Incluido en Plan</Badge>}
+                                      {isAddon && (
+                                        <Badge className={cn("text-[8px] h-4 border-none shadow-sm", isActive ? "bg-blue-600 text-white" : "bg-blue-100 text-blue-700")}>
+                                            Add-on {isActive ? 'Activo' : 'Inactivo'}
+                                        </Badge>
+                                      )}
+                                      {!isPlanDefault && !isAddon && <Badge variant="outline" className="text-[8px] h-4 border-gray-300 text-gray-500">No Incluido</Badge>}
                                   </div>
-                                  <p className="text-[10px] font-medium text-muted-foreground uppercase">{moduleItem.status}</p>
+                                  <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                                      {isActive ? 'ACTIVE' : 'INACTIVE'} (Negocio)
+                                  </p>
                               </div>
                             </div>
                             <Switch checked={isActive} />
@@ -864,4 +892,3 @@ export default function BusinessesPage() {
     </div>
   );
 }
-
