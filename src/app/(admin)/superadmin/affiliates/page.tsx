@@ -1,7 +1,6 @@
-
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useUser, useFirestore, useCollection, useDoc, useMemoFirebase } from '@/firebase';
 import { collection, query, orderBy, doc, where } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -19,6 +18,11 @@ export default function AffiliatesAdminPage() {
   const { profile, isProfileLoading } = useUser();
   const firestore = useFirestore();
   const [activeTab, setActiveTab] = useState('referrals');
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // 1. Validar acceso de Super Admin
   const isAuthorized = profile?.role === 'super_admin';
@@ -48,7 +52,7 @@ export default function AffiliatesAdminPage() {
   const anyError = configError || referralsError || logsError;
   const isPermissionError = anyError?.message?.includes('permission-denied');
 
-  if (isProfileLoading) {
+  if (!mounted || isProfileLoading) {
     return (
       <div className="flex h-screen items-center justify-center">
         <Loader2 className="h-10 w-10 animate-spin text-primary" />

@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
 import { collection, query, getDocs } from "firebase/firestore";
@@ -19,7 +19,7 @@ import { Bar, BarChart, CartesianGrid, XAxis, YAxis, Line, LineChart, Pie, PieCh
 import { Building, TestTube, Users, FileText, ShoppingCart, Loader2, DollarSign } from "lucide-react";
 import type { User } from "@/models/user";
 import type { Order } from "@/models/order";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import type { Product } from "@/models/product";
 import type { LandingPageData } from "@/models/landing-page";
 import type { ContactSubmission } from "@/models/contact-submission";
@@ -29,11 +29,12 @@ const formatCurrency = (value: number) => {
         style: 'currency',
         currency: 'COP',
         minimumFractionDigits: 0,
-    }).format(value);
+    }).format(value || 0);
 };
 
 export default function AnalyticsPage() {
   const firestore = useFirestore();
+  const [mounted, setMounted] = useState(false);
 
   // State for aggregated data
   const [aggregatedData, setAggregatedData] = useState<{
@@ -56,6 +57,10 @@ export default function AnalyticsPage() {
   const { data: users, isLoading: usersLoading } = useCollection<User>(usersQuery);
   const { data: businesses, isLoading: businessesLoading } = useCollection(businessesQuery);
 
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   // Effect to fetch and aggregate sub-collection data
   useEffect(() => {
     if (!firestore || !businesses) return;
@@ -67,84 +72,94 @@ export default function AnalyticsPage() {
         const allProducts: Product[] = [];
         const allOrders: Order[] = [];
 
-        for (const business of businesses) {
-            const pagesQuery = query(collection(firestore, 'businesses', business.id, 'landingPages'));
-            const submissionsQuery = query(collection(firestore, 'businesses', business.id, 'contactSubmissions'));
-            const productsQuery = query(collection(firestore, 'businesses', business.id, 'products'));
-            const ordersQuery = query(collection(firestore, 'businesses', business.id, 'orders'));
+        try {
+            for (const business of businesses) {
+                const pagesQuery = query(collection(firestore, 'businesses', business.id, 'landingPages'));
+                const submissionsQuery = query(collection(firestore, 'businesses', business.id, 'contactSubmissions'));
+                const productsQuery = query(collection(firestore, 'businesses', business.id, 'products'));
+                const ordersQuery = query(collection(firestore, 'businesses', business.id, 'orders'));
 
-            const [pagesSnap, submissionsSnap, productsSnap, ordersSnap] = await Promise.all([
-                getDocs(pagesQuery),
-                getDocs(submissionsQuery),
-                getDocs(productsQuery),
-                getDocs(ordersQuery),
-            ]);
+                const [pagesSnap, submissionsSnap, productsSnap, ordersSnap] = await Promise.all([
+                    getDocs(pagesQuery),
+                    getDocs(submissionsQuery),
+                    getDocs(productsQuery),
+                    getDocs(ordersQuery),
+                ]);
 
-            pagesSnap.forEach(doc => allLandingPages.push({ ...doc.data() as LandingPageData, id: doc.id } as any));
-            submissionsSnap.forEach(doc => allSubmissions.push({ ...doc.data() as ContactSubmission, id: doc.id } as any));
-            productsSnap.forEach(doc => allProducts.push({ ...doc.data() as Product, id: doc.id } as any));
-            ordersSnap.forEach(doc => allOrders.push({ ...doc.data() as Order, id: doc.id } as any));
+                pagesSnap.forEach(doc => allLandingPages.push({ ...doc.data() as LandingPageData, id: doc.id } as any));
+                submissionsSnap.forEach(doc => allSubmissions.push({ ...doc.data() as ContactSubmission, id: doc.id } as any));
+                productsSnap.forEach(doc => allProducts.push({ ...doc.data() as Product, id: doc.id } as any));
+                ordersSnap.forEach(doc => allOrders.push({ ...doc.data() as Order, id: doc.id } as any));
+            }
+
+            setAggregatedData({
+                landingPages: allLandingPages,
+                submissions: allSubmissions,
+                products: allProducts,
+                orders: allOrders,
+            });
+        } catch (error) {
+            console.error("Error aggregating subcollections:", error);
+        } finally {
+            setIsAggregating(false);
         }
-
-        setAggregatedData({
-            landingPages: allLandingPages,
-            submissions: allSubmissions,
-            products: allProducts,
-            orders: allOrders,
-        });
-        setIsAggregating(false);
     };
 
     aggregateSubcollections();
   }, [firestore, businesses]);
 
-  const isLoading = usersLoading || businessesLoading || isAggregating;
+  const isLoading = !mounted || usersLoading || businessesLoading || isAggregating;
 
-  const totalSales = useMemoFirebase(() => {
+  const totalSales = useMemo(() => {
     if (!aggregatedData.orders) return 0;
-    return aggregatedData.orders.reduce((acc, order) => acc + order.subtotal, 0);
+    return aggregatedData.orders.reduce((acc, order) => acc + (order.total || order.subtotal || 0), 0);
   }, [aggregatedData.orders]);
 
   const kpiData = [
-      { title: "Empresas Registradas", value: businesses?.length.toString() ?? "0", icon: Building, change: "+15.2%", period: "el último mes" },
-      { title: "Landing Pages", value: aggregatedData.landingPages.length.toString(), icon: TestTube, change: "+8.9%", period: "esta semana" },
-      { title: "Envíos de Formularios", value: aggregatedData.submissions.length.toString(), icon: FileText, change: "+112", period: "hoy" },
-      { title: "Productos en Catálogo", value: aggregatedData.products.length.toString(), icon: ShoppingCart, change: "+0", period: "esta semana" },
-      { title: "Nuevos Usuarios", value: users?.length.toString() ?? "0", icon: Users, change: "+22.5%", period: "el último mes" },
+      { title: "Empresas Registradas", value: (businesses?.length || 0).toString(), icon: Building, change: "+15.2%", period: "el último mes" },
+      { title: "Landing Pages", value: (aggregatedData.landingPages?.length || 0).toString(), icon: TestTube, change: "+8.9%", period: "esta semana" },
+      { title: "Envíos de Formularios", value: (aggregatedData.submissions?.length || 0).toString(), icon: FileText, change: "+112", period: "hoy" },
+      { title: "Productos en Catálogo", value: (aggregatedData.products?.length || 0).toString(), icon: ShoppingCart, change: "+0", period: "esta semana" },
+      { title: "Nuevos Usuarios", value: (users?.length || 0).toString(), icon: Users, change: "+22.5%", period: "el último mes" },
       { title: "Ventas Totales", value: formatCurrency(totalSales), icon: DollarSign, change: "+12%", period: "el último mes" },
   ];
 
   // --- Chart Data Processing ---
-  const userGrowthData = useMemoFirebase(() => {
+  const userGrowthData = useMemo(() => {
     if (!users) return [];
     const monthNames = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
     const monthlyCounts: { [key: string]: number } = {};
 
     users.forEach(user => {
       if (user.createdAt) {
-        const date = new Date(user.createdAt);
-        const month = monthNames[date.getMonth()];
-        monthlyCounts[month] = (monthlyCounts[month] || 0) + 1;
+        try {
+            const date = new Date(user.createdAt);
+            if (!isNaN(date.getTime())) {
+                const month = monthNames[date.getMonth()];
+                monthlyCounts[month] = (monthlyCounts[month] || 0) + 1;
+            }
+        } catch (e) {}
       }
     });
 
     return monthNames.map(month => ({ month, count: monthlyCounts[month] || 0 }));
   }, [users]);
   
-  const contentOverviewData = useMemoFirebase(() => {
+  const contentOverviewData = useMemo(() => {
       return [
         { name: 'Empresas', count: businesses?.length ?? 0 },
-        { name: 'Landing Pages', count: aggregatedData.landingPages.length },
-        { name: 'Productos', count: aggregatedData.products.length },
-        { name: 'Formularios', count: aggregatedData.submissions.length },
+        { name: 'Landing Pages', count: aggregatedData.landingPages?.length || 0 },
+        { name: 'Productos', count: aggregatedData.products?.length || 0 },
+        { name: 'Formularios', count: aggregatedData.submissions?.length || 0 },
       ];
   }, [businesses, aggregatedData]);
   
-  const userRolesData = useMemoFirebase(() => {
+  const userRolesData = useMemo(() => {
     if (!users) return [];
     const roleCounts: { [key: string]: number } = {};
     users.forEach(user => {
-        const roleName = user.role === 'super_admin' ? 'Super Admin' : 'Cliente Admin';
+        const role = user.role || 'cliente_admin';
+        const roleName = role === 'super_admin' ? 'Super Admin' : 'Cliente Admin';
         roleCounts[roleName] = (roleCounts[roleName] || 0) + 1;
     });
     return Object.entries(roleCounts).map(([name, value]) => ({ name, value }));
@@ -161,6 +176,12 @@ export default function AnalyticsPage() {
         label: "Usuarios",
       }
   };
+
+  if (!mounted) return (
+    <div className="flex h-screen w-full items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+    </div>
+  );
 
   return (
     <div className="flex flex-col gap-6">

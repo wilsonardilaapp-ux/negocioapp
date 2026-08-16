@@ -26,6 +26,7 @@ import {
   ChartTooltipContent,
 } from "@/components/ui/chart";
 import { Bar, CartesianGrid, XAxis, YAxis, BarChart as RechartsBarChart } from "recharts";
+import { useMemo } from "react";
 import type { GlobalConfig } from "@/models/global-config";
 
 const chartConfig = {
@@ -56,7 +57,7 @@ export default function SuperAdminDashboard() {
   const totalServices = services?.length ?? 0;
 
   // Chart data - using real user count for one month as an example
-  const chartData = useMemoFirebase(() => {
+  const chartData = useMemo(() => {
     return [
       { month: "Enero", users: totalUsers > 1 ? Math.floor(totalUsers / 6) : 0 },
       { month: "Febrero", users: totalUsers > 2 ? Math.floor(totalUsers / 3) : 0 },

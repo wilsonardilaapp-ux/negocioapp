@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { collection, query, orderBy } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -41,9 +41,11 @@ const ActivityBadge = ({ status }: { status: string | undefined }) => {
         dormant: 'Inactivo',
     };
 
+    const safeStatus = status || 'dormant';
+
     return (
-        <Badge variant="outline" className={cn('capitalize font-bold border-2', config[status] || 'bg-gray-100 text-gray-800 border-gray-200')}>
-            {labels[status] || status.replace('_', ' ')}
+        <Badge variant="outline" className={cn('capitalize font-bold border-2', config[safeStatus] || 'bg-gray-100 text-gray-800 border-gray-200')}>
+            {labels[safeStatus] || safeStatus.replace('_', ' ')}
         </Badge>
     );
 };
@@ -52,13 +54,18 @@ export default function BusinessActivityPage() {
   const firestore = useFirestore();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [mounted, setMounted] = useState(false);
 
   const businessesQuery = useMemoFirebase(() => {
     if (!firestore) return null;
     return query(collection(firestore, "businesses"), orderBy("name", "asc"));
   }, [firestore]);
 
-  const { data: businesses, isLoading } = useCollection<Business>(businessesQuery);
+  const { data: businesses, isLoading: areBusinessesLoading } = useCollection<Business>(businessesQuery);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const stats = useMemo(() => {
     if (!businesses) return { total: 0, active: 0, at_risk: 0, dormant: 0, unknown: 0 };
@@ -74,8 +81,12 @@ export default function BusinessActivityPage() {
   const filteredBusinesses = useMemo(() => {
     if (!businesses) return [];
     return businesses.filter(b => {
-      const matchesSearch = b.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                            (b.ownerName && b.ownerName.toLowerCase().includes(searchTerm.toLowerCase()));
+      const name = b.name || '';
+      const ownerName = b.ownerName || '';
+      const ownerEmail = b.ownerEmail || '';
+      const matchesSearch = name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                            ownerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                            ownerEmail.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesFilter = filterStatus === 'all' || b.activityStatus === filterStatus;
       return matchesSearch && matchesFilter;
     });
@@ -89,6 +100,14 @@ export default function BusinessActivityPage() {
         return 'Fecha inválida';
     }
   };
+
+  const isLoading = !mounted || areBusinessesLoading;
+
+  if (!mounted) return (
+    <div className="flex h-screen w-full items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+    </div>
+  );
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
