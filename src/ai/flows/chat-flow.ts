@@ -30,15 +30,15 @@ export async function chat(input: ChatInput): Promise<string> {
 }
 
 /**
- * Recuperación de datos (RAG) con TIMEOUT REAL de 3.5 segundos.
- * Garantiza que el flujo nunca se detenga y siempre pase al Paso 4.
+ * Recuperación de datos (RAG) con TIMEOUT ULTRA-RÁPIDO de 1 segundo.
+ * Bypass absoluto: Si falla o tarda más de 1s, salta de inmediato a la IA general.
  */
 async function getBusinessContext(businessId: string, userMessage: string): Promise<string> {
-  console.log(`[PASO 3] [RAG-DEBUG] Iniciando búsqueda para el negocio ${businessId}`);
+  console.log(`[PASO 3] [RAG-DEBUG] Iniciando búsqueda relámpago (1s) para el negocio ${businessId}`);
   
-  // Temporizador de seguridad: 3.5 segundos máximo
+  // Temporizador de seguridad: 1 segundo máximo para evitar bloqueos del webhook
   const timeoutPromise = new Promise<string>((_, reject) =>
-    setTimeout(() => reject(new Error('TIMEOUT_RAG')), 3500)
+    setTimeout(() => reject(new Error('TIMEOUT_RAG')), 1000)
   );
 
   const fetchPromise = (async () => {
@@ -53,7 +53,6 @@ async function getBusinessContext(businessId: string, userMessage: string): Prom
       let knowledgeBaseContent = "";
       let productsContent = "";
 
-      // Ejecutamos búsquedas concurrentes para optimizar tiempo
       const [knowledgeSnap, productsSnap] = await Promise.all([
         firestore.collection(`businesses/${businessId}/chatbotConfig/main/knowledgeBase`).get(),
         firestore.collection(`businesses/${businessId}/products`).limit(20).get()
@@ -84,16 +83,15 @@ ${productsContent || "Catálogo no disponible."}
   })();
 
   try {
-    // COMPETICIÓN: La búsqueda contra el reloj de 3.5s
+    // COMPETICIÓN: La búsqueda contra el reloj de 1s
     const context = await Promise.race([fetchPromise, timeoutPromise]);
-    console.log(`[RAG-SUCCESS] Contexto recuperado dentro del tiempo límite.`);
+    console.log(`[RAG-SUCCESS] Contexto recuperado a tiempo.`);
     return context as string;
   } catch (error: any) {
-    // RED DE SEGURIDAD OBLIGATORIA: Jamás dejar que la app crashee
-    console.error('[RAG-ERROR-CRITICO]', error.message || error);
+    // BYPASS ABSOLUTO POR LENTITUD: Si Firestore es lento o falla, no bloqueamos el bot.
+    console.error('[RAG-ERROR-CRITICO] Fallo o Timeout en 1s:', error.message || error);
     
-    // Retorno de contexto mínimo (Empty Context Fallback)
-    // Esto permite que el Paso 4 reciba una respuesta y el bot pueda al menos saludar
+    // Retorno de contexto mínimo para que el PASO 4 proceda sin demoras
     return `Información del negocio: Salón de Belleza Natural.`;
   }
 }
@@ -127,7 +125,7 @@ export async function getAIConfig(businessId?: string): Promise<{ provider: stri
       fields = data?.fields || {};
     }
 
-    // PRIORIDAD 1: DeepSeek
+    // PRIORIDAD 1: DeepSeek (Ahorro de costos)
     if (fields.deepseek?.apiKey) {
       return { provider: 'deepseek', apiKey: fields.deepseek.apiKey, model: 'deepseek-chat' };
     }
@@ -156,7 +154,7 @@ const chatFlow = ai.defineFlow(
     outputSchema: z.string(),
   },
   async (input) => {
-    // PASO 3: Recuperar contexto con protección absoluta contra cuelgues
+    // PASO 3: Recuperar contexto con protección absoluta de 1s contra latencia
     const contextData = await getBusinessContext(input.businessId, input.message);
     
     // PASO 4: Configurar motor de IA y generar respuesta
@@ -171,7 +169,7 @@ const chatFlow = ai.defineFlow(
 Responde ÚNICAMENTE basándote en el CONTEXTO proporcionado.
 
 REGLAS CRÍTICAS:
-1. Si el mensaje del usuario es un saludo (hola, buenos días), preséntate como el Asistente del Salón de Belleza Natural y pregunta en qué puedes ayudar. No necesitas buscar en el contexto para saludar.
+1. Si el mensaje del usuario es un simple saludo (hola, buenos días), preséntate como el Asistente del Salón de Belleza Natural y pregunta en qué puedes ayudar. No necesitas buscar en el contexto para saludar.
 2. Para preguntas sobre el negocio, usa ESTRICTAMENTE el contexto proporcionado.
 3. Si la información no está en el CONTEXTO y no es un saludo, responde: "Hola, soy el asistente del Salón de Belleza Natural. No encontré esa info en mis manuales, ¿en qué más te ayudo?"
 4. NO uses conocimiento general para inventar precios o servicios.
