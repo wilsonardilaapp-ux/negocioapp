@@ -1,5 +1,4 @@
-
-import { NextRequest, NextResponse } from 'next/request';
+import { NextRequest, NextResponse } from 'next/server';
 import { getAdminFirestore } from '@/firebase/server-init';
 import { chat } from '@/ai/flows/chat-flow';
 import { v4 as uuidv4 } from "uuid";
@@ -23,7 +22,7 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
-  console.log('[PAYLOAD-ENTRANTE]', JSON.stringify(body));
+  console.log('[WHAPI-WEBHOOK] Payload entrante:', JSON.stringify(body));
 
   try {
     const message = body.messages?.[0];
@@ -34,6 +33,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (!channelId) {
+      console.error('[WHAPI-WEBHOOK] [ERROR] No se recibió channel_id en el payload.');
       return NextResponse.json({ status: 'error', message: 'missing_channel_id' }, { status: 200 });
     }
 
@@ -41,12 +41,13 @@ export async function POST(req: NextRequest) {
     const incomingChatId = message.chat_id || message.from;
 
     if (!incomingText) {
+      console.log('[WHAPI-WEBHOOK] Mensaje sin texto ignorado.');
       return NextResponse.json({ status: 'ignored', reason: 'no_text' }, { status: 200 });
     }
 
+    console.log(`[WHAPI-WEBHOOK] [PASO 1] Resolviendo negocio para canal: ${channelId}`);
     const db = await getAdminFirestore();
     
-    // --- [PASO 1] RESOLUCIÓN DE IDENTIDAD ---
     let configSnapshot = await db.collectionGroup('chatbotConfig')
       .where('whapiChannelId', '==', channelId)
       .limit(1)
@@ -60,7 +61,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (configSnapshot.empty) {
-      console.warn(`[WHAPI-WEBHOOK] Negocio no identificado para el canal: ${channelId}`);
+      console.warn(`[WHAPI-WEBHOOK] [ERROR] Negocio no identificado para el canal: ${channelId}`);
       return NextResponse.json({ status: 'error', reason: 'business_not_found' }, { status: 200 });
     }
 
@@ -71,21 +72,16 @@ export async function POST(req: NextRequest) {
     const businessToken = configData.whatsApp?.token;
 
     if (!businessId || !businessToken) {
+      console.error(`[WHAPI-WEBHOOK] [ERROR] Configuración incompleta para business ${businessId}. Falta Token.`);
       return NextResponse.json({ status: 'error', reason: 'incomplete_config' }, { status: 200 });
     }
 
-    console.log(`[WHAPI-SUCCESS] Negocio identificado: ${businessId}`);
-
-    /**
-     * Proceso principal de IA y envío. 
-     * Se utiliza AWAIT para asegurar que la tarea termine antes de que el worker muera.
-     */
     const processMessage = async () => {
         try {
             const senderNumber = normalizePhoneNumber(incomingChatId);
             const conversationId = uuidv4();
             
-            // Registro de analítica
+            console.log(`[WHAPI-WEBHOOK] [PASO 2] Negocio identificado: ${businessId}. Registrando analítica...`);
             await db.collection('businesses')
               .doc(businessId!)
               .collection('chatConversations')
@@ -99,17 +95,18 @@ export async function POST(req: NextRequest) {
                 channel: 'whatsapp',
             });
 
-            // Generación IA (Bypasseando RAG)
+            console.log(`[WHAPI-WEBHOOK] [PASO 4] Iniciando generación de respuesta con IA...`);
             const aiResponse = await chat({
                 businessId: businessId!,
                 message: incomingText,
                 history: [] 
             });
 
+            console.log(`[WHAPI-WEBHOOK] [PASO 4.5] Respuesta generada: ${aiResponse?.substring(0, 100)}...`);
             const finalMessage = aiResponse?.trim() || "Hola, déjanos tu mensaje y te atenderemos pronto.";
 
-            // Despacho WHAPI
-            await fetch('https://gate.whapi.cloud/messages/text', {
+            console.log(`[WHAPI-WEBHOOK] [PASO 5] Enviando mensaje a WHAPI a chat_id: ${incomingChatId}`);
+            const whapiFetch = await fetch('https://gate.whapi.cloud/messages/text', {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${businessToken!.trim()}`,
@@ -122,18 +119,20 @@ export async function POST(req: NextRequest) {
                 })
             });
 
+            console.log(`[WHAPI-WEBHOOK] [PASO 5.5] Respuesta de WHAPI status: ${whapiFetch.status}`);
+
         } catch (error: any) {
-            console.error(`[ERROR-PROCESO-WEBHOOK]:`, error.message);
+            console.error(`[ERROR-WEBHOOK-PROCESS]:`, error.message);
         }
     };
 
-    // Await obligatorio para evitar que Vercel mate el proceso a mitad de camino
+    // Await obligatorio para asegurar la persistencia del hilo en Vercel antes de cerrar la conexión HTTP
     await processMessage();
 
     return NextResponse.json({ status: 'received', businessId }, { status: 200 });
 
   } catch (error: any) {
-    console.error(`[ERROR-WEBHOOK-FATAL]:`, error.message);
+    console.error(`[WHAPI-WEBHOOK] [ERROR-FATAL]:`, error.message);
     return NextResponse.json({ error: 'Internal error' }, { status: 500 });
   }
 }
