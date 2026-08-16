@@ -786,12 +786,11 @@ export default function BusinessesPage() {
                       
                       return (
                         <div key={moduleItem.id} className={cn(
-                            'flex flex-col p-3 border rounded-lg transition-all', 
+                            'flex flex-col p-3 border rounded-lg transition-all cursor-pointer', 
                             isActive ? 'border-primary bg-primary/5 shadow-sm' : 'hover:bg-muted/30', 
-                            moduleItem.status === 'inactive' && 'opacity-60',
                             isActive && !isIncludedInPlan && 'border-blue-500 bg-blue-50/30'
-                        )}>
-                          <div className="flex items-center justify-between cursor-pointer" onClick={() => moduleItem.status !== 'inactive' && toggleModuleAssignment(moduleItem.id)}>
+                        )} onClick={() => toggleModuleAssignment(moduleItem.id)}>
+                          <div className="flex items-center justify-between">
                             <div className="flex items-center gap-3">
                               <div className={cn('w-9 h-9 rounded-lg flex items-center justify-center', isActive ? 'bg-primary/20 text-primary' : 'bg-muted text-muted-foreground')}>
                                 {iconMap[moduleItem.id] || iconMap.default}
@@ -810,7 +809,7 @@ export default function BusinessesPage() {
                           </div>
                           
                           {isActive && (
-                            <div className="mt-3 pt-3 border-t grid grid-cols-3 items-end gap-4 animate-in fade-in slide-in-from-top-1 duration-200">
+                            <div className="mt-3 pt-3 border-t grid grid-cols-3 items-end gap-4 animate-in fade-in slide-in-from-top-1 duration-200" onClick={(e) => e.stopPropagation()}>
                               <div><Label className="text-[10px] uppercase font-bold text-muted-foreground">Límite Base</Label><div className="h-9 flex items-center px-3 bg-muted rounded-md font-bold text-xs">{validation.baseLimit === -1 ? '∞' : validation.baseLimit}</div></div>
                               <div><Label className="text-[10px] uppercase font-bold text-muted-foreground">Extra (+)</Label><Input type="number" className="h-9 text-xs" value={moduleExtras[cleanId] ?? 0} onChange={(e) => handleExtraChange(moduleItem.id, e.target.value)} /></div>
                               <div><Label className="text-[10px] uppercase font-bold text-muted-foreground">Total Real</Label><div className="h-9 flex items-center px-3 bg-primary/20 text-primary rounded-md font-black text-xs">{validation.totalLimit === -1 ? '∞' : validation.totalLimit}</div></div>
