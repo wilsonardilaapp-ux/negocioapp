@@ -5,22 +5,14 @@ import type { NextConfig } from 'next';
  * Se eliminan configuraciones redundantes de Webpack que causaban fallos en la generación de manifiestos.
  */
 const nextConfig: NextConfig = {
+    // Reducimos la transpilación a lo estrictamente necesario para evitar errores de chunks
     transpilePackages: [
         'lucide-react', 
         'recharts', 
         'date-fns', 
         'embla-carousel-react', 
         'embla-carousel-autoplay',
-        'react-quill',
-        'quill',
-        'firebase',
-        '@firebase/app',
-        '@firebase/auth',
-        '@firebase/component',
-        '@firebase/firestore',
-        '@firebase/functions',
-        '@firebase/storage',
-        '@firebase/util'
+        'react-quill'
     ],
     experimental: {
         serverComponentsExternalPackages: [

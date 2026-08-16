@@ -1,4 +1,1 @@
-{
-  "name": "neutralized-package",
-  "description": "Redundant package.json neutralized to avoid build context confusion"
-}
+{}

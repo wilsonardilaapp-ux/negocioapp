@@ -118,7 +118,7 @@ export async function POST(req: NextRequest) {
                 const senderNumber = normalizePhoneNumber(incomingChatId);
                 const conversationId = uuidv4();
                 
-                // Operación no bloqueante: lanzamos y manejamos el error internamente
+                // Operación no bloqueante
                 db.collection('businesses')
                   .doc(businessId!)
                   .collection('chatConversations')
@@ -139,10 +139,14 @@ export async function POST(req: NextRequest) {
             console.log(`[PASO 2.5] Analíticas superadas. Pasando a RAG e IA...`);
 
             // --- [PASO 3] GENERACIÓN CON IA ---
+            // El timeout de 1s está dentro de la función chat -> chatFlow -> getBusinessContext
             const aiResponse = await chat({
                 businessId: businessId!,
                 message: incomingText,
                 history: [] 
+            }).catch(e => {
+                console.error("[CHAT-FLOW-FATAL]", e);
+                return fallbackMessage;
             });
 
             clearTimeout(timeoutMonitor);
@@ -168,14 +172,11 @@ export async function POST(req: NextRequest) {
             if (!whapiResponse.ok) {
                 const errorBody = await whapiResponse.text();
                 console.error(`[WHAPI-FATAL] Fallo al enviar respuesta final. Status: ${whapiResponse.status}. Body: ${errorBody}`);
-            } else {
-                console.log(`[WHAPI-SUCCESS] Respuesta final entregada correctamente.`);
             }
 
         } catch (error: any) {
             console.error(`[WHAPI-NETWORK-ERROR] Error crítico en el proceso asíncrono:`, error.message);
             
-            // Envío forzado de fallback en caso de error catastrófico
             if (!responseSent) {
                 await fetch('https://gate.whapi.cloud/messages/text', {
                     method: 'POST',
