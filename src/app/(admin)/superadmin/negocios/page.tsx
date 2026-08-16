@@ -406,19 +406,24 @@ export default function BusinessesPage() {
             updatedAt: Timestamp.now()
         }, { merge: true });
         
-        // PERSISTENCIA QUIRÚRGICA: Solo escribimos diferencias o estados explícitos en la subcolección
-        (modules || []).forEach(globalMod => {
-          const cleanId = normalizeModuleId(globalMod.id);
+        // UNIFICAR FUENTES DE ITERACIÓN: Garantizar cobertura total para persistir desactivaciones
+        const unifiedModuleIds = new Set<string>();
+        (modules || []).forEach(m => unifiedModuleIds.add(normalizeModuleId(m.id)));
+        planModules.forEach(id => unifiedModuleIds.add(normalizeModuleId(id)));
+        assignedModules.forEach(id => unifiedModuleIds.add(normalizeModuleId(id)));
+
+        unifiedModuleIds.forEach(cleanId => {
           const isCurrentlyActive = assignedModules.includes(cleanId);
           const isDefaultInPlan = planModules.includes(cleanId);
-
-          // Si el estado es diferente al del plan, o si tiene extras, persistimos
           const extra = moduleExtras[cleanId] || 0;
+
+          // Si el estado es diferente al del plan, o si tiene extras, persistimos obligatoriamente en la subcolección
           if (isCurrentlyActive !== isDefaultInPlan || extra > 0) {
             batch.set(doc(firestore, `businesses/${selectedBusiness.id}/modules`, cleanId), { 
               status: isCurrentlyActive ? 'active' : 'inactive', 
-              isAddon: isCurrentlyActive && !isDefaultInPlan, // Flag de Add-on FASE 3
-              extra 
+              isAddon: isCurrentlyActive && !isDefaultInPlan,
+              extra,
+              updatedAt: new Date().toISOString()
             }, { merge: true });
           }
         });
@@ -859,3 +864,4 @@ export default function BusinessesPage() {
     </div>
   );
 }
+
