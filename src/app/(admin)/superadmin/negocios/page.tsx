@@ -38,7 +38,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Check, Plus, Search, Building2, Eye, Puzzle, Tag, AlertCircle, TrendingUp, Mail, User, ShieldCheck, Loader2, Sparkles, Trash2, Clock } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, normalizeModuleId } from '@/lib/utils';
 import { Label } from '@/components/ui/label';
 import { validateModuleExtra, validateLimitesExtra } from '@/utils/validateModuleExtra';
 
@@ -55,15 +55,6 @@ const iconMap: { [key: string]: React.ReactNode } = {
   'chatbot-integrado-con-whatsapp-para-soporte-y-ventas': <Building2 className="w-4 h-4" />,
   promotions: <Tag className="w-4 h-4" />,
   default: <Puzzle className="w-4 h-4" />,
-};
-
-const normalizeId = (id: string): string => {
-  return id
-    .toLowerCase()
-    .trim()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9-]/g, "");
 };
 
 const StatusBadge = ({ status }: { status: EntityStatus | string | undefined }) => {
@@ -296,6 +287,7 @@ export default function BusinessesPage() {
         const actualPlanId = (subData?.status === 'active' ? subData.plan : null) || business.planName || 'WxZYuL7JwmkSKBXGn1QZ';
         const currentPlanDetails = allPlans.find(p => p.id === actualPlanId || p.name === actualPlanId || ('slug' in p && p.slug === actualPlanId));
         const resolvedPlanName = currentPlanDetails?.name || business.planName || 'Plan Crecimiento';
+        const planModules = (currentPlanDetails as any)?.includedModuleKeys?.map((k: string) => normalizeModuleId(k)) || [];
 
         if (business.planName !== resolvedPlanName) {
             updateDocumentNonBlocking(doc(firestore, 'businesses', business.id), { planName: resolvedPlanName });
@@ -312,18 +304,21 @@ export default function BusinessesPage() {
         });
         
         const modulesSnapshot = await getDocs(collection(firestore, `businesses/${business.id}/modules`));
-        const activeModuleIds: string[] = [];
+        const activeModuleIds = new Set<string>(planModules); // Base: Módulos del Plan
         const extras: Record<string, number> = {};
         
         modulesSnapshot.docs.forEach(doc => {
             const data = doc.data();
+            const cleanId = normalizeModuleId(doc.id);
             if (data.status === 'active') {
-                activeModuleIds.push(doc.id);
-                extras[doc.id] = data.extra || 0;
+                activeModuleIds.add(cleanId);
+                extras[cleanId] = data.extra || 0;
+            } else if (data.status === 'inactive') {
+                activeModuleIds.delete(cleanId); // Sobre-escritura OFF
             }
         });
         
-        setAssignedModules(activeModuleIds);
+        setAssignedModules(Array.from(activeModuleIds));
         setModuleExtras(extras);
 
         const servicesSnapshot = await getDocs(collection(firestore, `businesses/${business.id}/services`));
@@ -400,26 +395,36 @@ export default function BusinessesPage() {
 
         const targetPlan = allPlans.find(p => p.name === selectedBusiness.planName || p.id === selectedBusiness.planName || ('slug' in p && p.slug === selectedBusiness.planName));
         const planIdToSync = targetPlan?.id || 'WxZYuL7JwmkSKBXGn1QZ';
-        const subscriptionRef = doc(firestore, `businesses/${selectedBusiness.id}/subscription`, 'current');
+        const planModules = (targetPlan as any)?.includedModuleKeys?.map((k: string) => normalizeModuleId(k)) || [];
         
+        const subscriptionRef = doc(firestore, `businesses/${selectedBusiness.id}/subscription`, 'current');
         batch.set(subscriptionRef, {
             plan: planIdToSync,
             status: 'active',
             updatedAt: Timestamp.now()
         }, { merge: true });
         
-        const currentModules = await getDocs(collection(firestore, `businesses/${selectedBusiness.id}/modules`));
-        currentModules.forEach(mDoc => batch.update(mDoc.ref, { status: 'inactive' }));
+        // PERSISTENCIA QUIRÚRGICA: Solo escribimos diferencias o estados explícitos en la subcolección
+        (modules || []).forEach(globalMod => {
+          const cleanId = normalizeModuleId(globalMod.id);
+          const isCurrentlyActive = assignedModules.includes(cleanId);
+          const isDefaultInPlan = planModules.includes(cleanId);
+
+          // Si el estado es diferente al del plan, o si tiene extras, persistimos
+          const extra = moduleExtras[cleanId] || 0;
+          if (isCurrentlyActive !== isDefaultInPlan || extra > 0) {
+            batch.set(doc(firestore, `businesses/${selectedBusiness.id}/modules`, cleanId), { 
+              status: isCurrentlyActive ? 'active' : 'inactive', 
+              extra 
+            }, { merge: true });
+          } else {
+            // Si el estado coincide con el plan y no hay extras, podemos limpiar el doc para seguir el plan
+            // batch.delete(doc(firestore, `businesses/${selectedBusiness.id}/modules`, cleanId));
+          }
+        });
         
         const currentServices = await getDocs(collection(firestore, `businesses/${selectedBusiness.id}/services`));
         currentServices.forEach(sDoc => batch.update(sDoc.ref, { status: 'inactive' }));
-        
-        assignedModules.forEach(rawId => {
-          const id = normalizeId(rawId);
-          const extra = moduleExtras[rawId] || 0;
-          batch.set(doc(firestore, `businesses/${selectedBusiness.id}/modules`, id), { status: 'active', extra }, { merge: true });
-        });
-        
         assignedServices.forEach(id => {
             batch.set(doc(firestore, `businesses/${selectedBusiness.id}/services`, id), { status: 'active' }, { merge: true });
         });
@@ -436,21 +441,23 @@ export default function BusinessesPage() {
   };
   
   const toggleModuleAssignment = (moduleId: string) => {
-    setAssignedModules(prev => prev.includes(moduleId) ? prev.filter(id => id !== moduleId) : [...prev, moduleId]);
-    if (assignedModules.includes(moduleId)) {
+    const cleanId = normalizeModuleId(moduleId);
+    setAssignedModules(prev => prev.includes(cleanId) ? prev.filter(id => id !== cleanId) : [...prev, cleanId]);
+    
+    if (assignedModules.includes(cleanId)) {
       setModuleExtras(prev => {
         const newExtras = { ...prev };
-        delete newExtras[moduleId];
+        delete newExtras[cleanId];
         return newExtras;
       });
     } else {
-      setModuleExtras(prev => ({ ...prev, [moduleId]: 0 }));
+      setModuleExtras(prev => ({ ...prev, [cleanId]: 0 }));
     }
   };
 
   const handleExtraChange = (moduleId: string, value: string) => {
     const numericValue = parseInt(value, 10) || 0;
-    setModuleExtras(prev => ({ ...prev, [moduleId]: numericValue }));
+    setModuleExtras(prev => ({ ...prev, [normalizeModuleId(moduleId)]: numericValue }));
   };
 
   const handleLimiteExtraChange = (key: string, value: string) => {
@@ -762,7 +769,7 @@ export default function BusinessesPage() {
                 <div className="grid grid-cols-1 gap-2">
                   {(() => {
                     const currentPlan = allPlans.find(p => p.name === selectedBusiness.planName || p.id === selectedBusiness.planName || ('slug' in p && p.slug === selectedBusiness.planName));
-                    const includedModules = (currentPlan as any)?.includedModuleKeys || [];
+                    const planModules = (currentPlan as any)?.includedModuleKeys?.map((k: string) => normalizeModuleId(k)) || [];
 
                     const displayedModules = (modules || []).reduce((acc: Module[], current) => {
                       const x = acc.find(item => item.name === current.name);
@@ -772,10 +779,10 @@ export default function BusinessesPage() {
                     }, []);
 
                     return displayedModules.map(moduleItem => {
-                      const normalizedTargetId = normalizeId(moduleItem.id);
-                      const isActive = assignedModules.some(id => normalizeId(id) === normalizedTargetId);
-                      const isIncludedInPlan = includedModules.some((k: string) => normalizeId(k) === normalizedTargetId);
-                      const validation = validateModuleExtra(selectedBusiness.planName, moduleExtras[moduleItem.id] || 0);
+                      const cleanId = normalizeModuleId(moduleItem.id);
+                      const isActive = assignedModules.includes(cleanId);
+                      const isIncludedInPlan = planModules.includes(cleanId);
+                      const validation = validateModuleExtra(selectedBusiness.planName, moduleExtras[cleanId] || 0);
                       
                       return (
                         <div key={moduleItem.id} className={cn(
@@ -798,13 +805,13 @@ export default function BusinessesPage() {
                                   <p className="text-[10px] font-medium text-muted-foreground uppercase">{moduleItem.status}</p>
                               </div>
                             </div>
-                            {isActive && <Check className="w-5 h-5 text-primary" />}
+                            <Switch checked={isActive} />
                           </div>
                           
                           {isActive && (
                             <div className="mt-3 pt-3 border-t grid grid-cols-3 items-end gap-4 animate-in fade-in slide-in-from-top-1 duration-200">
                               <div><Label className="text-[10px] uppercase font-bold text-muted-foreground">Límite Base</Label><div className="h-9 flex items-center px-3 bg-muted rounded-md font-bold text-xs">{validation.baseLimit === -1 ? '∞' : validation.baseLimit}</div></div>
-                              <div><Label className="text-[10px] uppercase font-bold text-muted-foreground">Extra (+)</Label><Input type="number" className="h-9 text-xs" value={moduleExtras[moduleItem.id] ?? 0} onChange={(e) => handleExtraChange(moduleItem.id, e.target.value)} /></div>
+                              <div><Label className="text-[10px] uppercase font-bold text-muted-foreground">Extra (+)</Label><Input type="number" className="h-9 text-xs" value={moduleExtras[cleanId] ?? 0} onChange={(e) => handleExtraChange(moduleItem.id, e.target.value)} /></div>
                               <div><Label className="text-[10px] uppercase font-bold text-muted-foreground">Total Real</Label><div className="h-9 flex items-center px-3 bg-primary/20 text-primary rounded-md font-black text-xs">{validation.totalLimit === -1 ? '∞' : validation.totalLimit}</div></div>
                             </div>
                           )}

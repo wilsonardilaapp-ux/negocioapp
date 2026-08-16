@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useMemo, useState, useEffect, useCallback } from 'react';
@@ -16,23 +15,9 @@ import type { Coupon } from '@/models/coupon';
 import type { Promotion } from '@/models/promotion';
 import type { HybridPlan } from '@/models/hybrid-plan';
 import type { Module } from '@/models/module';
+import { normalizeModuleId } from '@/lib/utils';
 
 const LOADING_TIMEOUT_MS = 10_000;
-
-/**
- * Normaliza un ID técnico eliminando mayúsculas, espacios y acentos.
- * Se utiliza slugify para garantizar consistencia con los nombres de planes.
- */
-const normalizeId = (id: string | undefined): string => {
-  if (!id) return "";
-  return id
-    .toLowerCase()
-    .trim()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/\s+/g, '-')
-    .replace(/[^a-z0-9-]/g, "");
-};
 
 export function useSubscription() {
   const { user, isUserLoading } = useUser();
@@ -174,43 +159,25 @@ export function useSubscription() {
     };
 
     const activeModuleIds = new Set<string>();
-    const activeFromDB = new Set<string>();
     const inactiveFromDB = new Set<string>();
     
-    // 1. Recopilar estados de la base de datos con normalización defensiva
+    // 1. Prioridad 2: Módulos incluidos por defecto en el Plan asignado (Normalizados)
+    details?.includedModuleKeys?.forEach(key => activeModuleIds.add(normalizeModuleId(key)));
+
+    // 2. Prioridad 1: Sobre-escritura explícita desde la subcolección del negocio en la BD
     dbModules?.forEach(m => {
-        const cleanId = normalizeId(m.id);
-        if (m.status === 'active') activeFromDB.add(cleanId);
-        else if (m.status === 'inactive') inactiveFromDB.add(cleanId);
-    });
-    
-    // 2. Módulos incluidos por defecto en el plan (Normalizados)
-    details?.includedModuleKeys?.forEach(key => activeModuleIds.add(normalizeId(key)));
-
-    // 3. Red de seguridad Premium (Hardcoded)
-    const PREMIUM_PLAN_IDS = new Set([
-      'AoKkP9RLp517Nl11aNxt', // Plan Estándar
-      'KmDDgHJW2H2e8I69Owud', // Plan Profesional
-    ]);
-    const planName = details?.name || currentPlanId;
-    const normalizedName = normalizeId(planName);
-
-    const hasPremiumId = details?.id && PREMIUM_PLAN_IDS.has(details.id);
-    const hasPremiumName = normalizedName.includes('estandar') || normalizedName.includes('pro') || normalizedName.includes('enterprise');
-
-    if (hasPremiumId || hasPremiumName) {
-        activeModuleIds.add('catalogo');
-        activeModuleIds.add('blog');
-        activeModuleIds.add('chatbot-integrado-con-whatsapp-para-soporte-y-ventas');
-    }
-
-    // 4. SOBRESCRITURA FINAL: Priorizar ACTIVE de la DB, luego procesar INACTIVE
-    activeFromDB.forEach(id => activeModuleIds.add(id));
-    inactiveFromDB.forEach(id => {
-        if (!activeFromDB.has(id)) {
-            activeModuleIds.delete(id);
+        const cleanId = normalizeModuleId(m.id);
+        if (m.status === 'active') {
+          activeModuleIds.add(cleanId);
+          inactiveFromDB.delete(cleanId); // Asegurar que no esté en la lista negra
+        } else if (m.status === 'inactive') {
+          activeModuleIds.delete(cleanId);
+          inactiveFromDB.add(cleanId); // Marcar explícitamente como inactivo
         }
     });
+
+    const planName = details?.name || currentPlanId;
+    const normalizedName = normalizeModuleId(planName);
 
     return {
       plan: details?.name || currentPlanId,
@@ -254,7 +221,7 @@ export function useSubscription() {
   }, [memoizedSubscriptionValues.limits.suggestions]);
 
   const isModuleAuthorized = useCallback((moduleId: string): boolean => {
-      return memoizedSubscriptionValues.activeModuleIds.has(normalizeId(moduleId));
+      return memoizedSubscriptionValues.activeModuleIds.has(normalizeModuleId(moduleId));
   }, [memoizedSubscriptionValues.activeModuleIds]);
 
   return {

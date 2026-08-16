@@ -11,6 +11,21 @@ export function stripHtml(html: string): string {
 }
 
 /**
+ * Normaliza un identificador de módulo para asegurar consistencia en comparaciones y DB.
+ * Elimina mayúsculas, acentos, espacios y caracteres especiales.
+ */
+export function normalizeModuleId(id: string | undefined | null): string {
+  if (!id) return "";
+  return id
+    .toLowerCase()
+    .trim()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, '-')
+    .replace(/[^a-z0-9-]/g, "");
+}
+
+/**
  * Normaliza un número de teléfono al formato internacional (código de país + número).
  * Elimina caracteres no numéricos y antepone "57" (Colombia) si el número tiene 10 dígitos.
  */
