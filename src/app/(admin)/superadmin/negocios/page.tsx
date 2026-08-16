@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -419,9 +420,6 @@ export default function BusinessesPage() {
               isAddon: isCurrentlyActive && !isDefaultInPlan, // Flag de Add-on FASE 3
               extra 
             }, { merge: true });
-          } else {
-            // Si el estado coincide con el plan y no hay extras, podemos limpiar el doc para seguir el plan
-            // batch.delete(doc(firestore, `businesses/${selectedBusiness.id}/modules`, cleanId));
           }
         });
         

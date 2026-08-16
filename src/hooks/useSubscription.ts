@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useMemo, useState, useEffect, useCallback } from 'react';
@@ -85,7 +86,7 @@ export function useSubscription() {
   const { data: businessDataArr, isLoading: isBusinessDataLoading } = useCollection<Business>(businessQuery);
   const businessData = businessDataArr?.[0] ?? null;
   const { data: allPlans, isLoading: arePlansLoading, error: plansError } = useCollection<SubscriptionPlan>(plansRef);
-  const { data: allHybridPlans, isLoading: areHybridPlansLoading } = useCollection<HybridPlan>(hybridPlansRef);
+  const { data: allHybridPlans, isLoading: areHybridPlansLoading, error: hybridPlansError } = useCollection<HybridPlan>(hybridPlansRef);
   const { data: dbModules, isLoading: areModulesLoading } = useCollection<Module>(modulesRef);
   
   const { data: products, isLoading: isProductsLoading, error: productsError } = useCollection<Product>(productsRef);
@@ -96,7 +97,7 @@ export function useSubscription() {
   const { data: coupons, isLoading: isCouponsLoading, error: couponsError } = useCollection<Coupon>(couponsQuery);
   const { data: promotions, isLoading: isPromotionsLoading, error: promotionsError } = useCollection<Promotion>(promotionsQuery);
 
-  const error = subError || plansError || productsError || blogPostsError || landingPagesError || ordersError || suggestionsError || couponsError || promotionsError;
+  const error = subError || plansError || hybridPlansError || productsError || blogPostsError || landingPagesError || ordersError || suggestionsError || couponsError || promotionsError;
 
   const rawIsLoading =
     isUserLoading ||
@@ -136,8 +137,6 @@ export function useSubscription() {
         currentPlanId = subscriptionPlanId;
     } else if (businessPlanName && businessPlanName !== 'Plan Crecimiento') {
         currentPlanId = businessPlanName;
-    } else if (businessPlanName === 'Plan Crecimiento' && subscriptionPlanId) {
-        currentPlanId = subscriptionPlanId;
     }
 
     const details = allPlans?.find(p => p.id === currentPlanId || p.name === currentPlanId || ('slug' in p && p.slug === currentPlanId)) || 
@@ -148,6 +147,7 @@ export function useSubscription() {
     const extras = (businessData as any)?.limitesExtra || {};
     const baseLimits = details?.limits ?? defaultLimits;
 
+    // FÓRMULA MAESTRA: Límite Base + Extra = Total Real
     const mergedLimits: PlanLimits = {
         products: baseLimits.products === -1 ? -1 : (baseLimits.products + (extras.products || 0)),
         blogPosts: baseLimits.blogPosts === -1 ? -1 : (baseLimits.blogPosts + (extras.blogPosts || 0)),
@@ -159,20 +159,18 @@ export function useSubscription() {
     };
 
     const activeModuleIds = new Set<string>();
-    const inactiveFromDB = new Set<string>();
     
+    // JERARQUÍA DE RESOLUCIÓN DE MÓDULOS:
     // 1. Prioridad 2: Módulos incluidos por defecto en el Plan asignado (Normalizados)
     details?.includedModuleKeys?.forEach(key => activeModuleIds.add(normalizeModuleId(key)));
 
-    // 2. Prioridad 1: Sobre-escritura explícita desde la subcolección del negocio en la BD
+    // 2. Prioridad 1 (Override): Sobre-escritura explícita desde la subcolección del negocio
     dbModules?.forEach(m => {
         const cleanId = normalizeModuleId(m.id);
         if (m.status === 'active') {
           activeModuleIds.add(cleanId);
-          inactiveFromDB.delete(cleanId); // Asegurar que no esté en la lista negra
         } else if (m.status === 'inactive') {
           activeModuleIds.delete(cleanId);
-          inactiveFromDB.add(cleanId); // Marcar explícitamente como inactivo
         }
     });
 
@@ -196,7 +194,6 @@ export function useSubscription() {
   const landingPagesCount = landingPages?.length ?? 0;
   const ordersCount = orders?.length ?? 0;
   const suggestionsCount = suggestions?.length ?? 0;
-  const commissionsCount = orders?.filter(o => o.orderStatus !== 'Cancelado').length ?? 0;
   const couponsCount = coupons?.length ?? 0;
   const promotionsCount = promotions?.length ?? 0;
 
@@ -236,7 +233,6 @@ export function useSubscription() {
     landingPagesCount,
     ordersCount,
     suggestionsCount,
-    commissionsCount,
     couponsCount,
     promotionsCount,
     canAddBlogPosts,
