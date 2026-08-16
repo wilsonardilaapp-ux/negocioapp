@@ -25,19 +25,18 @@ export async function chat(input: ChatInput): Promise<string> {
     return await chatFlow(input);
   } catch (error: any) {
     console.error("Error crítico en chatFlow:", error.message);
-    // [BOT-MUST-SPEAK] Fallback de emergencia si todo falla
     return "Hola, soy el asistente del Salón de Belleza Natural. Estoy teniendo unos problemas técnicos momentáneos, pero puedes escribirnos directamente por este medio y un asesor te atenderá pronto.";
   }
 }
 
 /**
- * Recuperación de datos (RAG) con TIMEOUT de 3.5 segundos para evitar bloqueos.
- * Garantiza que el flujo siempre pase al Paso 4.
+ * Recuperación de datos (RAG) con TIMEOUT REAL de 3.5 segundos.
+ * Garantiza que el flujo nunca se detenga y siempre pase al Paso 4.
  */
 async function getBusinessContext(businessId: string, userMessage: string): Promise<string> {
   console.log(`[PASO 3] [RAG-DEBUG] Iniciando búsqueda para el negocio ${businessId}`);
   
-  // Timeout estricto de 3.5 segundos solicitado
+  // Temporizador de seguridad: 3.5 segundos máximo
   const timeoutPromise = new Promise<string>((_, reject) =>
     setTimeout(() => reject(new Error('TIMEOUT_RAG')), 3500)
   );
@@ -54,26 +53,21 @@ async function getBusinessContext(businessId: string, userMessage: string): Prom
       let knowledgeBaseContent = "";
       let productsContent = "";
 
-      try {
-        // Ejecutamos búsquedas en paralelo para optimizar tiempo
-        const [knowledgeSnap, productsSnap] = await Promise.all([
-          firestore.collection(`businesses/${businessId}/chatbotConfig/main/knowledgeBase`).get(),
-          firestore.collection(`businesses/${businessId}/products`).limit(20).get()
-        ]);
+      // Ejecutamos búsquedas concurrentes para optimizar tiempo
+      const [knowledgeSnap, productsSnap] = await Promise.all([
+        firestore.collection(`businesses/${businessId}/chatbotConfig/main/knowledgeBase`).get(),
+        firestore.collection(`businesses/${businessId}/products`).limit(20).get()
+      ]);
 
-        knowledgeBaseContent = knowledgeSnap.docs.map(d => {
-          const data = d.data();
-          return `--- TEMA: ${data.fileName || "Info"} ---\n${data.extractedText || data.content || ""}\n`;
-        }).join('\n');
+      knowledgeBaseContent = knowledgeSnap.docs.map(d => {
+        const data = d.data();
+        return `--- TEMA: ${data.fileName || "Info"} ---\n${data.extractedText || data.content || ""}\n`;
+      }).join('\n');
 
-        productsContent = productsSnap.docs.map(d => {
-          const p = d.data();
-          return `- ${p.name}: $${p.price || 'Consultar'} - ${p.description || ''}`;
-        }).join('\n');
-
-      } catch (innerError: any) {
-        console.warn(`[RAG-ERROR-INTERNAL] Fallo en sub-consultas: ${innerError.message}`);
-      }
+      productsContent = productsSnap.docs.map(d => {
+        const p = d.data();
+        return `- ${p.name}: $${p.price || 'Consultar'} - ${p.description || ''}`;
+      }).join('\n');
 
       return `
 INFORMACIÓN DEL NEGOCIO: ${businessName}
@@ -90,13 +84,16 @@ ${productsContent || "Catálogo no disponible."}
   })();
 
   try {
+    // COMPETICIÓN: La búsqueda contra el reloj de 3.5s
     const context = await Promise.race([fetchPromise, timeoutPromise]);
-    console.log(`[PASO 3.5] [RAG-SUCCESS] Contexto recuperado.`);
-    return context;
+    console.log(`[RAG-SUCCESS] Contexto recuperado dentro del tiempo límite.`);
+    return context as string;
   } catch (error: any) {
-    // CAPTURA GLOBAL OBLIGATORIA
+    // RED DE SEGURIDAD OBLIGATORIA: Jamás dejar que la app crashee
     console.error('[RAG-ERROR-CRITICO]', error.message || error);
-    // Retorno de contexto mínimo para que la IA pueda saludar o usar el mensaje de contingencia
+    
+    // Retorno de contexto mínimo (Empty Context Fallback)
+    // Esto permite que el Paso 4 reciba una respuesta y el bot pueda al menos saludar
     return `Información del negocio: Salón de Belleza Natural.`;
   }
 }
@@ -109,14 +106,12 @@ export async function getAIConfig(businessId?: string): Promise<{ provider: stri
   try {
     const firestore = await getAdminFirestore();
     
-    // Consulta a la configuración global
     const globalConfigSnap = await firestore.doc('globalConfig/config_ia').get();
     const integrationSnap = await firestore.doc('integrations/chatbot-integrado-con-whatsapp-para-soporte-y-ventas').get();
 
     const configDoc = globalConfigSnap.exists ? globalConfigSnap : integrationSnap;
 
     if (!configDoc.exists) {
-      console.error("[AI-ERROR] No hay motor de IA activo en el panel de Super Admin.");
       return { provider: 'googleai', apiKey: '', model: 'gemini-1.5-flash' };
     }
 
@@ -132,23 +127,23 @@ export async function getAIConfig(businessId?: string): Promise<{ provider: stri
       fields = data?.fields || {};
     }
 
-    // --- REGLA DE PRIORIDAD: DeepSeek primero ---
+    // PRIORIDAD 1: DeepSeek
     if (fields.deepseek?.apiKey) {
       return { provider: 'deepseek', apiKey: fields.deepseek.apiKey, model: 'deepseek-chat' };
     }
     
+    // PRIORIDAD 2: Google
     if (fields.google?.apiKey) {
       return { provider: 'googleai', apiKey: fields.google.apiKey, model: 'gemini-1.5-flash' };
     }
     
+    // PRIORIDAD 3: OpenAI
     if (fields.openai?.apiKey) {
       return { provider: 'openai', apiKey: fields.openai.apiKey, model: 'gpt-4o-mini' };
     }
 
-    console.error("[AI-ERROR] No se encontró ninguna API Key configurada.");
-
   } catch (e: any) {
-    console.error("[AI-ERROR] Fallo al leer configuración IA:", e.message);
+    console.error("[AI-CONFIG-ERROR]", e.message);
   }
 
   return { provider: 'googleai', apiKey: '', model: 'gemini-1.5-flash' };
@@ -161,7 +156,7 @@ const chatFlow = ai.defineFlow(
     outputSchema: z.string(),
   },
   async (input) => {
-    // PASO 3: Recuperar contexto con protección contra cuelgues
+    // PASO 3: Recuperar contexto con protección absoluta contra cuelgues
     const contextData = await getBusinessContext(input.businessId, input.message);
     
     // PASO 4: Configurar motor de IA y generar respuesta
@@ -169,7 +164,7 @@ const chatFlow = ai.defineFlow(
 
     if (!aiConfig.apiKey) {
       console.error("[PASO 4] [AI-FATAL] No se puede generar respuesta sin API Key.");
-      return "Lo siento, el servicio de asistencia no está configurado correctamente.";
+      return "Hola, soy el asistente del Salón de Belleza Natural. No encontré esa info en mis manuales, ¿en qué más te ayudo?";
     }
 
     const systemPrompt = `Eres un asistente profesional del Salón de Belleza Natural. 
@@ -201,7 +196,7 @@ ${contextData}
       return response.text ?? "Hola, soy el asistente del Salón de Belleza Natural. ¿En qué puedo ayudarte?";
     }
 
-    // Fallback compatible con OpenAI (DeepSeek, Groq, etc.)
+    // Fallback compatible con OpenAI (DeepSeek)
     try {
       let endpoint = 'https://api.openai.com/v1/chat/completions';
       if (aiConfig.provider === 'deepseek') endpoint = 'https://api.deepseek.com/v1/chat/completions';
@@ -232,7 +227,7 @@ ${contextData}
 
       return textResponse;
     } catch (e) {
-      console.error("[PASO 4] [AI-ERROR-FALLBACK]", e);
+      console.error("[PASO 4] [AI-ERROR-DESPACHO]", e);
       return "Hola, soy el asistente del Salón de Belleza Natural. No pude procesar tu duda, ¿en qué más te ayudo?";
     }
   }

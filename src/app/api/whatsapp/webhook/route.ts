@@ -139,7 +139,6 @@ export async function POST(req: NextRequest) {
             console.log(`[PASO 2.5] Analíticas superadas. Pasando a RAG e IA...`);
 
             // --- [PASO 3] GENERACIÓN CON IA ---
-            console.log(`[AI-DEBUG] Iniciando generación con IA para: ${incomingText}`);
             const aiResponse = await chat({
                 businessId: businessId!,
                 message: incomingText,
