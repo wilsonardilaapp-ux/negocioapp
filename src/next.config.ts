@@ -1,6 +1,5 @@
-
 /**
- * Archivo neutralizado para evitar conflictos con el archivo de configuración 
- * en la raíz del proyecto.
+ * Archivo neutralizado para evitar colisiones con la raíz del proyecto.
+ * La configuración de Next.js debe residir exclusivamente en la raíz.
  */
 export default {};

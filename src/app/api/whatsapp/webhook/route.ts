@@ -48,6 +48,7 @@ export async function POST(req: NextRequest) {
     console.log(`[WHAPI-WEBHOOK] [PASO 1] Resolviendo negocio para canal: ${channelId}`);
     const db = await getAdminFirestore();
     
+    // Resolución de inquilino (Tenant Resolution)
     let configSnapshot = await db.collectionGroup('chatbotConfig')
       .where('whapiChannelId', '==', channelId)
       .limit(1)
@@ -76,12 +77,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ status: 'error', reason: 'incomplete_config' }, { status: 200 });
     }
 
+    // Proceso asíncrono pero esperado (Awaited) para evitar que Vercel mate el hilo
     const processMessage = async () => {
         try {
             const senderNumber = normalizePhoneNumber(incomingChatId);
             const conversationId = uuidv4();
             
-            console.log(`[WHAPI-WEBHOOK] [PASO 2] Negocio identificado: ${businessId}. Registrando analítica...`);
+            console.log(`[WHAPI-WEBHOOK] [PASO 2] Registrando conversación: ${conversationId} para business: ${businessId}`);
             await db.collection('businesses')
               .doc(businessId!)
               .collection('chatConversations')
@@ -95,21 +97,26 @@ export async function POST(req: NextRequest) {
                 channel: 'whatsapp',
             });
 
-            console.log(`[WHAPI-WEBHOOK] [PASO 4] Iniciando generación de respuesta con IA...`);
+            console.log(`[WHAPI-WEBHOOK] [PASO 4] Solicitando respuesta a la IA...`);
             const aiResponse = await chat({
                 businessId: businessId!,
                 message: incomingText,
                 history: [] 
             });
 
-            console.log(`[WHAPI-WEBHOOK] [PASO 4.5] Respuesta generada: ${aiResponse?.substring(0, 100)}...`);
-            const finalMessage = aiResponse?.trim() || "Hola, déjanos tu mensaje y te atenderemos pronto.";
+            console.log(`[WHAPI-WEBHOOK] [PASO 4.5] IA respondió. Longitud: ${aiResponse?.length || 0}`);
+            const finalMessage = aiResponse?.trim() || "Hola, estamos procesando tu solicitud.";
 
-            console.log(`[WHAPI-WEBHOOK] [PASO 5] Enviando mensaje a WHAPI a chat_id: ${incomingChatId}`);
-            const whapiFetch = await fetch('https://gate.whapi.cloud/messages/text', {
+            const token = businessToken.trim();
+            const whapiUrl = 'https://gate.whapi.cloud/messages/text';
+            
+            console.log(`[WHAPI-WEBHOOK] [PASO 5] Despachando a WHAPI. Target: ${incomingChatId}`);
+            console.log(`[WHAPI-WEBHOOK] [DEBUG-GATE] URL: ${whapiUrl} | Token: ${token.substring(0, 4)}...`);
+
+            const whapiFetch = await fetch(whapiUrl, {
                 method: 'POST',
                 headers: {
-                    'Authorization': `Bearer ${businessToken!.trim()}`,
+                    'Authorization': `Bearer ${token}`,
                     'Accept': 'application/json',
                     'Content-Type': 'application/json'
                 },
@@ -119,10 +126,18 @@ export async function POST(req: NextRequest) {
                 })
             });
 
-            console.log(`[WHAPI-WEBHOOK] [PASO 5.5] Respuesta de WHAPI status: ${whapiFetch.status}`);
+            const whapiStatus = whapiFetch.status;
+            const whapiBody = await whapiFetch.text();
+            console.log(`[WHAPI-WEBHOOK] [PASO 5.5] WHAPI Status: ${whapiStatus}`);
+            
+            if (!whapiFetch.ok) {
+              console.error(`[WHAPI-WEBHOOK] [ERROR-GATE]: ${whapiStatus} - ${whapiBody}`);
+            } else {
+              console.log(`[WHAPI-WEBHOOK] [PASO 6] Mensaje enviado con éxito.`);
+            }
 
         } catch (error: any) {
-            console.error(`[ERROR-WEBHOOK-PROCESS]:`, error.message);
+            console.error(`[WHAPI-WEBHOOK] [ERROR-FATAL-PROCESS]:`, error.message);
         }
     };
 
@@ -132,7 +147,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ status: 'received', businessId }, { status: 200 });
 
   } catch (error: any) {
-    console.error(`[WHAPI-WEBHOOK] [ERROR-FATAL]:`, error.message);
+    console.error(`[WHAPI-WEBHOOK] [ERROR-FATAL-ROUTE]:`, error.message);
     return NextResponse.json({ error: 'Internal error' }, { status: 500 });
   }
 }
