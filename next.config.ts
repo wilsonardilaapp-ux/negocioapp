@@ -1,14 +1,10 @@
 import type { NextConfig } from 'next';
 
 /**
- * Configuración maestra de Next.js optimizada para el entorno de build.
+ * Configuración maestra de Next.js optimizada para el entorno de producción.
+ * Se han eliminado los overrides de webpack que causaban errores de resolución de chunks (Cannot find module).
  */
 const nextConfig: NextConfig = {
-    // Estabilización de módulos para evitar errores de chunks faltantes (Cannot find module)
-    webpack: (config) => {
-        config.optimization.splitChunks = false;
-        return config;
-    },
     transpilePackages: [
         'lucide-react', 
         'recharts', 

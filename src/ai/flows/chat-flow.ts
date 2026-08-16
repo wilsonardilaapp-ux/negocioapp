@@ -1,6 +1,6 @@
 'use server';
 /**
- * @fileOverview A chatbot flow using Genkit with Absolute Shielding.
+ * @fileOverview A chatbot flow using Genkit with Absolute Shielding and Traceability.
  * 
  * - chat - A function that generates a response from the assistant.
  * - ChatInput - The input type for the chat function.
@@ -35,15 +35,15 @@ export async function chat(input: ChatInput): Promise<string> {
 }
 
 /**
- * Recuperación de datos (RAG) con blindaje absoluto.
- * Implementa un timeout estricto de 1 segundo para evitar bloqueos del servidor.
+ * Recuperación de datos (RAG) con blindaje absoluto y trazabilidad.
  */
 async function getBusinessContext(businessId: string, userMessage: string): Promise<string> {
   const logPrefix = `[PASO 3] [RAG-DEBUG]`;
-  console.log(`${logPrefix} Iniciando búsqueda blindada (1s)...`);
+  console.log(`${logPrefix} [3.1] Iniciando búsqueda blindada (1s)...`);
 
+  // BLINDAJE ABSOLUTO: Try/Catch que envuelve todo el proceso de búsqueda
   try {
-    // 1. Definir el temporizador de rescate (1 segundo)
+    // 1. Definir el temporizador de rescate (1 segundo para evitar colapsos en producción)
     const timeoutPromise = new Promise<string>((_, reject) =>
       setTimeout(() => reject(new Error('TIMEOUT_RAG')), 1000)
     );
@@ -51,7 +51,9 @@ async function getBusinessContext(businessId: string, userMessage: string): Prom
     // 2. Definir la promesa de búsqueda real en Firestore
     const contextPromise = (async () => {
       try {
+        console.log(`${logPrefix} [3.2] Conectando a Admin Firestore...`);
         const db = await getAdminFirestore();
+        console.log(`${logPrefix} [3.3] Ejecutando consultas paralelas...`);
         
         // Obtener descripción del negocio, documentos y catálogo en paralelo
         const [businessSnap, knowledgeSnap, catalogSnap] = await Promise.all([
@@ -59,6 +61,8 @@ async function getBusinessContext(businessId: string, userMessage: string): Prom
           db.collection('businesses').doc(businessId).collection('chatbotConfig').doc('main').collection('knowledgeBase').where('status', '==', 'ready').get(),
           db.collection('businesses').doc(businessId).collection('publicData').doc('catalog').get()
         ]);
+
+        console.log(`${logPrefix} [3.4] Consultas completadas. Procesando resultados...`);
 
         let context = `INFORMACIÓN DEL NEGOCIO: ${businessSnap.exists ? businessSnap.data()?.description : ''}\n\n`;
         
@@ -73,32 +77,30 @@ async function getBusinessContext(businessId: string, userMessage: string): Prom
           context += `PRODUCTOS DISPONIBLES:\n${JSON.stringify(catalogData?.products || [])}\n`;
         }
 
+        console.log(`${logPrefix} [3.5] Contexto construido exitosamente (${context.length} bytes)`);
         return context;
       } catch (innerError: any) {
-        console.warn(`${logPrefix} Error en consulta Firestore: ${innerError.message}`);
+        console.error(`${logPrefix} [3.2-ERROR] Fallo en consulta Firestore: ${innerError.message}`);
         return "";
       }
     })();
 
-    // 3. Carrera contra el tiempo: El primero que termine gana
+    // 3. Carrera contra el tiempo: Si Firestore tarda > 1s, se aborta y se rescata el flujo
     return await Promise.race([contextPromise, timeoutPromise]);
 
   } catch (error: any) {
-    // RESCATE ABSOLUTO: Si falla la búsqueda o el timeout de 1s, devolvemos vacío inmediatamente
-    console.warn(`${logPrefix} Rescate activado: ${error.message}. Continuando al Paso 4 sin documentos.`);
+    // RESCATE OBLIGATORIO: Nunca permitir que el fallo de documentos frene la respuesta
+    console.warn(`${logPrefix} [3-RESCATE] Activado por: ${error.message}. Saltando al Paso 4...`);
     return ""; 
   }
 }
 
 /**
  * Obtiene la configuración de IA activa desde el panel global.
- * Prioriza DeepSeek para optimización de costos.
  */
 export async function getAIConfig(businessId?: string): Promise<{ provider: string; apiKey: string; model: string }> {
   try {
     const firestore = await getAdminFirestore();
-    
-    // Buscar en integraciones globales
     const integrationSnap = await firestore.doc('integrations/chatbot-integrado-con-whatsapp-para-soporte-y-ventas').get();
 
     if (!integrationSnap.exists) {
@@ -117,17 +119,15 @@ export async function getAIConfig(businessId?: string): Promise<{ provider: stri
       fields = data?.fields || {};
     }
 
-    // PRIORIDAD 1: DeepSeek (Costo-Efectivo)
+    // Prioridad DeepSeek por costos y velocidad en producción
     if (fields.deepseek?.apiKey) {
       return { provider: 'deepseek', apiKey: fields.deepseek.apiKey, model: 'deepseek-chat' };
     }
     
-    // PRIORIDAD 2: Google AI (Gemini)
     if (fields.google?.apiKey) {
       return { provider: 'googleai', apiKey: fields.google.apiKey, model: 'gemini-1.5-flash' };
     }
     
-    // PRIORIDAD 3: OpenAI
     if (fields.openai?.apiKey) {
       return { provider: 'openai', apiKey: fields.openai.apiKey, model: 'gpt-4o-mini' };
     }
@@ -146,15 +146,18 @@ const chatFlow = ai.defineFlow(
     outputSchema: z.string(),
   },
   async (input) => {
-    // PASO 3: Búsqueda blindada con timeout de 1s
+    // PASO 3: Búsqueda blindada (con timeout de 1s)
     const contextData = await getBusinessContext(input.businessId, input.message);
     
-    // PASO 4: Configurar motor de IA y generar respuesta
+    // PASO 4: Configurar motor de IA
     const aiConfig = await getAIConfig(input.businessId);
 
     if (!aiConfig.apiKey) {
+      console.warn(`[PASO 4-ERROR] No se encontró API Key para el proveedor configurado.`);
       return "Hola, soy el asistente del Salón de Belleza Natural. No encontré esa info en mis manuales, ¿en qué más te ayudo?";
     }
+
+    console.log(`[PASO 5] Generando respuesta con ${aiConfig.provider} (${aiConfig.model})...`);
 
     const systemPrompt = `Eres un asistente profesional del Salón de Belleza Natural. 
 Responde de forma amable y profesional.
@@ -204,8 +207,10 @@ REGLAS CRÍTICAS:
       });
 
       const data = await response.json();
-      return data.choices?.[0]?.message?.content || "Hola, soy el asistente del Salón de Belleza Natural. ¿En qué puedo ayudarte?";
-    } catch (e: unknown) {
+      const answer = data.choices?.[0]?.message?.content;
+      return answer || "Hola, soy el asistente del Salón de Belleza Natural. ¿En qué puedo ayudarte?";
+    } catch (e: any) {
+      console.error(`[PASO 5-ERROR] Error en generación externa: ${e.message}`);
       return "Hola, soy el asistente del Salón de Belleza Natural. No pude procesar tu duda, ¿en qué más te ayudo?";
     }
   }
