@@ -65,10 +65,17 @@ export function useUser() {
 
   // 2. Obtener Perfil y Autosanación de Roles
   useEffect(() => {
-    if (!firestore || !authState.user) return;
+    // Cambio quirúrgico: Depender del UID para estabilizar la referencia y romper bucles
+    if (!firestore || !authState.user?.uid) {
+        if (!authState.isLoading && !authState.user) {
+            setProfileLoading(false);
+        }
+        return;
+    }
 
     setProfileLoading(true);
-    const userDocRef = doc(firestore, 'users', authState.user.uid);
+    const userId = authState.user.uid;
+    const userDocRef = doc(firestore, 'users', userId);
     const userEmail = authState.user.email?.toLowerCase().trim() || '';
 
     const unsubscribe = onSnapshot(userDocRef, async (docSnap) => {
@@ -79,13 +86,11 @@ export function useUser() {
             const isAuthorizedAdmin = SUPER_ADMIN_EMAILS.includes(userEmail);
             
             if (data.role === 'super_admin' && !isAuthorizedAdmin) {
-                // Degradación de seguridad para usuarios no autorizados que intentan usurpar el rol
                 console.warn(`[Seguridad] Degradando usuario no autorizado: ${userEmail}`);
                 const correctedProfile = { ...data, role: 'cliente_admin' as const };
                 setProfile(correctedProfile);
                 updateDocumentNonBlocking(userDocRef, { role: 'cliente_admin' });
             } else if (data.role !== 'super_admin' && isAuthorizedAdmin) {
-                // Auto-ascensión para correos en la lista blanca
                 console.log(`[Seguridad] Elevando privilegios para admin autorizado: ${userEmail}`);
                 const correctedProfile = { ...data, role: 'super_admin' as const };
                 setProfile(correctedProfile);
@@ -97,7 +102,7 @@ export function useUser() {
             // Auto-creación del perfil si el usuario existe en Auth pero no en Firestore
             const isAdmin = SUPER_ADMIN_EMAILS.includes(userEmail);
             const newProfile: UserProfile = {
-                id: authState.user!.uid,
+                id: userId,
                 name: authState.user!.displayName || 'Usuario',
                 email: userEmail,
                 role: isAdmin ? 'super_admin' : 'cliente_admin',
@@ -115,7 +120,7 @@ export function useUser() {
     });
 
     return () => unsubscribe();
-  }, [firestore, authState.user]);
+  }, [firestore, authState.user?.uid, authState.isLoading]);
 
   // 3. Activity Tracker para Negocios (SaaS Tenant Activity)
   useEffect(() => {
@@ -145,7 +150,6 @@ export function useUser() {
                 if (shouldUpdate) {
                     const nowISO = now.toISOString();
                     // Calculamos el estado basándonos en la fecha actual (que será 'active')
-                    // pero mantenemos la lógica por si en el futuro se usa un valor histórico
                     const currentStatus = getActivityStatus(nowISO);
                     
                     updateDocumentNonBlocking(businessRef, {
@@ -213,7 +217,7 @@ export function useUser() {
   return {
     user: authState.user,
     profile: profile,
-    isUserLoading: authState.isLoading,
+    isUserLoading: authState.isLoading || (!!authState.user && isProfileLoading),
     isProfileLoading: isProfileLoading,
     userError: authState.error,
   };

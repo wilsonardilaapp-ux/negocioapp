@@ -127,7 +127,8 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       };
   };
 
-  if (isUserLoading) {
+  // Cambio quirúrgico: Permitir el renderizado si ya existe un objeto 'user' aunque esté cargando el perfil
+  if (isUserLoading && !user) {
     return <LoadingScreen />;
   }
   
