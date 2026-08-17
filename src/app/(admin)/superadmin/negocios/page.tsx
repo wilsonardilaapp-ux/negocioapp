@@ -53,6 +53,18 @@ import { WhatsAppIcon } from '@/components/icons';
 
 type ModuleState = { active: boolean; isAddon: boolean; isPlanDefault: boolean };
 
+const LEGACY_MODULE_ALIASES: Record<string, string> = {
+  'chatbot-de-soporte-whatsapp': 'whapi-whatsapp',
+  'chatbot-integrado-con-whatsapp-para-soporte-y-ventas': 'whapi-whatsapp',
+  'api-whatsapp': 'whapi-whatsapp',
+  'whatsapp': 'whapi-whatsapp'
+};
+
+const getCanonicalModuleId = (id: string) => {
+  const normalized = normalizeModuleId(id);
+  return LEGACY_MODULE_ALIASES[normalized] || normalized;
+};
+
 const iconMap: { [key: string]: React.ReactNode } = {
   catalogo: <Building2 className="w-4 h-4" />,
   'whapi-whatsapp': <WhatsAppIcon className="w-4 h-4" />,
@@ -62,6 +74,8 @@ const iconMap: { [key: string]: React.ReactNode } = {
   contabilidad: <Calculator className="w-4 h-4" />,
   'inventario-kardex': <Package className="w-4 h-4" />,
   'pistola-escaner': <ScanLine className="w-4 h-4" />,
+  'motor-de-sugerencias-inteligentes': <Sparkles className="w-4 h-4" />,
+  'google-analytics': <TrendingUp className="w-4 h-4" />,
   default: <Puzzle className="w-4 h-4" />,
 };
 
@@ -150,6 +164,7 @@ export default function BusinessesPage() {
   ], [plans, hybridPlans]);
 
   // displayedModules combinando Firestore con los módulos del sistema para asegurar visibilidad constante
+  // Implementación de DEDUPLICACIÓN CANÓNICA para eliminar módulos fantasma
   const displayedModules = useMemo(() => {
       const dbModules = modules || [];
       const modulesMap = new Map<string, Module>();
@@ -166,9 +181,15 @@ export default function BusinessesPage() {
           } as Module);
       });
 
-      // 2. Mezclar con módulos reales de la DB
+      // 2. Mezclar con módulos reales de la DB aplicando mapeo de ALIAS
       dbModules.forEach(m => {
-          modulesMap.set(normalizeModuleId(m.id), m);
+          const canonicalId = getCanonicalModuleId(m.id);
+          
+          // Si el ID ya existe en el mapa (ya sea porque es del sistema o ya se procesó un alias),
+          // lo ignoramos para evitar duplicados como el fantasma de WHAPI.
+          if (!modulesMap.has(canonicalId)) {
+              modulesMap.set(canonicalId, { ...m, id: canonicalId });
+          }
       });
 
       return Array.from(modulesMap.values());
@@ -320,7 +341,7 @@ export default function BusinessesPage() {
         const actualPlanId = (subData?.status === 'active' ? subData.plan : null) || business.planName || 'WxZYuL7JwmkSKBXGn1QZ';
         const currentPlanDetails = allPlans.find(p => p.id === actualPlanId || p.name === actualPlanId || ('slug' in p && p.slug === actualPlanId));
         const resolvedPlanName = currentPlanDetails?.name || business.planName || 'Plan Crecimiento';
-        const planModules = (currentPlanDetails as any)?.includedModuleKeys?.map((k: string) => normalizeModuleId(k)) || [];
+        const planModules = (currentPlanDetails as any)?.includedModuleKeys?.map((k: string) => getCanonicalModuleId(k)) || [];
 
         if (business.planName !== resolvedPlanName) {
             updateDocumentNonBlocking(doc(firestore, 'businesses', business.id), { planName: resolvedPlanName });
@@ -345,10 +366,10 @@ export default function BusinessesPage() {
           initialState[id] = { active: true, isAddon: false, isPlanDefault: true };
         });
 
-        // Corregir con la subcolección
+        // Corregir con la subcolección aplicando CANONICAL MAPPER
         modulesSnapshot.docs.forEach(doc => {
             const data = doc.data();
-            const cleanId = normalizeModuleId(doc.id);
+            const cleanId = getCanonicalModuleId(doc.id);
             const isAddon = data.isAddon === true;
             const isPlanDefault = planModules.includes(cleanId);
             
@@ -450,24 +471,25 @@ export default function BusinessesPage() {
             updatedAt: Timestamp.now()
         }, { merge: true });
         
-        // PERSISTENCIA UNIFICADA Y OBLIGATORIA
+        // PERSISTENCIA UNIFICADA Y OBLIGATORIA (CON MAPEO CANÓNICO)
         const allModuleIds = new Set<string>();
-        displayedModules.forEach(m => allModuleIds.add(normalizeModuleId(m.id)));
-        Object.keys(businessModulesState).forEach(id => allModuleIds.add(id));
+        displayedModules.forEach(m => allModuleIds.add(getCanonicalModuleId(m.id)));
+        Object.keys(businessModulesState).forEach(id => allModuleIds.add(getCanonicalModuleId(id)));
         
         allModuleIds.forEach(moduleId => {
-            const state = businessModulesState[moduleId];
-            const extra = moduleExtras[moduleId] || 0;
+            const canonicalId = getCanonicalModuleId(moduleId);
+            const state = businessModulesState[canonicalId];
+            const extra = moduleExtras[canonicalId] || 0;
             const currentPlanDetails = allPlans.find(p => p.name === selectedBusiness.planName || p.id === selectedBusiness.planName || ('slug' in p && p.slug === selectedBusiness.planName));
-            const planModules = (currentPlanDetails as any)?.includedModuleKeys?.map((k: string) => normalizeModuleId(k)) || [];
-            const isIncludedInPlan = planModules.includes(moduleId);
+            const planModules = (currentPlanDetails as any)?.includedModuleKeys?.map((k: string) => getCanonicalModuleId(k)) || [];
+            const isIncludedInPlan = planModules.includes(canonicalId);
             
             if (state) {
               const isCurrentlyActive = state.active;
               
               // Persistencia obligatoria si es Add-on o si el estado difiere del plan
               if (!isIncludedInPlan || (isIncludedInPlan && !isCurrentlyActive)) {
-                batch.set(doc(firestore, `businesses/${selectedBusiness.id}/modules`, moduleId), { 
+                batch.set(doc(firestore, `businesses/${selectedBusiness.id}/modules`, canonicalId), { 
                   status: isCurrentlyActive ? 'active' : 'inactive', 
                   isAddon: !isIncludedInPlan,
                   extra,
@@ -475,7 +497,7 @@ export default function BusinessesPage() {
                 }, { merge: true });
               } else if (isIncludedInPlan && isCurrentlyActive) {
                 // Sanitizar isAddon: false si ahora está incluido en el plan
-                batch.set(doc(firestore, `businesses/${selectedBusiness.id}/modules`, moduleId), {
+                batch.set(doc(firestore, `businesses/${selectedBusiness.id}/modules`, canonicalId), {
                   status: 'active',
                   isAddon: false,
                   updatedAt: new Date().toISOString()
@@ -502,12 +524,12 @@ export default function BusinessesPage() {
   };
   
   const toggleModuleAssignment = (moduleId: string) => {
-    const cleanId = normalizeModuleId(moduleId);
+    const cleanId = getCanonicalModuleId(moduleId);
     setBusinessModulesState(prev => {
         if (!selectedBusiness) return prev;
         
         const currentPlan = allPlans.find(p => p.name === selectedBusiness.planName || p.id === selectedBusiness.planName || ('slug' in p && p.slug === selectedBusiness.planName));
-        const planModules = (currentPlan as any)?.includedModuleKeys?.map((k: string) => normalizeModuleId(k)) || [];
+        const planModules = (currentPlan as any)?.includedModuleKeys?.map((k: string) => getCanonicalModuleId(k)) || [];
         const isIncludedInPlan = planModules.includes(cleanId);
 
         const current = prev[cleanId] || { 
@@ -528,7 +550,7 @@ export default function BusinessesPage() {
 
   const handleExtraChange = (moduleId: string, value: string) => {
     const numericValue = parseInt(value, 10) || 0;
-    setModuleExtras(prev => ({ ...prev, [normalizeModuleId(moduleId)]: numericValue }));
+    setModuleExtras(prev => ({ ...prev, [getCanonicalModuleId(moduleId)]: numericValue }));
   };
 
   const handleLimiteExtraChange = (key: string, value: string) => {
@@ -840,10 +862,10 @@ export default function BusinessesPage() {
                 <div className="grid grid-cols-1 gap-2">
                   {(() => {
                     const currentPlan = allPlans.find(p => p.name === selectedBusiness.planName || p.id === selectedBusiness.planName || ('slug' in p && p.slug === selectedBusiness.planName));
-                    const planModules = (currentPlan as any)?.includedModuleKeys?.map((k: string) => normalizeModuleId(k)) || [];
+                    const planModules = (currentPlan as any)?.includedModuleKeys?.map((k: string) => getCanonicalModuleId(k)) || [];
 
                     return displayedModules.map(moduleItem => {
-                      const cleanId = normalizeModuleId(moduleItem.id);
+                      const cleanId = getCanonicalModuleId(moduleItem.id);
                       const itemState = businessModulesState[cleanId] || { 
                           active: false, 
                           isAddon: false, 
@@ -864,7 +886,7 @@ export default function BusinessesPage() {
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-3">
                               <div className={cn('w-9 h-9 rounded-lg flex items-center justify-center', isActive ? 'bg-primary/20 text-primary' : 'bg-muted text-muted-foreground')}>
-                                {iconMap[moduleItem.id] || iconMap.default}
+                                {iconMap[cleanId] || iconMap.default}
                               </div>
                               <div>
                                   <div className="flex items-center gap-2">
