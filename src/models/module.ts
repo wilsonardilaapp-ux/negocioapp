@@ -16,7 +16,7 @@ export const DEFAULT_MODULES = [
   { id: 'catalogo', name: 'Catálogo de Productos', description: 'Permite a los negocios gestionar un catálogo digital con carrito de WhatsApp.', limit: -1 },
   { id: 'blog', name: 'Blog Profesional', description: 'Módulo de artículos y noticias para SEO y fidelización.', limit: 5 },
   { id: 'promotions', name: 'Promociones y Ofertas', description: 'Gestión de banners promocionales y cupones de descuento.', limit: 2 },
-  { id: 'chatbot-integrado-con-whatsapp-para-soporte-y-ventas', name: 'Chatbot de Soporte WhatsApp', description: 'Asistente IA para atención al cliente integrado con WhatsApp API.', limit: -1 },
+  { id: 'whapi-whatsapp', name: 'WHAPI (WhatsApp)', description: 'Proveedor de WhatsApp para envío de notificaciones y chatbot.', limit: -1 },
   { id: 'ycloud-whatsapp', name: 'YCloud (WhatsApp)', description: 'Proveedor de WhatsApp API v2 oficial para envío de notificaciones y chatbot.', limit: -1 },
   { id: 'google-analytics', name: 'Google Analytics', description: 'Integración de métricas avanzadas para la landing page.', limit: -1 },
   { id: 'business-directory', name: 'Directorio de Negocios', description: 'Módulo para listar el negocio en el directorio público de la plataforma.', limit: -1 },

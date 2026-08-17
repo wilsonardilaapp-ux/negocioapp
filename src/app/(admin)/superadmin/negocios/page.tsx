@@ -55,7 +55,7 @@ type ModuleState = { active: boolean; isAddon: boolean; isPlanDefault: boolean }
 
 const iconMap: { [key: string]: React.ReactNode } = {
   catalogo: <Building2 className="w-4 h-4" />,
-  'chatbot-integrado-con-whatsapp-para-soporte-y-ventas': <WhatsAppIcon className="w-4 h-4" />,
+  'whapi-whatsapp': <WhatsAppIcon className="w-4 h-4" />,
   'ycloud-whatsapp': <Smartphone className="w-4 h-4" />,
   promotions: <Tag className="w-4 h-4" />,
   loyalty: <Sparkles className="w-4 h-4" />,
@@ -149,7 +149,7 @@ export default function BusinessesPage() {
     ...(hybridPlans || []).map(p => ({ ...p, origin: 'hybrid' as const }))
   ], [plans, hybridPlans]);
 
-  // NUEVO: displayedModules combinando Firestore con los módulos del sistema para asegurar visibilidad constante de YCloud y otros
+  // displayedModules combinando Firestore con los módulos del sistema para asegurar visibilidad constante
   const displayedModules = useMemo(() => {
       const dbModules = modules || [];
       const modulesMap = new Map<string, Module>();
@@ -166,7 +166,7 @@ export default function BusinessesPage() {
           } as Module);
       });
 
-      // 2. Mezclar con módulos reales de la DB (sobreescribe si existe para capturar personalizaciones de Super Admin)
+      // 2. Mezclar con módulos reales de la DB
       dbModules.forEach(m => {
           modulesMap.set(normalizeModuleId(m.id), m);
       });
@@ -450,13 +450,11 @@ export default function BusinessesPage() {
             updatedAt: Timestamp.now()
         }, { merge: true });
         
-        // PERSISTENCIA UNIFICADA Y OBLIGATORIA (FASE 3.1)
-        // 1. Crear un Set con todos los IDs relevantes para no dejar huérfanos
+        // PERSISTENCIA UNIFICADA Y OBLIGATORIA
         const allModuleIds = new Set<string>();
         displayedModules.forEach(m => allModuleIds.add(normalizeModuleId(m.id)));
         Object.keys(businessModulesState).forEach(id => allModuleIds.add(id));
         
-        // 2. Iterar y grabar estado explícito para cada uno
         allModuleIds.forEach(moduleId => {
             const state = businessModulesState[moduleId];
             const extra = moduleExtras[moduleId] || 0;
@@ -464,16 +462,22 @@ export default function BusinessesPage() {
             const planModules = (currentPlanDetails as any)?.includedModuleKeys?.map((k: string) => normalizeModuleId(k)) || [];
             const isIncludedInPlan = planModules.includes(moduleId);
             
-            // Decisión de guardado: Add-on o Discrepancia con el Plan
             if (state) {
               const isCurrentlyActive = state.active;
               
-              // Persistencia obligatoria si es Add-on o si el estado difiere del plan (para guardar el 'inactive' físico)
+              // Persistencia obligatoria si es Add-on o si el estado difiere del plan
               if (!isIncludedInPlan || (isIncludedInPlan && !isCurrentlyActive)) {
                 batch.set(doc(firestore, `businesses/${selectedBusiness.id}/modules`, moduleId), { 
                   status: isCurrentlyActive ? 'active' : 'inactive', 
                   isAddon: !isIncludedInPlan,
                   extra,
+                  updatedAt: new Date().toISOString()
+                }, { merge: true });
+              } else if (isIncludedInPlan && isCurrentlyActive) {
+                // Sanitizar isAddon: false si ahora está incluido en el plan
+                batch.set(doc(firestore, `businesses/${selectedBusiness.id}/modules`, moduleId), {
+                  status: 'active',
+                  isAddon: false,
                   updatedAt: new Date().toISOString()
                 }, { merge: true });
               }
@@ -848,7 +852,6 @@ export default function BusinessesPage() {
                       
                       const isActive = itemState.active;
                       const isPlanDefault = itemState.isPlanDefault;
-                      const isAddon = itemState.isAddon;
                       
                       const validation = validateModuleExtra(selectedBusiness.planName, moduleExtras[cleanId] || 0);
                       
@@ -866,13 +869,24 @@ export default function BusinessesPage() {
                               <div>
                                   <div className="flex items-center gap-2">
                                       <p className="text-sm font-bold">{moduleItem.name}</p>
-                                      {isPlanDefault && <Badge className="text-[8px] h-4 bg-green-600">Incluido en Plan</Badge>}
-                                      {isAddon && (
-                                        <Badge className={cn("text-[8px] h-4 border-none shadow-sm", isActive ? "bg-blue-600 text-white" : "bg-blue-100 text-blue-700")}>
-                                            Add-on {isActive ? 'Activo' : 'Inactivo'}
+                                      {isPlanDefault ? (
+                                        <Badge variant="outline" className="text-[8px] h-4 border-green-500 text-green-600 bg-green-50">
+                                          Incluido en Plan
+                                        </Badge>
+                                      ) : itemState.isAddon ? (
+                                        <Badge variant="outline" className={cn(
+                                          "text-[8px] h-4",
+                                          isActive 
+                                            ? "border-blue-500 text-blue-600 bg-blue-50" 
+                                            : "border-gray-400 text-gray-500 bg-gray-50"
+                                        )}>
+                                          {isActive ? "Add-on Activo" : "Add-on Inactivo"}
+                                        </Badge>
+                                      ) : (
+                                        <Badge variant="outline" className="text-[8px] h-4 border-gray-300 text-gray-400">
+                                          No Incluido
                                         </Badge>
                                       )}
-                                      {!isPlanDefault && !isAddon && <Badge variant="outline" className="text-[8px] h-4 border-gray-300 text-gray-500">No Incluido</Badge>}
                                   </div>
                                   <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                                       {isActive ? 'ACTIVE' : 'INACTIVE'} (Negocio)
