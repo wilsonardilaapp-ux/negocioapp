@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -38,7 +37,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
-import { Check, Plus, Search, Building2, Eye, Puzzle, Tag, AlertCircle, TrendingUp, Mail, User, ShieldCheck, Loader2, Sparkles, Trash2, Clock } from 'lucide-react';
+import { Check, Plus, Search, Building2, Eye, Puzzle, Tag, AlertCircle, TrendingUp, Mail, User, ShieldCheck, Loader2, Sparkles, Trash2, Clock, Smartphone } from 'lucide-react';
 import { cn, normalizeModuleId } from '@/lib/utils';
 import { Label } from '@/components/ui/label';
 import { validateModuleExtra, validateLimitesExtra } from '@/utils/validateModuleExtra';
@@ -50,12 +49,14 @@ import type { SystemService } from '@/models/system-service';
 import type { Module } from '@/models/module';
 import type { HybridPlan } from '@/models/hybrid-plan';
 import { useToast } from '@/hooks/use-toast';
+import { WhatsAppIcon } from '@/components/icons';
 
 type ModuleState = { active: boolean; isAddon: boolean; isPlanDefault: boolean };
 
 const iconMap: { [key: string]: React.ReactNode } = {
   catalogo: <Building2 className="w-4 h-4" />,
-  'chatbot-integrado-con-whatsapp-para-soporte-y-ventas': <Building2 className="w-4 h-4" />,
+  'chatbot-integrado-con-whatsapp-para-soporte-y-ventas': <WhatsAppIcon className="w-4 h-4" />,
+  'ycloud-whatsapp': <Smartphone className="w-4 h-4" />,
   promotions: <Tag className="w-4 h-4" />,
   default: <Puzzle className="w-4 h-4" />,
 };
@@ -420,16 +421,26 @@ export default function BusinessesPage() {
             updatedAt: Timestamp.now()
         }, { merge: true });
         
-        // PERSISTENCIA DE ESTADOS DE MÓDULOS (ESTADO ENRIQUECIDO)
-        Object.entries(businessModulesState).forEach(([moduleId, state]) => {
-          const extra = moduleExtras[moduleId] || 0;
-          
-          batch.set(doc(firestore, `businesses/${selectedBusiness.id}/modules`, moduleId), { 
-            status: state.active ? 'active' : 'inactive', 
-            isAddon: state.isAddon,
-            extra,
-            updatedAt: new Date().toISOString()
-          }, { merge: true });
+        // PERSISTENCIA UNIFICADA Y OBLIGATORIA (FASE 3.1)
+        // 1. Crear un Set con todos los IDs relevantes para no dejar huérfanos
+        const allModuleIds = new Set<string>();
+        (modules || []).forEach(m => allModuleIds.add(normalizeModuleId(m.id)));
+        Object.keys(businessModulesState).forEach(id => allModuleIds.add(id));
+        
+        // 2. Iterar y grabar estado explícito para cada uno
+        allModuleIds.forEach(moduleId => {
+            const state = businessModulesState[moduleId];
+            const extra = moduleExtras[moduleId] || 0;
+            
+            if (state) {
+                // Si el módulo está en el estado, grabamos su configuración actual (sea ON u OFF)
+                batch.set(doc(firestore, `businesses/${selectedBusiness.id}/modules`, moduleId), { 
+                    status: state.active ? 'active' : 'inactive', 
+                    isAddon: state.isAddon,
+                    extra,
+                    updatedAt: new Date().toISOString()
+                }, { merge: true });
+            }
         });
         
         const currentServices = await getDocs(collection(firestore, `businesses/${selectedBusiness.id}/services`));

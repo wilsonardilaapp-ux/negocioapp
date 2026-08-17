@@ -59,6 +59,7 @@ const DEFAULT_MODULES = [
   { name: 'Blog Profesional', description: 'Módulo de artículos y noticias para SEO y fidelización.', limit: 5, idOverride: 'blog' },
   { name: 'Promociones y Ofertas', description: 'Gestión de banners promocionales y cupones de descuento.', limit: 2, idOverride: 'promotions' },
   { name: 'Chatbot de Soporte WhatsApp', description: 'Asistente IA para atención al cliente integrado con WhatsApp API.', limit: -1, idOverride: 'chatbot-integrado-con-whatsapp-para-soporte-y-ventas' },
+  { name: 'YCloud (WhatsApp)', description: 'Proveedor de WhatsApp API v2 oficial para envío de notificaciones y chatbot.', limit: -1, idOverride: 'ycloud-whatsapp' },
   { name: 'Google Analytics', description: 'Integración de métricas avanzadas para la landing page.', limit: -1, idOverride: 'google-analytics' },
   { name: 'Directorio de Negocios', description: 'Módulo para listar el negocio en el directorio público de la plataforma.', limit: -1, idOverride: 'business-directory' },
   { name: 'Chatbot Menú Público', description: 'Asistente virtual para el menú público que responde preguntas de los visitantes sobre productos, precios, horarios y promociones del negocio.', limit: -1, idOverride: PUBLIC_MENU_CHATBOT_MODULE_ID },
@@ -76,7 +77,7 @@ const DEFAULT_MODULES = [
   },
   { 
     name: 'Inventario Kardex', 
-    description: 'Control detallado de inventario, movimientos de entrada/salida y valuación de stock.', 
+    description: 'Control detallado de inventario, movimientos de entrada/salida y valución de stock.', 
     limit: -1, 
     idOverride: 'inventario-kardex' 
   },
