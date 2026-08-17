@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -66,8 +67,9 @@ export function useCollection<T = any>(
         setIsLoading(false);
       },
       (err: FirestoreError) => {
-        // Ignorar errores de "Target ID already exists"
+        // Ignorar errores de "Target ID already exists" pero detener la carga
         if (err.message && err.message.includes('Target ID already exists')) {
+          setIsLoading(false);
           return;
         }
         setError(err);

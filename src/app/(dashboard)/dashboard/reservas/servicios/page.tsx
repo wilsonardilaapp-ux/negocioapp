@@ -48,11 +48,12 @@ import {
   Frown, 
   Tag, 
   AlertCircle,
-  MoreVertical
+  Save
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useSubscription } from '@/hooks/useSubscription';
 import type { BookingService } from '@/models/booking';
+import { cn } from '@/lib/utils';
 
 const formatCurrency = (value: number) => {
   return new Intl.NumberFormat('es-CO', {
@@ -63,9 +64,11 @@ const formatCurrency = (value: number) => {
 };
 
 export default function BookingServicesPage() {
-  const { user } = useUser();
+  const { user, isUserLoading } = useUser();
   const firestore = useFirestore();
   const { toast } = useToast();
+  
+  // No bloqueamos toda la UI con isSubLoading para evitar bloqueos por queries pesadas
   const { isModuleAuthorized, isLoading: isSubLoading } = useSubscription();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -74,13 +77,13 @@ export default function BookingServicesPage() {
 
   // Firestore Query
   const servicesQuery = useMemoFirebase(() => {
-    if (!user || !firestore) return null;
+    if (!user?.uid || !firestore) return null;
     return collection(firestore, `businesses/${user.uid}/bookingServices`);
-  }, [user, firestore]);
+  }, [user?.uid, firestore]);
 
   const { data: services, isLoading: areServicesLoading } = useCollection<BookingService>(servicesQuery);
 
-  const isAuthorized = isModuleAuthorized('reservas-agendamiento');
+  const isAuthorized = useMemo(() => isModuleAuthorized('reservas-agendamiento'), [isModuleAuthorized]);
 
   const handleOpenModal = (service: BookingService | null = null) => {
     setEditingService(service);
@@ -155,7 +158,8 @@ export default function BookingServicesPage() {
     }
   };
 
-  if (isSubLoading || areServicesLoading) {
+  // Solo mostramos el loader principal si los datos básicos del usuario y los servicios están cargando
+  if (isUserLoading || areServicesLoading) {
     return (
       <div className="flex flex-col items-center justify-center h-64 gap-4">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -164,7 +168,8 @@ export default function BookingServicesPage() {
     );
   }
 
-  if (!isAuthorized) {
+  // Si ya terminó de cargar el plan y no está autorizado, mostramos el aviso
+  if (!isSubLoading && !isAuthorized) {
     return (
       <Card className="border-destructive/20 bg-destructive/5">
         <CardContent className="flex flex-col items-center justify-center text-center p-10 min-h-[400px] gap-4">
@@ -341,15 +346,5 @@ export default function BookingServicesPage() {
         </DialogContent>
       </Dialog>
     </div>
-  );
-}
-
-function Save(props: any) {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
-      <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
-      <polyline points="17 21 17 13 7 13 7 21" />
-      <polyline points="7 3 7 8 15 8" />
-    </svg>
   );
 }

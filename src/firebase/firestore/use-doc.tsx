@@ -1,3 +1,4 @@
+
 'use client';
     
 import { useState, useEffect } from 'react';
@@ -66,9 +67,9 @@ export function useDoc<T = any>(
         setIsLoading(false);
       },
       (err: FirestoreError) => {
-        // Ignorar errores de "Target ID already exists" ya que son artefactos internos del SDK
-        // que suelen dispararse durante re-renderizados rápidos en modo desarrollo.
+        // Ignorar errores de "Target ID already exists" pero detener la carga
         if (err.message && err.message.includes('Target ID already exists')) {
+          setIsLoading(false);
           return;
         }
         setError(err);
