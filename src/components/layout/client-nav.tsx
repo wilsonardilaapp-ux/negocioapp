@@ -54,7 +54,7 @@ const allNavItems = [
   { href: "/dashboard/share", icon: Share2, label: "Compartir Menú", moduleId: 'catalogo' },
   { href: "/dashboard/blog", icon: FileText, label: "Blog", moduleId: 'blog' },
   { href: "/dashboard/valoraciones-directorio", icon: Star, label: "Valoraciones del Directorio" },
-  { href: "/dashboard/chatbot", icon: Bot, label: "Asistente IA", moduleId: 'chatbot-de-soporte-whatsapp' },
+  { href: "/dashboard/chatbot", icon: MessageSquare, label: "Asistente WHAPI", moduleId: 'whapi-whatsapp' },
   { href: "/dashboard/configuracion/ycloud", icon: Smartphone, label: "Asistente YCloud", moduleId: 'ycloud-whatsapp' },
   { href: "/dashboard/messages", icon: Bell, label: "Notificaciones" },
   { href: "/dashboard/mensajes-clientes", icon: Mail, label: "Messages de Clientes" },

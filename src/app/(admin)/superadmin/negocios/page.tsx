@@ -37,7 +37,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
-import { Check, Plus, Search, Building2, Eye, Puzzle, Tag, AlertCircle, TrendingUp, Mail, User, ShieldCheck, Loader2, Sparkles, Trash2, Clock, Smartphone, ScanLine, Calculator, Package } from 'lucide-react';
+import { Check, Plus, Search, Building2, Eye, Puzzle, Tag, AlertCircle, TrendingUp, Mail, User, ShieldCheck, Loader2, Sparkles, Trash2, Clock, Smartphone, ScanLine, Calculator, Package, MessageSquare } from 'lucide-react';
 import { cn, normalizeModuleId } from '@/lib/utils';
 import { Label } from '@/components/ui/label';
 import { validateModuleExtra, validateLimitesExtra } from '@/utils/validateModuleExtra';
