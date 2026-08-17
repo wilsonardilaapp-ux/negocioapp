@@ -17,6 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import type { HybridPlan } from '@/models/hybrid-plan';
 import type { Module } from '@/models/module';
+import { DEFAULT_MODULES } from '@/models/module';
 import { useForm, Controller, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { HybridPlanSchema } from '@/models/hybrid-plan';
@@ -210,6 +211,23 @@ function HybridPlanDialog({ isOpen, onClose, plan }: { isOpen: boolean, onClose:
 
   const modulesQuery = useMemoFirebase(() => !firestore ? null : collection(firestore, 'modules'), [firestore]);
   const { data: allModules } = useCollection<Module>(modulesQuery);
+
+  /**
+   * Unifica la fuente de verdad de los módulos.
+   * Combina DEFAULT_MODULES con los documentos físicos de Firestore.
+   */
+  const displayedModules = useMemo(() => {
+    const dbModules = allModules || [];
+    const modulesMap = new Map<string, any>();
+    
+    // 1. Cargar módulos por defecto del sistema
+    DEFAULT_MODULES.forEach(m => modulesMap.set(m.id, m));
+    
+    // 2. Sobreescribir con los documentos físicos de Firestore si existen
+    dbModules.forEach(m => modulesMap.set(m.id, m));
+    
+    return Array.from(modulesMap.values()) as Module[];
+  }, [allModules]);
 
   const { register, control, handleSubmit, reset, watch, setValue, getValues, formState: { errors, isSubmitting } } = useForm<HybridPlan>({
     resolver: zodResolver(HybridPlanSchema),
@@ -416,7 +434,7 @@ function HybridPlanDialog({ isOpen, onClose, plan }: { isOpen: boolean, onClose:
                  };
                  return (
                    <div className="space-y-2 border rounded-lg p-4 max-h-80 overflow-y-auto">
-                     {(allModules || []).map((mod) => (
+                     {displayedModules.map((mod) => (
                        <div key={mod.id} className="flex items-center gap-3 py-1.5">
                          <Checkbox
                            id={`module-${mod.id}`}
@@ -520,3 +538,4 @@ function HybridPlanDialog({ isOpen, onClose, plan }: { isOpen: boolean, onClose:
     </Dialog>
   );
 }
+
