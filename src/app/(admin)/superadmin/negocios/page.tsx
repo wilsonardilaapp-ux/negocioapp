@@ -37,7 +37,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
-import { Check, Plus, Search, Building2, Eye, Puzzle, Tag, AlertCircle, TrendingUp, Mail, User, ShieldCheck, Loader2, Sparkles, Trash2, Clock, Smartphone } from 'lucide-react';
+import { Check, Plus, Search, Building2, Eye, Puzzle, Tag, AlertCircle, TrendingUp, Mail, User, ShieldCheck, Loader2, Sparkles, Trash2, Clock, Smartphone, ScanLine, Calculator, Package } from 'lucide-react';
 import { cn, normalizeModuleId } from '@/lib/utils';
 import { Label } from '@/components/ui/label';
 import { validateModuleExtra, validateLimitesExtra } from '@/utils/validateModuleExtra';
@@ -46,7 +46,7 @@ import { validateModuleExtra, validateLimitesExtra } from '@/utils/validateModul
 import type { Business, EntityStatus } from '@/models/business';
 import type { SubscriptionPlan } from '@/models/subscription-plan';
 import type { SystemService } from '@/models/system-service';
-import type { Module } from '@/models/module';
+import { Module, DEFAULT_MODULES } from '@/models/module';
 import type { HybridPlan } from '@/models/hybrid-plan';
 import { useToast } from '@/hooks/use-toast';
 import { WhatsAppIcon } from '@/components/icons';
@@ -58,6 +58,10 @@ const iconMap: { [key: string]: React.ReactNode } = {
   'chatbot-integrado-con-whatsapp-para-soporte-y-ventas': <WhatsAppIcon className="w-4 h-4" />,
   'ycloud-whatsapp': <Smartphone className="w-4 h-4" />,
   promotions: <Tag className="w-4 h-4" />,
+  loyalty: <Sparkles className="w-4 h-4" />,
+  contabilidad: <Calculator className="w-4 h-4" />,
+  'inventario-kardex': <Package className="w-4 h-4" />,
+  'pistola-escaner': <ScanLine className="w-4 h-4" />,
   default: <Puzzle className="w-4 h-4" />,
 };
 
@@ -144,6 +148,31 @@ export default function BusinessesPage() {
     ...(plans || []).map(p => ({ ...p, origin: 'standard' as const })),
     ...(hybridPlans || []).map(p => ({ ...p, origin: 'hybrid' as const }))
   ], [plans, hybridPlans]);
+
+  // NUEVO: displayedModules combinando Firestore con los módulos del sistema para asegurar visibilidad constante de YCloud y otros
+  const displayedModules = useMemo(() => {
+      const dbModules = modules || [];
+      const modulesMap = new Map<string, Module>();
+
+      // 1. Inyectar módulos del sistema (fuente de verdad absoluta)
+      DEFAULT_MODULES.forEach(dm => {
+          modulesMap.set(dm.id, {
+              id: dm.id,
+              name: dm.name,
+              description: dm.description,
+              limit: dm.limit,
+              status: 'active',
+              createdAt: new Date().toISOString()
+          } as Module);
+      });
+
+      // 2. Mezclar con módulos reales de la DB (sobreescribe si existe para capturar personalizaciones de Super Admin)
+      dbModules.forEach(m => {
+          modulesMap.set(normalizeModuleId(m.id), m);
+      });
+
+      return Array.from(modulesMap.values());
+  }, [modules]);
 
   // Filter State
   const [searchBusiness, setSearchBusiness] = useState('');
@@ -424,22 +453,30 @@ export default function BusinessesPage() {
         // PERSISTENCIA UNIFICADA Y OBLIGATORIA (FASE 3.1)
         // 1. Crear un Set con todos los IDs relevantes para no dejar huérfanos
         const allModuleIds = new Set<string>();
-        (modules || []).forEach(m => allModuleIds.add(normalizeModuleId(m.id)));
+        displayedModules.forEach(m => allModuleIds.add(normalizeModuleId(m.id)));
         Object.keys(businessModulesState).forEach(id => allModuleIds.add(id));
         
         // 2. Iterar y grabar estado explícito para cada uno
         allModuleIds.forEach(moduleId => {
             const state = businessModulesState[moduleId];
             const extra = moduleExtras[moduleId] || 0;
+            const currentPlanDetails = allPlans.find(p => p.name === selectedBusiness.planName || p.id === selectedBusiness.planName || ('slug' in p && p.slug === selectedBusiness.planName));
+            const planModules = (currentPlanDetails as any)?.includedModuleKeys?.map((k: string) => normalizeModuleId(k)) || [];
+            const isIncludedInPlan = planModules.includes(moduleId);
             
+            // Decisión de guardado: Add-on o Discrepancia con el Plan
             if (state) {
-                // Si el módulo está en el estado, grabamos su configuración actual (sea ON u OFF)
+              const isCurrentlyActive = state.active;
+              
+              // Persistencia obligatoria si es Add-on o si el estado difiere del plan (para guardar el 'inactive' físico)
+              if (!isIncludedInPlan || (isIncludedInPlan && !isCurrentlyActive)) {
                 batch.set(doc(firestore, `businesses/${selectedBusiness.id}/modules`, moduleId), { 
-                    status: state.active ? 'active' : 'inactive', 
-                    isAddon: state.isAddon,
-                    extra,
-                    updatedAt: new Date().toISOString()
+                  status: isCurrentlyActive ? 'active' : 'inactive', 
+                  isAddon: !isIncludedInPlan,
+                  extra,
+                  updatedAt: new Date().toISOString()
                 }, { merge: true });
+              }
             }
         });
         
@@ -800,13 +837,6 @@ export default function BusinessesPage() {
                   {(() => {
                     const currentPlan = allPlans.find(p => p.name === selectedBusiness.planName || p.id === selectedBusiness.planName || ('slug' in p && p.slug === selectedBusiness.planName));
                     const planModules = (currentPlan as any)?.includedModuleKeys?.map((k: string) => normalizeModuleId(k)) || [];
-
-                    const displayedModules = (modules || []).reduce((acc: Module[], current) => {
-                      const x = acc.find(item => item.name === current.name);
-                      if (!x) return acc.concat([current]);
-                      if (current.id === 'chatbot-integrado-con-whatsapp-para-soporte-y-ventas') return acc.map(item => item.name === current.name ? current : item);
-                      return acc;
-                    }, []);
 
                     return displayedModules.map(moduleItem => {
                       const cleanId = normalizeModuleId(moduleItem.id);

@@ -43,8 +43,7 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { useState, useEffect } from 'react';
-import type { Module } from '@/models/module';
-import { PUBLIC_MENU_CHATBOT_MODULE_ID } from '@/models/public-menu-chatbot';
+import { Module, DEFAULT_MODULES } from '@/models/module';
 
 const moduleSchema = z.object({
   name: z.string().min(3, { message: "El nombre debe tener al menos 3 caracteres." }),
@@ -53,41 +52,6 @@ const moduleSchema = z.object({
 });
 
 type ModuleFormData = z.infer<typeof moduleSchema>;
-
-const DEFAULT_MODULES = [
-  { name: 'Catálogo de Productos', description: 'Permite a los negocios gestionar un catálogo digital con carrito de WhatsApp.', limit: -1, idOverride: 'catalogo' },
-  { name: 'Blog Profesional', description: 'Módulo de artículos y noticias para SEO y fidelización.', limit: 5, idOverride: 'blog' },
-  { name: 'Promociones y Ofertas', description: 'Gestión de banners promocionales y cupones de descuento.', limit: 2, idOverride: 'promotions' },
-  { name: 'Chatbot de Soporte WhatsApp', description: 'Asistente IA para atención al cliente integrado con WhatsApp API.', limit: -1, idOverride: 'chatbot-integrado-con-whatsapp-para-soporte-y-ventas' },
-  { name: 'YCloud (WhatsApp)', description: 'Proveedor de WhatsApp API v2 oficial para envío de notificaciones y chatbot.', limit: -1, idOverride: 'ycloud-whatsapp' },
-  { name: 'Google Analytics', description: 'Integración de métricas avanzadas para la landing page.', limit: -1, idOverride: 'google-analytics' },
-  { name: 'Directorio de Negocios', description: 'Módulo para listar el negocio en el directorio público de la plataforma.', limit: -1, idOverride: 'business-directory' },
-  { name: 'Chatbot Menú Público', description: 'Asistente virtual para el menú público que responde preguntas de los visitantes sobre productos, precios, horarios y promociones del negocio.', limit: -1, idOverride: PUBLIC_MENU_CHATBOT_MODULE_ID },
-  { 
-    name: 'Fidelización e Inteligencia (IA)', 
-    description: 'Sistema de puntos, ranking VIP, reseñas y recuperación automática de clientes mediante IA por WhatsApp.', 
-    limit: -1, 
-    idOverride: 'loyalty' 
-  },
-  { 
-    name: 'Contabilidad', 
-    description: 'Módulo integral de gestión contable, plan de cuentas y asientos para el negocio.', 
-    limit: -1, 
-    idOverride: 'contabilidad' 
-  },
-  { 
-    name: 'Inventario Kardex', 
-    description: 'Control detallado de inventario, movimientos de entrada/salida y valución de stock.', 
-    limit: -1, 
-    idOverride: 'inventario-kardex' 
-  },
-  { 
-    name: 'Pistola Escáner', 
-    description: 'Configuración y gestión de lectores de códigos de barras para puntos de venta y bodega.', 
-    limit: -1, 
-    idOverride: 'pistola-escaner' 
-  },
-];
 
 export default function ModulesPage() {
   const firestore = useFirestore();
@@ -108,9 +72,9 @@ export default function ModulesPage() {
 
   useEffect(() => {
     if (!isLoading && modules && firestore) {
-      // 1. Sincronización de módulos por defecto (Seeding)
+      // Sincronización de módulos por defecto usando la fuente de verdad centralizada
       DEFAULT_MODULES.forEach(async (m) => {
-        const moduleId = m.idOverride || m.name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, "");
+        const moduleId = m.id;
         const exists = modules.some(existing => existing.id === moduleId);
 
         if (!exists) {
@@ -127,21 +91,8 @@ export default function ModulesPage() {
           console.log(`[ModuleSeeder] Módulo ${m.name} sincronizado con éxito.`);
         }
       });
-
-      // 2. Limpieza de módulos huérfanos/legacy conocidos (Mantenimiento)
-      const legacyIds = ['kardex']; 
-      legacyIds.forEach(async (id) => {
-        const orphaned = modules.find(m => m.id === id);
-        if (orphaned) {
-          console.log(`[Cleanup] Eliminando módulo huérfano detectado: ${id}`);
-          const docRef = doc(firestore, 'modules', id);
-          // Eliminación física para limpiar la colección global y los paneles administrativos
-          await deleteDocumentNonBlocking(docRef);
-          toast({ title: "Limpieza de sistema", description: `Módulo duplicado "${id}" eliminado.` });
-        }
-      });
     }
-  }, [modules, isLoading, firestore, toast]);
+  }, [modules, isLoading, firestore]);
 
   const onSubmit = async (data: ModuleFormData) => {
     if (!firestore) return;
