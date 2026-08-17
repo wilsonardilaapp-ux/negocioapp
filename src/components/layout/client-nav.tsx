@@ -34,6 +34,7 @@ import {
   UserPlus,
   DollarSign,
   PieChart,
+  Smartphone,
 } from "lucide-react";
 
 import { SidebarMenu, SidebarMenuItem, SidebarMenuButton, useSidebar } from "@/components/ui/sidebar";
@@ -54,6 +55,7 @@ const allNavItems = [
   { href: "/dashboard/blog", icon: FileText, label: "Blog", moduleId: 'blog' },
   { href: "/dashboard/valoraciones-directorio", icon: Star, label: "Valoraciones del Directorio" },
   { href: "/dashboard/chatbot", icon: Bot, label: "Asistente IA", moduleId: 'chatbot-de-soporte-whatsapp' },
+  { href: "/dashboard/configuracion/ycloud", icon: Smartphone, label: "Asistente YCloud", moduleId: 'ycloud-whatsapp' },
   { href: "/dashboard/messages", icon: Bell, label: "Notificaciones" },
   { href: "/dashboard/mensajes-clientes", icon: Mail, label: "Messages de Clientes" },
   { href: "/dashboard/referidos", icon: Users, label: "Programa de Socios" },
