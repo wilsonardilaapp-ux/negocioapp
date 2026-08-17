@@ -25,4 +25,5 @@ export const DEFAULT_MODULES = [
   { id: 'contabilidad', name: 'Contabilidad', description: 'Módulo integral de gestión contable, plan de cuentas y asientos para el negocio.', limit: -1 },
   { id: 'inventario-kardex', name: 'Inventario Kardex', description: 'Control detallado de inventario, movimientos de entrada/salida y valución de stock.', limit: -1 },
   { id: 'pistola-escaner', name: 'Pistola Escáner', description: 'Configuración y gestión de lectores de códigos de barras para puntos de venta y bodega.', limit: -1 },
+  { id: 'reservas-agendamiento', name: 'Reservas y Citas', description: 'Sistema de agendamiento online, gestión de profesionales y recordatorios automáticos.', limit: 30 },
 ];

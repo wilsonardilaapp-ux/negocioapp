@@ -5,7 +5,6 @@ import { usePathname } from "next/navigation";
 import { useMemo } from 'react';
 import { useSubscription } from "@/hooks/useSubscription";
 import { useUser } from "@/firebase";
-import { PUBLIC_MENU_CHATBOT_MODULE_ID } from "@/models/public-menu-chatbot";
 import { normalizeModuleId } from "@/lib/utils";
 import {
   LayoutDashboard,
@@ -15,95 +14,43 @@ import {
   CreditCard,
   ShoppingBag,
   BarChart,
-  Lightbulb,
   UserCircle,
-  Printer,
   Package,
   Share2,
-  HardDrive,
   Calculator,
-  Mail,
-  Bell,
-  ScanLine,
   Tag,
   Ticket,
   Bot,
-  Star,
-  Users,
-  Sparkles,
-  UserPlus,
-  DollarSign,
-  PieChart,
   Smartphone,
+  CalendarCheck
 } from "lucide-react";
 
 import { SidebarMenu, SidebarMenuItem, SidebarMenuButton, useSidebar } from "@/components/ui/sidebar";
 
 const allNavItems = [
   { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
-  { href: "/dashboard/landing-page", icon: FileText, label: "Landing Page" },
-  { href: "/dashboard/share-landing", icon: Share2, label: "Compartir Landing Page" },
   { href: "/dashboard/catalogo", icon: ShoppingCart, label: "Catálogo", moduleId: 'catalogo' },
-  { href: "/dashboard/catalogo/estadisticas", icon: BarChart, label: "Estadísticas de Productos", moduleId: 'catalogo' },
-  { href: "/dashboard/medicion/numero-pedidos", icon: ShoppingBag, label: "N° Pedidos", moduleId: 'catalogo' },
-  { href: "/dashboard/medicion/ticket-promedio", icon: DollarSign, label: "Ticket Promedio", moduleId: 'catalogo' },
-  { href: "/dashboard/medicion/clientes-nuevos", icon: UserPlus, label: "Clientes Nuevos", moduleId: 'catalogo' },
-  { href: "/dashboard/medicion/clientes-recurrentes", icon: Users, label: "Retención Clientes", moduleId: 'catalogo' },
-  { href: "/dashboard/medicion/pedidos-por-canal", icon: PieChart, label: "Canales de Venta", moduleId: 'catalogo' },
-  { href: "/dashboard/loyalty", icon: Sparkles, label: "Fidelización", moduleId: 'loyalty' },
-  { href: "/dashboard/share", icon: Share2, label: "Compartir Menú", moduleId: 'catalogo' },
   { href: "/dashboard/blog", icon: FileText, label: "Blog", moduleId: 'blog' },
-  { href: "/dashboard/valoraciones-directorio", icon: Star, label: "Valoraciones del Directorio" },
-  { href: "/dashboard/chatbot", icon: MessageSquare, label: "Asistente WHAPI", moduleId: 'whapi-whatsapp' },
-  { href: "/dashboard/configuracion/ycloud", icon: Smartphone, label: "Asistente YCloud", moduleId: 'ycloud-whatsapp' },
-  { href: "/dashboard/messages", icon: Bell, label: "Notificaciones" },
-  { href: "/dashboard/mensajes-clientes", icon: Mail, label: "Messages de Clientes" },
-  { href: "/dashboard/referidos", icon: Users, label: "Programa de Socios" },
+  { href: "/dashboard/reservas", icon: CalendarCheck, label: "Reservas", moduleId: 'reservas-agendamiento' },
   { href: "/dashboard/promotions", icon: Tag, label: "Promociones", moduleId: 'promotions' },
-  { href: "/dashboard/cupones", icon: Ticket, label: "Cupones", moduleId: 'promotions' },
-  { href: "/dashboard/contacto", icon: MessageSquare, label: "Soporte" },
-  { href: "/dashboard/pedidos", icon: ShoppingBag, label: "Pedidos", moduleId: 'catalogo' },
-  { href: "/dashboard/empaque", icon: Package, label: "Empaque", moduleId: 'catalogo' },
-  { href: "/dashboard/pagos", icon: CreditCard, label: "Pagos" },
   { href: "/dashboard/contabilidad", icon: Calculator, label: "Contabilidad", moduleId: 'contabilidad' },
-  { href: "/dashboard/kardex", icon: Package, label: "Inventario Kardex", moduleId: 'inventario-kardex' },
-  { href: "/dashboard/configuracion/factura", icon: FileText, label: "Editor Factura", moduleId: 'catalogo' },
-  { href: "/dashboard/configuracion/impresoras", icon: Printer, label: "Impresoras", moduleId: 'catalogo' },
-  { href: "/dashboard/configuracion/chatbot-menu", icon: Bot, label: "Chatbot Menú", moduleId: PUBLIC_MENU_CHATBOT_MODULE_ID },
-  { href: "/dashboard/pistola-scanner", icon: ScanLine, label: "Pistola Escáner", moduleId: 'pistola-escaner' },
-  { href: "/dashboard/backups", icon: HardDrive, label: "Backups" },
-  { href: "/dashboard/subscription", icon: CreditCard, label: "Suscripción" },
+  { href: "/dashboard/kardex", icon: Package, label: "Inventario", moduleId: 'inventario-kardex' },
   { href: "/dashboard/perfil", icon: UserCircle, label: "Perfil" },
-  { href: "/dashboard/suggestions", icon: Lightbulb, label: "Sugerencias", moduleId: 'motor-de-sugerencias-inteligentes' },
-  { href: "/dashboard/analytics", icon: BarChart, label: "Métricas", moduleId: 'google-analytics' },
 ];
 
 export function ClientNav() {
   const pathname = usePathname();
   const { profile } = useUser();
   const { setOpenMobile } = useSidebar();
-  const { isModuleAuthorized, isLoading: isSubLoading } = useSubscription();
+  const { isModuleAuthorized } = useSubscription();
 
   const navItems = useMemo(() => {
     return allNavItems.filter(item => {
       if (!item.moduleId) return true;
       if (profile?.role === 'super_admin') return true;
-      
-      // Aplicamos normalización estricta para la validación del Sidebar
-      const cleanModuleId = normalizeModuleId(item.moduleId);
-      return isModuleAuthorized(cleanModuleId);
+      return isModuleAuthorized(normalizeModuleId(item.moduleId));
     });
   }, [isModuleAuthorized, profile?.role]);
-
-  if (isSubLoading && navItems.length === 0) {
-    return (
-      <div className="flex flex-col gap-2 p-4">
-        {[...Array(6)].map((_, i) => (
-            <div key={i} className="h-8 w-full bg-muted animate-pulse rounded-md" />
-        ))}
-      </div>
-    );
-  }
 
   return (
     <SidebarMenu>
@@ -111,8 +58,7 @@ export function ClientNav() {
         <SidebarMenuItem key={item.href}>
           <SidebarMenuButton
             asChild
-            isActive={pathname.startsWith(item.href) && (item.href !== "/dashboard" || pathname === "/dashboard")}
-            tooltip={item.label}
+            isActive={pathname === item.href}
             onClick={() => setOpenMobile(false)}
           >
             <Link href={item.href}>

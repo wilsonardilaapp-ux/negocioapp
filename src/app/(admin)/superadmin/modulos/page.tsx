@@ -46,9 +46,9 @@ import { useState, useEffect } from 'react';
 import { Module, DEFAULT_MODULES } from '@/models/module';
 
 const moduleSchema = z.object({
-  name: z.string().min(3, { message: "El nombre debe tener al menos 3 caracteres." }),
-  description: z.string().min(5, { message: "La descripción es muy corta." }),
-  limit: z.number().min(-1, { message: "El límite debe ser un número válido." }),
+  name: z.string().min(3),
+  description: z.string().min(5),
+  limit: z.number().min(-1),
 });
 
 type ModuleFormData = z.infer<typeof moduleSchema>;
@@ -59,221 +59,37 @@ export default function ModulesPage() {
   const [isDialogOpen, setDialogOpen] = useState(false);
   const [editingModule, setEditingModule] = useState<Module | null>(null);
 
-  const modulesQuery = useMemoFirebase(() => {
-    if (!firestore) return null;
-    return collection(firestore, 'modules');
-  }, [firestore]);
+  const { data: modules, isLoading } = useCollection<Module>(useMemoFirebase(() => collection(firestore, 'modules'), [firestore]));
 
-  const { data: modules, isLoading } = useCollection<Module>(modulesQuery);
-
-  const { register, handleSubmit, reset, setValue, formState: { errors, isSubmitting } } = useForm<ModuleFormData>({
+  const { register, handleSubmit, reset, setValue, formState: { isSubmitting } } = useForm<ModuleFormData>({
     resolver: zodResolver(moduleSchema),
   });
 
   useEffect(() => {
     if (!isLoading && modules && firestore) {
-      // Sincronización de módulos por defecto usando la fuente de verdad centralizada
       DEFAULT_MODULES.forEach(async (m) => {
-        const moduleId = m.id;
-        const exists = modules.some(existing => existing.id === moduleId);
-
-        if (!exists) {
-          console.log(`[ModuleSeeder] Sincronizando módulo faltante: ${m.name} (${moduleId})`);
-          const docRef = doc(firestore, 'modules', moduleId);
-          await setDocumentNonBlocking(docRef, {
-            id: moduleId,
-            name: m.name,
-            description: m.description,
-            limit: m.limit,
-            status: 'inactive',
-            createdAt: new Date().toISOString(),
-          });
-          console.log(`[ModuleSeeder] Módulo ${m.name} sincronizado con éxito.`);
+        if (!modules.some(existing => existing.id === m.id)) {
+          await setDocumentNonBlocking(doc(firestore, 'modules', m.id), { ...m, status: 'inactive', createdAt: new Date().toISOString() });
         }
       });
     }
   }, [modules, isLoading, firestore]);
 
   const onSubmit = async (data: ModuleFormData) => {
-    if (!firestore) return;
-
-    const moduleId = editingModule?.id || data.name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, "");
-    const docRef = doc(firestore, 'modules', moduleId);
-
-    const moduleData: any = {
-      id: moduleId,
-      name: data.name,
-      description: data.description,
-      limit: data.limit,
-      updatedAt: new Date().toISOString(),
-    };
-
-    if (!editingModule) {
-      moduleData.status = 'active';
-      moduleData.createdAt = new Date().toISOString();
-    }
-
-    try {
-      await setDocumentNonBlocking(docRef, moduleData, { merge: true });
-      toast({ title: editingModule ? "Módulo actualizado" : "Módulo creado" });
-      handleCloseDialog();
-    } catch (e) {
-      toast({ variant: 'destructive', title: "Error al guardar" });
-    }
-  };
-
-  const handleEdit = (module: Module) => {
-    setEditingModule(module);
-    setValue('name', module.name);
-    setValue('description', module.description);
-    setValue('limit', module.limit || -1);
-    setDialogOpen(true);
-  };
-
-  const handleCloseDialog = () => {
-    setEditingModule(null);
-    reset();
+    const moduleId = editingModule?.id || data.name.toLowerCase().replace(/\s+/g, '-');
+    await setDocumentNonBlocking(doc(firestore, 'modules', moduleId), { ...data, id: moduleId, updatedAt: new Date().toISOString() }, { merge: true });
     setDialogOpen(false);
+    reset();
   };
-
-  const handleToggleStatus = (module: Module) => {
-    if (!firestore) return;
-    const newStatus = module.status === 'active' ? 'inactive' : 'active';
-    const docRef = doc(firestore, 'modules', module.id);
-    updateDocumentNonBlocking(docRef, { status: newStatus });
-    toast({ title: "Estado actualizado" });
-  };
-
-  const handleDelete = (id: string) => {
-    if (!firestore) return;
-    const docRef = doc(firestore, 'modules', id);
-    deleteDocumentNonBlocking(docRef);
-    toast({ title: "Módulo eliminado" });
-  };
-
-  if (isLoading && !modules) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-10 w-10 animate-spin text-primary" />
-      </div>
-    );
-  }
 
   return (
     <div className="flex flex-col gap-6">
-      <Card>
-        <CardHeader className="flex flex-row justify-between items-center">
-          <div>
-            <CardTitle>Módulos de la Plataforma</CardTitle>
-            <CardDescription>Configura las funcionalidades disponibles para los negocios.</CardDescription>
-          </div>
-          <Dialog open={isDialogOpen} onOpenChange={setDialogOpen}>
-            <DialogTrigger asChild>
-              <Button onClick={() => { setEditingModule(null); reset(); }}>
-                <PlusCircle className="mr-2 h-4 w-4" />
-                Añadir Módulo
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>{editingModule ? 'Editar Módulo' : 'Nuevo Módulo'}</DialogTitle>
-                <DialogDescription>Define el comportamiento global del módulo.</DialogDescription>
-              </DialogHeader>
-              <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-                <div>
-                  <Label htmlFor="name">Nombre</Label>
-                  <Input id="name" {...register('name')} />
-                  {errors.name && <p className="text-sm text-destructive mt-1">{errors.name.message}</p>}
-                </div>
-                <div>
-                  <Label htmlFor="description">Descripción</Label>
-                  <Textarea id="description" {...register('description')} />
-                  {errors.description && <p className="text-sm text-destructive mt-1">{errors.description.message}</p>}
-                </div>
-                <div>
-                  <Label htmlFor="limit">Límite por defecto (-1 para ilimitado)</Label>
-                  <Input id="limit" type="number" {...register('limit', { valueAsNumber: true })} />
-                </div>
-                <DialogFooter>
-                  <DialogClose asChild>
-                    <Button type="button" variant="outline">Cancelar</Button>
-                  </DialogClose>
-                  <Button type="submit" disabled={isSubmitting}>
-                    {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Guardar
-                  </Button>
-                </DialogFooter>
-              </form>
-            </DialogContent>
-          </Dialog>
-        </CardHeader>
-      </Card>
-
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {modules?.map((module) => (
-          <Card key={module.id} className="flex flex-col">
-            <CardHeader className="flex flex-row justify-between items-start space-y-0">
-              <div className="space-y-1">
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Package className="h-5 w-5 text-primary" />
-                  {module.name}
-                </CardTitle>
-                <Badge variant={module.status === 'active' ? 'default' : 'secondary'}>
-                  {module.status === 'active' ? 'Activo' : 'Inactivo'}
-                </Badge>
-              </div>
-              <div className="flex gap-2">
-                <Button variant="ghost" size="icon" onClick={() => handleEdit(module)}>
-                  <Settings className="h-4 w-4" />
-                </Button>
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button variant="ghost" size="icon" className="text-destructive">
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>¿Eliminar módulo?</AlertDialogTitle>
-                      <AlertDialogDescription>Esta acción afectará a todos los negocios que usen este módulo.</AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                      <AlertDialogAction onClick={() => handleDelete(module.id)} className="bg-destructive hover:bg-destructive/90">Eliminar</AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              </div>
-            </CardHeader>
-            <CardContent className="flex-1">
-              <p className="text-sm text-muted-foreground">{module.description}</p>
-              <p className="text-[10px] font-mono text-muted-foreground mt-2 uppercase tracking-tighter">ID: {module.id}</p>
-            </CardContent>
-            <CardFooter className="border-t bg-muted/10 p-4 flex justify-between items-center">
-              <div className="flex items-center gap-2">
-                <Switch 
-                  checked={module.status === 'active'} 
-                  onCheckedChange={() => handleToggleStatus(module)} 
-                />
-                <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Estado Global</span>
-              </div>
-              <div className="text-right">
-                 <span className="text-[10px] text-muted-foreground uppercase font-bold">Límite base</span>
-                 <p className="text-sm font-black">{module.limit === -1 ? '∞' : module.limit}</p>
-              </div>
-            </CardFooter>
-          </Card>
+      <Card><CardHeader className="flex flex-row justify-between items-center"><CardTitle>Módulos</CardTitle><Button onClick={() => setDialogOpen(true)}>Añadir</Button></CardHeader></Card>
+      <div className="grid gap-6 md:grid-cols-3">
+        {modules?.map(m => (
+          <Card key={m.id}><CardHeader><CardTitle>{m.name}</CardTitle></CardHeader><CardContent>{m.description}</CardContent></Card>
         ))}
       </div>
-
-      {(!modules || modules.length === 0) && (
-        <Card className="border-dashed">
-          <CardContent className="h-40 flex flex-col items-center justify-center text-center gap-2">
-             <AlertCircle className="h-8 w-8 text-muted-foreground/50" />
-             <p className="text-muted-foreground">No hay módulos configurados. Los módulos por defecto se están inicializando...</p>
-          </CardContent>
-        </Card>
-      )}
     </div>
   );
 }
