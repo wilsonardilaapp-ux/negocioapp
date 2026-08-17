@@ -1,18 +1,24 @@
+import { YCloudFields } from "./integration";
+
+export type WhatsAppProviderType = 'whapi' | 'ycloud';
+
 export type ChatbotConfig = {
   id: string;
   businessId: string;
-  whapiChannelId?: string; // Nuevo campo para resolución de inquilino (Tenant ID)
+  provider?: WhatsAppProviderType;
+  whapiChannelId?: string; 
   whatsApp: {
     connected: boolean;
     number: string;
     token: string;
   };
+  yCloud?: YCloudFields;
   business: {
     name: string;
     type: 'Restaurante' | 'Panadería' | 'Heladería' | 'Cafetería' | 'Salud y Bienestar' | 'Otro';
     description: string;
     logoUrl: string;
-    avatarUrl?: string; // Campo para el avatar del chatbot
+    avatarUrl?: string; 
   };
   communication: {
     tone: 'Profesional y formal' | 'Amigable y cercano' | 'Casual y divertido' | 'Profesional y empático';
@@ -34,8 +40,8 @@ export type KnowledgeDocument = {
   status: 'training' | 'ready' | 'error';
   createdAt: string;
   extractedText?: string;
-  content?: string; // Added for manual entries
-  isManual?: boolean; // Flag for manual entries
+  content?: string; 
+  isManual?: boolean; 
 };
 
 export type ChatConversation = {
@@ -47,6 +53,6 @@ export type ChatConversation = {
   status: 'active' | 'resolved' | 'abandoned' | 'escalated';
   satisfactionRating?: number;
   summary?: string;
-  messagesCount?: number; // Nuevo campo
-  channel?: 'web' | 'whatsapp'; // Nuevo campo
+  messagesCount?: number; 
+  channel?: 'web' | 'whatsapp'; 
 };

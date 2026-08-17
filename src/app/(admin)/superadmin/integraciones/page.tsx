@@ -36,11 +36,12 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Plug, Cloud, CheckCircle, XCircle, Loader2, Eye, EyeOff, Bot, Trash2, AlertTriangle } from 'lucide-react';
+import { PlusCircle, Plug, Cloud, CheckCircle, XCircle, Loader2, Eye, EyeOff, Bot, Trash2, AlertTriangle, Send } from 'lucide-react';
 import { WhatsAppIcon } from '@/components/icons';
-import type { Integration, CloudinaryFields, WhapiFields } from '@/models/integration';
+import type { Integration, CloudinaryFields, WhapiFields, YCloudFields } from '@/models/integration';
 import type { Module } from '@/models/module';
 import { testWhapiConnection } from '@/ai/flows/test-whapi-connection-flow';
+import { testYCloudConnection } from '@/ai/flows/test-ycloud-connection-flow';
 import { createIntegration, saveIntegrationFields, updateIntegrationStatus, deleteIntegration } from '@/actions/integrations';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -179,6 +180,87 @@ const WhapiForm = ({
   );
 };
 
+const YCloudForm = ({
+  integration, onSave, onCancel, isSaving,
+}: {
+  integration: Integration;
+  onSave: (data: YCloudFields) => void;
+  onCancel: () => void;
+  isSaving: boolean;
+}) => {
+  const [fields, setFields] = useState<YCloudFields>(() => {
+    let parsed: any = {};
+    try {
+      if (typeof integration.fields === 'object' && integration.fields !== null) {
+        parsed = integration.fields;
+      } else if (typeof integration.fields === 'string' && integration.fields.trim().startsWith('{')) {
+        parsed = JSON.parse(integration.fields);
+      }
+    } catch (e) { console.error('YCloud parse error', e); }
+    return { 
+      apiKey: parsed?.apiKey || '', 
+      wabaId: parsed?.wabaId || '', 
+      phoneNumber: parsed?.phoneNumber || '',
+      webhookSecret: parsed?.webhookSecret || ''
+    };
+  });
+  const [testStatus, setTestStatus] = useState<TestStatus>('idle');
+  const [modalState, setModalState] = useState<ModalState>({ isOpen: false, title: '', message: '' });
+
+  const handleTestConnection = async () => {
+    if (!fields.apiKey || !fields.wabaId) return;
+    setTestStatus('testing');
+    try {
+      const result = await testYCloudConnection({ apiKey: fields.apiKey, wabaId: fields.wabaId });
+      setTestStatus(result.success ? 'success' : 'error');
+      setModalState({ isOpen: true, title: result.success ? 'Éxito' : 'Error', message: result.message });
+    } catch { setTestStatus('error'); }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="space-y-1">
+        <Label>API Key (V2)</Label>
+        <Input type="password" value={fields.apiKey} onChange={(e) => setFields(prev => ({ ...prev, apiKey: e.target.value }))} disabled={isSaving} placeholder="yc_..." />
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-1">
+          <Label>WABA ID</Label>
+          <Input value={fields.wabaId} onChange={(e) => setFields(prev => ({ ...prev, wabaId: e.target.value }))} disabled={isSaving} placeholder="ID de la cuenta de WhatsApp" />
+        </div>
+        <div className="space-y-1">
+          <Label>Número Emisor</Label>
+          <Input value={fields.phoneNumber} onChange={(e) => setFields(prev => ({ ...prev, phoneNumber: e.target.value }))} disabled={isSaving} placeholder="E.164 (ej: 57322...)" />
+        </div>
+      </div>
+      <div className="space-y-1">
+        <Label>Webhook Signing Secret (Opcional)</Label>
+        <Input type="password" value={fields.webhookSecret} onChange={(e) => setFields(prev => ({ ...prev, webhookSecret: e.target.value }))} disabled={isSaving} />
+      </div>
+      
+      <Button variant="outline" className="w-full" onClick={handleTestConnection} disabled={isSaving || testStatus === 'testing'}>
+        {testStatus === 'testing' && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+        Probar Conexión
+      </Button>
+
+      <DialogFooter className="pt-4">
+        <Button variant="outline" onClick={onCancel} disabled={isSaving}>Cancelar</Button>
+        <Button onClick={() => onSave(fields)} disabled={isSaving}>
+          {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          Guardar Cambios
+        </Button>
+      </DialogFooter>
+
+      <AlertDialog open={modalState.isOpen} onOpenChange={(open) => setModalState(prev => ({ ...prev, isOpen: open }))}>
+        <AlertDialogContent>
+          <AlertDialogHeader><AlertDialogTitle>{modalState.title}</AlertDialogTitle><AlertDialogDescription>{modalState.message}</AlertDialogDescription></AlertDialogHeader>
+          <AlertDialogFooter><AlertDialogAction onClick={() => setModalState(prev => ({ ...prev, isOpen: false }))}>Cerrar</AlertDialogAction></AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+};
+
 const newIntegrationSchema = z.object({
   name: z.string().min(3, 'El nombre debe tener al menos 3 caracteres.'),
   description: z.string().optional(),
@@ -189,6 +271,7 @@ const REQUIRED_INTEGRATIONS: Array<{ id: string; name: string }> = [
     { id: 'cloudinary', name: 'Cloudinary' },
     { id: 'chatbot-integrado-con-whatsapp-para-soporte-y-ventas', name: 'Chatbot IA (Google/OpenAI/Groq/NanoBanana/DeepSeek/Qwen/z.ai/Custom API)' },
     { id: 'whapi-whatsapp', name: 'WHAPI (WhatsApp)' },
+    { id: 'ycloud-whatsapp', name: 'YCloud (WhatsApp)' },
 ];
 
 export default function IntegrationsPage() {
@@ -355,7 +438,7 @@ export default function IntegrationsPage() {
           const icon =
             integration.id === 'cloudinary'
               ? <Cloud className="h-8 w-8" />
-              : integration.id === 'whapi-whatsapp'
+              : (integration.id === 'whapi-whatsapp' || integration.id === 'ycloud-whatsapp')
                 ? <WhatsAppIcon className="h-8 w-8" />
                 : <Bot className="h-8 w-8" />;
 
@@ -382,6 +465,8 @@ export default function IntegrationsPage() {
               );
             } else if (integration.id === 'whapi-whatsapp') {
               isConfigured = !!(fields.apiKey && fields.instanceId);
+            } else if (integration.id === 'ycloud-whatsapp') {
+              isConfigured = !!(fields.apiKey && fields.wabaId && fields.phoneNumber);
             } else {
               isConfigured = Object.keys(fields).length > 0;
             }
@@ -485,7 +570,10 @@ export default function IntegrationsPage() {
               {editingIntegration.id === 'whapi-whatsapp' && (
                 <WhapiForm integration={editingIntegration} onSave={handleSaveFields} onCancel={() => setEditingIntegration(null)} isSaving={isSaving} />
               )}
-              {!['cloudinary', 'chatbot-integrado-con-whatsapp-para-soporte-y-ventas', 'whapi-whatsapp'].includes(editingIntegration.id) && (
+              {editingIntegration.id === 'ycloud-whatsapp' && (
+                <YCloudForm integration={editingIntegration} onSave={handleSaveFields} onCancel={() => setEditingIntegration(null)} isSaving={isSaving} />
+              )}
+              {!['cloudinary', 'chatbot-integrado-con-whatsapp-para-soporte-y-ventas', 'whapi-whatsapp', 'ycloud-whatsapp'].includes(editingIntegration.id) && (
                 <div className="p-4 text-center text-muted-foreground text-sm">
                   Esta es una integración personalizada. La configuración avanzada se realiza a través de la API.
                 </div>
@@ -497,3 +585,4 @@ export default function IntegrationsPage() {
     </div>
   );
 }
+

@@ -1,4 +1,3 @@
-
 export type CloudinaryFields = {
     cloud_name: string;
     api_key: string;
@@ -8,6 +7,13 @@ export type CloudinaryFields = {
 export type WhapiFields = {
     apiKey: string;
     instanceId: string;
+};
+
+export type YCloudFields = {
+    apiKey: string;
+    wabaId: string;
+    phoneNumber: string;
+    webhookSecret?: string;
 };
 
 /**

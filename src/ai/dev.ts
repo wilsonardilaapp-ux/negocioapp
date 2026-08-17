@@ -3,6 +3,7 @@ import './flows/rate-product-flow';
 import './flows/upload-media-flow';
 import './flows/test-api-key-flow';
 import './flows/test-whapi-connection-flow';
+import './flows/test-ycloud-connection-flow';
 import './flows/chat-flow';
 import './flows/suggestion-flow';
 import './flows/update-suggestion-metrics-flow';
