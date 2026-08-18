@@ -1,9 +1,8 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { 
   ChevronLeft, 
   ChevronRight, 
@@ -11,23 +10,15 @@ import {
   Clock, 
   User, 
   Phone,
-  MoreHorizontal,
   PlusCircle,
   Loader2,
   CalendarDays
 } from 'lucide-react';
-import { 
-  DropdownMenu, 
-  DropdownMenuContent, 
-  DropdownMenuItem, 
-  DropdownMenuLabel, 
-  DropdownMenuSeparator, 
-  DropdownMenuTrigger 
-} from '@/components/ui/dropdown-menu';
 import { StatusBadge } from './StatusBadge';
-import type { Reservation, ReservationStatus } from '@/models/booking';
-import { useUser, useFirestore, useCollection, useMemoFirebase, updateDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase';
-import { collection, query, where, orderBy, doc } from 'firebase/firestore';
+import { StatusActions } from './StatusActions';
+import type { Reservation } from '@/models/booking';
+import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import { collection, query, where, orderBy } from 'firebase/firestore';
 import { format, addDays, subDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cn, normalizePhoneNumber } from '@/lib/utils';
@@ -62,18 +53,6 @@ export function AgendaGrid() {
 
   const { data: reservations, isLoading } = useCollection<Reservation>(resQuery);
 
-  const handleUpdateStatus = async (resId: string, newStatus: ReservationStatus) => {
-    if (!user || !firestore) return;
-    const docRef = doc(firestore, `businesses/${user.uid}/reservations`, resId);
-    await updateDocumentNonBlocking(docRef, { status: newStatus, updatedAt: new Date().toISOString() });
-  };
-
-  const handleDelete = async (resId: string) => {
-    if (!user || !firestore || !confirm('¿Eliminar esta reserva permanentemente?')) return;
-    const docRef = doc(firestore, `businesses/${user.uid}/reservations`, resId);
-    await deleteDocumentNonBlocking(docRef);
-  };
-
   const navigateDay = (direction: 'prev' | 'next') => {
     const current = new Date(selectedDate + 'T00:00:00');
     const next = direction === 'next' ? addDays(current, 1) : subDays(current, 1);
@@ -86,7 +65,7 @@ export function AgendaGrid() {
         <div className="flex items-center gap-4">
             <div className="flex items-center border rounded-xl overflow-hidden bg-muted/20">
                 <Button variant="ghost" size="icon" onClick={() => navigateDay('prev')} className="h-10 w-10 hover:bg-white"><ChevronLeft className="h-4 w-4" /></Button>
-                <div className="px-4 font-black text-sm border-x flex items-center gap-2 bg-white">
+                <div className="px-4 font-black text-sm border-x flex items-center gap-2 bg-white min-w-[200px] justify-center">
                     <CalendarIcon className="h-4 w-4 text-primary" />
                     {format(new Date(selectedDate + 'T00:00:00'), "EEEE, d 'de' MMMM", { locale: es })}
                 </div>
@@ -108,7 +87,7 @@ export function AgendaGrid() {
       ) : reservations && reservations.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in fade-in duration-500">
           {reservations.map((res) => (
-            <Card key={res.id} className={cn("overflow-hidden transition-all hover:shadow-md border-gray-100", res.status === 'cancelled' && "opacity-50")}>
+            <Card key={res.id} className={cn("overflow-hidden transition-all hover:shadow-md border-gray-100", res.status === 'cancelled' && "opacity-50 grayscale")}>
               <CardHeader className="pb-3 border-b bg-muted/20">
                 <div className="flex justify-between items-center">
                   <div className="flex items-center gap-2">
@@ -143,30 +122,19 @@ export function AgendaGrid() {
                       <span className="text-muted-foreground font-medium uppercase tracking-wider text-[9px]">Especialista</span>
                       <span className="font-bold text-gray-600">{res.staffId || 'No asignado'}</span>
                    </div>
+                   {res.rescheduleHistory && res.rescheduleHistory.length > 0 && (
+                      <div className="pt-1 text-[10px] text-orange-600 font-bold italic">
+                        * Turno reprogramado ({res.rescheduleHistory.length} cambios)
+                      </div>
+                   )}
                    <div className="flex justify-between pt-1 font-black text-primary border-t border-primary/5">
                       <span>Total</span>
                       <span>{formatCurrency(res.price)}</span>
                    </div>
                 </div>
               </CardContent>
-              <CardFooter className="bg-muted/30 pt-4 flex gap-2">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="outline" className="flex-1 font-bold h-9">
-                        Acciones <MoreHorizontal className="ml-2 h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-48">
-                      <DropdownMenuLabel className="text-[10px] uppercase font-black text-muted-foreground">Estado</DropdownMenuLabel>
-                      <DropdownMenuItem onClick={() => handleUpdateStatus(res.id, 'confirmed')} className="gap-2 text-blue-600 font-bold"><CheckCircle2 className="h-4 w-4" /> Confirmar</DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => handleUpdateStatus(res.id, 'completed')} className="gap-2 text-green-600 font-bold"><CheckCircle2 className="h-4 w-4" /> Completada</DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => handleUpdateStatus(res.id, 'no_show')} className="gap-2 text-gray-600 font-bold"><XCircle className="h-4 w-4" /> No Asistió</DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={() => { setEditingReservation(res); setIsModalOpen(true); }} className="gap-2"><Edit className="h-4 w-4" /> Reprogramar / Editar</DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => handleUpdateStatus(res.id, 'cancelled')} className="gap-2 text-red-600 font-bold"><Trash2 className="h-4 w-4" /> Cancelar Cita</DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => handleDelete(res.id)} className="gap-2 text-destructive"><Trash2 className="h-4 w-4" /> Eliminar Registro</DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+              <CardFooter className="bg-muted/30 pt-4">
+                 <StatusActions reservation={res} businessId={user?.uid!} />
               </CardFooter>
             </Card>
           ))}
@@ -207,16 +175,4 @@ export function AgendaGrid() {
       </Dialog>
     </div>
   );
-}
-
-function CheckCircle2(props: any) {
-  return <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="m9 12 2 2 4-4"/></svg>;
-}
-
-function XCircle(props: any) {
-  return <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg>;
-}
-
-function Edit(props: any) {
-    return <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.375 2.625a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4Z"/></svg>;
 }

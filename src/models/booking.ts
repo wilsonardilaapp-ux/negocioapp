@@ -38,6 +38,13 @@ export interface BookingAvailability {
   breaks?: TimeRange[];
 }
 
+export interface RescheduleHistory {
+  previousDate: string;
+  previousStartTime: string;
+  previousEndTime: string;
+  rescheduledAt: string;
+}
+
 export interface Reservation {
   id: string;
   businessId: string;
@@ -54,6 +61,8 @@ export interface Reservation {
   notes?: string;
   source: 'web' | 'admin';
   loyaltyPointsGranted?: boolean; // Integración con módulo de fidelización
+  cancellationReason?: string;
+  rescheduleHistory?: RescheduleHistory[];
   createdAt: string;
   updatedAt: string;
 }
