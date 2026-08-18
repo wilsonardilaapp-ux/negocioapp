@@ -4,12 +4,11 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { onAuthStateChanged, type User } from 'firebase/auth';
 import { doc, onSnapshot, setDoc, getDoc } from 'firebase/firestore';
-import { useFirebase } from '@/firebase/provider';
-import { updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
-import type { User as UserProfile } from '@/models/user';
+import { useFirebase } from '../provider';
+import { updateDocumentNonBlocking } from '../non-blocking-updates';
+import type { User as UserProfile } from '../../models/user';
 
 // --- LISTA BLANCA ESTRICTA DE SUPER ADMINISTRADORES ---
-// Cualquier correo en esta lista tendrá acceso total al panel /superadmin
 export const SUPER_ADMIN_EMAILS = [
   'allseosoporte@gmail.com',
   'admin@zentry.com',
@@ -63,10 +62,10 @@ export function useUser() {
     return () => unsubscribe();
   }, [auth, isNetworkEnabled]);
 
-  // 2. Obtener Perfil y Autosanación de Roles
+  // 2. Obtener Perfil y Autosanación de Roles (Estabilizado por UID)
   useEffect(() => {
-    // Cambio quirúrgico: Depender del UID para estabilizar la referencia y romper bucles
-    if (!firestore || !authState.user?.uid) {
+    const userId = authState.user?.uid;
+    if (!firestore || !userId) {
         if (!authState.isLoading && !authState.user) {
             setProfileLoading(false);
         }
@@ -74,32 +73,26 @@ export function useUser() {
     }
 
     setProfileLoading(true);
-    const userId = authState.user.uid;
     const userDocRef = doc(firestore, 'users', userId);
-    const userEmail = authState.user.email?.toLowerCase().trim() || '';
+    const userEmail = authState.user?.email?.toLowerCase().trim() || '';
 
     const unsubscribe = onSnapshot(userDocRef, async (docSnap) => {
         if (docSnap.exists()) {
             const data = docSnap.data() as UserProfile;
-            
-            // --- LÓGICA DE SEGURIDAD: AUTOSANACIÓN DE ROLES ---
             const isAuthorizedAdmin = SUPER_ADMIN_EMAILS.includes(userEmail);
             
             if (data.role === 'super_admin' && !isAuthorizedAdmin) {
                 console.warn(`[Seguridad] Degradando usuario no autorizado: ${userEmail}`);
-                const correctedProfile = { ...data, role: 'cliente_admin' as const };
-                setProfile(correctedProfile);
+                setProfile({ ...data, role: 'cliente_admin' as const });
                 updateDocumentNonBlocking(userDocRef, { role: 'cliente_admin' });
             } else if (data.role !== 'super_admin' && isAuthorizedAdmin) {
                 console.log(`[Seguridad] Elevando privilegios para admin autorizado: ${userEmail}`);
-                const correctedProfile = { ...data, role: 'super_admin' as const };
-                setProfile(correctedProfile);
+                setProfile({ ...data, role: 'super_admin' as const });
                 updateDocumentNonBlocking(userDocRef, { role: 'super_admin' });
             } else {
                 setProfile(data);
             }
         } else {
-            // Auto-creación del perfil si el usuario existe en Auth pero no en Firestore
             const isAdmin = SUPER_ADMIN_EMAILS.includes(userEmail);
             const newProfile: UserProfile = {
                 id: userId,
@@ -122,7 +115,7 @@ export function useUser() {
     return () => unsubscribe();
   }, [firestore, authState.user?.uid, authState.isLoading]);
 
-  // 3. Activity Tracker para Negocios (SaaS Tenant Activity)
+  // 3. Activity Tracker para Negocios
   useEffect(() => {
     if (!firestore || !authState.user || !profile || profile.role !== 'cliente_admin') return;
 
@@ -141,20 +134,14 @@ export function useUser() {
                 if (lastActiveAt) {
                     const lastDate = new Date(lastActiveAt);
                     const diffInMinutes = (now.getTime() - lastDate.getTime()) / (1000 * 60);
-                    // Solo actualizar si pasaron más de 10 minutos para evitar escrituras excesivas
-                    if (diffInMinutes < 10) {
-                        shouldUpdate = false;
-                    }
+                    if (diffInMinutes < 10) shouldUpdate = false;
                 }
 
                 if (shouldUpdate) {
                     const nowISO = now.toISOString();
-                    // Calculamos el estado basándonos en la fecha actual (que será 'active')
-                    const currentStatus = getActivityStatus(nowISO);
-                    
                     updateDocumentNonBlocking(businessRef, {
                         lastActiveAt: nowISO,
-                        activityStatus: currentStatus
+                        activityStatus: getActivityStatus(nowISO)
                     });
                 }
             }
@@ -163,10 +150,8 @@ export function useUser() {
         }
     };
 
-    if (!authState.isLoading && !isProfileLoading) {
-        trackActivity();
-    }
-  }, [firestore, authState.user, authState.isLoading, profile, isProfileLoading]);
+    if (!authState.isLoading && !isProfileLoading) trackActivity();
+  }, [firestore, authState.user?.uid, authState.isLoading, profile?.role, isProfileLoading]);
 
   // 4. Lógica de Redirección Robusta
   useEffect(() => {
@@ -176,7 +161,6 @@ export function useUser() {
     const isDashboardPage = pathname.startsWith('/dashboard');
     const isSuperAdminPage = pathname.startsWith('/superadmin');
 
-    // Caso: No hay usuario autenticado
     if (!authState.user) {
         if (isDashboardPage || isSuperAdminPage) {
             isRedirecting.current = true;
@@ -185,19 +169,14 @@ export function useUser() {
         return;
     }
 
-    // Caso: Usuario autenticado con perfil cargado
     if (profile) {
-        const role = profile.role;
-        const isAdmin = role === 'super_admin';
-
+        const isAdmin = profile.role === 'super_admin';
         if (isAdmin) {
-            // El Super Admin siempre debe ser redirigido a /superadmin desde cualquier otra ruta protegida o de auth
             if (isAuthPage || isDashboardPage || pathname === '/') {
                 isRedirecting.current = true;
                 router.replace('/superadmin');
             }
         } else {
-            // Los Clientes no pueden entrar en /superadmin
             if (isAuthPage || isSuperAdminPage) {
                 isRedirecting.current = true;
                 router.replace('/dashboard');
@@ -205,14 +184,9 @@ export function useUser() {
         }
     }
 
-    // Resetear flag de redirección tras el ciclo de renderizado para evitar bloqueos
-    const timer = setTimeout(() => {
-        isRedirecting.current = false;
-    }, 1000);
-    
+    const timer = setTimeout(() => { isRedirecting.current = false; }, 1000);
     return () => clearTimeout(timer);
-
-  }, [authState.isLoading, authState.user, profile, isProfileLoading, pathname, router]);
+  }, [authState.isLoading, authState.user?.uid, profile?.role, isProfileLoading, pathname, router]);
 
   return {
     user: authState.user,
