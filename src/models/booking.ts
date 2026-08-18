@@ -61,6 +61,8 @@ export interface Reservation {
   notes?: string;
   source: 'web' | 'admin';
   loyaltyPointsGranted?: boolean; // Integración con módulo de fidelización
+  pointsEarned?: number;          // Puntos otorgados al completar (Fase 8)
+  completedAt?: string;           // Marca de tiempo de finalización (Fase 8)
   cancellationReason?: string;
   rescheduleHistory?: RescheduleHistory[];
   reminderSentAt?: string; // Marca de tiempo del último recordatorio manual enviado (Fase 7)

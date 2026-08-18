@@ -12,7 +12,8 @@ import {
   Phone,
   PlusCircle,
   Loader2,
-  CalendarDays
+  CalendarDays,
+  Sparkles
 } from 'lucide-react';
 import { StatusBadge } from './StatusBadge';
 import { StatusActions } from './StatusActions';
@@ -94,7 +95,15 @@ export function AgendaGrid() {
                     <div className="p-1.5 bg-primary/10 rounded-lg text-primary"><Clock className="h-4 w-4" /></div>
                     <span className="font-black text-lg">{res.startTime}</span>
                   </div>
-                  <StatusBadge status={res.status} />
+                  <div className="flex items-center gap-2">
+                    {res.status === 'completed' && res.pointsEarned && (
+                       <Badge variant="outline" className="bg-primary/5 text-primary border-primary/20 gap-1 animate-in zoom-in duration-500">
+                          <Sparkles className="h-3 w-3" />
+                          +{res.pointsEarned} pts
+                       </Badge>
+                    )}
+                    <StatusBadge status={res.status} />
+                  </div>
                 </div>
               </CardHeader>
               <CardContent className="pt-5 space-y-4">
