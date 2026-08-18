@@ -3,24 +3,26 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
-import { CalendarDays, Users, Clock } from 'lucide-react';
+import { CalendarDays, Users, Clock, MessageSquare } from 'lucide-react';
 
 /**
  * @fileOverview Menú de navegación secundario para el módulo de Reservas.
- * Permite alternar entre la gestión de servicios, profesionales y horarios.
+ * Actualizado para incluir la pestaña de Notificaciones (Fase 7).
  */
 
 const tabs = [
-  { id: 'servicios', label: 'Servicios', href: '/dashboard/reservas/servicios', icon: CalendarDays },
+  { id: 'agenda', label: 'Agenda', href: '/dashboard/reservas', icon: CalendarDays },
+  { id: 'servicios', label: 'Servicios', href: '/dashboard/reservas/servicios', icon: Clock },
   { id: 'profesionales', label: 'Profesionales', href: '/dashboard/reservas/profesionales', icon: Users },
-  { id: 'horarios', label: 'Horarios y Turnos', href: '/dashboard/reservas/horarios', icon: Clock },
+  { id: 'horarios', label: 'Horarios', href: '/dashboard/reservas/horarios', icon: Clock },
+  { id: 'notificaciones', label: 'Notificaciones', href: '/dashboard/reservas/notificaciones', icon: MessageSquare },
 ];
 
 export function ReservasTabs() {
   const pathname = usePathname();
 
   return (
-    <div className="flex space-x-1 bg-muted/50 p-1 rounded-xl mb-6 w-fit">
+    <div className="flex flex-wrap gap-1 bg-muted/50 p-1 rounded-xl mb-6 w-fit">
       {tabs.map((tab) => {
         const isActive = pathname === tab.href;
         return (

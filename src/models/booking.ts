@@ -63,6 +63,7 @@ export interface Reservation {
   loyaltyPointsGranted?: boolean; // Integración con módulo de fidelización
   cancellationReason?: string;
   rescheduleHistory?: RescheduleHistory[];
+  reminderSentAt?: string; // Marca de tiempo del último recordatorio manual enviado (Fase 7)
   createdAt: string;
   updatedAt: string;
 }

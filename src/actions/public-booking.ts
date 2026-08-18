@@ -1,15 +1,16 @@
-
 'use server';
 
 /**
  * @fileOverview Acción de servidor para el agendamiento público.
  * Realiza una validación atómica de disponibilidad antes de guardar la reserva.
+ * Actualizado para disparar notificación de WhatsApp (Fase 7).
  */
 
 import { getAdminFirestore } from '@/firebase/server-init';
 import { isSlotAvailable } from '@/lib/booking-engine';
-import type { Reservation, BookingAvailability } from '@/models/booking';
+import type { Reservation, BookingAvailability, BookingService, BookingStaff } from '@/models/booking';
 import { calculateEndTime } from '@/models/booking';
+import { sendBookingNotification } from '@/services/booking-notifications';
 
 export async function confirmPublicBooking(businessId: string, data: Omit<Reservation, 'id' | 'businessId' | 'status' | 'source' | 'createdAt' | 'updatedAt'>) {
   if (!businessId) return { success: false, error: 'Identificador de negocio inválido.' };
@@ -20,12 +21,14 @@ export async function confirmPublicBooking(businessId: string, data: Omit<Reserv
 
   try {
     // 1. Re-validar disponibilidad en el servidor (Atomic check)
-    const [availSnap, resSnap] = await Promise.all([
+    const [availSnap, resSnap, servSnap, staffSnap] = await Promise.all([
       db.collection('businesses').doc(businessId).collection('bookingAvailability').doc(dayOfWeek.toString()).get(),
       db.collection('businesses').doc(businessId).collection('reservations')
         .where('date', '==', data.date)
         .where('staffId', '==', data.staffId)
-        .get()
+        .get(),
+      db.collection('businesses').doc(businessId).collection('bookingServices').doc(data.serviceId).get(),
+      data.staffId ? db.collection('businesses').doc(businessId).collection('bookingStaff').doc(data.staffId).get() : Promise.resolve(null)
     ]);
 
     if (!availSnap.exists) {
@@ -53,13 +56,17 @@ export async function confirmPublicBooking(businessId: string, data: Omit<Reserv
       ...data,
       id: resRef.id,
       businessId,
-      status: 'confirmed', // Podría ser 'pending' según config del negocio
+      status: 'pending', // Reservas web inician en pendiente
       source: 'web',
       createdAt: now,
       updatedAt: now
     };
 
     await resRef.set(newReservation);
+
+    // --- NOTIFICACIÓN AUTOMÁTICA (Fase 7) ---
+    // Disparo asíncrono no bloqueante
+    sendBookingNotification('onCreate', businessId, newReservation, servSnap.data() as BookingService, staffSnap?.data() as BookingStaff);
 
     return { success: true, reservationId: resRef.id };
 
