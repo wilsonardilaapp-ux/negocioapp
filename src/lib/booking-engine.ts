@@ -3,6 +3,21 @@
 import type { BookingAvailability, TimeRange, Reservation } from '@/models/booking';
 
 /**
+ * Calcula la hora de fin sumando la duración a la hora de inicio.
+ * Implementación matemática pura para máxima compatibilidad.
+ */
+export function calculateEndTime(startTime: string, durationMinutes: number): string {
+  if (!startTime) return '00:00';
+  const [hoursStr, minutesStr] = startTime.split(':');
+  const hours = parseInt(hoursStr, 10) || 0;
+  const minutes = parseInt(minutesStr, 10) || 0;
+  const totalMinutes = hours * 60 + minutes + (Number(durationMinutes) || 0);
+  const endHours = Math.floor(totalMinutes / 60) % 24;
+  const endMinutes = totalMinutes % 60;
+  return `${String(endHours).padStart(2, '0')}:${String(endMinutes).padStart(2, '0')}`;
+}
+
+/**
  * Convierte una cadena de hora "HH:mm" a minutos totales desde las 00:00.
  */
 export function timeToMinutes(time: string): number {
@@ -64,7 +79,7 @@ export function isSlotAvailable(
     return { available: false, reason: 'Coincide con el horario de descanso.' };
   }
 
-  // 4. Validar colisiones con otras reservas activas
+  // 4. Validar colisiones con otras reservas activas (con fallback seguro)
   const safeReservations = Array.isArray(existingReservations) ? existingReservations : [];
   const collision = safeReservations
     .filter(r => r && r.status !== 'cancelled' && r.status !== 'no_show')
