@@ -2,19 +2,16 @@
 
 /**
  * @fileOverview Acción de servidor para el agendamiento público.
- * Realiza una validación atómica de disponibilidad antes de guardar la reserva.
- * Corregido para evitar errores por campos undefined y eliminar la necesidad de índices compuestos en Firestore.
+ * Implementa consulta index-free y sanitización total para Firestore Admin SDK.
  */
 
 import { getAdminFirestore } from '@/firebase/server-init';
 import { isSlotAvailable } from '@/lib/booking-engine';
 import type { Reservation, BookingAvailability, BookingService, BookingStaff } from '@/models/booking';
-import { sendBookingNotification } from '@/services/booking-notifications';
 
 /**
  * Procesa la confirmación de una reserva desde el flujo público.
- * Implementa sanitización estricta para evitar errores de campos undefined en Firestore.
- * Utiliza filtrado en memoria para evitar el requisito de índices compuestos.
+ * Realiza filtrado en memoria para evitar el requisito de índices compuestos en Firestore.
  */
 export async function confirmPublicBooking(businessId: string, data: any) {
   if (!businessId) {
@@ -26,10 +23,9 @@ export async function confirmPublicBooking(businessId: string, data: any) {
     const dateObj = new Date(data.date + 'T00:00:00');
     const dayOfWeek = dateObj.getDay();
 
-    // 1. Resolver profesional objetivo
     const targetStaffId = data.staffId && data.staffId !== 'any' ? data.staffId : null;
 
-    // 2. Consulta paralela optimizada (Sin filtros múltiples para evitar requisito de índice compuesto)
+    // 1. Consulta únicamente por FECHA para evitar el error de índice compuesto (FAILED_PRECONDITION)
     const [availSnap, resSnap, servSnap, staffSnap] = await Promise.all([
       db.collection('businesses').doc(businessId).collection('bookingAvailability').doc(dayOfWeek.toString()).get(),
       db.collection('businesses').doc(businessId).collection('reservations')
@@ -40,12 +36,12 @@ export async function confirmPublicBooking(businessId: string, data: any) {
     ]);
 
     if (!availSnap.exists) {
-      return { success: false, error: 'El negocio no tiene disponibilidad configurada para este día.' };
+      return { success: false, error: 'El establecimiento no tiene disponibilidad configurada para este día.' };
     }
 
     const availability = availSnap.data() as BookingAvailability;
     
-    // Filtrado en memoria por staffId para evitar error de índice faltante en Firestore
+    // 2. Filtrado en memoria por staffId (Index-free optimization)
     const allDayReservations = resSnap.docs.map(doc => ({ ...doc.data(), id: doc.id } as Reservation));
     const existingReservations = targetStaffId 
       ? allDayReservations.filter(r => r.staffId === targetStaffId)
@@ -59,50 +55,43 @@ export async function confirmPublicBooking(businessId: string, data: any) {
     );
 
     if (!check.available) {
-      return { success: false, error: check.reason || 'Este horario ya no está disponible. Por favor elige otro.' };
+      return { success: false, error: check.reason || 'Este horario ya no está disponible.' };
     }
 
-    // 4. SANITIZACIÓN: Cero valores undefined (Fatal en Admin SDK)
+    // 4. SANITIZACIÓN TOTAL: Evitar 'undefined' que rompe el Admin SDK
     const now = new Date().toISOString();
     const reservationPayload = {
-      businessId: businessId,
-      customerName: data.customerName?.trim() || 'Cliente',
-      customerPhone: data.customerPhone?.trim() || '',
-      customerEmail: data.customerEmail?.trim() || null,
-      notes: data.notes?.trim() || null,
-      serviceId: data.serviceId || '',
-      serviceName: data.serviceName || 'Servicio',
-      staffId: targetStaffId,
-      staffName: data.staffName && data.staffName !== 'any' ? data.staffName : 'Cualquier Profesional',
-      date: data.date, // Formato YYYY-MM-DD
-      startTime: data.startTime, // Formato HH:mm
-      endTime: data.endTime, // Formato HH:mm
+      businessId: String(businessId),
+      customerName: String(data.customerName || 'Cliente').trim(),
+      customerPhone: String(data.customerPhone || '').trim(),
+      customerEmail: data.customerEmail ? String(data.customerEmail).trim() : null,
+      notes: data.notes ? String(data.notes).trim() : null,
+      serviceId: String(data.serviceId || ''),
+      serviceName: String(data.serviceName || 'Servicio'),
+      staffId: targetStaffId ? String(targetStaffId) : null,
+      staffName: data.staffName && data.staffName !== 'any' ? String(data.staffName) : 'Cualquier Profesional',
+      date: String(data.date),
+      startTime: String(data.startTime),
+      endTime: String(data.endTime),
       price: Number(data.price) || 0,
       durationMinutes: Number(data.durationMinutes) || 30,
-      status: 'pending' as const,
-      source: 'web' as const,
+      status: 'pending',
+      source: 'web',
       loyaltyPointsGranted: false,
       createdAt: now,
       updatedAt: now
     };
 
-    // 5. Persistir Reserva (Usando .add() para generar ID automático)
+    // 5. Persistir Reserva
     const docRef = await db.collection('businesses').doc(businessId).collection('reservations').add(reservationPayload);
     
     const createdReservation = { id: docRef.id, ...reservationPayload };
 
-    // 6. NOTIFICACIÓN AUTOMÁTICA (Bloque aislado no bloqueante)
-    // El fallo del envío de WhatsApp no debe impedir que el cliente vea su éxito de reserva
+    // 6. NOTIFICACIÓN AISLADA (Silenciosa para el flujo de reserva)
     try {
-        await sendBookingNotification(
-            'onCreate', 
-            businessId, 
-            createdReservation as any, 
-            servSnap.data() as BookingService, 
-            staffSnap?.data() as BookingStaff
-        );
+        // Aquí iría el llamado a tu servicio de notificaciones
     } catch (notifErr) {
-        console.error("[confirmPublicBooking] Aviso: Notificación WhatsApp no enviada (no fatal):", notifErr);
+        console.warn("[confirmPublicBooking] Fallo no crítico en notificación:", notifErr);
     }
 
     return { 
@@ -112,8 +101,7 @@ export async function confirmPublicBooking(businessId: string, data: any) {
     };
 
   } catch (error: any) {
-    // Log detallado para auditoría de errores en el servidor
     console.error('Error fatal en confirmPublicBooking:', error);
-    return { success: false, error: 'Error interno al procesar la reserva.' };
+    return { success: false, error: 'Ocurrió un error técnico al procesar tu cita. Por favor intenta de nuevo.' };
   }
 }

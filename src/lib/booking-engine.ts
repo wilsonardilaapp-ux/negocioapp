@@ -3,7 +3,7 @@
 import type { BookingAvailability, TimeRange, Reservation } from '@/models/booking';
 
 /**
- * Convierte una cadena de hora "HH:mm" a minutos totales desde las 00:00 para cálculos.
+ * Convierte una cadena de hora "HH:mm" a minutos totales desde las 00:00.
  */
 export function timeToMinutes(time: string): number {
   if (!time) return 0;
@@ -36,20 +36,19 @@ export function doTimesOverlap(range1: TimeRange, range2: TimeRange): boolean {
 }
 
 /**
- * Motor de validación de disponibilidad.
- * Verifica jornada, descansos y colisiones con otras reservas.
+ * Motor de validación de disponibilidad blindado contra valores undefined.
  */
 export function isSlotAvailable(
   proposed: TimeRange,
-  availability: BookingAvailability,
+  availability: BookingAvailability | null | undefined,
   existingReservations: Reservation[] = []
 ): { available: boolean; reason?: string } {
-  // 1. Validar si el negocio/profesional está abierto ese día
+  // 1. Validar si el negocio/profesional está abierto
   if (!availability || !availability.isOpen) {
     return { available: false, reason: 'El profesional no atiende este día.' };
   }
 
-  // 2. Validar que esté dentro de la jornada (shifts) con fallback seguro
+  // 2. Validar jornada (shifts)
   const shifts = Array.isArray(availability.shifts) ? availability.shifts : [];
   const inJornada = shifts.some(shift => isTimeContained(proposed, shift));
   
@@ -57,7 +56,7 @@ export function isSlotAvailable(
     return { available: false, reason: 'Fuera del horario de atención.' };
   }
 
-  // 3. Validar que no choque con descansos (breaks) con fallback seguro
+  // 3. Validar descansos (breaks)
   const breaks = Array.isArray(availability.breaks) ? availability.breaks : [];
   const inBreak = breaks.some(brk => doTimesOverlap(proposed, brk));
   
@@ -65,10 +64,10 @@ export function isSlotAvailable(
     return { available: false, reason: 'Coincide con el horario de descanso.' };
   }
 
-  // 4. Validar colisiones con otras reservas activas (Blindaje de arreglo)
+  // 4. Validar colisiones con otras reservas activas
   const safeReservations = Array.isArray(existingReservations) ? existingReservations : [];
   const collision = safeReservations
-    .filter(r => r && r.status !== 'cancelled' && r.status !== 'rejected')
+    .filter(r => r && r.status !== 'cancelled' && r.status !== 'no_show')
     .some(r => doTimesOverlap(proposed, { start: r.startTime, end: r.endTime }));
 
   if (collision) {
@@ -79,7 +78,7 @@ export function isSlotAvailable(
 }
 
 /**
- * Genera slots de tiempo disponibles cada X minutos.
+ * Genera slots de tiempo cada X minutos.
  */
 export function generateTimeSlots(intervalMinutes: number = 15): string[] {
   const slots: string[] = [];

@@ -1,45 +1,35 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, query, where, orderBy, doc } from 'firebase/firestore';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { 
-  Card, 
-  CardContent, 
-  CardHeader, 
-  CardTitle, 
-  CardDescription, 
-  CardFooter 
-} from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { 
-  Loader2, 
-  ChevronRight, 
-  ChevronLeft, 
-  Calendar, 
-  Clock, 
-  User, 
   CheckCircle2, 
-  UserCheck, 
-  Sparkles,
-  Info
+  ChevronRight, 
+  ArrowLeft, 
+  User, 
+  Clock, 
+  Calendar, 
+  Tag, 
+  UserCheck,
+  Smartphone,
+  Mail,
+  Loader2,
+  Sparkles
 } from 'lucide-react';
+import type { BookingService, BookingStaff, BookingAvailability, Reservation } from '@/models/booking';
+import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import { collection, query, where, orderBy } from 'firebase/firestore';
+import { TimeStep } from './TimeStep';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { confirmPublicBooking } from '@/actions/public-booking';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
-import { TimeStep } from './TimeStep';
-import { confirmPublicBooking } from '@/actions/public-booking';
-import type { BookingService, BookingStaff, BookingAvailability, Reservation } from '@/models/booking';
 
-/**
- * @fileOverview Asistente de agendamiento público de 4 pasos.
- * Corregido para soportar navegación de meses y validación de tipos en disponibilidad.
- */
-
-type Step = 'service' | 'staff' | 'time' | 'details' | 'success';
+type Step = 1 | 2 | 3 | 4 | 5;
 
 interface BookingWizardProps {
   businessId: string;
@@ -49,239 +39,233 @@ interface BookingWizardProps {
 }
 
 export function BookingWizard({ businessId, services, staff, initialServiceId }: BookingWizardProps) {
-  const { firestore } = useFirebase();
+  const [step, setStep] = useState<Step>(1);
   const { toast } = useToast();
-  
-  // --- ESTADO DEL ASISTENTE ---
-  const [step, setStep] = useState<Step>(initialServiceId ? 'staff' : 'service');
-  const [selectedService, setSelectedService] = useState<BookingService | null>(
-    initialServiceId ? (services.find(s => s.id === initialServiceId) || null) : null
-  );
-  const [selectedStaff, setSelectedStaff] = useState<BookingStaff | 'any'>('any');
-  const [selectedDate, setSelectedDate] = useState<string>('');
-  const [selectedTime, setSelectedTime] = useState<string>('');
-  const [customerData, setCustomerData] = useState({ name: '', phone: '', email: '', notes: '' });
-  
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const firestore = useFirestore();
   const [isMounted, setIsMounted] = useState(false);
 
-  useEffect(() => { setIsMounted(true); }, []);
+  // Estados de selección
+  const [selectedService, setSelectedService] = useState<BookingService | null>(
+    services.find(s => s.id === initialServiceId) || null
+  );
+  const [selectedStaffId, setSelectedStaffId] = useState<string>('');
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [selectedTime, setSelectedTime] = useState<string | null>(null);
+  
+  // Datos de cliente
+  const [customerData, setCustomerData] = useState({
+    name: '',
+    phone: '',
+    email: '',
+    notes: ''
+  });
 
-  // --- DATA FETCHING (Disponibilidad y Reservas ocupadas) ---
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+    if (initialServiceId && selectedService) setStep(2);
+  }, [initialServiceId, selectedService]);
+
+  // --- CONSULTAS DE DISPONIBILIDAD ---
   const availQuery = useMemoFirebase(() => collection(firestore, `businesses/${businessId}/bookingAvailability`), [businessId, firestore]);
-  const resQuery = useMemoFirebase(() => collection(firestore, `businesses/${businessId}/reservations`), [businessId, firestore]);
+  const resQuery = useMemoFirebase(() => {
+    if (!selectedDate) return null;
+    const dateStr = selectedDate.toISOString().split('T')[0];
+    return query(
+      collection(firestore, `businesses/${businessId}/reservations`),
+      where('date', '==', dateStr)
+    );
+  }, [businessId, firestore, selectedDate]);
 
-  const { data: availability } = useCollection<BookingAvailability>(availQuery);
-  const { data: reservations } = useCollection<Reservation>(resQuery);
+  const { data: availabilityList } = useCollection<BookingAvailability>(availQuery);
+  const { data: existingReservations } = useCollection<Reservation>(resQuery);
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('es-CO', {
-      style: 'currency',
-      currency: 'COP',
-      minimumFractionDigits: 0,
-    }).format(value);
+  const formatCurrency = (val: number) => {
+    if (!isMounted) return `$${val}`;
+    return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(val);
   };
 
-  const handleConfirmBooking = async () => {
+  const handleConfirm = async () => {
     if (!selectedService || !selectedDate || !selectedTime) return;
     setIsSubmitting(true);
-    try {
-      const result = await confirmPublicBooking(businessId, {
-        serviceId: selectedService.id,
-        staffId: selectedStaff === 'any' ? '' : selectedStaff.id,
-        date: selectedDate,
-        startTime: selectedTime,
-        customerName: customerData.name,
-        customerPhone: customerData.phone,
-        customerEmail: customerData.email,
-        notes: customerData.notes,
-        price: selectedService.price,
-        endTime: '', // Se calcula en el servidor por seguridad
-      });
+    
+    const result = await confirmPublicBooking(businessId, {
+      ...customerData,
+      customerName: customerData.name,
+      customerPhone: customerData.phone,
+      customerEmail: customerData.email,
+      serviceId: selectedService.id,
+      serviceName: selectedService.name,
+      staffId: selectedStaffId,
+      staffName: staff.find(s => s.id === selectedStaffId)?.name || 'Cualquier Profesional',
+      date: selectedDate.toISOString().split('T')[0],
+      startTime: selectedTime,
+      price: selectedService.price,
+      durationMinutes: selectedService.durationMinutes
+    });
 
-      if (result.success) {
-        setStep('success');
-      } else {
-        toast({ variant: 'destructive', title: 'Error', description: result.error });
-      }
-    } catch (e) {
-      toast({ variant: 'destructive', title: 'Fallo de conexión', description: 'No pudimos procesar tu reserva.' });
-    } finally {
-      setIsSubmitting(false);
+    if (result.success) {
+      setStep(5);
+    } else {
+      toast({ variant: 'destructive', title: 'Error', description: result.error });
     }
+    setIsSubmitting(false);
   };
 
-  if (!isMounted) return null;
-
-  if (step === 'success') {
-    return (
-      <div className="max-w-md mx-auto py-12 text-center space-y-6 animate-in zoom-in duration-500">
-        <div className="relative mx-auto w-24 h-24">
-            <div className="absolute inset-0 bg-green-100 rounded-full animate-ping opacity-25"></div>
-            <div className="relative bg-green-500 rounded-full w-full h-full flex items-center justify-center shadow-xl shadow-green-100">
-                <CheckCircle2 className="h-12 w-12 text-white" />
-            </div>
-        </div>
-        <div className="space-y-2">
-            <h2 className="text-3xl font-black text-gray-900">¡Reserva Solicitada!</h2>
-            <p className="text-muted-foreground font-medium">Hemos recibido tus datos. Te enviaremos una confirmación por WhatsApp en unos minutos.</p>
-        </div>
-        <Card className="bg-muted/30 border-none shadow-none p-4 rounded-2xl">
-            <div className="text-left text-sm space-y-2">
-                <div className="flex justify-between">
-                    <span className="text-muted-foreground">Servicio:</span>
-                    <span className="font-bold">{selectedService?.name}</span>
-                </div>
-                <div className="flex justify-between">
-                    <span className="text-muted-foreground">Fecha:</span>
-                    <span className="font-bold">{selectedDate}</span>
-                </div>
-                <div className="flex justify-between">
-                    <span className="text-muted-foreground">Hora:</span>
-                    <span className="font-bold">{selectedTime}</span>
-                </div>
-            </div>
-        </Card>
-        <Button onClick={() => window.location.reload()} variant="outline" className="w-full h-12 font-bold rounded-xl">Volver al inicio</Button>
-      </div>
-    );
-  }
+  if (!isMounted) return <div className="flex h-64 items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
 
   return (
     <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in duration-500">
-      
-      {/* Paso 1: Selección de Servicio */}
-      {step === 'service' && (
-        <div className="space-y-6">
-          <div className="space-y-1">
-            <h2 className="text-3xl font-black text-gray-900">¿Qué servicio necesitas?</h2>
-            <p className="text-muted-foreground">Elige el tratamiento o consulta que deseas agendar.</p>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {services.map(s => (
-              <button 
-                key={s.id}
-                onClick={() => { setSelectedService(s); setStep('staff'); }}
-                className="group p-6 bg-white rounded-[2rem] border-2 border-gray-100 text-left hover:border-primary/30 hover:shadow-xl transition-all flex justify-between items-center"
-              >
-                <div className="space-y-1">
-                    <p className="font-black text-gray-900 text-lg group-hover:text-primary transition-colors">{s.name}</p>
-                    <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                        <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> {s.durationMinutes} min</span>
-                        <span className="font-bold text-primary">{formatCurrency(s.price)}</span>
-                    </div>
-                </div>
-                <div className="h-10 w-10 rounded-full bg-primary/5 flex items-center justify-center text-primary opacity-0 group-hover:opacity-100 transition-opacity">
-                    <ChevronRight className="h-6 w-6" />
-                </div>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Paso 2: Selección de Profesional */}
-      {step === 'staff' && (
-        <div className="space-y-6">
-          <Button variant="ghost" onClick={() => setStep('service')} className="pl-0 text-muted-foreground hover:text-primary"><ChevronLeft className="mr-2 h-4 w-4" /> Cambiar servicio</Button>
-          <div className="space-y-1">
-            <h2 className="text-3xl font-black text-gray-900">Elige un especialista</h2>
-            <p className="text-muted-foreground">Selecciona a tu profesional preferido o elige cualquiera disponible.</p>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-             <button 
-                onClick={() => { setSelectedStaff('any'); setStep('time'); }}
-                className={cn(
-                    "p-6 rounded-[2rem] border-2 text-center transition-all",
-                    selectedStaff === 'any' ? "border-primary bg-primary/5" : "bg-white border-gray-100 hover:border-primary/20"
-                )}
-             >
-                <div className="h-16 w-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-3 text-primary"><Sparkles className="h-8 w-8" /></div>
-                <p className="font-black">Cualquier Profesional</p>
-                <p className="text-xs text-muted-foreground">Asignación automática</p>
-             </button>
-
-             {staff.filter(s => s.assignedServiceIds.includes(selectedService?.id || '') && s.isActive).map(s => (
-                <button 
-                    key={s.id}
-                    onClick={() => { setSelectedStaff(s); setStep('time'); }}
-                    className={cn(
-                        "p-6 rounded-[2rem] border-2 text-center transition-all",
-                        selectedStaff !== 'any' && selectedStaff.id === s.id ? "border-primary bg-primary/5" : "bg-white border-gray-100 hover:border-primary/20"
-                    )}
-                >
-                    <div className="h-16 w-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-3 text-muted-foreground"><UserCheck className="h-8 w-8" /></div>
-                    <p className="font-black">{s.name}</p>
-                    <p className="text-xs text-muted-foreground">{s.specialty || 'Especialista'}</p>
-                </button>
-             ))}
-          </div>
-        </div>
-      )}
-
-      {/* Paso 3: Selección de Fecha y Hora */}
-      {step === 'time' && selectedService && (
-        <div className="space-y-6">
-            <Button variant="ghost" onClick={() => setStep('staff')} className="pl-0 text-muted-foreground hover:text-primary"><ChevronLeft className="mr-2 h-4 w-4" /> Cambiar especialista</Button>
-            <TimeStep 
-                businessId={businessId}
-                selectedService={selectedService}
-                selectedStaff={selectedStaff}
-                availability={availability || []}
-                reservations={reservations || []}
-                staffList={staff}
-                onSelect={(d, t) => { setSelectedDate(d); setSelectedTime(t); setStep('details'); }}
-            />
-        </div>
-      )}
-
-      {/* Paso 4: Datos del Cliente */}
-      {step === 'details' && (
-        <div className="max-w-2xl mx-auto space-y-6">
-            <Button variant="ghost" onClick={() => setStep('time')} className="pl-0 text-muted-foreground hover:text-primary"><ChevronLeft className="mr-2 h-4 w-4" /> Cambiar horario</Button>
-            <div className="space-y-1">
-                <h2 className="text-3xl font-black text-gray-900">Tus Datos</h2>
-                <p className="text-muted-foreground">Completa la información para confirmar tu cita.</p>
+      {/* Indicador de pasos */}
+      <div className="flex items-center justify-between px-4">
+        {[1, 2, 3, 4].map(num => (
+          <div key={num} className="flex flex-col items-center gap-2">
+            <div className={cn(
+                "h-10 w-10 rounded-full flex items-center justify-center font-black transition-all",
+                step === num ? "bg-primary text-white shadow-lg scale-110" : 
+                step > num ? "bg-green-500 text-white" : "bg-muted text-muted-foreground"
+            )}>
+                {step > num ? <CheckCircle2 className="h-5 w-5" /> : num}
             </div>
-            
-            <Card className="rounded-[2.5rem] shadow-xl border-none overflow-hidden">
-                <CardContent className="p-8 space-y-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="space-y-2">
-                            <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Nombre Completo</Label>
-                            <Input placeholder="Ej: Juan Pérez" value={customerData.name} onChange={e => setCustomerData({...customerData, name: e.target.value})} className="h-12 bg-muted/20 border-none rounded-xl" />
-                        </div>
-                        <div className="space-y-2">
-                            <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">WhatsApp</Label>
-                            <Input placeholder="300 123 4567" value={customerData.phone} onChange={e => setCustomerData({...customerData, phone: e.target.value})} className="h-12 bg-muted/20 border-none rounded-xl" />
-                        </div>
-                        <div className="md:col-span-2 space-y-2">
-                            <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Correo Electrónico</Label>
-                            <Input type="email" placeholder="tu@correo.com" value={customerData.email} onChange={e => setCustomerData({...customerData, email: e.target.value})} className="h-12 bg-muted/20 border-none rounded-xl" />
-                        </div>
-                        <div className="md:col-span-2 space-y-2">
-                            <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Notas Adicionales</Label>
-                            <Textarea placeholder="Cuéntanos algún detalle..." value={customerData.notes} onChange={e => setCustomerData({...customerData, notes: e.target.value})} className="h-32 bg-muted/20 border-none rounded-xl resize-none" />
-                        </div>
-                    </div>
-                </CardContent>
-                <CardFooter className="p-8 bg-muted/30 border-t flex flex-col gap-4">
-                    <div className="flex items-start gap-3 p-4 bg-white rounded-2xl border shadow-sm w-full">
-                        <Info className="h-5 w-5 text-primary shrink-0 mt-0.5" />
-                        <p className="text-[10px] leading-relaxed text-muted-foreground font-medium uppercase tracking-tight">
-                            Al confirmar, recibirás una solicitud de confirmación por WhatsApp. La reserva estará sujeta a la aprobación del establecimiento.
-                        </p>
-                    </div>
-                    <Button 
-                        onClick={handleConfirmBooking} 
-                        disabled={isSubmitting || !customerData.name || !customerData.phone} 
-                        className="w-full h-14 text-lg font-black shadow-2xl rounded-2xl shadow-primary/20"
-                    >
-                        {isSubmitting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <CheckCircle2 className="mr-2 h-5 w-5" />}
-                        Confirmar mi cita
-                    </Button>
-                </CardFooter>
+            <span className={cn("text-[9px] font-black uppercase tracking-widest", step === num ? "text-primary" : "text-muted-foreground opacity-50")}>
+                {num === 1 ? 'Servicio' : num === 2 ? 'Experto' : num === 3 ? 'Horario' : 'Datos'}
+            </span>
+          </div>
+        ))}
+      </div>
+
+      {/* PASO 1: SERVICIOS */}
+      {step === 1 && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {services.map(s => (
+            <Card key={s.id} className="group hover:border-primary transition-all cursor-pointer rounded-3xl" onClick={() => { setSelectedService(s); setStep(2); }}>
+              <CardContent className="p-6 flex justify-between items-center">
+                <div className="space-y-1">
+                  <h4 className="font-black text-lg">{s.name}</h4>
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Clock className="h-3 w-3" /> {s.durationMinutes} min
+                    <span className="mx-1">•</span>
+                    <Tag className="h-3 w-3" /> {s.category || 'General'}
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="text-primary font-black text-lg">{formatCurrency(s.price)}</p>
+                  <ChevronRight className="h-5 w-5 ml-auto text-muted-foreground group-hover:text-primary transition-colors" />
+                </div>
+              </CardContent>
             </Card>
+          ))}
+        </div>
+      )}
+
+      {/* PASO 2: STAFF */}
+      {step === 2 && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-in slide-in-from-right-3">
+          <Card className="hover:border-primary transition-all cursor-pointer rounded-3xl group border-2 border-dashed border-muted" onClick={() => { setSelectedStaffId('any'); setStep(3); }}>
+             <CardContent className="p-8 text-center space-y-4">
+                <div className="h-16 w-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto text-primary group-hover:scale-110 transition-transform"><UserCheck className="h-8 w-8" /></div>
+                <div className="space-y-1">
+                    <h4 className="font-black text-xl text-gray-900">Cualquier Profesional</h4>
+                    <p className="text-sm text-muted-foreground">Veremos todas las horas disponibles del equipo.</p>
+                </div>
+             </CardContent>
+          </Card>
+          {staff.filter(s => s.assignedServiceIds.includes(selectedService?.id!)).map(s => (
+            <Card key={s.id} className="hover:border-primary transition-all cursor-pointer rounded-3xl" onClick={() => { setSelectedStaffId(s.id); setStep(3); }}>
+              <CardContent className="p-6 flex items-center gap-4">
+                <div className="h-12 w-12 bg-muted rounded-full flex items-center justify-center"><User className="h-6 w-6 text-muted-foreground" /></div>
+                <div><h4 className="font-bold">{s.name}</h4><p className="text-xs text-muted-foreground">{s.specialty || 'Especialista'}</p></div>
+                <ChevronRight className="h-5 w-5 ml-auto text-muted-foreground" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {/* PASO 3: TIME SELECTION */}
+      {step === 3 && selectedService && (
+        <TimeStep 
+            businessId={businessId}
+            selectedService={selectedService}
+            selectedStaffId={selectedStaffId}
+            availability={availabilityList || []}
+            existingReservations={existingReservations || []}
+            selectedDate={selectedDate}
+            selectedTime={selectedTime}
+            onDateSelect={setSelectedDate}
+            onTimeSelect={setSelectedTime}
+        />
+      )}
+
+      {/* PASO 4: CUSTOMER DATA */}
+      {step === 4 && (
+        <Card className="rounded-[2.5rem] border-none shadow-2xl overflow-hidden">
+            <CardHeader className="bg-primary/5 p-8 border-b">
+                <CardTitle className="text-2xl font-black">Tus Datos de Contacto</CardTitle>
+                <CardDescription>Completa la información para confirmar tu asistencia.</CardDescription>
+            </CardHeader>
+            <CardContent className="p-8 space-y-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                        <Label className="flex items-center gap-2"><User className="h-4 w-4 text-primary" /> Nombre Completo</Label>
+                        <Input value={customerData.name} onChange={e => setCustomerData({...customerData, name: e.target.value})} placeholder="Ej: Juan Pérez" className="h-12 rounded-xl" />
+                    </div>
+                    <div className="space-y-2">
+                        <Label className="flex items-center gap-2"><Smartphone className="h-4 w-4 text-primary" /> WhatsApp</Label>
+                        <Input value={customerData.phone} onChange={e => setCustomerData({...customerData, phone: e.target.value})} placeholder="300 123 4567" className="h-12 rounded-xl" />
+                    </div>
+                </div>
+                <div className="space-y-2">
+                    <Label className="flex items-center gap-2"><Mail className="h-4 w-4 text-primary" /> Correo Electrónico</Label>
+                    <Input value={customerData.email} onChange={e => setCustomerData({...customerData, email: e.target.value})} placeholder="tu@email.com" className="h-12 rounded-xl" />
+                </div>
+                <div className="space-y-2">
+                    <Label>Notas Adicionales</Label>
+                    <Textarea value={customerData.notes} onChange={e => setCustomerData({...customerData, notes: e.target.value})} placeholder="Información que debamos saber..." className="h-24 resize-none rounded-xl" />
+                </div>
+            </CardContent>
+            <CardFooter className="bg-muted/30 p-8 border-t">
+                <Button 
+                    className="w-full h-14 text-lg font-black shadow-xl shadow-primary/20 rounded-2xl"
+                    onClick={handleConfirm}
+                    disabled={isSubmitting || !customerData.name || !customerData.phone}
+                >
+                    {isSubmitting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <CheckCircle2 className="mr-2 h-5 w-5" />}
+                    Confirmar mi cita
+                </Button>
+            </CardFooter>
+        </Card>
+      )}
+
+      {/* PASO 5: SUCCESS */}
+      {step === 5 && (
+        <Card className="rounded-[3rem] p-12 text-center space-y-6 shadow-2xl border-none animate-in zoom-in duration-500">
+            <div className="h-24 w-24 bg-green-100 rounded-full flex items-center justify-center mx-auto text-green-600 ring-8 ring-green-50">
+                <CheckCircle2 className="h-12 w-12" />
+            </div>
+            <div className="space-y-2">
+                <h2 className="text-3xl font-black text-gray-900">¡Cita Agendada!</h2>
+                <p className="text-muted-foreground font-medium">Hemos recibido tu reserva exitosamente. Te hemos enviado una confirmación por WhatsApp.</p>
+            </div>
+            <div className="p-6 bg-muted/30 rounded-3xl border-2 border-dashed space-y-3">
+                <div className="flex justify-between text-sm"><span className="text-muted-foreground font-bold">Servicio</span><span className="font-black">{selectedService?.name}</span></div>
+                <div className="flex justify-between text-sm"><span className="text-muted-foreground font-bold">Fecha</span><span className="font-black">{selectedDate ? format(selectedDate, 'PPP', { locale: es }) : ''}</span></div>
+                <div className="flex justify-between text-sm"><span className="text-muted-foreground font-bold">Hora</span><span className="font-black">{selectedTime}</span></div>
+            </div>
+            <Button variant="outline" className="font-bold h-12 px-10 rounded-2xl" onClick={() => window.location.reload()}>Agendar otra cita</Button>
+        </Card>
+      )}
+
+      {/* Navegación Inferior */}
+      {step > 1 && step < 5 && (
+        <div className="flex justify-between items-center pt-8">
+            <Button variant="ghost" onClick={() => setStep(prev => (prev - 1) as Step)} className="font-bold text-gray-500 gap-2">
+                <ArrowLeft className="h-4 w-4" /> Volver
+            </Button>
+            {step === 3 && selectedTime && (
+                <Button onClick={() => setStep(4)} className="font-black px-10 rounded-xl shadow-lg">Continuar <ChevronRight className="ml-2 h-4 w-4" /></Button>
+            )}
         </div>
       )}
     </div>
