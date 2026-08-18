@@ -1,19 +1,25 @@
-
 'use client';
 
-import React, { useState } from 'react';
-import { ServiceStep } from './ServiceStep';
-import { StaffStep } from './StaffStep';
-import { TimeStep } from './TimeStep';
-import { ContactStep } from './ContactStep';
-import { SuccessView } from './SuccessView';
-import { Progress } from '@/components/ui/progress';
-import { Button } from '@/components/ui/button';
-import { ChevronLeft, Loader2 } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { ServiceStep } from './steps/ServiceStep';
+import { StaffStep } from './steps/StaffStep';
+import { TimeStep } from './steps/TimeStep';
+import { SummaryStep } from './steps/SummaryStep';
+import { CheckoutStep } from './steps/CheckoutStep';
+import { SuccessStep } from './steps/SuccessStep';
+import { BookingProgress } from './BookingProgress';
 import type { BookingService, BookingStaff, Reservation } from '@/models/booking';
-import { calculateEndTime } from '@/models/booking';
-import { confirmPublicBooking } from '@/actions/public-booking';
-import { useToast } from '@/hooks/use-toast';
+import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { ChevronLeft } from 'lucide-react';
+
+/**
+ * @fileOverview Orquestador del flujo de reserva público.
+ * Actualizado para soportar Deep Linking por servicio (Fase 13).
+ */
+
+type Step = 'service' | 'staff' | 'time' | 'summary' | 'checkout' | 'success';
 
 interface Props {
   businessId: string;
@@ -21,117 +27,106 @@ interface Props {
   staff: BookingStaff[];
 }
 
-type Step = 'service' | 'staff' | 'time' | 'contact' | 'success';
-
 export function BookingWizard({ businessId, services, staff }: Props) {
-  const [currentStep, setCurrentStep] = useState<Step>('service');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const { toast } = useToast();
-
-  // Estado de la selección
-  const [selection, setSelection] = useState<Partial<Reservation>>({
+  const searchParams = useSearchParams();
+  const [step, setStep] = useState<Step>('service');
+  const [bookingData, setBookingData] = useState<Partial<Reservation>>({
+    businessId,
     serviceId: '',
     staffId: '',
     date: '',
     startTime: '',
     customerName: '',
     customerPhone: '',
-    customerEmail: '',
-    notes: ''
   });
 
-  const steps: Step[] = ['service', 'staff', 'time', 'contact', 'success'];
-  const progress = ((steps.indexOf(currentStep)) / (steps.length - 1)) * 100;
-
-  const handleNext = (updates: Partial<Reservation>, nextStep: Step) => {
-    setSelection(prev => ({ ...prev, ...updates }));
-    setCurrentStep(nextStep);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
-  const handleBack = () => {
-    const currentIndex = steps.indexOf(currentStep);
-    if (currentIndex > 0) setCurrentStep(steps[currentIndex - 1]);
-  };
-
-  const handleFinalConfirm = async (contactData: Pick<Reservation, 'customerName' | 'customerPhone' | 'customerEmail' | 'notes'>) => {
-    setIsSubmitting(true);
-    try {
-      const service = services.find(s => s.id === selection.serviceId);
-      if (!service) throw new Error('Servicio inválido');
-
-      const bookingData = {
-        ...selection,
-        ...contactData,
-        endTime: calculateEndTime(selection.startTime!, service.durationMinutes),
-        price: service.price
-      } as Omit<Reservation, 'id' | 'businessId' | 'status' | 'source' | 'createdAt' | 'updatedAt'>;
-
-      const result = await confirmPublicBooking(businessId, bookingData);
-
-      if (result.success) {
-        setSelection(prev => ({ ...prev, ...contactData, id: result.reservationId }));
-        setCurrentStep('success');
-      } else {
-        toast({ variant: 'destructive', title: 'Horario no disponible', description: result.error });
-        if (result.error?.includes('horario')) setCurrentStep('time');
+  // --- LÓGICA DE DEEP LINKING (FASE 13) ---
+  useEffect(() => {
+    const serviceIdFromUrl = searchParams.get('service');
+    if (serviceIdFromUrl) {
+      const exists = services.find(s => s.id === serviceIdFromUrl);
+      if (exists) {
+        setBookingData(prev => ({ ...prev, serviceId: serviceIdFromUrl }));
+        setStep('staff'); // Saltar directamente al paso 2
       }
-    } catch (e: any) {
-      toast({ variant: 'destructive', title: 'Error', description: 'No se pudo completar la reserva.' });
-    } finally {
-      setIsSubmitting(false);
     }
+  }, [searchParams, services]);
+
+  const updateData = (updates: Partial<Reservation>) => {
+    setBookingData(prev => ({ ...prev, ...updates }));
   };
 
-  if (currentStep === 'success') {
-    return <SuccessView reservation={selection as Reservation} service={services.find(s => s.id === selection.serviceId)!} />;
-  }
+  const steps: { id: Step; label: string }[] = [
+    { id: 'service', label: 'Servicio' },
+    { id: 'staff', label: 'Profesional' },
+    { id: 'time', label: 'Horario' },
+    { id: 'summary', label: 'Resumen' },
+    { id: 'checkout', label: 'Datos' },
+    { id: 'success', label: 'Listo' }
+  ];
+
+  const canGoBack = step !== 'service' && step !== 'success';
+  const handleBack = () => {
+    const currentIndex = steps.findIndex(s => s.id === step);
+    if (currentIndex > 0) setStep(steps[currentIndex - 1].id);
+  };
 
   return (
     <div className="max-w-xl mx-auto space-y-8 animate-in fade-in duration-500">
-      <div className="space-y-4">
-        <div className="flex items-center justify-between px-1">
-          {currentStep !== 'service' ? (
-            <Button variant="ghost" size="sm" onClick={handleBack} className="text-muted-foreground hover:text-primary">
-              <ChevronLeft className="h-4 w-4 mr-1" /> Volver
-            </Button>
-          ) : <div />}
-          <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-            Paso {steps.indexOf(currentStep) + 1} de 4
-          </span>
-        </div>
-        <Progress value={progress} className="h-1.5" />
+      <div className="flex items-center justify-between">
+        {canGoBack ? (
+          <Button variant="ghost" onClick={handleBack} className="text-gray-500 font-bold gap-2 pl-0">
+            <ChevronLeft className="h-4 w-4" /> Volver
+          </Button>
+        ) : <div />}
+        <BookingProgress currentStep={step} steps={steps} />
       </div>
 
-      {currentStep === 'service' && (
-        <ServiceStep 
-          services={services} 
-          onSelect={(id) => handleNext({ serviceId: id }, 'staff')} 
-        />
-      )}
-
-      {currentStep === 'staff' && (
-        <StaffStep 
-          staff={staff.filter(s => s.assignedServiceIds.includes(selection.serviceId!))} 
-          onSelect={(id) => handleNext({ staffId: id }, 'time')} 
-        />
-      )}
-
-      {currentStep === 'time' && (
-        <TimeStep 
-          businessId={businessId}
-          staffId={selection.staffId!}
-          serviceDuration={services.find(s => s.id === selection.serviceId!)?.durationMinutes || 30}
-          onSelect={(date, time) => handleNext({ date, startTime: time }, 'contact')} 
-        />
-      )}
-
-      {currentStep === 'contact' && (
-        <ContactStep 
-          isSubmitting={isSubmitting}
-          onConfirm={handleFinalConfirm} 
-        />
-      )}
+      <Card className="border-none shadow-2xl rounded-[2.5rem] overflow-hidden bg-white">
+        <CardContent className="p-0">
+          {step === 'service' && (
+            <ServiceStep 
+              services={services} 
+              onSelect={(id) => { updateData({ serviceId: id }); setStep('staff'); }} 
+            />
+          )}
+          {step === 'staff' && (
+            <StaffStep 
+              staff={staff} 
+              serviceId={bookingData.serviceId!} 
+              onSelect={(id) => { updateData({ staffId: id }); setStep('time'); }} 
+            />
+          )}
+          {step === 'time' && (
+            <TimeStep 
+              businessId={businessId}
+              serviceId={bookingData.serviceId!}
+              staffId={bookingData.staffId!}
+              onSelect={(date, start, end) => { updateData({ date, startTime: start, endTime: end }); setStep('summary'); }} 
+            />
+          )}
+          {step === 'summary' && (
+            <SummaryStep 
+              data={bookingData} 
+              services={services} 
+              staff={staff} 
+              onConfirm={() => setStep('checkout')} 
+            />
+          )}
+          {step === 'checkout' && (
+            <CheckoutStep 
+              data={bookingData} 
+              onConfirm={(customer) => { updateData(customer); setStep('success'); }} 
+            />
+          )}
+          {step === 'success' && (
+            <SuccessStep 
+              data={bookingData} 
+              services={services}
+            />
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
