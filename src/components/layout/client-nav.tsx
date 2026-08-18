@@ -38,6 +38,7 @@ import {
   ShieldCheck,
   Lightbulb,
   User,
+  CalendarCheck,
 } from "lucide-react";
 
 import { SidebarMenu, SidebarMenuItem, SidebarMenuButton, useSidebar } from "@/components/ui/sidebar";
@@ -65,6 +66,7 @@ const allNavItems = [
   { href: "/dashboard/share", icon: Share2, label: "Compartir Menú" },
   { href: "/dashboard/blog", icon: BookOpen, label: "Blog", moduleId: 'blog' },
   { href: "/dashboard/valoraciones-directorio", icon: Star, label: "Valoraciones del Directorio" },
+  { href: "/dashboard/reservas", icon: CalendarCheck, label: "Reservas y Citas", moduleId: "reservas-agendamiento" },
   
   // 15-18: COMUNICACIÓN
   { href: "/dashboard/chatbot", icon: MessageSquare, label: "Asistente WHAPI", moduleId: 'whapi-whatsapp' },
