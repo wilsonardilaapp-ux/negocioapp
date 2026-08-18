@@ -346,22 +346,22 @@ export default function BusinessesPage() {
             <Card className="bg-muted/30 border-none shadow-none">
               <CardContent className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 <div className="space-y-1">
-                  <Label className="text-[10px] font-black uppercase text-muted-foreground flex items-center gap-1.5"><User className="w-3 h-3" /> Propietario</Label>
+                  <Label className="text-[10px] font-black uppercase text-muted-foreground flex items-center gap-1.5"><User className="w-4 h-4" /> Propietario</Label>
                   <p className="font-bold text-sm truncate">{selectedBusiness?.ownerName || selectedBusiness?.name}</p>
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-[10px] font-black uppercase text-muted-foreground flex items-center gap-1.5"><Mail className="w-3 h-3" /> Email Principal</Label>
+                  <Label className="text-[10px] font-black uppercase text-muted-foreground flex items-center gap-1.5"><Mail className="w-4 h-4" /> Email Principal</Label>
                   <p className="font-medium text-sm truncate">{selectedBusiness?.ownerEmail}</p>
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-[10px] font-black uppercase text-muted-foreground flex items-center gap-1.5"><Building2 className="w-3 h-3" /> Plan de Suscripción</Label>
+                  <Label className="text-[10px] font-black uppercase text-muted-foreground flex items-center gap-1.5"><Building2 className="w-4 h-4" /> Plan de Suscripción</Label>
                   <Select value={selectedBusiness?.planName} onValueChange={(v) => setSelectedBusiness(prev => prev ? {...prev, planName: v} : null)}>
                     <SelectTrigger className="h-8 font-bold text-xs bg-white"><SelectValue /></SelectTrigger>
                     <SelectContent>{allPlans.map(p => <SelectItem key={p.id} value={p.name}>{p.name}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-[10px] font-black uppercase text-muted-foreground flex items-center gap-1.5"><ShieldCheck className="w-3 h-3" /> Estado</Label>
+                  <Label className="text-[10px] font-black uppercase text-muted-foreground flex items-center gap-1.5"><ShieldCheck className="w-4 h-4" /> Estado</Label>
                   <Select value={selectedBusiness?.status} onValueChange={(v: EntityStatus) => setSelectedBusiness(prev => prev ? {...prev, status: v} : null)}>
                     <SelectTrigger className="h-8 font-bold text-xs bg-white"><SelectValue /></SelectTrigger>
                     <SelectContent><SelectItem value="active">Activo</SelectItem><SelectItem value="inactive">Inactivo</SelectItem></SelectContent>
@@ -407,34 +407,58 @@ export default function BusinessesPage() {
             </section>
 
             <section className="space-y-4 pt-4 border-t">
-              <h3 className="text-lg font-bold flex items-center gap-2 text-gray-800"><TrendingUp className="w-5 h-5 text-green-600" /> Capacidades y Límites Adicionales</h3>
-              <div className="rounded-2xl border border-gray-100 overflow-hidden bg-white shadow-sm">
-                <Table>
-                  <TableHeader className="bg-muted/30">
-                    <TableRow>
-                      <TableHead className="font-black text-[10px] uppercase">Recurso</TableHead>
-                      <TableHead className="font-black text-[10px] uppercase text-center">Base Plan</TableHead>
-                      <TableHead className="font-black text-[10px] uppercase text-center">Aumento</TableHead>
-                      <TableHead className="font-black text-[10px] uppercase text-right">Total Final</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {Object.keys(resourceLabels).map(key => {
-                      const planDetails = allPlans.find(p => p.name === selectedBusiness?.planName || p.id === selectedBusiness?.planName);
-                      const base = (planDetails?.limits as any)?.[key] ?? 0;
-                      const extra = limitesExtra[key] || 0;
-                      const total = base === -1 ? '∞' : base + extra;
-                      return (
-                        <TableRow key={key}>
-                          <TableCell className="font-bold text-sm text-gray-700">{resourceLabels[key]}</TableCell>
-                          <TableCell className="text-center"><Badge variant="secondary" className="font-bold">{base === -1 ? '∞' : base}</Badge></TableCell>
-                          <TableCell className="text-center flex justify-center"><Input type="number" value={extra} onChange={e => setLimitesExtra(prev => ({...prev, [key]: Number(e.target.value)}))} className="w-24 h-8 text-center font-bold" /></TableCell>
-                          <TableCell className="text-right"><Badge className="bg-green-100 text-green-800 font-black">{total}</Badge></TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
+              <h3 className="text-lg font-bold flex items-center gap-2 text-gray-800">
+                <TrendingUp className="w-5 h-5 text-green-600" /> Capacidades y Límites Adicionales
+              </h3>
+              <div className="flex flex-col gap-3">
+                {Object.keys(resourceLabels).map(key => {
+                  const planDetails = allPlans.find(p => p.name === selectedBusiness?.planName || p.id === selectedBusiness?.planName);
+                  const base = (planDetails?.limits as any)?.[key] ?? 0;
+                  const extra = limitesExtra[key] || 0;
+                  const total = base === -1 ? '∞' : base + extra;
+                  
+                  return (
+                    <div key={key} className="flex flex-col md:flex-row items-center justify-between p-4 bg-white rounded-xl border border-gray-100 shadow-sm transition-all hover:border-primary/20 group">
+                      <div className="flex items-center gap-3 w-full md:w-auto mb-4 md:mb-0">
+                        <div className="p-2 bg-primary/5 rounded-lg text-primary group-hover:bg-primary group-hover:text-white transition-colors">
+                          <TrendingUp className="w-4 h-4" />
+                        </div>
+                        <span className="font-bold text-sm text-gray-800">{resourceLabels[key]}</span>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-4 w-full md:w-[420px]">
+                        <div className="space-y-1 text-center">
+                          <Label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Base Plan</Label>
+                          <div className="h-9 flex items-center justify-center bg-muted/50 rounded-lg font-bold text-xs border border-transparent">
+                            {base === -1 ? '∞' : base}
+                          </div>
+                        </div>
+                        
+                        <div className="space-y-1 text-center">
+                          <Label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Aumento</Label>
+                          <Input 
+                            type="number" 
+                            value={extra} 
+                            onChange={e => setLimitesExtra(prev => ({...prev, [key]: Number(e.target.value)}))} 
+                            className="h-9 text-center font-bold bg-white border-gray-200 focus-visible:ring-primary/30" 
+                          />
+                        </div>
+
+                        <div className="space-y-1 text-center">
+                          <Label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Total Final</Label>
+                          <div className={cn(
+                            "h-9 flex items-center justify-center rounded-lg font-black text-sm border shadow-sm transition-all",
+                            total === base 
+                              ? "bg-muted/20 text-muted-foreground border-transparent" 
+                              : "bg-green-50 text-green-700 border-green-200"
+                          )}>
+                            {total}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </section>
           </div>
