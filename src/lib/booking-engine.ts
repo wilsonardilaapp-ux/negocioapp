@@ -42,32 +42,37 @@ export function doTimesOverlap(range1: TimeRange, range2: TimeRange): boolean {
 export function isSlotAvailable(
   proposed: TimeRange,
   availability: BookingAvailability,
-  existingReservations: Reservation[]
+  existingReservations: Reservation[] = []
 ): { available: boolean; reason?: string } {
   // 1. Validar si el negocio/profesional está abierto ese día
-  if (!availability.isOpen) {
+  if (!availability || !availability.isOpen) {
     return { available: false, reason: 'El profesional no atiende este día.' };
   }
 
-  // 2. Validar que esté dentro de la jornada (shifts)
-  const inJornada = availability.shifts?.some(shift => isTimeContained(proposed, shift)) ?? false;
+  // 2. Validar que esté dentro de la jornada (shifts) con fallback seguro
+  const shifts = Array.isArray(availability.shifts) ? availability.shifts : [];
+  const inJornada = shifts.some(shift => isTimeContained(proposed, shift));
+  
   if (!inJornada) {
     return { available: false, reason: 'Fuera del horario de atención.' };
   }
 
-  // 3. Validar que no choque con descansos (breaks)
-  const inBreak = availability.breaks?.some(brk => doTimesOverlap(proposed, brk)) ?? false;
+  // 3. Validar que no choque con descansos (breaks) con fallback seguro
+  const breaks = Array.isArray(availability.breaks) ? availability.breaks : [];
+  const inBreak = breaks.some(brk => doTimesOverlap(proposed, brk));
+  
   if (inBreak) {
     return { available: false, reason: 'Coincide con el horario de descanso.' };
   }
 
-  // 4. Validar colisiones con otras reservas activas
-  const collision = existingReservations
-    .filter(r => r.status !== 'cancelled' && r.status !== 'rejected')
+  // 4. Validar colisiones con otras reservas activas (Blindaje de arreglo)
+  const safeReservations = Array.isArray(existingReservations) ? existingReservations : [];
+  const collision = safeReservations
+    .filter(r => r && r.status !== 'cancelled' && r.status !== 'rejected')
     .some(r => doTimesOverlap(proposed, { start: r.startTime, end: r.endTime }));
 
   if (collision) {
-    return { available: false, reason: 'Este horario ya está reservado.' };
+    return { available: false, reason: 'Este horario ya no está disponible.' };
   }
 
   return { available: true };
