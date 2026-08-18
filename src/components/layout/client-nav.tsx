@@ -1,4 +1,3 @@
-
 "use client";
 
 import Link from "next/link";
@@ -32,7 +31,8 @@ import {
   Users,
   Megaphone,
   Star,
-  Gift
+  Gift,
+  Share
 } from "lucide-react";
 
 import { SidebarMenu, SidebarMenuItem, SidebarMenuButton, useSidebar } from "@/components/ui/sidebar";
@@ -48,6 +48,7 @@ const allNavItems = [
   { href: "/dashboard/configuracion/factura", icon: FileEdit, label: "Editor de Factura" },
   { href: "/dashboard/configuracion/impresoras", icon: Printer, label: "Impresoras POS" },
   { href: "/dashboard/share", icon: Share2, label: "Compartir Catálogo" },
+  { href: "/dashboard/share-landing", icon: Share, label: "Compartir Landing" },
   
   // MARKETING Y FIDELIZACIÓN
   { href: "/dashboard/blog", icon: FileText, label: "Blog Profesional", moduleId: 'blog' },
@@ -69,7 +70,7 @@ const allNavItems = [
   { href: "/dashboard/chatbot", icon: MessageSquare, label: "Asistente WHAPI", moduleId: 'whapi-whatsapp' },
   { href: "/dashboard/configuracion/ycloud", icon: Bot, label: "Asistente YCloud", moduleId: 'ycloud-whatsapp' },
   
-  // PERFIL
+  // PERFIL Y SISTEMA
   { href: "/dashboard/perfil", icon: UserCircle, label: "Perfil del Negocio" },
 ];
 
