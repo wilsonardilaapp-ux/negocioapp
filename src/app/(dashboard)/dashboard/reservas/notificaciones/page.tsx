@@ -3,7 +3,7 @@ import { ReservasTabs } from '@/components/reservas/ReservasTabs';
 import { NotificationSettingsForm } from '@/components/reservas/NotificationSettingsForm';
 import { DEFAULT_BOOKING_NOTIFICATION_SETTINGS, type BookingNotificationSettings } from '@/models/booking-notifications';
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { MessageSquare } from 'lucide-react';
+import { MessageSquare, Loader2 } from 'lucide-react';
 import { headers } from 'next/headers';
 
 export const dynamic = 'force-dynamic';
@@ -32,7 +32,7 @@ export default async function NotificacionesConfigPage() {
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
       <header className="space-y-1">
-        <h1 className="text-3xl font-black tracking-tight flex items-center gap-3">
+        <h1 className="text-3xl font-black tracking-tight text-gray-900 flex items-center gap-3">
           <MessageSquare className="h-8 w-8 text-primary" />
           Mensajería Automática
         </h1>
