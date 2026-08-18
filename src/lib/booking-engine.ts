@@ -6,8 +6,9 @@ import type { BookingAvailability, TimeRange, Reservation } from '@/models/booki
  * Convierte una cadena de hora "HH:mm" a minutos totales desde las 00:00 para cálculos.
  */
 export function timeToMinutes(time: string): number {
+  if (!time) return 0;
   const [hours, minutes] = time.split(':').map(Number);
-  return hours * 60 + minutes;
+  return (hours || 0) * 60 + (minutes || 0);
 }
 
 /**
@@ -49,20 +50,20 @@ export function isSlotAvailable(
   }
 
   // 2. Validar que esté dentro de la jornada (shifts)
-  const inJornada = availability.shifts.some(shift => isTimeContained(proposed, shift));
+  const inJornada = availability.shifts?.some(shift => isTimeContained(proposed, shift)) ?? false;
   if (!inJornada) {
     return { available: false, reason: 'Fuera del horario de atención.' };
   }
 
   // 3. Validar que no choque con descansos (breaks)
-  const inBreak = availability.breaks?.some(brk => doTimesOverlap(proposed, brk));
+  const inBreak = availability.breaks?.some(brk => doTimesOverlap(proposed, brk)) ?? false;
   if (inBreak) {
     return { available: false, reason: 'Coincide con el horario de descanso.' };
   }
 
   // 4. Validar colisiones con otras reservas activas
   const collision = existingReservations
-    .filter(r => r.status !== 'cancelled')
+    .filter(r => r.status !== 'cancelled' && r.status !== 'rejected')
     .some(r => doTimesOverlap(proposed, { start: r.startTime, end: r.endTime }));
 
   if (collision) {
