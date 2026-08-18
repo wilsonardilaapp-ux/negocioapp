@@ -19,7 +19,8 @@ import {
   Trash2,
   Clock,
   UserCheck,
-  Bell
+  Bell,
+  Loader2
 } from 'lucide-react';
 import type { Reservation, ReservationStatus } from '@/models/booking';
 import { updateReservationStatus } from '@/actions/booking-management';
@@ -41,21 +42,24 @@ export function StatusActions({ reservation, businessId }: StatusActionsProps) {
   const firestore = useFirestore();
   const [isCancelOpen, setIsCancelOpen] = useState(false);
   const [isRescheduleOpen, setIsRescheduleOpen] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
 
   const handleUpdate = async (status: ReservationStatus) => {
+    setIsUpdating(true);
     const result = await updateReservationStatus(businessId, reservation.id, status);
     if (result.success) {
       toast({ title: 'Estado actualizado' });
     } else {
       toast({ variant: 'destructive', title: 'Error', description: result.error });
     }
+    setIsUpdating(false);
   };
 
   const handleDelete = async () => {
     if (!confirm('¿Eliminar registro? Esta acción no se puede deshacer.')) return;
     try {
-      const docRef = doc(firestore, `businesses/${businessId}/reservations`, reservation.id);
-      await deleteDocumentNonBlocking(docRef);
+      const resRef = doc(firestore, `businesses/${businessId}/reservations`, reservation.id);
+      await deleteDocumentNonBlocking(resRef);
       toast({ title: 'Reserva eliminada' });
     } catch (e) {
       toast({ variant: 'destructive', title: 'Error al eliminar' });
@@ -65,13 +69,12 @@ export function StatusActions({ reservation, businessId }: StatusActionsProps) {
   return (
     <>
       <div className="flex gap-2 w-full">
-        {/* Acción primaria de WhatsApp siempre visible */}
         <ReminderButton reservation={reservation} businessId={businessId} />
         
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm" className="font-bold h-9">
-                <MoreHorizontal className="h-4 w-4" />
+            <Button variant="outline" size="sm" className="font-bold h-9" disabled={isUpdating}>
+                {isUpdating ? <Loader2 className="h-4 w-4 animate-spin" /> : <MoreHorizontal className="h-4 w-4" />}
             </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">

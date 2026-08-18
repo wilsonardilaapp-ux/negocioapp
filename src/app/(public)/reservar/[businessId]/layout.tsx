@@ -1,8 +1,8 @@
-
 import { getAdminFirestore } from '@/firebase/server-init';
 import { Logo } from '@/components/icons';
 import Image from 'next/image';
 import Link from 'next/link';
+import { Button } from '@/components/ui/button';
 
 async function getBusinessBranding(id: string) {
   try {
@@ -33,7 +33,7 @@ export default async function BookingLayout({
           <div className="flex items-center gap-3">
              {business?.logoURL ? (
                 <div className="relative h-10 w-10 rounded-xl overflow-hidden border shadow-sm bg-white">
-                  <Image src={business.logoURL} alt={business.name} fill className="object-cover" />
+                  <Image src={business.logoURL} alt={business.name || 'Logo'} fill className="object-cover" />
                 </div>
              ) : <Logo className="h-8 w-8 text-primary" />}
              <span className="font-black tracking-tighter text-xl">{business?.name || 'Markix Reservas'}</span>
@@ -54,5 +54,3 @@ export default async function BookingLayout({
     </div>
   );
 }
-
-import { Button } from '@/components/ui/button';
