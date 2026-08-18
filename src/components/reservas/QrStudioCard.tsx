@@ -23,11 +23,16 @@ export function QrStudioCard({ businessId }: { businessId: string }) {
   const qrRef = useRef<HTMLDivElement>(null);
 
   // Obtener branding del negocio para el poster
-  const businessRef = useMemoFirebase(() => doc(firestore, 'businesses', businessId), [businessId, firestore]);
+  // Se añade validación para evitar que el SDK de Firestore falle si los argumentos son indefinidos
+  const businessRef = useMemoFirebase(() => {
+    if (!firestore || !businessId) return null;
+    return doc(firestore, 'businesses', businessId);
+  }, [businessId, firestore]);
+
   const { data: business } = useDoc<Business>(businessRef);
 
   const bookingUrl = useMemo(() => {
-    if (typeof window === 'undefined') return '';
+    if (typeof window === 'undefined' || !businessId) return '';
     return `${window.location.origin}/reservar/${businessId}`;
   }, [businessId]);
 
@@ -102,7 +107,7 @@ export function QrStudioCard({ businessId }: { businessId: string }) {
           <Button 
             className="w-full h-12 font-black shadow-lg shadow-primary/10" 
             onClick={handleDownload}
-            disabled={isExporting}
+            disabled={isExporting || !businessId}
           >
             {isExporting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Download className="h-4 w-4 mr-2" />}
             Descargar PNG
@@ -111,6 +116,7 @@ export function QrStudioCard({ businessId }: { businessId: string }) {
             variant="outline" 
             className="w-full h-12 font-bold bg-white"
             onClick={handlePrint}
+            disabled={!businessId}
           >
             <Printer className="h-4 w-4 mr-2" /> Imprimir Cartel de Mostrador
           </Button>
