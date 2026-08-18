@@ -3,11 +3,11 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
-import { CalendarDays, Users, Clock, MessageSquare, Target } from 'lucide-react';
+import { CalendarDays, Users, Clock, MessageSquare, Target, BarChart3 } from 'lucide-react';
 
 /**
  * @fileOverview Menú de navegación secundario para el módulo de Reservas.
- * Actualizado para incluir la pestaña de Oportunidades (Fase 9).
+ * Actualizado para incluir la pestaña de Estadísticas (Fase 11).
  */
 
 const tabs = [
@@ -17,6 +17,7 @@ const tabs = [
   { id: 'horarios', label: 'Horarios', href: '/dashboard/reservas/horarios', icon: Clock },
   { id: 'oportunidades', label: 'Oportunidades', href: '/dashboard/reservas/oportunidades', icon: Target },
   { id: 'notificaciones', label: 'Notificaciones', href: '/dashboard/reservas/notificaciones', icon: MessageSquare },
+  { id: 'estadisticas', label: 'Estadísticas', href: '/dashboard/reservas/estadisticas', icon: BarChart3 },
 ];
 
 export function ReservasTabs() {
