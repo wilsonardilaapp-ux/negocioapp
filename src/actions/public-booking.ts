@@ -151,7 +151,6 @@ export async function confirmPublicBooking(businessId: string, bookingData: any)
 
   } catch (error: any) {
     console.error('FATAL ERROR IN confirmPublicBooking:', error);
-    // Devolvemos el error real para diagnóstico, con fallback genérico si no hay mensaje
     return { 
       success: false, 
       error: error?.message || "Error interno de servidor al procesar la reserva." 

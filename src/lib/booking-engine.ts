@@ -77,7 +77,10 @@ export function isSlotAvailable(
 
   // 2. Validar solapamiento con Descansos (Almuerzos/Pausas)
   const breaks = Array.isArray(availability.breaks) ? availability.breaks : [];
-  const inBreak = breaks.some(brk => doTimesOverlap(proposed, brk));
+  const inBreak = breaks.some(brk => {
+    if (!brk.start || !brk.end) return false;
+    return doTimesOverlap(proposed, brk);
+  });
   
   if (inBreak) {
     return { available: false, reason: 'Coincide con el horario de descanso.' };

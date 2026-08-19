@@ -1,185 +1,176 @@
 'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { Calendar } from '@/components/ui/calendar';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { format, isPast, isToday } from 'date-fns';
+import { Calendar } from '@/components/ui/calendar';
+import { 
+  ArrowLeft, 
+  Clock, 
+  Calendar as CalendarIcon, 
+  Loader2,
+  ChevronRight,
+  Info
+} from "lucide-react";
+import { format, addMonths, subMonths, isBefore, startOfDay, endOfMonth, startOfMonth } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Clock, Loader2, ChevronRight, Info, ArrowLeft, CalendarDays } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { calculateEndTime, isSlotAvailable, generateTimeSlots } from '@/lib/booking-engine';
+import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import { collection, query, where, getDocs } from 'firebase/firestore';
 import type { BookingService, BookingStaff, BookingAvailability, Reservation } from '@/models/booking';
-import { Label } from '@/components/ui/label';
+import { generateAvailableSlots, calculateEndTime } from '@/lib/booking-engine';
+import { cn } from '@/lib/utils';
 
 interface TimeStepProps {
-  selectedService: BookingService;
-  selectedStaff: BookingStaff | null;
-  availabilityList: BookingAvailability[];
-  existingReservations: Reservation[];
-  onSelectDateTime: (data: { date: string; startTime: string; endTime: string }) => void;
+  businessId: string;
+  selectedService?: BookingService;
+  selectedStaff?: BookingStaff;
   onBack: () => void;
+  onSelectDateTime: (data: { date: string; startTime: string; endTime: string }) => void;
 }
 
-export function TimeStep({ 
-  selectedService, 
-  selectedStaff, 
-  availabilityList, 
-  existingReservations, 
-  onSelectDateTime, 
-  onBack 
-}: TimeStepProps) {
+export function TimeStep({ businessId, selectedService, selectedStaff, onBack, onSelectDateTime }: TimeStepProps) {
+  const firestore = useFirestore();
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
-  const [selectedTime, setSelectedTime] = useState<string | null>(null);
+  const [selectedTime, setSelectedTime] = useState('');
+  const [month, setMonth] = useState<Date>(new Date());
 
-  // Helper para obtener el string YYYY-MM-DD local
-  const formatToDateString = (d: Date): string => {
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  };
+  // --- DATA FETCHING ---
+  const availabilityQuery = useMemoFirebase(() => 
+    businessId ? collection(firestore, `businesses/${businessId}/bookingAvailability`) : null, 
+  [businessId, firestore]);
 
-  // Cálculo de turnos disponibles
+  const reservationsQuery = useMemoFirebase(() => {
+    if (!businessId || !selectedDate) return null;
+    const dateStr = format(selectedDate, 'yyyy-MM-dd');
+    return query(
+        collection(firestore, `businesses/${businessId}/reservations`),
+        where('date', '==', dateStr)
+    );
+  }, [businessId, selectedDate, firestore]);
+
+  const { data: availabilityList, isLoading: loadingAvail } = useCollection<BookingAvailability>(availabilityQuery);
+  const { data: reservations, isLoading: loadingRes } = useCollection<Reservation>(reservationsQuery);
+
+  // --- CALCULAR SLOTS DISPONIBLES ---
   const availableSlots = useMemo(() => {
-    if (!selectedDate) return [];
-
-    const dateStr = formatToDateString(selectedDate);
+    if (!selectedDate || !availabilityList || !selectedService) return [];
+    
     const dayOfWeek = selectedDate.getDay();
+    const dayConfig = availabilityList.find(a => a.dayOfWeek === dayOfWeek);
     
-    // PROTECCIÓN DEFENSIVA: Extracción segura de variables con fallbacks
-    const currentStaffId = selectedStaff?.id || 'any';
-    const currentDuration = Number(selectedService?.durationMinutes) || 30;
+    if (!dayConfig || !dayConfig.isOpen) return [];
 
-    const dayConfig = availabilityList?.find(a => Number(a.dayOfWeek) === dayOfWeek);
+    // Filtrado por profesional si es específico
+    const filteredReservations = selectedStaff 
+        ? (reservations || []).filter(r => r.staffId === selectedStaff.id)
+        : (reservations || []);
 
-    // Fallback: Si no hay config, asumimos abierto L-S 08:00-18:00
-    const isDayOpen = dayConfig !== undefined ? Boolean(dayConfig.isOpen) : dayOfWeek !== 0;
-    
-    if (!isDayOpen) return [];
-
-    const effectiveShifts = (dayConfig?.shifts && dayConfig.shifts.length > 0)
-      ? dayConfig.shifts
-      : [{ start: '08:00', end: '18:00' }];
-
-    const dailyReservations = existingReservations?.filter(r => 
-      r.date === dateStr && (currentStaffId === 'any' || r.staffId === currentStaffId)
-    ) || [];
-
-    const allSlots = generateTimeSlots(15);
-    
-    return allSlots.filter(time => {
-      const endTime = calculateEndTime(time, currentDuration);
-      return isSlotAvailable(
-        { start: time, end: endTime },
-        { ...dayConfig, isOpen: true, shifts: effectiveShifts, dayOfWeek } as any,
-        dailyReservations
-      ).available;
-    });
-
-  // LÍNEA 83: Protección con encadenamiento opcional en dependencias
-  }, [
-    selectedDate, 
-    availabilityList, 
-    existingReservations, 
-    selectedStaff?.id, 
-    selectedService?.id, 
-    selectedService?.durationMinutes
-  ]);
+    return generateAvailableSlots(
+        dayConfig, 
+        selectedService.durationMinutes, 
+        filteredReservations,
+        selectedDate
+    );
+  }, [selectedDate, availabilityList, reservations, selectedService, selectedStaff]);
 
   const handleContinue = () => {
-    if (selectedDate && selectedTime) {
+    if (selectedDate && selectedTime && selectedService) {
+      const dateStr = format(selectedDate, 'yyyy-MM-dd');
       onSelectDateTime({
-        date: formatToDateString(selectedDate),
+        date: dateStr,
         startTime: selectedTime,
-        endTime: calculateEndTime(selectedTime, Number(selectedService?.durationMinutes) || 30)
+        endTime: calculateEndTime(selectedTime, selectedService.durationMinutes)
       });
     }
   };
 
+  const isLoading = loadingAvail || loadingRes;
+
   return (
-    <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-6 sm:p-8 max-w-4xl mx-auto relative animate-in fade-in duration-500">
-      <button
-        onClick={onBack}
-        className="absolute left-6 top-6 p-2 rounded-full hover:bg-muted/50 text-gray-500 hover:text-gray-900 transition-colors"
-        aria-label="Volver"
-      >
+    <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-6 sm:p-8 max-w-4xl mx-auto relative">
+      <button onClick={onBack} className="absolute left-6 top-6 p-2 rounded-full hover:bg-muted/50 text-gray-500 transition-colors">
         <ArrowLeft className="w-5 h-5" />
       </button>
 
-      <div className="text-center mb-8">
-        <h2 className="text-2xl sm:text-3xl font-black text-gray-900 mb-2">Agenda tu Turno</h2>
-        <p className="text-sm text-muted-foreground">Selecciona la fecha y hora que mejor te convenga.</p>
+      <div className="text-center mb-10 pt-2">
+        <h2 className="text-2xl sm:text-3xl font-black text-gray-900 mb-2">Selecciona fecha y hora</h2>
+        <p className="text-sm text-muted-foreground font-medium">Busca el espacio que mejor se adapte a tu tiempo.</p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
+        {/* Calendario */}
         <div className="space-y-4">
-          <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">1. Selecciona el día</Label>
-          <Calendar
-            mode="single"
-            selected={selectedDate}
-            onSelect={(date) => {
-                setSelectedDate(date);
-                setSelectedTime(null);
-            }}
-            locale={es}
-            className="rounded-2xl border shadow-sm bg-white"
-            disabled={(date) => isPast(date) && !isToday(date)}
-          />
-        </div>
-
-        <div className="space-y-4 flex flex-col">
-          <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">2. Turnos Disponibles</Label>
-          
-          <div className="flex-1 min-h-[300px] border rounded-2xl p-4 bg-muted/20 overflow-y-auto">
-            {!selectedDate ? (
-              <div className="h-full flex flex-col items-center justify-center text-center p-4">
-                <CalendarDays className="h-10 w-10 text-muted-foreground/30 mb-2" />
-                <p className="text-xs text-muted-foreground">Selecciona un día del calendario</p>
-              </div>
-            ) : availableSlots.length > 0 ? (
-              <div className="grid grid-cols-3 gap-2">
-                {availableSlots.map(time => (
-                  <Button
-                    key={time}
-                    variant={selectedTime === time ? "default" : "outline"}
-                    className={cn(
-                      "h-10 font-bold rounded-xl transition-all",
-                      selectedTime === time ? "shadow-md scale-105" : "bg-white hover:border-primary/50"
-                    )}
-                    onClick={() => setSelectedTime(time)}
-                  >
-                    {time}
-                  </Button>
-                ))}
-              </div>
-            ) : (
-              <div className="h-full flex flex-col items-center justify-center text-center p-4">
-                <Clock className="h-10 w-10 text-muted-foreground/30 mb-2" />
-                <p className="text-xs text-muted-foreground font-medium">No hay turnos disponibles para este día.</p>
-              </div>
-            )}
-          </div>
-
-          <div className="pt-4">
-             <Button 
-              className="w-full h-12 font-black rounded-xl shadow-lg shadow-primary/10" 
-              disabled={!selectedDate || !selectedTime}
-              onClick={handleContinue}
-            >
-              Continuar <ChevronRight className="ml-2 h-4 w-4" />
-            </Button>
+          <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+            <CalendarIcon className="w-3 h-3" /> Escoge un día
+          </Label>
+          <div className="border-2 rounded-[2rem] p-4 bg-muted/10 shadow-inner">
+            <Calendar
+              mode="single"
+              selected={selectedDate}
+              onSelect={(date) => { setSelectedDate(date); setSelectedTime(''); }}
+              month={month}
+              onMonthChange={setMonth}
+              disabled={(date) => isBefore(date, startOfDay(new Date()))}
+              locale={es}
+              className="w-full"
+            />
           </div>
         </div>
-      </div>
-      
-      <div className="mt-8 p-4 bg-primary/5 rounded-2xl border border-primary/10 flex items-start gap-3">
-        <Info className="h-5 w-5 text-primary shrink-0 mt-0.5" />
-        <div className="space-y-1">
-            <p className="text-xs font-bold text-primary uppercase tracking-widest">Resumen de selección</p>
-            <p className="text-xs text-gray-600 leading-relaxed">
-                Has seleccionado a <strong>{selectedStaff?.name || 'Cualquier Profesional'}</strong> para un servicio de <strong>{selectedService?.name || 'Servicio'}</strong>.
-            </p>
+
+        {/* Selector de Horas */}
+        <div className="space-y-6">
+           <div className="space-y-4">
+              <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+                <Clock className="w-3 h-3" /> Horas disponibles
+              </Label>
+              
+              {isLoading ? (
+                <div className="flex flex-col items-center justify-center h-48 gap-3 border-2 border-dashed rounded-3xl">
+                   <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                   <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Verificando agenda...</p>
+                </div>
+              ) : availableSlots.length > 0 ? (
+                <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 h-48 overflow-y-auto no-scrollbar pr-1">
+                   {availableSlots.map(time => (
+                     <button
+                        key={time}
+                        onClick={() => setSelectedTime(time)}
+                        className={cn(
+                            "h-11 rounded-xl font-bold text-sm transition-all border-2",
+                            selectedTime === time 
+                                ? "bg-primary text-white border-primary shadow-lg shadow-primary/20 scale-105" 
+                                : "bg-white border-gray-100 text-gray-600 hover:border-primary/30 hover:bg-primary/5"
+                        )}
+                     >
+                        {time}
+                     </button>
+                   ))}
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center h-48 p-6 text-center border-2 border-dashed rounded-3xl bg-muted/5">
+                   <Info className="h-8 w-8 text-muted-foreground/30 mb-2" />
+                   <p className="text-xs font-bold text-muted-foreground uppercase leading-tight">No hay turnos para este día</p>
+                   <p className="text-[10px] text-muted-foreground mt-1">Intenta con otra fecha u otro profesional.</p>
+                </div>
+              )}
+           </div>
+
+           {/* Resumen Selección */}
+           <div className="p-4 bg-primary/5 rounded-2xl border border-primary/10 flex items-center justify-between">
+              <div className="space-y-1">
+                <p className="text-[9px] font-black text-primary uppercase tracking-widest">Tu selección</p>
+                <p className="text-xs font-bold text-gray-900">
+                    {selectedDate ? format(selectedDate, "d 'de' MMMM", { locale: es }) : '---'} • {selectedTime || '--:--'}
+                </p>
+              </div>
+              <Button 
+                onClick={handleContinue} 
+                disabled={!selectedDate || !selectedTime}
+                className="font-black px-6 rounded-xl shadow-lg shadow-primary/10"
+              >
+                Continuar <ChevronRight className="ml-2 h-4 w-4" />
+              </Button>
+           </div>
         </div>
       </div>
     </div>

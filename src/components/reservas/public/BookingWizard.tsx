@@ -1,10 +1,12 @@
 'use client';
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from 'react';
+import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
-import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Card, CardHeader, CardContent, CardTitle, CardDescription } from "@/components/ui/card";
 import { 
   Check, 
   User, 
@@ -15,13 +17,14 @@ import {
   CalendarCheck
 } from "lucide-react";
 
-import { ServiceStep } from "./ServiceStep";
-import { StaffStep } from "./StaffStep";
-import { TimeStep } from "./TimeStep";
-import { ContactStep } from "./ContactStep";
-import { SuccessView } from "./SuccessView";
-import { confirmPublicBooking } from "@/actions/public-booking";
-import type { BookingService, BookingStaff, Reservation } from "@/models/booking";
+import { ServiceStep } from './ServiceStep';
+import { StaffStep } from './StaffStep';
+import { TimeStep } from './TimeStep';
+import { ContactStep } from './ContactStep';
+import { SuccessView } from './SuccessView';
+
+import type { BookingService, BookingStaff, Reservation } from '@/models/booking';
+import { confirmPublicBooking } from '@/actions/public-booking';
 
 interface BookingWizardProps {
   businessId: string;
@@ -31,7 +34,7 @@ interface BookingWizardProps {
 }
 
 const STEPS = [
-  { s: 1, label: "SERVICIO", icon: CalendarCheck },
+  { s: 1, label: "SERVICIO", icon: Check },
   { s: 2, label: "PROFESIONAL", icon: User },
   { s: 3, label: "HORARIO", icon: Clock },
   { s: 4, label: "TUS DATOS", icon: Calendar },
@@ -44,22 +47,22 @@ export function BookingWizard({ businessId, services, staff, initialServiceId }:
   const [createdReservation, setCreatedReservation] = useState<Reservation | null>(null);
 
   const [bookingData, setBookingData] = useState({
-    serviceId: initialServiceId || "",
-    serviceName: "",
-    staffId: null as string | null,
-    staffName: "Cualquier Profesional",
-    date: "",
-    startTime: "",
-    endTime: "",
-    price: 0,
+    serviceId: initialServiceId || '',
+    serviceName: '',
     durationMinutes: 30,
-    customerName: "",
-    customerPhone: "",
-    customerEmail: "",
-    notes: ""
+    price: 0,
+    staffId: 'any',
+    staffName: 'Cualquier Profesional',
+    date: '',
+    startTime: '',
+    endTime: '',
+    customerName: '',
+    customerPhone: '',
+    customerEmail: '',
+    notes: ''
   });
 
-  // Efecto para pre-seleccionar servicio si viene por URL
+  // Efecto para auto-seleccionar servicio si viene por URL
   useEffect(() => {
     if (initialServiceId && services.length > 0) {
       const s = services.find(item => item.id === initialServiceId);
@@ -68,155 +71,136 @@ export function BookingWizard({ businessId, services, staff, initialServiceId }:
           ...prev,
           serviceId: s.id,
           serviceName: s.name,
-          price: s.price,
-          durationMinutes: s.durationMinutes
+          durationMinutes: s.durationMinutes,
+          price: s.price
         }));
         setStep(2);
       }
     }
   }, [initialServiceId, services]);
 
-  const handleServiceSelect = (service: BookingService) => {
-    setBookingData(prev => ({
-      ...prev,
-      serviceId: service.id,
-      serviceName: service.name,
-      price: service.price,
-      durationMinutes: service.durationMinutes
-    }));
-    setStep(2);
-  };
+  const handleBack = () => setStep(prev => Math.max(1, prev - 1));
 
-  const handleStaffSelect = (staffId: string | 'any', staffObj?: BookingStaff) => {
-    setBookingData(prev => ({
-      ...prev,
-      staffId: staffId === 'any' ? null : staffId,
-      staffName: staffId === 'any' ? 'Cualquier Profesional' : (staffObj?.name || 'Profesional')
-    }));
-    setStep(3);
-  };
-
-  const handleDateTimeSelect = (data: { date: string, startTime: string, endTime: string }) => {
-    setBookingData(prev => ({
-      ...prev,
-      date: data.date,
-      startTime: data.startTime,
-      endTime: data.endTime
-    }));
-    setStep(4);
-  };
-
-  const handleConfirmBooking = async (contactInfo: { customerName: string, customerPhone: string, customerEmail?: string, notes?: string }) => {
+  const handleConfirmBooking = async (formData: any) => {
     setIsSubmitting(true);
+    const finalData = { ...bookingData, ...formData };
     
-    // Unificar datos finales
-    const finalData = {
-      ...bookingData,
-      ...contactInfo
-    };
-
     try {
       const res = await confirmPublicBooking(businessId, finalData);
       
-      if (res.success) {
-        setCreatedReservation(res.reservation as Reservation);
-        setStep(5); // Pantalla de éxito
-      } else {
+      if (!res.success) {
         toast({
           variant: "destructive",
           title: "Error al agendar",
-          description: res.error || "Ocurrió un error técnico al procesar tu cita. Por favor intenta de nuevo.",
+          description: res.error || "No se pudo completar la reserva.",
         });
+        setIsSubmitting(false);
+        return;
       }
+
+      setCreatedReservation(res.reservation as Reservation);
+      setStep(5);
     } catch (err: any) {
       toast({
         variant: "destructive",
         title: "Error de conexión",
-        description: err?.message || "No pudimos conectar con el servidor. Revisa tu conexión.",
+        description: err?.message || "Ocurrió un error inesperado.",
       });
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleBack = () => {
-    setStep(prev => Math.max(1, prev - 1));
-  };
-
-  // Si ya se creó la reserva, mostrar vista de éxito
-  if (step === 5 && createdReservation) {
-    return <SuccessView reservation={createdReservation} businessId={businessId} />;
-  }
-
-  return (
-    <div className="max-w-4xl mx-auto space-y-10">
-      {/* STEPPER SUPERIOR RESTAURADO */}
-      <div className="flex items-center justify-between px-4 sm:px-10 relative">
-        {/* Línea de fondo */}
-        <div className="absolute top-5 left-10 right-10 h-0.5 bg-gray-200 -z-10 hidden sm:block" />
-        
-        {STEPS.map((item) => {
-          const isCompleted = step > item.s;
-          const isActive = step === item.s;
-          
-          return (
-            <div key={item.s} className="flex flex-col items-center gap-2">
-              <div className={cn(
-                "h-10 w-10 rounded-full flex items-center justify-center transition-all duration-500 shadow-sm",
-                isCompleted ? "bg-primary text-white" : 
-                isActive ? "bg-primary text-white ring-4 ring-primary/20" : 
-                "bg-white border-2 border-gray-200 text-gray-300"
-              )}>
-                {isCompleted ? <Check className="h-5 w-5" /> : <item.icon className="h-5 w-5" />}
-              </div>
-              <span className={cn(
-                "text-[10px] font-black uppercase tracking-widest",
-                isActive || isCompleted ? "text-primary" : "text-gray-400"
-              )}>
-                {item.label}
-              </span>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* RENDERIZADO DINÁMICO DE PASOS */}
-      <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
-        {step === 1 && (
+  const renderStep = () => {
+    switch (step) {
+      case 1:
+        return (
           <ServiceStep 
             services={services} 
-            onSelect={handleServiceSelect} 
-            selectedId={bookingData.serviceId} 
+            selectedId={bookingData.serviceId}
+            onSelect={(s) => {
+              setBookingData(prev => ({ ...prev, serviceId: s.id, serviceName: s.name, durationMinutes: s.durationMinutes, price: s.price }));
+              setStep(2);
+            }} 
           />
-        )}
-        
-        {step === 2 && (
+        );
+      case 2:
+        return (
           <StaffStep 
-            staffList={staff.filter(s => s.assignedServiceIds.includes(bookingData.serviceId))} 
-            onSelectStaff={handleStaffSelect}
-            selectedStaffId={bookingData.staffId || 'any'}
+            staffList={staff.filter(s => s.assignedServiceIds.includes(bookingData.serviceId))}
+            selectedStaffId={bookingData.staffId}
             onBack={handleBack}
+            onSelectStaff={(id, s) => {
+              setBookingData(prev => ({ ...prev, staffId: id, staffName: s?.name || 'Cualquier Profesional' }));
+              setStep(3);
+            }}
           />
-        )}
-
-        {step === 3 && (
+        );
+      case 3:
+        return (
           <TimeStep 
             businessId={businessId}
             selectedService={services.find(s => s.id === bookingData.serviceId)}
-            selectedStaff={staff.find(s => s.id === bookingData.staffId) || null}
+            selectedStaff={staff.find(s => s.id === bookingData.staffId)}
             onBack={handleBack}
-            onSelectDateTime={handleDateTimeSelect}
+            onSelectDateTime={(data) => {
+              setBookingData(prev => ({ ...prev, ...data }));
+              setStep(4);
+            }}
           />
-        )}
-
-        {step === 4 && (
+        );
+      case 4:
+        return (
           <ContactStep 
-            bookingData={bookingData} // Pasa el objeto actual (asegurado por useState inicial)
+            bookingData={bookingData}
+            isSubmitting={isSubmitting}
             onBack={handleBack}
             onSubmit={handleConfirmBooking}
-            isSubmitting={isSubmitting}
           />
-        )}
+        );
+      case 5:
+        return <SuccessView reservation={createdReservation!} />;
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <div className="max-w-4xl mx-auto">
+      {step < 5 && (
+        <div className="flex items-center justify-center mb-12 relative px-4">
+          <div className="absolute top-1/2 left-4 right-4 h-0.5 bg-gray-200 -z-10 -translate-y-4"></div>
+          <div className="flex justify-between w-full max-w-2xl">
+            {STEPS.map((item) => {
+              const isActive = step === item.s;
+              const isCompleted = step > item.s;
+              const Icon = item.icon;
+
+              return (
+                <div key={item.s} className="flex flex-col items-center gap-3">
+                  <div className={cn(
+                    "w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 border-4",
+                    isCompleted ? "bg-primary border-primary text-white" :
+                    isActive ? "bg-white border-primary text-primary shadow-lg shadow-primary/20 scale-110" :
+                    "bg-white border-gray-200 text-gray-300"
+                  )}>
+                    {isCompleted ? <Check className="w-5 h-5" /> : <Icon className="w-5 h-5" />}
+                  </div>
+                  <span className={cn(
+                    "text-[10px] font-black tracking-widest uppercase",
+                    isActive || isCompleted ? "text-primary" : "text-gray-400"
+                  )}>
+                    {item.label}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+        {renderStep()}
       </div>
     </div>
   );
