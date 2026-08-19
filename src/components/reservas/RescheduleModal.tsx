@@ -30,7 +30,7 @@ import {
 } from 'lucide-react';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query, where, getDocs } from 'firebase/firestore';
-import { generateTimeSlots, isSlotAvailable } from '@/lib/booking-engine';
+import { generateTimeSlots, isSlotAvailable, generateAvailableSlots } from '@/lib/booking-engine';
 import { calculateEndTime, type Reservation, type BookingService, type BookingStaff, type BookingAvailability } from '@/models/booking';
 import { rescheduleReservation } from '@/actions/booking-management';
 import { useToast } from '@/hooks/use-toast';
@@ -43,6 +43,36 @@ interface RescheduleModalProps {
   businessId: string;
 }
 
+/**
+ * Parseo universal de fecha (soporta YYYY-MM-DD y DD/MM/YYYY)
+ * Evita desfases UTC construyendo la fecha en zona horaria local.
+ */
+const parseLocalDate = (dateStr: string): { localDate: Date; dayOfWeek: number; formattedDateKey: string } => {
+  if (!dateStr) return { localDate: new Date(), dayOfWeek: new Date().getDay(), formattedDateKey: '' };
+  
+  let year = new Date().getFullYear();
+  let month = new Date().getMonth();
+  let day = new Date().getDate();
+
+  if (dateStr.includes('-')) {
+    const parts = dateStr.split('-').map(Number);
+    year = parts[0];
+    month = parts[1] - 1;
+    day = parts[2];
+  } else if (dateStr.includes('/')) {
+    const parts = dateStr.split('/').map(Number);
+    day = parts[0];
+    month = parts[1] - 1;
+    year = parts[2];
+  }
+
+  const localDate = new Date(year, month, day);
+  const dayOfWeek = localDate.getDay();
+  const formattedDateKey = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+
+  return { localDate, dayOfWeek, formattedDateKey };
+};
+
 export function RescheduleModal({ isOpen, onClose, reservation, businessId }: RescheduleModalProps) {
   const { toast } = useToast();
   const firestore = useFirestore();
@@ -53,10 +83,7 @@ export function RescheduleModal({ isOpen, onClose, reservation, businessId }: Re
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // --- DATA FETCHING ---
-  const servicesQuery = useMemoFirebase(() => query(collection(firestore, `businesses/${businessId}/bookingServices`), where('isActive', '==', true)), [businessId, firestore]);
   const staffQuery = useMemoFirebase(() => collection(firestore, `businesses/${businessId}/bookingStaff`), [businessId, firestore]);
-  
-  const { data: services } = useCollection<BookingService>(servicesQuery);
   const { data: allStaff } = useCollection<BookingStaff>(staffQuery);
 
   const availableStaff = (allStaff || []).filter(s => s.assignedServiceIds.includes(reservation.serviceId) && s.isActive);
@@ -66,7 +93,7 @@ export function RescheduleModal({ isOpen, onClose, reservation, businessId }: Re
   const [isCheckingSlots, setIsCheckingSlots] = useState(false);
 
   useEffect(() => {
-    if (!newStaffId || !newDate || !services) {
+    if (!newStaffId || !newDate || !businessId || !firestore) {
       setAvailableSlots([]);
       return;
     }
@@ -74,54 +101,59 @@ export function RescheduleModal({ isOpen, onClose, reservation, businessId }: Re
     const checkSlots = async () => {
       setIsCheckingSlots(true);
       try {
-        const service = services.find(s => s.id === reservation.serviceId);
-        if (!service) return;
+        const { localDate, dayOfWeek, formattedDateKey } = parseLocalDate(newDate);
 
-        // 1. Parsea la fecha de forma segura sin desfases UTC (Uso de componentes locales)
-        const [year, month, day] = newDate.split('-').map(Number);
-        const localDate = new Date(year, month - 1, day);
-        const dayOfWeek = localDate.getDay(); // 0 (Dom) a 6 (Sáb)
-
+        // Consulta de disponibilidad y reservas del negocio sin índices compuestos (Index-Free)
         const [availSnap, resSnap] = await Promise.all([
-          getDocs(query(collection(firestore, `businesses/${businessId}/bookingAvailability`), where('dayOfWeek', '==', dayOfWeek))),
-          getDocs(query(collection(firestore, `businesses/${businessId}/reservations`), where('staffId', '==', newStaffId), where('date', '==', newDate)))
+          getDocs(collection(firestore, `businesses/${businessId}/bookingAvailability`)),
+          getDocs(collection(firestore, `businesses/${businessId}/reservations`))
         ]);
 
-        let dayAvailability: BookingAvailability;
+        // 1. Resolver disponibilidad del día (o fallback si no hay datos guardados)
+        const availDocs = availSnap.docs.map(d => ({ id: d.id, ...d.data() } as any));
+        const dayDoc = availDocs.find(a => Number(a.dayOfWeek) === dayOfWeek || a.id === String(dayOfWeek));
 
-        // 2. Inyección de jornada por defecto si no existe configuración manual en DB
-        if (!availSnap.empty) {
-          dayAvailability = availSnap.docs[0].data() as BookingAvailability;
-        } else {
-          // Jornada de respaldo: Lunes a Sábado abierto (08:00 a 18:00), Domingo cerrado
-          dayAvailability = {
-            dayOfWeek,
-            isOpen: dayOfWeek !== 0,
-            shifts: [{ start: "08:00", end: "18:00" }],
-            breaks: [{ start: "13:00", end: "14:00" }]
-          };
-        }
+        const dayAvailability: BookingAvailability = dayDoc ? {
+          dayOfWeek,
+          isOpen: Boolean(dayDoc.isOpen),
+          shifts: dayDoc.shifts?.length ? dayDoc.shifts : [{ start: "08:00", end: "18:00" }],
+          breaks: dayDoc.breaks || [{ start: "13:00", end: "14:00" }]
+        } : {
+          dayOfWeek,
+          isOpen: dayOfWeek !== 0, // Lunes a Sábado abierto por defecto
+          shifts: [{ start: "08:00", end: "18:00" }],
+          breaks: [{ start: "13:00", end: "14:00" }]
+        };
 
-        // Si el día está configurado explícitamente como cerrado:
         if (!dayAvailability.isOpen) {
           setAvailableSlots([]);
+          setIsCheckingSlots(false);
           return;
         }
 
-        // 3. Exclusión de la cita actual en colisiones para permitir movimiento en el mismo día
-        const existingRes = resSnap.docs
-          .map(d => ({ ...d.data(), id: d.id } as Reservation))
-          .filter(r => r.id !== reservation.id && r.status !== 'cancelled');
+        // 2. Filtrar en memoria por fecha, especialista y excluir la cita actual (CERO ÍNDICES COMPUESTOS)
+        const existingReservations = resSnap.docs
+          .map(d => ({ id: d.id, ...d.data() } as any))
+          .filter((r: any) => {
+            const matchesDate = r.date === formattedDateKey || r.date === newDate;
+            const matchesStaff = newStaffId && newStaffId !== 'any' ? r.staffId === newStaffId : true;
+            const isNotCurrent = r.id !== reservation.id;
+            const isActive = r.status !== 'cancelled';
+            return matchesDate && matchesStaff && isNotCurrent && isActive;
+          });
 
-        const allPossibleSlots = generateTimeSlots(15);
-        const validSlots = allPossibleSlots.filter(startTime => {
-          const endTime = calculateEndTime(startTime, service.durationMinutes);
-          return isSlotAvailable({ start: startTime, end: endTime }, dayAvailability, existingRes).available;
-        });
+        // 3. Generar turnos disponibles válidos usando el motor central
+        const duration = Number(reservation.durationMinutes) || 30;
+        const slots = generateAvailableSlots(
+          dayAvailability,
+          duration,
+          existingReservations,
+          localDate
+        );
 
-        setAvailableSlots(validSlots);
-      } catch (err) {
-        console.error("Error checking slots:", err);
+        setAvailableSlots(slots);
+      } catch (error) {
+        console.error("Error al calcular turnos de reprogramación:", error);
         setAvailableSlots([]);
       } finally {
         setIsCheckingSlots(false);
@@ -129,7 +161,7 @@ export function RescheduleModal({ isOpen, onClose, reservation, businessId }: Re
     };
 
     checkSlots();
-  }, [newStaffId, newDate, services, businessId, firestore, reservation.id, reservation.serviceId]);
+  }, [newStaffId, newDate, businessId, firestore, reservation.id, reservation.durationMinutes]);
 
   const handleReschedule = async () => {
     if (!newDate || !newStartTime) return;
@@ -159,7 +191,6 @@ export function RescheduleModal({ isOpen, onClose, reservation, businessId }: Re
         </DialogHeader>
 
         <div className="space-y-6 py-4">
-          {/* Horario Actual Info */}
           <div className="flex items-center justify-between p-3 bg-muted rounded-xl border border-dashed text-xs">
             <div className="space-y-1">
                 <span className="font-bold text-muted-foreground uppercase tracking-widest text-[9px]">Horario Actual</span>
