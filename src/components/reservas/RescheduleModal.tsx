@@ -77,7 +77,7 @@ export function RescheduleModal({ isOpen, onClose, reservation, businessId }: Re
         const service = services.find(s => s.id === reservation.serviceId);
         if (!service) return;
 
-        // 1. Parsea la fecha de forma segura sin desfases UTC
+        // 1. Parsea la fecha de forma segura sin desfases UTC (Uso de componentes locales)
         const [year, month, day] = newDate.split('-').map(Number);
         const localDate = new Date(year, month - 1, day);
         const dayOfWeek = localDate.getDay(); // 0 (Dom) a 6 (Sáb)
@@ -89,7 +89,7 @@ export function RescheduleModal({ isOpen, onClose, reservation, businessId }: Re
 
         let dayAvailability: BookingAvailability;
 
-        // 2. Inyección de jornada por defecto (ELIMINAR BLOQUEO POR availSnap.empty)
+        // 2. Inyección de jornada por defecto si no existe configuración manual en DB
         if (!availSnap.empty) {
           dayAvailability = availSnap.docs[0].data() as BookingAvailability;
         } else {
@@ -108,7 +108,7 @@ export function RescheduleModal({ isOpen, onClose, reservation, businessId }: Re
           return;
         }
 
-        // 3. Exclusión de la cita actual en colisiones
+        // 3. Exclusión de la cita actual en colisiones para permitir movimiento en el mismo día
         const existingRes = resSnap.docs
           .map(d => ({ ...d.data(), id: d.id } as Reservation))
           .filter(r => r.id !== reservation.id && r.status !== 'cancelled');
