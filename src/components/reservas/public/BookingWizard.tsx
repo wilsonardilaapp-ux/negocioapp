@@ -1,33 +1,32 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { Card, CardHeader, CardContent, CardTitle, CardDescription } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { 
-  Check, 
-  ChevronLeft, 
-  ChevronRight, 
-  Calendar, 
-  Clock, 
-  User, 
-  Tag, 
-  CheckCircle2, 
-  Loader2,
-  ArrowLeft
-} from 'lucide-react';
-import { cn } from '@/lib/utils';
+import React, { useState, useEffect, useMemo } from "react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { useToast } from "@/hooks/use-toast";
-import type { BookingService, BookingStaff, BookingAvailability, Reservation } from '@/models/booking';
-import { confirmPublicBooking } from '@/actions/public-booking';
-
-// Steps components
-import { ServiceStep } from './ServiceStep';
-import { StaffStep } from './StaffStep';
-import { TimeStep } from './TimeStep';
-import { ContactStep } from './ContactStep';
-import { SuccessView } from './SuccessView';
+import { toast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
+import { 
+  Check, 
+  User, 
+  Clock, 
+  Calendar, 
+  ArrowLeft, 
+  ChevronRight,
+  Loader2,
+  Sparkles,
+  MapPin,
+  Smartphone,
+  CheckCircle2,
+  CalendarDays
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { ServiceStep } from "./ServiceStep";
+import { StaffStep } from "./StaffStep";
+import { TimeStep } from "./TimeStep";
+import { ContactStep } from "./ContactStep";
+import { SuccessView } from "./SuccessView";
+import { confirmPublicBooking } from "@/actions/public-booking";
+import type { BookingService, BookingStaff, Reservation } from "@/models/booking";
 
 interface BookingWizardProps {
   businessId: string;
@@ -36,35 +35,22 @@ interface BookingWizardProps {
   initialServiceId?: string;
 }
 
-/**
- * Helper resiliente para formatear fechas de reserva (objetos o strings)
- */
-const formatReservationDate = (dateVal: any) => {
-  try {
-    if (!dateVal) return "";
-    const d = typeof dateVal === 'string' 
-      ? new Date(dateVal.includes('T') ? dateVal : `${dateVal}T00:00:00`) 
-      : new Date(dateVal);
-    
-    if (isNaN(d.getTime())) return String(dateVal);
-    return format(d, "EEEE, d 'de' MMMM", { locale: es });
-  } catch {
-    return String(dateVal || "");
-  }
-};
-
 export function BookingWizard({ businessId, services, staff, initialServiceId }: BookingWizardProps) {
-  const { toast } = useToast();
   const [mounted, setMounted] = useState(false);
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [createdReservation, setCreatedReservation] = useState<Reservation | null>(null);
 
-  const [bookingData, setBookingData] = useState<Partial<Reservation>>({
+  const [bookingData, setBookingData] = useState({
     serviceId: initialServiceId || '',
+    serviceName: '',
+    durationMinutes: 30,
+    price: 0,
     staffId: '',
+    staffName: '',
     date: '',
     startTime: '',
+    endTime: '',
     customerName: '',
     customerPhone: '',
     customerEmail: '',
@@ -73,52 +59,66 @@ export function BookingWizard({ businessId, services, staff, initialServiceId }:
 
   useEffect(() => {
     setMounted(true);
-    if (initialServiceId) setStep(2);
-  }, [initialServiceId]);
+  }, []);
 
-  const selectedService = services.find(s => s.id === bookingData.serviceId);
-  const selectedStaff = staff.find(s => s.id === bookingData.staffId);
+  const STEPS = [
+    { s: 1, label: "SERVICIO", icon: CheckCircle2 },
+    { s: 2, label: "PROFESIONAL", icon: User },
+    { s: 3, label: "HORARIO", icon: Clock },
+    { s: 4, label: "TUS DATOS", icon: CalendarDays },
+  ];
 
-  const handleSelectService = (id: string) => {
-    setBookingData(prev => ({ ...prev, serviceId: id, staffId: '' }));
+  const handleSelectService = (service: BookingService) => {
+    setBookingData(prev => ({
+      ...prev,
+      serviceId: service.id,
+      serviceName: service.name,
+      durationMinutes: service.durationMinutes,
+      price: service.price
+    }));
     setStep(2);
   };
 
-  const handleSelectStaff = (id: string) => {
-    setBookingData(prev => ({ ...prev, staffId: id }));
+  const handleSelectStaff = (staffId: string, staffMember?: BookingStaff) => {
+    setBookingData(prev => ({
+      ...prev,
+      staffId: staffId,
+      staffName: staffMember ? staffMember.name : 'Cualquier Profesional'
+    }));
     setStep(3);
   };
 
   const handleSelectDateTime = (data: { date: string; startTime: string; endTime: string }) => {
-    setBookingData(prev => ({ 
-      ...prev, 
-      date: data.date, 
-      startTime: data.startTime, 
-      endTime: data.endTime 
+    setBookingData(prev => ({
+      ...prev,
+      date: data.date,
+      startTime: data.startTime,
+      endTime: data.endTime
     }));
     setStep(4);
   };
 
-  const handleConfirmBooking = async () => {
+  const handleConfirm = async (contactData: any) => {
     setIsSubmitting(true);
+    const finalData = { ...bookingData, ...contactData };
+
     try {
-      const res = await confirmPublicBooking(businessId, bookingData);
-      
+      const res = await confirmPublicBooking(businessId, finalData);
       if (res.success) {
-        setCreatedReservation(res.reservation as Reservation);
+        setCreatedReservation(res.reservation);
         setStep(5);
       } else {
         toast({
           variant: "destructive",
           title: "Error al agendar",
-          description: res.error || "No se pudo completar la reserva.",
+          description: res.error || "No se pudo procesar tu cita. Por favor intenta de nuevo.",
         });
       }
     } catch (err: any) {
       toast({
         variant: "destructive",
-        title: "Error de conexión",
-        description: err?.message || "Ocurrió un error técnico inesperado.",
+        title: "Error técnico",
+        description: err.message || "Ocurrió un error inesperado.",
       });
     } finally {
       setIsSubmitting(false);
@@ -127,92 +127,83 @@ export function BookingWizard({ businessId, services, staff, initialServiceId }:
 
   if (!mounted) return null;
 
-  // Renderizar Resumen para pasos avanzados
-  const renderSummary = () => {
-    if (step < 2 || step > 4) return null;
-    return (
-      <Card className="rounded-3xl border-none shadow-lg bg-white overflow-hidden animate-in slide-in-from-top-2 duration-500">
-        <CardHeader className="bg-primary p-6">
-          <CardTitle className="text-white text-sm font-black uppercase tracking-[0.2em]">Resumen de tu Turno</CardTitle>
-        </CardHeader>
-        <CardContent className="p-6 grid grid-cols-1 sm:grid-cols-3 gap-6">
-          {selectedService && (
-            <div className="space-y-1">
-              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Servicio</span>
-              <p className="font-black text-gray-900 truncate">{selectedService.name}</p>
-            </div>
-          )}
-          {selectedStaff && (
-            <div className="space-y-1">
-              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Profesional</span>
-              <p className="font-bold text-gray-700 truncate">{selectedStaff.name}</p>
-            </div>
-          )}
-          {bookingData.startTime && (
-            <div className="space-y-1">
-              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Fecha y Hora</span>
-              <div className="flex items-center gap-1 font-black text-primary capitalize">
-                <span>{bookingData.date ? formatReservationDate(bookingData.date) : ''}</span>
-                <span>•</span>
-                <span>{bookingData.startTime}</span>
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-    );
-  };
+  // Pantalla de Éxito (Fuera del layout estándar del wizard)
+  if (step === 5 && createdReservation) {
+    return <SuccessView reservation={createdReservation} businessId={businessId} />;
+  }
 
   return (
-    <div className="max-w-5xl mx-auto space-y-8">
-      {/* Indicador de Pasos */}
-      {step < 5 && (
-        <div className="flex justify-center items-center gap-4 mb-10">
-          {[1, 2, 3, 4].map((s) => (
-            <React.Fragment key={s}>
+    <div className="w-full max-w-4xl mx-auto space-y-10 py-4 px-2">
+      {/* STEPPER SUPERIOR RESTAURADO */}
+      <div className="flex justify-between items-center relative max-w-2xl mx-auto px-4">
+        {/* Línea de fondo */}
+        <div className="absolute top-5 left-8 right-8 h-0.5 bg-gray-200 -z-0" />
+        
+        {STEPS.map((item) => {
+          const isActive = step === item.s;
+          const isCompleted = step > item.s;
+          const Icon = isCompleted ? Check : item.icon;
+
+          return (
+            <div key={item.s} className="flex flex-col items-center gap-3 relative z-10">
               <div 
                 className={cn(
-                  "h-10 w-10 rounded-full flex items-center justify-center font-black transition-all duration-300",
-                  step === s ? "bg-primary text-white scale-110 shadow-lg shadow-primary/20" : 
-                  step > s ? "bg-green-500 text-white" : "bg-white border-2 text-muted-foreground"
+                  "w-10 h-10 rounded-full flex items-center justify-center transition-all duration-500 border-2 shadow-sm",
+                  isCompleted ? "bg-primary border-primary text-white" :
+                  isActive ? "bg-primary border-primary text-white scale-110 shadow-lg" :
+                  "bg-white border-gray-200 text-gray-300"
                 )}
               >
-                {step > s ? <Check className="h-5 w-5" /> : s}
+                <Icon className={cn("w-5 h-5", isActive && "animate-in zoom-in duration-300")} />
               </div>
-              {s < 4 && <div className={cn("h-1 w-8 sm:w-16 rounded-full transition-colors duration-500", step > s ? "bg-green-500" : "bg-muted")} />}
-            </React.Fragment>
-          ))}
-        </div>
-      )}
+              <span className={cn(
+                "text-[10px] font-black tracking-widest uppercase",
+                isActive || isCompleted ? "text-primary" : "text-gray-400"
+              )}>
+                {item.label}
+              </span>
+            </div>
+          );
+        })}
+      </div>
 
-      {renderSummary()}
+      {/* CONTENIDO DE LOS PASOS */}
+      <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
+        {step === 1 && (
+          <ServiceStep 
+            services={services} 
+            onSelect={handleSelectService} 
+            selectedServiceId={bookingData.serviceId} 
+          />
+        )}
 
-      <div className="min-h-[400px]">
-        {step === 1 && <ServiceStep services={services} onSelect={handleSelectService} />}
-        {step === 2 && <StaffStep staff={staff.filter(s => s.assignedServiceIds.includes(bookingData.serviceId!))} onSelect={handleSelectStaff} onBack={() => setStep(1)} />}
+        {step === 2 && (
+          <StaffStep 
+            staffList={staff.filter(s => s.assignedServiceIds.includes(bookingData.serviceId))} 
+            onSelectStaff={handleSelectStaff}
+            onBack={() => setStep(1)}
+            selectedStaffId={bookingData.staffId}
+          />
+        )}
+
         {step === 3 && (
           <TimeStep 
             businessId={businessId}
-            selectedService={selectedService!}
-            selectedStaff={selectedStaff!}
-            availabilityList={[]} // En producción esto se recuperaría vía hooks o props
-            existingReservations={[]}
+            selectedService={services.find(s => s.id === bookingData.serviceId)}
+            selectedStaffId={bookingData.staffId}
             onSelectDateTime={handleSelectDateTime}
             onBack={() => setStep(2)}
           />
         )}
+
         {step === 4 && (
           <ContactStep 
-            onSubmit={async (data) => {
-              setBookingData(prev => ({ ...prev, ...data }));
-              // El botón de confirmar ejecuta handleConfirmBooking
-            }}
-            onConfirm={handleConfirmBooking}
-            isSubmitting={isSubmitting}
+            bookingData={bookingData}
+            onConfirm={handleConfirm}
             onBack={() => setStep(3)}
+            isSubmitting={isSubmitting}
           />
         )}
-        {step === 5 && createdReservation && <SuccessView reservation={createdReservation} />}
       </div>
     </div>
   );
