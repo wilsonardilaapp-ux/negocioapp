@@ -32,9 +32,18 @@ export function SuccessView({ reservation, businessName }: SuccessViewProps) {
     // Implementación simple de enlace a Google Calendar
     const startTime = reservation.startTime.replace(':', '');
     const endTime = reservation.endTime.replace(':', '');
-    const date = reservation.date.replace(/-/g, '');
+    const startDate = reservation.date.replace(/-/g, '');
+
+    // Si la hora de fin es menor a la de inicio, la cita cruza medianoche: sumar un día a la fecha de fin
+    const crossesMidnight = reservation.endTime < reservation.startTime;
+    const endDateObj = new Date(`${reservation.date}T00:00:00`);
+    if (crossesMidnight) {
+      endDateObj.setDate(endDateObj.getDate() + 1);
+    }
+    const endDate = `${endDateObj.getFullYear()}${String(endDateObj.getMonth() + 1).padStart(2, '0')}${String(endDateObj.getDate()).padStart(2, '0')}`;
+
     const text = encodeURIComponent(`Cita en ${businessName}: ${reservation.serviceName}`);
-    const dates = `${date}T${startTime}00/${date}T${endTime}00`;
+    const dates = `${startDate}T${startTime}00/${endDate}T${endTime}00`;
     
     window.open(`https://www.google.com/calendar/render?action=TEMPLATE&text=${text}&dates=${dates}&details=Cita+agendada+desde+Markix`, '_blank');
   };
