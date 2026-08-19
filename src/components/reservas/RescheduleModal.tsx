@@ -77,31 +77,52 @@ export function RescheduleModal({ isOpen, onClose, reservation, businessId }: Re
         const service = services.find(s => s.id === reservation.serviceId);
         if (!service) return;
 
-        const dateObj = new Date(newDate + 'T00:00:00');
-        const dayOfWeek = dateObj.getDay();
+        // 1. Parsea la fecha de forma segura sin desfases UTC
+        const [year, month, day] = newDate.split('-').map(Number);
+        const localDate = new Date(year, month - 1, day);
+        const dayOfWeek = localDate.getDay(); // 0 (Dom) a 6 (Sáb)
 
         const [availSnap, resSnap] = await Promise.all([
           getDocs(query(collection(firestore, `businesses/${businessId}/bookingAvailability`), where('dayOfWeek', '==', dayOfWeek))),
           getDocs(query(collection(firestore, `businesses/${businessId}/reservations`), where('staffId', '==', newStaffId), where('date', '==', newDate)))
         ]);
 
-        if (availSnap.empty) {
+        let dayAvailability: BookingAvailability;
+
+        // 2. Inyección de jornada por defecto (ELIMINAR BLOQUEO POR availSnap.empty)
+        if (!availSnap.empty) {
+          dayAvailability = availSnap.docs[0].data() as BookingAvailability;
+        } else {
+          // Jornada de respaldo: Lunes a Sábado abierto (08:00 a 18:00), Domingo cerrado
+          dayAvailability = {
+            dayOfWeek,
+            isOpen: dayOfWeek !== 0,
+            shifts: [{ start: "08:00", end: "18:00" }],
+            breaks: [{ start: "13:00", end: "14:00" }]
+          };
+        }
+
+        // Si el día está configurado explícitamente como cerrado:
+        if (!dayAvailability.isOpen) {
           setAvailableSlots([]);
           return;
         }
 
-        const availability = availSnap.docs[0].data() as BookingAvailability;
+        // 3. Exclusión de la cita actual en colisiones
         const existingRes = resSnap.docs
           .map(d => ({ ...d.data(), id: d.id } as Reservation))
-          .filter(r => r.id !== reservation.id); // No chocar consigo misma
+          .filter(r => r.id !== reservation.id && r.status !== 'cancelled');
 
         const allPossibleSlots = generateTimeSlots(15);
         const validSlots = allPossibleSlots.filter(startTime => {
           const endTime = calculateEndTime(startTime, service.durationMinutes);
-          return isSlotAvailable({ start: startTime, end: endTime }, availability, existingRes).available;
+          return isSlotAvailable({ start: startTime, end: endTime }, dayAvailability, existingRes).available;
         });
 
         setAvailableSlots(validSlots);
+      } catch (err) {
+        console.error("Error checking slots:", err);
+        setAvailableSlots([]);
       } finally {
         setIsCheckingSlots(false);
       }
