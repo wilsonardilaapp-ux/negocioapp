@@ -36,20 +36,17 @@ export async function confirmPublicBooking(businessId: string, bookingData: any)
     }
     const dayOfWeek = dateObj.getDay();
 
-    const targetStaffId = bookingData.staffId && bookingData.staffId !== 'any' ? bookingData.staffId : null;
+    const targetStaffId = (bookingData.staffId && bookingData.staffId !== 'any') ? String(bookingData.staffId) : null;
 
     // --- CONSULTA SEGURA DE SERVICIO Y DISPONIBILIDAD ---
-    // Resolvemos el servicio, disponibilidad y reservas existentes.
-    // Usamos filtrado en memoria para las reservas para evitar el requisito de índices compuestos.
-    
     const promises: any[] = [
       db.collection('businesses').doc(businessId).collection('bookingAvailability').doc(dayOfWeek.toString()).get(),
       db.collection('businesses').doc(businessId).collection('reservations')
-        .where('date', '==', bookingData.date)
+        .where('date', '==', String(bookingData.date))
         .get()
     ];
 
-    // Solo consultamos el servicio si el ID es válido (evita crash de path vacío en Admin SDK)
+    // Solo consultamos el servicio si el ID es válido
     if (bookingData.serviceId && typeof bookingData.serviceId === 'string' && bookingData.serviceId.trim() !== '') {
         promises.push(db.collection('businesses').doc(businessId).collection('bookingServices').doc(bookingData.serviceId).get());
     } else {
@@ -57,7 +54,7 @@ export async function confirmPublicBooking(businessId: string, bookingData: any)
     }
 
     // Solo consultamos el staff si el ID es válido
-    if (targetStaffId && typeof targetStaffId === 'string' && targetStaffId.trim() !== '') {
+    if (targetStaffId && targetStaffId.trim() !== '') {
         promises.push(db.collection('businesses').doc(businessId).collection('bookingStaff').doc(targetStaffId).get());
     } else {
         promises.push(Promise.resolve(null));
@@ -66,36 +63,35 @@ export async function confirmPublicBooking(businessId: string, bookingData: any)
     const [availSnap, resSnap, servSnap, staffSnap] = await Promise.all(promises);
 
     // --- DETERMINAR VALORES DEL SERVICIO (CON FALLBACKS) ---
-    let serviceName = bookingData.serviceName || 'Servicio';
+    let serviceName = String(bookingData.serviceName || 'Servicio');
     let servicePrice = Number(bookingData.price) || 0;
     let durationMinutes = Number(bookingData.durationMinutes) || 30;
 
     if (servSnap && servSnap.exists) {
       const sData = servSnap.data();
-      serviceName = sData?.name || serviceName;
-      servicePrice = Number(sData?.price) ?? servicePrice;
-      durationMinutes = Number(sData?.durationMinutes) ?? durationMinutes;
+      serviceName = String(sData?.name || serviceName);
+      servicePrice = Number(sData?.price) || servicePrice;
+      durationMinutes = Number(sData?.durationMinutes) || durationMinutes;
     }
 
     // --- DETERMINAR VALORES DEL STAFF (CON FALLBACKS) ---
-    let staffName = bookingData.staffName && bookingData.staffName !== 'any' ? bookingData.staffName : 'Cualquier Profesional';
+    let staffName = (targetStaffId && targetStaffId !== 'any') ? String(bookingData.staffName || 'Profesional') : 'Cualquier Profesional';
     if (staffSnap && staffSnap.exists) {
-      staffName = staffSnap.data()?.name || staffName;
+      staffName = String(staffSnap.data()?.name || staffName);
     }
 
-    // --- VALIDACIÓN DE DISPONIBILIDAD EN SERVIDOR (ÚLTIMA LÍNEA DE DEFENSA) ---
+    // --- VALIDACIÓN DE DISPONIBILIDAD EN SERVIDOR ---
     if (availSnap.exists) {
       const availability = availSnap.data() as BookingAvailability;
       const allDayReservations = resSnap.docs.map((doc: any) => ({ ...doc.data(), id: doc.id } as Reservation));
       
-      // Filtrar en memoria por staffId para evitar el índice compuesto
       const existingReservations = targetStaffId 
         ? allDayReservations.filter((r: Reservation) => r.staffId === targetStaffId)
         : allDayReservations;
 
       const endTime = calculateEndTime(bookingData.startTime, durationMinutes);
       const check = isSlotAvailable(
-        { start: bookingData.startTime, end: endTime },
+        { start: String(bookingData.startTime), end: endTime },
         availability,
         existingReservations
       );
@@ -105,7 +101,7 @@ export async function confirmPublicBooking(businessId: string, bookingData: any)
       }
     }
 
-    // 3. PERSISTENCIA: CONSTRUCCIÓN DE PAYLOAD LIMPIO (CERO UNDEFINED)
+    // 3. PERSISTENCIA: CONSTRUCCIÓN DE PAYLOAD TOTALMENTE SANITIZADO (CERO UNDEFINED)
     const now = new Date().toISOString();
     const reservationPayload = {
       businessId: String(businessId),
@@ -113,13 +109,13 @@ export async function confirmPublicBooking(businessId: string, bookingData: any)
       customerPhone: String(bookingData.customerPhone || '').trim(),
       customerEmail: bookingData.customerEmail?.trim() || null,
       notes: bookingData.notes?.trim() || null,
-      serviceId: bookingData.serviceId || 'general',
+      serviceId: String(bookingData.serviceId || 'general'),
       serviceName: String(serviceName),
-      staffId: targetStaffId ? String(targetStaffId) : null,
+      staffId: targetStaffId,
       staffName: String(staffName),
       date: String(bookingData.date),
       startTime: String(bookingData.startTime),
-      endTime: bookingData.endTime || calculateEndTime(bookingData.startTime, durationMinutes),
+      endTime: String(bookingData.endTime || calculateEndTime(bookingData.startTime, durationMinutes)),
       price: Number(servicePrice),
       durationMinutes: Number(durationMinutes),
       status: 'pending',
@@ -138,17 +134,15 @@ export async function confirmPublicBooking(businessId: string, bookingData: any)
     
     const createdReservation = { id: docRef.id, ...reservationPayload };
 
-    // 4. DISPARO DE NOTIFICACIÓN WHATSAPP (AISLADO Y NO BLOQUEANTE)
+    // 4. DISPARO DE NOTIFICACIÓN WHATSAPP (AISLADO)
     try {
         const serviceObj = servSnap?.exists ? (servSnap.data() as BookingService) : undefined;
         const staffObj = staffSnap?.exists ? (staffSnap.data() as BookingStaff) : undefined;
-
         await sendBookingNotification('onCreate', businessId, createdReservation as Reservation, serviceObj, staffObj);
     } catch (notifErr) {
         console.error("Aviso: Notificación WhatsApp no enviada (no fatal):", notifErr);
     }
 
-    // 5. RESPUESTA DE ÉXITO
     return { 
         success: true, 
         reservationId: docRef.id,
@@ -156,7 +150,11 @@ export async function confirmPublicBooking(businessId: string, bookingData: any)
     };
 
   } catch (error: any) {
-    console.error('Error fatal en confirmPublicBooking:', error);
-    return { success: false, error: 'Ocurrió un error técnico al procesar tu cita. Por favor intenta de nuevo.' };
+    console.error('FATAL ERROR IN confirmPublicBooking:', error);
+    // Devolvemos el error real para diagnóstico, con fallback genérico si no hay mensaje
+    return { 
+      success: false, 
+      error: error?.message || "Error interno de servidor al procesar la reserva." 
+    };
   }
 }
