@@ -1,3 +1,4 @@
+
 'use client';
 
 /**
@@ -6,7 +7,7 @@
  */
 
 import type { Reservation } from '@/models/booking';
-import { differenceInDays, parseISO } from 'date-fns';
+import { differenceInDays } from 'date-fns';
 
 export type RiskLevel = 'critical' | 'overdue' | 'upcoming' | 'normal';
 
@@ -34,7 +35,8 @@ export interface ChurnMetrics {
 
 export class BookingChurnService {
   /**
-   * Procesa un listado de reservas completadas para detectar oportunidades de re-agendamiento.
+   * Procesa un listado de reservas para detectar oportunidades de re-agendamiento.
+   * Filtra las citas completadas y calcula la frecuencia de cada cliente.
    */
   static getBookingOpportunities(reservations: Reservation[]): {
     opportunities: BookingOpportunity[];
@@ -43,9 +45,11 @@ export class BookingChurnService {
     const today = new Date();
     const customerMap = new Map<string, Reservation[]>();
 
-    // 1. Agrupar por teléfono de cliente
+    // 1. Agrupar por teléfono de cliente todas las citas atendidas exitosamente
     reservations.forEach((res) => {
-      if (res.status !== 'completed') return;
+      // Consideramos tanto completed como confirmed para visibilidad de clientes activos
+      if (res.status !== 'completed' && res.status !== 'confirmed') return;
+      
       const phone = res.customerPhone;
       if (!customerMap.has(phone)) {
         customerMap.set(phone, []);
@@ -62,9 +66,9 @@ export class BookingChurnService {
       totalOpportunities: 0,
     };
 
-    // 2. Analizar cada cliente
+    // 2. Analizar el comportamiento histórico de cada cliente
     customerMap.forEach((userRes, phone) => {
-      // Ordenar por fecha descendente (más reciente primero)
+      // Ordenar por fecha descendente para identificar la última visita
       const sortedRes = [...userRes].sort((a, b) => 
         new Date(b.date).getTime() - new Date(a.date).getTime()
       );
@@ -73,36 +77,45 @@ export class BookingChurnService {
       const oldest = sortedRes[sortedRes.length - 1];
       const visitCount = sortedRes.length;
       
+      // Cálculo de inactividad ignorando desfases de hora
       const lastVisitDate = new Date(latest.date + 'T00:00:00');
       const daysSinceLastVisit = Math.abs(differenceInDays(today, lastVisitDate));
 
-      // Calcular intervalo promedio
-      let averageIntervalDays = 30; // Fallback 1 mes
+      // Determinar frecuencia habitual del cliente (intervalo promedio entre visitas)
+      let averageIntervalDays = 30; // 1 mes como base de referencia si solo hay una visita
       
       if (visitCount > 1) {
         const totalDaysRange = Math.abs(differenceInDays(
           new Date(latest.date + 'T00:00:00'),
           new Date(oldest.date + 'T00:00:00')
         ));
+        // Frecuencia real: días totales / (visitas - 1)
         averageIntervalDays = Math.max(7, Math.round(totalDaysRange / (visitCount - 1)));
       }
 
-      // Determinar Nivel de Riesgo
+      // Clasificación de Riesgo según frecuencia habitual
       let riskLevel: RiskLevel = 'normal';
       
+      // ALTO RIESGO: Si ha pasado más del 150% de su tiempo habitual sin volver
       if (daysSinceLastVisit > averageIntervalDays * 1.5) {
         riskLevel = 'critical';
         metrics.criticalCount++;
-      } else if (daysSinceLastVisit > averageIntervalDays) {
+      } 
+      // ATRASADO: Si superó su ciclo promedio pero aún está en ventana de recuperación corta
+      else if (daysSinceLastVisit > averageIntervalDays) {
         riskLevel = 'overdue';
         metrics.overdueCount++;
-      } else if (daysSinceLastVisit >= averageIntervalDays * 0.8) {
+      } 
+      // OPORTUNIDAD: Se acerca a su fecha de re-agendamiento (ventana del 80%)
+      else if (daysSinceLastVisit >= averageIntervalDays * 0.8) {
         riskLevel = 'upcoming';
         metrics.upcomingCount++;
       }
 
       if (riskLevel !== 'normal') {
         const estimatedValue = latest.price || 0;
+        
+        // Solo sumamos ingresos perdidos para clientes críticos o atrasados
         if (riskLevel !== 'upcoming') {
           metrics.totalAtRiskRevenue += estimatedValue;
         }
@@ -116,14 +129,14 @@ export class BookingChurnService {
           averageIntervalDays,
           riskLevel,
           estimatedValue,
-          lastServiceName: latest.serviceId, // En el futuro resolveremos el ID al nombre real si es necesario
+          lastServiceName: latest.serviceName || latest.serviceId,
           lastServiceId: latest.serviceId,
-          lastStaffName: latest.staffId || 'Cualquiera',
+          lastStaffName: latest.staffName || 'Cualquiera',
         });
       }
     });
 
-    // Ordenar: primero los críticos, luego los más caros
+    // Ordenamiento por prioridad operativa
     const sortedOpportunities = opportunities.sort((a, b) => {
       const riskOrder = { critical: 0, overdue: 1, upcoming: 2, normal: 3 };
       if (riskOrder[a.riskLevel] !== riskOrder[b.riskLevel]) {
