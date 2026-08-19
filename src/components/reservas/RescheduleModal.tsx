@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -113,16 +114,34 @@ export function RescheduleModal({ isOpen, onClose, reservation, businessId }: Re
         const availDocs = availSnap.docs.map(d => ({ id: d.id, ...d.data() } as any));
         const dayDoc = availDocs.find(a => Number(a.dayOfWeek) === dayOfWeek || a.id === String(dayOfWeek));
 
-        const dayAvailability: BookingAvailability = dayDoc ? {
+        // Verificar si el documento de Firestore tiene turnos válidos
+        const hasValidShifts = Boolean(
+          dayDoc && 
+          Array.isArray(dayDoc.shifts) && 
+          dayDoc.shifts.length > 0 &&
+          dayDoc.shifts[0]?.start &&
+          dayDoc.shifts[0]?.end
+        );
+
+        // Un día es operativo si está explícitamente abierto con turnos válidos,
+        // o si es un día laborable estándar (Lunes a Sábado: dayOfWeek !== 0)
+        const isOpenEffective = dayDoc !== undefined
+          ? (Boolean(dayDoc.isOpen) && hasValidShifts ? true : dayOfWeek !== 0)
+          : dayOfWeek !== 0;
+
+        const effectiveShifts = hasValidShifts
+          ? dayDoc.shifts
+          : [{ start: "08:00", end: "18:00" }];
+
+        const effectiveBreaks = (dayDoc?.breaks && Array.isArray(dayDoc.breaks) && dayDoc.breaks.length > 0)
+          ? dayDoc.breaks
+          : [{ start: "13:00", end: "14:00" }];
+
+        const dayAvailability: BookingAvailability = {
           dayOfWeek,
-          isOpen: Boolean(dayDoc.isOpen),
-          shifts: dayDoc.shifts?.length ? dayDoc.shifts : [{ start: "08:00", end: "18:00" }],
-          breaks: dayDoc.breaks || [{ start: "13:00", end: "14:00" }]
-        } : {
-          dayOfWeek,
-          isOpen: dayOfWeek !== 0, // Lunes a Sábado abierto por defecto
-          shifts: [{ start: "08:00", end: "18:00" }],
-          breaks: [{ start: "13:00", end: "14:00" }]
+          isOpen: isOpenEffective,
+          shifts: effectiveShifts,
+          breaks: effectiveBreaks,
         };
 
         if (!dayAvailability.isOpen) {
