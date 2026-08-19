@@ -1,19 +1,37 @@
-'use client';
-
-import React, { useState, useEffect } from 'react';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
+import React, { useState, useEffect, useMemo } from "react";
+import { Card, CardHeader, CardContent, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
-import { cn } from "@/lib/utils";
-import { format, isPast, isToday, addMonths, subMonths, isSameDay } from "date-fns";
+import { cn, formatReservationDate } from "@/lib/utils";
+import { 
+  Calendar as CalendarIcon, 
+  Clock, 
+  ChevronLeft, 
+  ChevronRight, 
+  AlertCircle, 
+  Check,
+  Loader2
+} from "lucide-react";
+import { 
+  format, 
+  isPast, 
+  isToday, 
+  addMonths, 
+  subMonths, 
+  startOfMonth, 
+  endOfMonth, 
+  eachDayOfInterval, 
+  isSameDay, 
+  getDay,
+  addDays,
+  startOfToday
+} from "date-fns";
 import { es } from "date-fns/locale";
-import { Calendar as CalendarIcon, Clock, ChevronLeft, ChevronRight, AlertCircle, Check } from "lucide-react";
-import { calculateEndTime, isSlotAvailable, generateAvailableSlots } from "@/lib/booking-engine";
 import { useFirestore, useCollection, useMemoFirebase } from "@/firebase";
 import { collection, query, where, getDocs } from "firebase/firestore";
 import type { BookingAvailability, Reservation } from "@/models/booking";
-import { Calendar } from "@/components/ui/calendar";
+import { generateAvailableSlots } from "@/lib/booking-engine";
 
 interface TimeStepProps {
   businessId: string;
@@ -23,62 +41,69 @@ interface TimeStepProps {
   onBack: () => void;
 }
 
-export function TimeStep({
-  businessId,
-  selectedStaffId,
-  serviceDuration,
-  onSelect,
-  onBack
-}: TimeStepProps) {
+export function TimeStep({ businessId, selectedStaffId, serviceDuration, onSelect, onBack }: TimeStepProps) {
   const firestore = useFirestore();
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
+  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
   const [availableSlots, setAvailableSlots] = useState<string[]>([]);
   const [isLoadingSlots, setIsLoadingSlots] = useState(false);
 
-  // Consultar disponibilidad y reservas existentes para el día seleccionado
-  useEffect(() => {
-    if (!selectedDate || !businessId) return;
+  // --- 1. DATA FETCHING: DISPONIBILIDAD Y RESERVAS ---
+  const availQuery = useMemoFirebase(() => collection(firestore, `businesses/${businessId}/bookingAvailability`), [businessId, firestore]);
+  const { data: allAvailability } = useCollection<BookingAvailability>(availQuery);
 
-    const fetchAvailability = async () => {
-      setIsLoadingSlots(true);
-      try {
-        const dayOfWeek = selectedDate.getDay();
-        const dateStr = format(selectedDate, 'yyyy-MM-dd');
-
-        const availRef = collection(firestore, `businesses/${businessId}/bookingAvailability`);
-        const availQuery = query(availRef, where('dayOfWeek', '==', dayOfWeek));
-        
-        const resRef = collection(firestore, `businesses/${businessId}/reservations`);
-        const resQuery = selectedStaffId !== 'any' 
-          ? query(resRef, where('date', '==', dateStr), where('staffId', '==', selectedStaffId))
-          : query(resRef, where('date', '==', dateStr));
-
-        const [availSnap, resSnap] = await Promise.all([
-          getDocs(availQuery),
-          getDocs(resQuery)
-        ]);
-
-        if (availSnap.empty) {
-          setAvailableSlots([]);
-          return;
-        }
-
-        const availability = availSnap.docs[0].data() as BookingAvailability;
-        const existingReservations = resSnap.docs.map(doc => ({ ...doc.data(), id: doc.id } as Reservation));
-
-        const slots = generateAvailableSlots(availability, serviceDuration, existingReservations, selectedDate);
-        setAvailableSlots(slots);
-      } catch (error) {
-        console.error("Error fetching availability:", error);
+  const fetchSlots = async (date: Date) => {
+    setIsLoadingSlots(true);
+    try {
+      const dateStr = format(date, 'yyyy-MM-dd');
+      const dayOfWeek = getDay(date);
+      
+      const dayAvail = allAvailability?.find(a => a.dayOfWeek === dayOfWeek);
+      if (!dayAvail || !dayAvail.isOpen) {
         setAvailableSlots([]);
-      } finally {
-        setIsLoadingSlots(false);
+        return;
       }
-    };
 
-    fetchAvailability();
-  }, [selectedDate, businessId, selectedStaffId, serviceDuration, firestore]);
+      // Obtener reservas del staff para ese día
+      const resQuery = query(
+        collection(firestore, `businesses/${businessId}/reservations`),
+        where('date', '==', dateStr),
+        where('staffId', '==', selectedStaffId)
+      );
+      const resSnap = await getDocs(resQuery);
+      const existingRes = resSnap.docs.map(doc => ({ ...doc.data(), id: doc.id } as Reservation));
+
+      const slots = generateAvailableSlots(dayAvail, serviceDuration, existingRes, date);
+      setAvailableSlots(slots);
+    } catch (error) {
+      console.error("Error fetching slots:", error);
+      setAvailableSlots([]);
+    } finally {
+      setIsLoadingSlots(false);
+    }
+  };
+
+  useEffect(() => {
+    if (selectedDate && allAvailability) {
+      fetchSlots(selectedDate);
+    }
+  }, [selectedDate, allAvailability, selectedStaffId]);
+
+  // --- LÓGICA DEL CALENDARIO ---
+  const days = useMemo(() => {
+    const start = startOfMonth(currentMonth);
+    const end = endOfMonth(currentMonth);
+    return eachDayOfInterval({ start, end });
+  }, [currentMonth]);
+
+  const monthLabel = format(currentMonth, 'MMMM yyyy', { locale: es });
+
+  const handleDateClick = (date: Date) => {
+    if (isPast(date) && !isToday(date)) return;
+    setSelectedDate(date);
+    setSelectedTime(null);
+  };
 
   const handleConfirm = () => {
     if (selectedDate && selectedTime) {
@@ -87,102 +112,127 @@ export function TimeStep({
   };
 
   return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Calendario */}
-        <Card className="rounded-3xl border-none shadow-xl shadow-primary/5">
-          <CardHeader>
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-primary/10 rounded-xl text-primary">
-                <CalendarIcon className="h-5 w-5" />
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      {/* Calendario */}
+      <Card className="rounded-[2.5rem] border-none shadow-xl bg-white overflow-hidden">
+        <CardHeader className="p-8 pb-4">
+           <div className="flex items-center justify-between mb-4">
+              <CardTitle className="text-2xl font-black">Selecciona el día</CardTitle>
+              <div className="flex gap-2">
+                <Button variant="outline" size="icon" className="rounded-full" onClick={() => setCurrentMonth(subMonths(currentMonth, 1))} disabled={isPast(startOfMonth(currentMonth))}><ChevronLeft className="h-4 w-4" /></Button>
+                <Button variant="outline" size="icon" className="rounded-full" onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}><ChevronRight className="h-4 w-4" /></Button>
               </div>
-              <div>
-                <CardTitle className="text-xl font-black">Escoge un día</CardTitle>
-                <CardDescription>Selecciona la fecha para tu cita.</CardDescription>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="flex justify-center pb-8">
-            <Calendar
-              mode="single"
-              selected={selectedDate}
-              onSelect={(date) => {
-                  setSelectedDate(date);
-                  setSelectedTime(null);
-              }}
-              locale={es}
-              className="rounded-2xl border shadow-sm"
-              disabled={(date) => isPast(date) && !isToday(date)}
-            />
-          </CardContent>
-        </Card>
-
-        {/* Selector de Horas */}
-        <Card className="rounded-3xl border-none shadow-xl shadow-primary/5 flex flex-col overflow-hidden">
-          <CardHeader className="bg-muted/20 border-b">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-primary/10 rounded-xl text-primary">
-                <Clock className="h-5 w-5" />
-              </div>
-              <div>
-                <CardTitle className="text-xl font-black">Turnos Disponibles</CardTitle>
-                <CardDescription>
-                    {selectedDate ? format(selectedDate, "EEEE, d 'de' MMMM", { locale: es }) : 'Selecciona una fecha'}
-                </CardDescription>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="flex-1 overflow-y-auto p-6 max-h-[400px]">
-            {isLoadingSlots ? (
-              <div className="flex flex-col items-center justify-center h-48 gap-3">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                <p className="text-sm font-medium text-muted-foreground animate-pulse">Buscando espacios...</p>
-              </div>
-            ) : availableSlots.length > 0 ? (
-              <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
-                {availableSlots.map((time) => (
-                  <button
-                    key={time}
-                    onClick={() => setSelectedTime(time)}
-                    className={cn(
-                      "h-12 rounded-xl text-sm font-bold transition-all border-2 flex items-center justify-center gap-1.5",
-                      selectedTime === time
-                        ? "bg-primary text-white border-primary shadow-lg shadow-primary/20 scale-105"
-                        : "bg-white border-gray-100 text-gray-600 hover:border-primary/30 hover:bg-primary/5"
-                    )}
-                  >
-                    {selectedTime === time && <Check className="h-3 w-3" />}
-                    {time}
-                  </button>
+           </div>
+           <p className="text-sm font-bold text-primary uppercase tracking-widest text-center py-2 bg-primary/5 rounded-xl border border-primary/10">
+              {monthLabel}
+           </p>
+        </CardHeader>
+        <CardContent className="p-8 pt-2">
+            <div className="grid grid-cols-7 gap-2 mb-4">
+                {['D', 'L', 'M', 'M', 'J', 'V', 'S'].map((d, i) => (
+                    <div key={i} className="text-center text-[10px] font-black text-muted-foreground uppercase">{d}</div>
                 ))}
-              </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center h-48 text-center space-y-3">
-                <div className="p-3 bg-muted rounded-full">
-                  <AlertCircle className="h-8 w-8 text-muted-foreground/30" />
-                </div>
-                <div className="space-y-1">
-                  <p className="font-bold text-gray-800">No hay turnos libres</p>
-                  <p className="text-xs text-muted-foreground">Intenta con otra fecha o profesional.</p>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+            </div>
+            <div className="grid grid-cols-7 gap-2">
+                {/* Espaciado inicial */}
+                {Array.from({ length: getDay(days[0]) }).map((_, i) => (
+                    <div key={`empty-${i}`} />
+                ))}
+                {days.map((date) => {
+                    const isSelected = selectedDate && isSameDay(date, selectedDate);
+                    const isPastDate = isPast(date) && !isToday(date);
+                    const dayOfWeek = getDay(date);
+                    const isClosed = allAvailability && !allAvailability.find(a => a.dayOfWeek === dayOfWeek)?.isOpen;
 
-      <CardFooter className="bg-muted/20 border-t p-6 flex justify-between items-center rounded-b-3xl">
-        <Button variant="ghost" onClick={onBack} className="font-bold rounded-xl">
-          <ChevronLeft className="mr-2 h-4 w-4" /> Volver
-        </Button>
-        <Button 
-          disabled={!selectedDate || !selectedTime} 
-          onClick={handleConfirm}
-          className="font-black px-10 h-12 shadow-lg shadow-primary/10 rounded-xl"
-        >
-          Siguiente <ChevronRight className="ml-2 h-4 w-4" />
-        </Button>
-      </CardFooter>
+                    return (
+                        <button
+                            key={date.toString()}
+                            onClick={() => handleDateClick(date)}
+                            disabled={isPastDate || isClosed}
+                            className={cn(
+                                "aspect-square rounded-2xl flex flex-col items-center justify-center transition-all duration-300 relative group",
+                                isSelected ? "bg-primary text-white shadow-lg scale-110 z-10" : "bg-muted/30 hover:bg-primary/10",
+                                (isPastDate || isClosed) && "opacity-20 cursor-not-allowed bg-transparent"
+                            )}
+                        >
+                            <span className="text-sm font-black">{format(date, 'd')}</span>
+                            {isToday(date) && !isSelected && <div className="absolute bottom-2 h-1 w-1 rounded-full bg-primary" />}
+                        </button>
+                    );
+                })}
+            </div>
+
+            <div className="mt-8 space-y-3">
+                <Label className="text-[10px] font-black uppercase text-muted-foreground flex items-center gap-2">
+                  <CalendarIcon className="h-3 w-3" /> Escoge un día
+                </Label>
+                <div className="flex flex-wrap gap-4 text-[10px] font-bold uppercase tracking-tighter">
+                   <div className="flex items-center gap-1.5"><div className="h-2 w-2 rounded-full bg-primary" /> Hoy</div>
+                   <div className="flex items-center gap-1.5 opacity-20"><div className="h-2 w-2 rounded-full bg-muted-foreground" /> No disponible</div>
+                </div>
+            </div>
+        </CardContent>
+      </Card>
+
+      {/* Horas */}
+      <Card className="rounded-[2.5rem] border-none shadow-xl bg-white overflow-hidden flex flex-col">
+        <CardHeader className="p-8 pb-4">
+           <CardTitle className="text-2xl font-black">Turnos Disponibles</CardTitle>
+           <CardDescription className="text-sm font-medium">
+              {selectedDate ? `Horarios para el ${format(selectedDate, 'd MMMM', { locale: es })}` : 'Selecciona un día para ver los turnos.'}
+           </CardDescription>
+        </CardHeader>
+        <CardContent className="p-8 pt-2 flex-1 overflow-y-auto max-h-[400px]">
+          {isLoadingSlots ? (
+             <div className="h-full flex flex-col items-center justify-center py-10 gap-3">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Calculando espacios...</p>
+             </div>
+          ) : selectedDate ? (
+            availableSlots.length > 0 ? (
+                <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
+                    {availableSlots.map((time) => (
+                        <button
+                            key={time}
+                            onClick={() => setSelectedTime(time)}
+                            className={cn(
+                                "h-12 rounded-xl flex items-center justify-center font-black text-sm transition-all duration-300",
+                                selectedTime === time 
+                                    ? "bg-primary text-white shadow-md scale-105" 
+                                    : "bg-muted/40 hover:bg-primary/10 text-gray-700"
+                            )}
+                        >
+                            {time}
+                        </button>
+                    ))}
+                </div>
+            ) : (
+                <div className="h-full flex flex-col items-center justify-center py-10 gap-4 text-center">
+                    <div className="p-4 bg-muted rounded-full text-muted-foreground/30"><Clock className="h-10 w-10" /></div>
+                    <div className="space-y-1">
+                        <p className="font-black text-gray-400 uppercase text-xs">Sin turnos disponibles</p>
+                        <p className="text-xs text-muted-foreground max-w-[200px]">Intenta seleccionar otro día u otro profesional.</p>
+                    </div>
+                </div>
+            )
+          ) : (
+            <div className="h-full flex flex-col items-center justify-center py-10 gap-4 text-center opacity-40">
+                <CalendarIcon className="h-12 w-12 text-muted-foreground" />
+                <p className="text-sm font-medium">Elige una fecha del calendario</p>
+            </div>
+          )}
+        </CardContent>
+        <CardFooter className="bg-muted/20 border-t p-6 flex justify-between items-center">
+            <Button variant="ghost" onClick={onBack} className="font-bold">Volver</Button>
+            <Button 
+              onClick={handleConfirm} 
+              disabled={!selectedTime} 
+              className="font-black px-8 shadow-lg shadow-primary/20"
+            >
+              Continuar <ChevronRight className="ml-2 h-4 w-4" />
+            </Button>
+        </CardFooter>
+      </Card>
     </div>
   );
 }

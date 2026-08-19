@@ -1,25 +1,12 @@
-
-'use client';
-
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect } from "react";
 import { ServiceStep } from "./ServiceStep";
 import { StaffStep } from "./StaffStep";
 import { TimeStep } from "./TimeStep";
 import { ContactStep } from "./ContactStep";
 import { SuccessView } from "./SuccessView";
-import { 
-  Check, 
-  User, 
-  Clock, 
-  Calendar, 
-  ArrowLeft, 
-  ChevronRight,
-  Loader2,
-  ShieldCheck,
-  Sparkles
-} from "lucide-react";
+import { Check, User, Clock, Calendar, ArrowLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { Reservation, BookingService, BookingStaff } from "@/models/booking";
+import type { BookingService, BookingStaff, Reservation } from "@/models/booking";
 import { confirmPublicBooking } from "@/actions/public-booking";
 import { useToast } from "@/hooks/use-toast";
 
@@ -36,26 +23,36 @@ export function BookingWizard({ businessId, businessName, services, staff, initi
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [createdReservation, setCreatedReservation] = useState<Reservation | null>(null);
-
+  
   const [bookingData, setBookingData] = useState<Partial<Reservation>>({
-    serviceId: initialServiceId || '',
-    status: 'pending',
-    durationMinutes: services.find(s => s.id === initialServiceId)?.durationMinutes || 30
+    businessId,
+    serviceId: initialServiceId || "",
+    status: 'pending'
   });
 
-  // Si hay un servicio inicial, saltamos al paso 2
   useEffect(() => {
-    if (initialServiceId && step === 1) {
-      setStep(2);
+    if (initialServiceId) {
+      const service = services.find(s => s.id === initialServiceId);
+      if (service) {
+        setBookingData(prev => ({ 
+          ...prev, 
+          serviceId: service.id,
+          serviceName: service.name,
+          price: service.price,
+          durationMinutes: service.durationMinutes
+        }));
+        setStep(2);
+      }
     }
-  }, [initialServiceId]);
+  }, [initialServiceId, services]);
 
   const handleServiceSelect = (service: BookingService) => {
     setBookingData(prev => ({ 
-        ...prev, 
-        serviceId: service.id,
-        durationMinutes: service.durationMinutes,
-        price: service.price
+      ...prev, 
+      serviceId: service.id, 
+      serviceName: service.name,
+      price: service.price,
+      durationMinutes: service.durationMinutes
     }));
     setStep(2);
   };
@@ -63,9 +60,9 @@ export function BookingWizard({ businessId, businessName, services, staff, initi
   const handleStaffSelect = (staffId: string) => {
     const staffObj = staff.find(s => s.id === staffId);
     setBookingData(prev => ({ 
-        ...prev, 
-        staffId: staffId === 'any' ? undefined : staffId, 
-        staffName: staffObj?.name || 'Cualquier Profesional' 
+      ...prev, 
+      staffId: staffId === 'any' ? undefined : staffId, 
+      staffName: staffObj?.name || 'Cualquier Profesional' 
     }));
     setStep(3);
   };
@@ -85,10 +82,18 @@ export function BookingWizard({ businessId, businessName, services, staff, initi
         setCreatedReservation(result.reservation as Reservation);
         setStep(5);
       } else {
-        toast({ variant: "destructive", title: "Error al agendar", description: result.error });
+        toast({
+          variant: "destructive",
+          title: "Error al agendar",
+          description: result.error || "No se pudo procesar la reserva."
+        });
       }
-    } catch (e: any) {
-      toast({ variant: "destructive", title: "Fallo técnico", description: "Ocurrió un error inesperado al procesar tu cita." });
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Error técnico",
+        description: error.message
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -99,91 +104,77 @@ export function BookingWizard({ businessId, businessName, services, staff, initi
   }
 
   const steps = [
-    { id: 1, label: 'SERVICIO', icon: <Clock className="w-4 h-4" /> },
-    { id: 2, label: 'PROFESIONAL', icon: <User className="w-4 h-4" /> },
-    { id: 3, label: 'HORARIO', icon: <Calendar className="w-4 h-4" /> },
-    { id: 4, label: 'FINALIZAR', icon: <Check className="w-4 h-4" /> },
+    { id: 1, label: "SERVICIO", icon: Check },
+    { id: 2, label: "PROFESIONAL", icon: User },
+    { id: 3, label: "HORARIO", icon: Clock },
+    { id: 4, label: "CONTACTO", icon: Calendar }
   ];
 
   return (
-    <div className="w-full max-w-5xl mx-auto space-y-10">
-      {/* Stepper Superior */}
-      <div className="relative flex justify-between items-center px-4 md:px-10 overflow-hidden">
-        {/* Línea de fondo */}
-        <div className="absolute top-1/2 left-0 right-0 h-1 bg-gray-100 -translate-y-1/2 z-0" />
-        
-        {steps.map((s, idx) => {
-          const isActive = step === s.id;
-          const isCompleted = step > s.id;
-          
-          return (
-            <div key={s.id} className="relative z-10 flex flex-col items-center gap-3">
+    <div className="max-w-4xl mx-auto">
+      {/* Stepper */}
+      <div className="flex items-center justify-between mb-8 px-4 sm:px-0 overflow-x-auto no-scrollbar">
+        {steps.map((s, idx) => (
+          <React.Fragment key={s.id}>
+            <div className="flex flex-col items-center gap-2 shrink-0">
               <div className={cn(
-                "w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-500 border-4",
-                isActive ? "bg-primary border-white text-white shadow-xl shadow-primary/20 scale-110" : 
-                isCompleted ? "bg-white border-primary text-primary" : "bg-white border-gray-100 text-gray-300"
+                "h-10 w-10 rounded-full flex items-center justify-center border-2 transition-all duration-300",
+                step >= s.id ? "bg-primary border-primary text-white" : "bg-white border-muted text-muted-foreground"
               )}>
-                {isCompleted ? <Check className="w-6 h-6 stroke-[3px]" /> : s.icon}
+                {step > s.id ? <Check className="h-5 w-5" /> : <s.icon className="h-5 w-5" />}
               </div>
               <span className={cn(
-                "text-[10px] font-black uppercase tracking-[0.2em] transition-colors",
-                isActive ? "text-primary" : "text-gray-400"
+                "text-[10px] font-black uppercase tracking-widest",
+                step >= s.id ? "text-primary" : "text-muted-foreground"
               )}>
                 {s.label}
               </span>
             </div>
-          );
-        })}
+            {idx < steps.length - 1 && (
+              <div className={cn(
+                "h-[2px] flex-1 mx-4 min-w-[20px] transition-colors duration-300",
+                step > s.id ? "bg-primary" : "bg-muted"
+              )} />
+            )}
+          </React.Fragment>
+        ))}
       </div>
 
-      {/* Contenido Dinámico del Wizard */}
-      <div className="min-h-[500px]">
+      {/* Wizard Content */}
+      <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
         {step === 1 && (
           <ServiceStep 
             services={services} 
             onSelect={handleServiceSelect} 
           />
         )}
-
         {step === 2 && (
           <StaffStep 
-            staffList={staff.filter(s => s.assignedServiceIds?.includes(bookingData.serviceId || ''))}
+            staffList={staff.filter(s => s.assignedServiceIds?.includes(bookingData.serviceId || ''))} 
+            onSelectStaff={handleStaffSelect} 
+            onBack={() => setStep(1)} 
             selectedStaffId={bookingData.staffId}
-            onSelectStaff={handleStaffSelect}
-            onBack={() => setStep(1)}
           />
         )}
-
         {step === 3 && (
-          <TimeStep
-            businessId={businessId}
-            selectedStaff={bookingData.staffId || 'any'}
-            serviceDuration={bookingData.durationMinutes || 30}
-            onSelect={handleTimeSelect}
-            onBack={() => setStep(2)}
+          <TimeStep 
+            businessId={businessId} 
+            selectedStaffId={bookingData.staffId || 'any'} 
+            serviceDuration={bookingData.durationMinutes || 30} 
+            onSelect={handleTimeSelect} 
+            onBack={() => setStep(2)} 
           />
         )}
-
         {step === 4 && (
-          <ContactStep
-            bookingData={bookingData}
+          <ContactStep 
+            bookingData={bookingData} 
             selectedService={services.find(s => s.id === bookingData.serviceId) || null}
             selectedStaff={staff.find(s => s.id === bookingData.staffId) || null}
-            onConfirm={handleConfirm}
-            onBack={() => setStep(3)}
-            isSubmitting={isSubmitting}
+            onConfirm={handleConfirm} 
+            onBack={() => setStep(3)} 
+            isSubmitting={isSubmitting} 
           />
         )}
-      </div>
-
-      {/* Footer de confianza */}
-      <div className="flex justify-center items-center gap-8 py-6 border-t border-dashed opacity-50 grayscale hover:grayscale-0 transition-all duration-500">
-          <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest">
-            <ShieldCheck className="w-4 h-4 text-primary" /> Reserva Segura SSL
-          </div>
-          <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest">
-            <Sparkles className="w-4 h-4 text-primary" /> Potenciado por Markix
-          </div>
       </div>
     </div>
   );
