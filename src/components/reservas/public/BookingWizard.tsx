@@ -1,184 +1,156 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
-import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, query, where, orderBy } from 'firebase/firestore';
+import { useState, useEffect } from "react";
 import { ServiceStep } from "./ServiceStep";
 import { StaffStep } from "./StaffStep";
 import { TimeStep } from "./TimeStep";
 import { ContactStep } from "./ContactStep";
 import { SuccessView } from "./SuccessView";
-import { Card } from "@/components/ui/card";
 import { Check, User, Clock, Calendar, ArrowLeft, ChevronRight } from "lucide-react";
+import type { BookingService, BookingStaff, Reservation } from "@/models/booking";
+import { confirmPublicBooking } from "@/actions/public-booking";
 import { cn } from "@/lib/utils";
-import { confirmPublicBooking } from '@/actions/public-booking';
-import { useToast } from '@/hooks/use-toast';
-import type { Reservation, BookingService, BookingStaff } from '@/models/booking';
 
-/**
- * @fileOverview Orquestador principal del flujo de reservas públicas (Wizard).
- * Gestiona el estado global del agendamiento y la navegación entre pasos.
- */
+interface BookingWizardProps {
+  businessId: string;
+  businessName: string;
+  services: BookingService[];
+  staff: BookingStaff[];
+  initialServiceId?: string;
+}
 
-export function BookingWizard({ 
-  businessId, 
-  services, 
-  staff, 
-  initialServiceId 
-}: { 
-  businessId: string, 
-  services: BookingService[], 
-  staff: BookingStaff[], 
-  initialServiceId?: string 
-}) {
-  const { toast } = useToast();
-  const [step, setStep] = useState(initialServiceId ? 2 : 1);
+export function BookingWizard({ businessId, businessName, services, staff, initialServiceId }: BookingWizardProps) {
+  const [step, setStep] = useState(1);
   const [bookingData, setBookingData] = useState<Partial<Reservation>>({
     businessId,
     serviceId: initialServiceId || '',
-    status: 'pending',
+    status: 'pending'
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [confirmedReservation, setCreatedReservation] = useState<Reservation | null>(null);
+  const [createdReservation, setCreatedReservation] = useState<Reservation | null>(null);
 
-  const handleNext = () => setStep(prev => prev + 1);
-  const handleBack = () => setStep(prev => prev - 1);
-
-  const handleConfirmBooking = async (contactData: any) => {
-    setIsSubmitting(true);
-    try {
-      const finalData = { ...bookingData, ...contactData };
-      const result = await confirmPublicBooking(businessId, finalData);
-      
-      if (result.success) {
-        setCreatedReservation(result.reservation);
-        handleNext();
-      } else {
-        toast({ 
-          variant: 'destructive', 
-          title: 'Error al agendar', 
-          description: result.error 
-        });
+  useEffect(() => {
+    if (initialServiceId) {
+      const service = services.find(s => s.id === initialServiceId);
+      if (service) {
+        setBookingData(prev => ({ ...prev, serviceId: initialServiceId, price: service.price }));
+        setStep(2);
       }
-    } catch (e) {
-      toast({ 
-        variant: 'destructive', 
-        title: 'Error técnico', 
-        description: 'No se pudo procesar la reserva en este momento.' 
-      });
+    }
+  }, [initialServiceId, services]);
+
+  const handleServiceSelect = (serviceId: string) => {
+    const service = services.find(s => s.id === serviceId);
+    setBookingData(prev => ({ ...prev, serviceId, price: service?.price || 0 }));
+    setStep(2);
+  };
+
+  const handleStaffSelect = (staffId: string) => {
+    const staffObj = staff.find(s => s.id === staffId);
+    setBookingData(prev => ({ ...prev, staffId: staffId === 'any' ? undefined : staffId, staffName: staffObj?.name || 'Cualquier Profesional' }));
+    setStep(3);
+  };
+
+  const handleDateTimeSelect = (date: string, startTime: string) => {
+    setBookingData(prev => ({ ...prev, date, startTime }));
+    setStep(4);
+  };
+
+  const handleConfirmBooking = async (contactData: { customerName: string; customerPhone: string; customerEmail?: string; notes?: string }) => {
+    setIsSubmitting(true);
+    const finalData = { ...bookingData, ...contactData };
+    try {
+      const result = await confirmPublicBooking(businessId, finalData);
+      if (result.success) {
+        setCreatedReservation(result.reservation as Reservation);
+        setStep(5);
+      } else {
+        throw new Error(result.error);
+      }
+    } catch (error: any) {
+      console.error("Error confirming booking:", error);
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const selectedService = useMemo(() => 
-    services.find(s => s.id === bookingData.serviceId), 
-    [services, bookingData.serviceId]
-  );
-  
-  const selectedStaff = useMemo(() => 
-    staff.find(s => s.id === bookingData.staffId), 
-    [staff, bookingData.staffId]
-  );
+  const handleBack = () => {
+    setStep(prev => Math.max(1, prev - 1));
+  };
 
-  // Definición de pasos para el Stepper superior
-  const wizardSteps = [
-    { id: 1, label: 'SERVICIO', icon: Clock },
+  if (step === 5 && createdReservation) {
+    return <SuccessView reservation={createdReservation} businessName={businessName} />;
+  }
+
+  const steps = [
+    { id: 1, label: 'SERVICIO', icon: Check },
     { id: 2, label: 'PROFESIONAL', icon: User },
-    { id: 3, label: 'HORARIO', icon: Calendar },
-    { id: 4, label: 'CONTACTO', icon: Check },
+    { id: 3, label: 'HORARIO', icon: Clock },
+    { id: 4, label: 'CONTACTO', icon: Calendar },
   ];
 
   return (
-    <div className="max-w-5xl mx-auto space-y-8 pb-20">
-      {/* Stepper Superior */}
-      {step < 5 && (
-        <div className="flex items-center justify-between px-4 sm:px-10">
-          {wizardSteps.map((s, idx) => {
-            const Icon = s.icon;
-            const isActive = step === s.id;
-            const isCompleted = step > s.id;
-            return (
-              <React.Fragment key={s.id}>
-                <div className="flex flex-col items-center gap-2">
-                  <div className={cn(
-                    "h-10 w-10 rounded-full flex items-center justify-center border-2 transition-all duration-300",
-                    isActive ? "border-primary bg-primary text-white shadow-lg shadow-primary/20 scale-110" :
-                    isCompleted ? "border-primary bg-primary/10 text-primary" : "border-muted text-muted-foreground bg-white"
-                  )}>
-                    {isCompleted ? <Check className="h-5 w-5" /> : <Icon className="h-5 w-5" />}
-                  </div>
-                  <span className={cn(
-                    "text-[10px] font-black tracking-widest transition-colors",
-                    isActive ? "text-primary" : "text-muted-foreground"
-                  )}>
-                    {s.label}
-                  </span>
-                </div>
-                {idx < wizardSteps.length - 1 && (
-                  <div className={cn(
-                    "h-[2px] flex-1 mx-2 transition-colors duration-500", 
-                    isCompleted ? "bg-primary" : "bg-muted"
-                  )}></div>
-                )}
-              </React.Fragment>
-            );
-          })}
-        </div>
-      )}
+    <div className="max-w-4xl mx-auto space-y-8">
+      {/* Stepper */}
+      <div className="flex items-center justify-between px-4 sm:px-0">
+        {steps.map((s, i) => (
+          <div key={s.id} className="flex items-center flex-1 last:flex-none">
+            <div className="flex flex-col items-center gap-2">
+              <div className={cn(
+                "h-10 w-10 rounded-full flex items-center justify-center border-2 transition-colors",
+                step >= s.id ? "border-primary bg-primary text-white" : "border-muted text-muted-foreground bg-white"
+              )}>
+                <s.icon className="h-5 w-5" />
+              </div>
+              <span className={cn(
+                "text-[10px] font-black tracking-widest",
+                step >= s.id ? "text-primary" : "text-muted-foreground"
+              )}>{s.label}</span>
+            </div>
+            {i < steps.length - 1 && (
+              <div className={cn(
+                "h-[2px] flex-1 mx-4 -mt-6",
+                step > s.id ? "bg-primary" : "bg-muted"
+              )} />
+            )}
+          </div>
+        ))}
+      </div>
 
-      {/* Vistas del Wizard */}
-      <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+      {/* Content */}
+      <div className="mt-8 animate-in fade-in duration-500">
         {step === 1 && (
           <ServiceStep 
             services={services} 
-            onSelect={(id) => { 
-              setBookingData({ ...bookingData, serviceId: id }); 
-              handleNext(); 
-            }} 
+            selectedServiceId={bookingData.serviceId} 
+            onSelect={handleServiceSelect} 
           />
         )}
-
         {step === 2 && (
           <StaffStep 
             staffList={staff.filter(s => s.assignedServiceIds?.includes(bookingData.serviceId || ''))}
-            onSelect={(id) => { 
-              setBookingData({ ...bookingData, staffId: id }); 
-              handleNext(); 
-            }}
+            selectedStaffId={bookingData.staffId} 
+            onSelect={handleStaffSelect}
             onBack={handleBack}
           />
         )}
-
         {step === 3 && (
           <TimeStep 
             businessId={businessId}
-            selectedService={selectedService}
-            selectedStaff={selectedStaff}
-            bookingData={bookingData}
-            onSelect={(date, time) => { 
-              setBookingData({ ...bookingData, date, startTime: time }); 
-              handleNext(); 
-            }}
+            staffId={bookingData.staffId || 'any'}
+            serviceDuration={services.find(s => s.id === bookingData.serviceId)?.durationMinutes || 30}
+            onSelect={handleDateTimeSelect}
             onBack={handleBack}
           />
         )}
-
         {step === 4 && (
           <ContactStep 
             bookingData={bookingData}
+            selectedService={services.find(s => s.id === bookingData.serviceId) || null}
+            selectedStaff={staff.find(s => s.id === bookingData.staffId) || null}
             onBack={handleBack}
             onSubmit={handleConfirmBooking}
             isSubmitting={isSubmitting}
-            selectedService={selectedService}
-            selectedStaff={selectedStaff}
-          />
-        )}
-
-        {step === 5 && confirmedReservation && (
-          <SuccessView 
-            reservation={confirmedReservation} 
-            businessId={businessId}
           />
         )}
       </div>

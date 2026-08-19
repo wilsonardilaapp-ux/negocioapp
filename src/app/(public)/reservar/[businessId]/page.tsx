@@ -1,4 +1,3 @@
-
 import { getAdminFirestore } from '@/firebase/server-init';
 import { BookingWizard } from '@/components/reservas/public/BookingWizard';
 import { notFound } from 'next/navigation';
@@ -15,19 +14,23 @@ async function getBookingData(businessId: string) {
   try {
     const db = await getAdminFirestore();
     
-    // Obtener servicios y staff en paralelo para optimizar carga
-    const [servicesSnap, staffSnap] = await Promise.all([
+    // Obtener servicios, staff y datos del negocio en paralelo para optimizar carga
+    const [servicesSnap, staffSnap, businessSnap] = await Promise.all([
       db.collection('businesses').doc(businessId).collection('bookingServices').where('isActive', '==', true).get(),
-      db.collection('businesses').doc(businessId).collection('bookingStaff').where('isActive', '==', true).get()
+      db.collection('businesses').doc(businessId).collection('bookingStaff').where('isActive', '==', true).get(),
+      db.collection('businesses').doc(businessId).get()
     ]);
+
+    const businessName = businessSnap.exists ? (businessSnap.data()?.name || 'el negocio') : 'el negocio';
 
     return {
       services: servicesSnap.docs.map(doc => ({ ...doc.data(), id: doc.id } as BookingService)),
-      staff: staffSnap.docs.map(doc => ({ ...doc.data(), id: doc.id } as BookingStaff))
+      staff: staffSnap.docs.map(doc => ({ ...doc.data(), id: doc.id } as BookingStaff)),
+      businessName
     };
   } catch (e) {
     console.error('Error fetching public booking data:', e);
-    return { services: [], staff: [] };
+    return { services: [], staff: [], businessName: 'el negocio' };
   }
 }
 
@@ -39,7 +42,7 @@ export default async function PublicBookingPage({
   searchParams: { service?: string }
 }) {
   const { businessId } = params;
-  const { services, staff } = await getBookingData(businessId);
+  const { services, staff, businessName } = await getBookingData(businessId);
 
   // Si no hay servicios configurados, no podemos agendar nada
   if (services.length === 0) {
@@ -59,6 +62,7 @@ export default async function PublicBookingPage({
   return (
     <BookingWizard 
       businessId={businessId} 
+      businessName={businessName}
       services={services} 
       staff={staff} 
       initialServiceId={searchParams.service}
