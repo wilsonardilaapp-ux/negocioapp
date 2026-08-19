@@ -49,9 +49,15 @@ export function ReservationModal({ existingReservation, onSave, onClose }: Reser
   const { register, handleSubmit, control, watch, setValue, reset, formState: { errors } } = useForm<ReservationFormData>({
     resolver: zodResolver(reservationSchema),
     defaultValues: existingReservation ? {
-      ...existingReservation,
+      serviceId: existingReservation.serviceId,
+      staffId: existingReservation.staffId ?? undefined, // Normalizar null a undefined
+      date: existingReservation.date,
+      startTime: existingReservation.startTime,
+      customerName: existingReservation.customerName,
+      customerPhone: existingReservation.customerPhone,
       customerEmail: existingReservation.customerEmail || '',
       notes: existingReservation.notes || '',
+      status: existingReservation.status,
     } : {
       date: new Date().toISOString().split('T')[0],
       status: 'confirmed',
@@ -59,6 +65,9 @@ export function ReservationModal({ existingReservation, onSave, onClose }: Reser
       customerPhone: '',
       customerEmail: '',
       notes: '',
+      serviceId: '',
+      staffId: '',
+      startTime: '',
     }
   });
 
