@@ -118,8 +118,10 @@ export class BookingDailyOpportunitiesService {
     // Ordenar: Críticos primero, luego por ingresos potenciales
     return opportunities.sort((a, b) => {
         const priorityMap = { critical: 0, high: 1, medium: 2, info: 3 };
-        if (priorityMap[a.priority] !== priorityMap[b.priority]) {
-            return priorityMap[a.priority] - priorityMap[b.priority];
+        const pA = priorityMap[a.priority as keyof typeof priorityMap] ?? 3;
+        const pB = priorityMap[b.priority as keyof typeof priorityMap] ?? 3;
+        if (pA !== pB) {
+            return pA - pB;
         }
         return (b.estimatedRevenue || 0) - (a.estimatedRevenue || 0);
     });

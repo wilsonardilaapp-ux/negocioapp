@@ -58,6 +58,7 @@ export interface Reservation {
   endTime: string;   // HH:mm
   status: ReservationStatus;
   price: number;
+  durationMinutes: number; // Persistido para cálculos de disponibilidad
   notes?: string;
   source: 'web' | 'admin';
   loyaltyPointsGranted?: boolean; // Integración con módulo de fidelización
