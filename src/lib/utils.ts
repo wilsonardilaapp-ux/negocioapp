@@ -14,7 +14,6 @@ export function stripHtml(html: string): string {
 
 /**
  * Normaliza un identificador de módulo para asegurar consistencia en comparaciones y DB.
- * Elimina mayúsculas, acentos, espacios y caracteres especiales.
  */
 export function normalizeModuleId(id: string | undefined | null): string {
   if (!id) return "";
@@ -29,32 +28,26 @@ export function normalizeModuleId(id: string | undefined | null): string {
 
 /**
  * Normaliza un número de teléfono al formato internacional (código de país + número).
- * Elimina caracteres no numéricos y antepone "57" (Colombia) si el número tiene 10 dígitos.
  */
 export function normalizePhoneNumber(phone: string | undefined | null): string {
   if (!phone) return '';
-  
-  // Eliminar todo lo que no sea dígito
   const digits = phone.replace(/\D/g, '');
-  
-  // Si tiene 10 dígitos (formato local colombiano), anteponer 57
   if (digits.length === 10) {
     return '57' + digits;
   }
-  
   return digits;
 }
 
 /**
  * Formatea una fecha string (YYYY-MM-DD) a un formato legible en español.
- * Ej: "2026-08-21" -> "viernes, 21 de agosto"
- * Implementación robusta para evitar desfases de zona horaria (UTC/Local).
+ * Evita el desfase UTC parseando los componentes de la fecha manualmente.
  */
 export function formatReservationDate(dateStr: string | undefined | null): string {
   if (!dateStr) return "";
   try {
-    // Parseo manual para evitar que el constructor de Date lo interprete como UTC
+    // Dividimos el string para evitar que el constructor Date aplique desfase UTC
     const [year, month, day] = dateStr.split('-').map(Number);
+    // month - 1 porque en JS los meses van de 0 a 11
     const date = new Date(year, month - 1, day);
     
     if (isNaN(date.getTime())) return dateStr;
