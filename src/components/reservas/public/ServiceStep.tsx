@@ -1,46 +1,63 @@
 'use client';
 
 import React from 'react';
-import { CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Sparkles, Clock, ChevronRight } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Clock, ChevronRight, Tag } from "lucide-react";
 import type { BookingService } from "@/models/booking";
-import { cn } from "@/lib/utils";
 
-export function ServiceStep({ services, selection, onSelect }: { services: BookingService[], selection: string, onSelect: (s: BookingService) => void }) {
-  const formatCurrency = (v: number) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(v);
+interface ServiceStepProps {
+  services: BookingService[];
+  onSelectService: (service: BookingService) => void;
+}
+
+export function ServiceStep({ services, onSelectService }: ServiceStepProps) {
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('es-CO', {
+      style: 'currency',
+      currency: 'COP',
+      minimumFractionDigits: 0,
+    }).format(value);
+  };
 
   return (
-    <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <CardHeader className="p-8 text-center bg-primary/5 border-b">
-        <CardTitle className="text-3xl font-black tracking-tight text-gray-900">¿Qué servicio necesitas?</CardTitle>
-        <CardDescription className="text-base font-medium">Selecciona el tratamiento o consulta que deseas agendar.</CardDescription>
-      </CardHeader>
-      <CardContent className="p-8">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {services.map((s) => (
-            <button
-              key={s.id}
-              onClick={() => onSelect(s)}
-              className={cn(
-                "group flex flex-col items-start p-6 rounded-3xl border-2 transition-all text-left",
-                selection === s.id ? "border-primary bg-primary/5 shadow-lg shadow-primary/10" : "border-muted hover:border-primary/30 hover:bg-muted/30"
-              )}
-            >
-              <div className="flex justify-between w-full mb-4">
-                <div className="p-2 bg-primary/10 rounded-xl text-primary"><Sparkles className="h-5 w-5" /></div>
-                <div className="h-8 w-8 rounded-full border flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-colors"><ChevronRight className="h-4 w-4" /></div>
+    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <div className="text-center space-y-2">
+        <h2 className="text-2xl font-black text-gray-900">¿Qué servicio necesitas?</h2>
+        <p className="text-muted-foreground">Selecciona una de nuestras opciones para agendar tu cita.</p>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 max-w-2xl mx-auto">
+        {services.map((service) => (
+          <Card 
+            key={service.id} 
+            className="group cursor-pointer hover:border-primary/50 transition-all hover:shadow-md overflow-hidden"
+            onClick={() => onSelectService(service)}
+          >
+            <CardContent className="p-0">
+              <div className="flex items-center justify-between p-6">
+                <div className="flex items-center gap-4">
+                  <div className="p-3 bg-primary/10 rounded-2xl text-primary group-hover:bg-primary group-hover:text-white transition-colors">
+                    <Tag className="h-6 w-6" />
+                  </div>
+                  <div className="space-y-1">
+                    <h3 className="font-bold text-lg text-gray-900">{service.name}</h3>
+                    <div className="flex items-center gap-3 text-xs text-muted-foreground font-medium">
+                      <span className="flex items-center gap-1">
+                        <Clock className="h-3 w-3" /> {service.durationMinutes} min
+                      </span>
+                      <span className="font-black text-primary">{formatCurrency(service.price)}</span>
+                    </div>
+                  </div>
+                </div>
+                <ChevronRight className="h-5 w-5 text-gray-300 group-hover:text-primary transition-colors" />
               </div>
-              <h3 className="font-black text-xl text-gray-900 mb-1">{s.name}</h3>
-              <p className="text-sm text-muted-foreground line-clamp-2 mb-4">{s.description}</p>
-              <div className="flex items-center gap-4 mt-auto">
-                <Badge variant="secondary" className="gap-1 px-3 py-1 font-bold"><Clock className="h-3 w-3" /> {s.durationMinutes} min</Badge>
-                <span className="font-black text-primary">{formatCurrency(s.price)}</span>
-              </div>
-            </button>
-          ))}
-        </div>
-      </CardContent>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
     </div>
   );
 }
+
+export default ServiceStep;

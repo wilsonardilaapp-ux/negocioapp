@@ -1,90 +1,78 @@
 'use client';
 
 import React from 'react';
-import { User, ArrowLeft, ChevronRight, Briefcase } from "lucide-react";
-import type { BookingStaff } from '@/models/booking';
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { User, ChevronRight, ArrowLeft, Briefcase } from "lucide-react";
+import type { BookingStaff } from "@/models/booking";
 import { cn } from "@/lib/utils";
 
 interface StaffStepProps {
   staffList: BookingStaff[];
-  selectedStaffId: string;
+  onSelectStaff: (staffId: string, staff?: BookingStaff) => void;
   onBack: () => void;
-  onSelectStaff: (id: string, staff?: BookingStaff) => void;
 }
 
-export function StaffStep({ staffList, selectedStaffId, onBack, onSelectStaff }: StaffStepProps) {
+export function StaffStep({ staffList, onSelectStaff, onBack }: StaffStepProps) {
   return (
-    <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-6 sm:p-8 max-w-2xl mx-auto relative">
-      {/* Botón Volver */}
-      <button
-        onClick={onBack}
-        className="absolute left-6 top-6 p-2 rounded-full hover:bg-muted/50 text-gray-500 hover:text-gray-900 transition-colors"
-        aria-label="Volver"
-      >
-        <ArrowLeft className="w-5 h-5" />
-      </button>
-
-      {/* Título y Subtítulo centrados */}
-      <div className="text-center mb-8 pt-2">
-        <h2 className="text-2xl sm:text-3xl font-black text-gray-900 mb-2">
-          ¿Con quién quieres tu cita?
-        </h2>
-        <p className="text-sm text-muted-foreground font-medium">
-          Elige a tu profesional de confianza o selecciona cualquiera disponible.
-        </p>
+    <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-500">
+      <div className="relative text-center space-y-2">
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          onClick={onBack}
+          className="absolute left-0 top-0 h-10 w-10 rounded-full"
+        >
+          <ArrowLeft className="h-5 w-5" />
+        </Button>
+        <h2 className="text-2xl font-black text-gray-900">¿Con quién quieres tu cita?</h2>
+        <p className="text-muted-foreground">Elige a tu profesional de confianza o selecciona cualquiera disponible.</p>
       </div>
 
-      {/* Grid de Selección */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {/* Opción 1: Cualquier Profesional */}
-        <div
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl mx-auto">
+        <Card 
+          className="group cursor-pointer hover:border-primary/50 transition-all hover:shadow-md border-dashed border-2"
           onClick={() => onSelectStaff('any')}
-          className={cn(
-            "border-2 border-dashed rounded-2xl p-5 flex items-center justify-between cursor-pointer transition-all active:scale-95",
-            selectedStaffId === 'any'
-              ? "border-green-500 bg-green-50/20 shadow-sm"
-              : "border-green-300 hover:border-green-400 hover:bg-green-50/5"
-          )}
         >
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center text-green-600 shadow-inner">
-              <User className="w-6 h-6" />
+          <CardContent className="p-6 flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="p-3 bg-muted rounded-2xl text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary transition-colors">
+                <User className="h-6 w-6" />
+              </div>
+              <div className="space-y-0.5">
+                <h3 className="font-bold text-gray-900 text-sm">Cualquier Profesional</h3>
+                <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Asignación Automática</p>
+              </div>
             </div>
-            <div>
-              <p className="font-bold text-sm text-gray-900">Cualquier Profesional</p>
-              <p className="text-[10px] font-black tracking-wider text-green-600 uppercase">
-                Asignación automática
-              </p>
-            </div>
-          </div>
-          <ChevronRight className="w-4 h-4 text-green-600 opacity-50" />
-        </div>
+            <ChevronRight className="h-4 w-4 text-gray-300 group-hover:text-primary transition-colors" />
+          </CardContent>
+        </Card>
 
-        {/* Especialistas Reales */}
         {staffList.map((staff) => (
-          <div
-            key={staff.id}
+          <Card 
+            key={staff.id} 
+            className="group cursor-pointer hover:border-primary/50 transition-all hover:shadow-md"
             onClick={() => onSelectStaff(staff.id, staff)}
-            className={cn(
-              "border-2 rounded-2xl p-5 flex items-center gap-3 cursor-pointer transition-all active:scale-95 shadow-sm",
-              selectedStaffId === staff.id
-                ? "border-green-500 bg-green-50/10"
-                : "border-gray-100 hover:border-gray-200 bg-white"
-            )}
           >
-            <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center text-gray-400 shadow-inner">
-              <User className="w-6 h-6" />
-            </div>
-            <div className="min-w-0">
-              <p className="font-bold text-sm text-gray-900 truncate">{staff.name}</p>
-              <p className="text-[10px] text-muted-foreground flex items-center gap-1 mt-0.5 font-bold uppercase tracking-tight">
-                <Briefcase className="w-3 h-3 text-muted-foreground/70" />
-                {staff.specialty || 'Especialista'}
-              </p>
-            </div>
-          </div>
+            <CardContent className="p-6 flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-muted rounded-2xl text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary transition-colors">
+                  <User className="h-6 w-6" />
+                </div>
+                <div className="space-y-0.5">
+                  <h3 className="font-bold text-gray-900 text-sm">{staff.name}</h3>
+                  <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest flex items-center gap-1">
+                    <Briefcase className="h-3 w-3" /> {staff.specialty || 'Especialista'}
+                  </p>
+                </div>
+              </div>
+              <ChevronRight className="h-4 w-4 text-gray-300 group-hover:text-primary transition-colors" />
+            </CardContent>
+          </Card>
         ))}
       </div>
     </div>
   );
 }
+
+export default StaffStep;
