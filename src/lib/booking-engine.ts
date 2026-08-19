@@ -56,6 +56,7 @@ export function doTimesOverlap(range1: TimeRange, range2: TimeRange): boolean {
 
 /**
  * Motor de validación de disponibilidad.
+ * Se utiliza tanto en la generación de slots (cliente) como en la validación final (servidor).
  */
 export function isSlotAvailable(
   proposed: TimeRange,
@@ -66,6 +67,7 @@ export function isSlotAvailable(
     return { available: false, reason: 'El profesional no atiende este día.' };
   }
 
+  // 1. Validar dentro de la Jornada Laboral
   const shifts = Array.isArray(availability.shifts) ? availability.shifts : [];
   const inJornada = shifts.some(shift => isTimeContained(proposed, shift));
   
@@ -73,6 +75,7 @@ export function isSlotAvailable(
     return { available: false, reason: 'Fuera del horario de atención.' };
   }
 
+  // 2. Validar solapamiento con Descansos (Almuerzos/Pausas)
   const breaks = Array.isArray(availability.breaks) ? availability.breaks : [];
   const inBreak = breaks.some(brk => doTimesOverlap(proposed, brk));
   
@@ -80,6 +83,7 @@ export function isSlotAvailable(
     return { available: false, reason: 'Coincide con el horario de descanso.' };
   }
 
+  // 3. Validar colisión con citas existentes (Excluyendo canceladas)
   const safeReservations = Array.isArray(existingReservations) ? existingReservations : [];
   const collision = safeReservations
     .filter(r => r && r.status !== 'cancelled' && r.status !== 'no_show')
@@ -103,4 +107,59 @@ export function generateTimeSlots(intervalMinutes: number = 15): string[] {
     }
   }
   return slots;
+}
+
+/**
+ * Genera la lista de turnos disponibles filtrando por disponibilidad, descansos y citas.
+ * Implementa simetría total con la validación del servidor.
+ */
+export function generateAvailableSlots(
+  availability: BookingAvailability,
+  serviceDuration: number = 30,
+  existingReservations: Reservation[] = [],
+  selectedDate?: Date
+): string[] {
+  if (!availability || !availability.isOpen) return [];
+
+  const validSlots: string[] = [];
+  const intervalMinutes = 15; // Granularidad de inicio de turnos
+  const candidateStarts = generateTimeSlots(intervalMinutes);
+
+  const safeReservations = Array.isArray(existingReservations) ? existingReservations : [];
+
+  // Lógica para filtrar horas pasadas si la fecha es hoy
+  const now = new Date();
+  const isToday = selectedDate ? (
+    selectedDate.getFullYear() === now.getFullYear() &&
+    selectedDate.getMonth() === now.getMonth() &&
+    selectedDate.getDate() === now.getDate()
+  ) : false;
+
+  // Margen de 15 minutos para permitir agendar con antelación mínima
+  const currentMinutes = now.getHours() * 60 + now.getMinutes() + 15;
+
+  for (const startTime of candidateStarts) {
+    // Si es hoy y la hora ya pasó (o está muy cerca), omitir
+    if (isToday) {
+      const [h, m] = startTime.split(':').map(Number);
+      if (h * 60 + m <= currentMinutes) continue;
+    }
+
+    // Calcular fin de la cita hipotética
+    const endTime = calculateEndTime(startTime, serviceDuration);
+
+    // Validar el bloque [startTime, endTime] completo contra descansos, jornada y citas
+    const check = isSlotAvailable(
+      { start: startTime, end: endTime },
+      availability,
+      safeReservations
+    );
+
+    // Solo si el bloque está 100% libre se añade a la lista
+    if (check.available) {
+      validSlots.push(startTime);
+    }
+  }
+
+  return validSlots;
 }
