@@ -1,5 +1,3 @@
-'use client';
-
 import type { BookingAvailability, TimeRange, Reservation } from '@/models/booking';
 
 /**
