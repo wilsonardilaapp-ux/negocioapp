@@ -1,33 +1,58 @@
-import { getAdminFirestore } from '@/firebase/server-init';
+'use client';
+
+import React, { useEffect, useState } from 'react';
+import { useUser } from '@/firebase/auth/use-user';
 import { ReservasTabs } from '@/components/reservas/ReservasTabs';
 import { NotificationSettingsForm } from '@/components/reservas/NotificationSettingsForm';
+import { getNotificationSettings } from '@/actions/booking-notifications-settings';
 import { DEFAULT_BOOKING_NOTIFICATION_SETTINGS, type BookingNotificationSettings } from '@/models/booking-notifications';
-import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { MessageSquare, Loader2 } from 'lucide-react';
-import { headers } from 'next/headers';
+import { Loader2, MessageSquare } from 'lucide-react';
 
-export const dynamic = 'force-dynamic';
+/**
+ * @fileOverview Página de configuración de notificaciones de reservas.
+ * Convertida a Client Component para garantizar la resolución de sesión vía useUser.
+ */
+export default function NotificacionesConfigPage() {
+  const { user, isUserLoading, profile } = useUser();
+  const [settings, setSettings] = useState<BookingNotificationSettings | null>(null);
+  const [loadingSettings, setLoadingSettings] = useState(true);
 
-async function fetchInitialSettings(businessId: string): Promise<BookingNotificationSettings> {
-  try {
-    const db = await getAdminFirestore();
-    const snap = await db.doc(`businesses/${businessId}/bookingSettings/notifications`).get();
-    return snap.exists ? (snap.data() as BookingNotificationSettings) : DEFAULT_BOOKING_NOTIFICATION_SETTINGS;
-  } catch (error) {
-    console.error('[NotificationsPage] Error fetching settings:', error);
-    return DEFAULT_BOOKING_NOTIFICATION_SETTINGS;
-  }
-}
+  // Intentamos obtener el ID del negocio desde el perfil o el UID del usuario
+  const businessId = (profile as any)?.businessId || user?.uid || '';
 
-export default async function NotificacionesConfigPage() {
-  const headerList = headers();
-  const userId = headerList.get('x-user-id'); // Asumiendo que el layout/middleware inyecta esto
-  
-  // Nota: En este entorno usamos una resolución simplificada si x-user-id no está.
-  // En producción real esto vendría de la sesión del servidor.
-  const businessId = userId || ''; 
+  useEffect(() => {
+    let isMounted = true;
 
-  const initialSettings = businessId ? await fetchInitialSettings(businessId) : DEFAULT_BOOKING_NOTIFICATION_SETTINGS;
+    const fetchSettings = async () => {
+      if (!businessId) {
+        if (!isUserLoading) setLoadingSettings(false);
+        return;
+      }
+
+      try {
+        setLoadingSettings(true);
+        const res = await getNotificationSettings(businessId);
+        if (isMounted) {
+          setSettings(res || DEFAULT_BOOKING_NOTIFICATION_SETTINGS);
+        }
+      } catch (error) {
+        console.warn("[NotificationsPage] Error cargando ajustes:", error);
+        if (isMounted) {
+          setSettings(DEFAULT_BOOKING_NOTIFICATION_SETTINGS);
+        }
+      } finally {
+        if (isMounted) {
+          setLoadingSettings(false);
+        }
+      }
+    };
+
+    fetchSettings();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [businessId, isUserLoading]);
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
@@ -41,15 +66,20 @@ export default async function NotificacionesConfigPage() {
 
       <ReservasTabs />
 
-      {businessId ? (
-        <NotificationSettingsForm 
-            businessId={businessId} 
-            initialSettings={initialSettings} 
-        />
-      ) : (
+      {/* Renderizado condicional basado en el estado de la sesión y la carga de datos */}
+      {isUserLoading || (loadingSettings && businessId) ? (
         <div className="p-10 text-center bg-muted/20 rounded-3xl border-2 border-dashed">
             <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
             <p className="mt-2 text-sm text-muted-foreground">Identificando sesión...</p>
+        </div>
+      ) : businessId && settings ? (
+        <NotificationSettingsForm 
+            businessId={businessId} 
+            initialSettings={settings} 
+        />
+      ) : (
+        <div className="p-10 text-center bg-muted/20 rounded-3xl border-2 border-dashed">
+            <p className="text-sm text-muted-foreground">No se pudo identificar un negocio activo para configurar las notificaciones.</p>
         </div>
       )}
     </div>
