@@ -1,5 +1,7 @@
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
+import { format } from "date-fns"
+import { es } from "date-fns/locale"
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -41,4 +43,20 @@ export function normalizePhoneNumber(phone: string | undefined | null): string {
   }
   
   return digits;
+}
+
+/**
+ * Formatea una fecha string (YYYY-MM-DD) a un formato legible en español.
+ * Ej: "2026-08-21" -> "viernes, 21 de agosto"
+ */
+export function formatReservationDate(dateStr: string | undefined | null): string {
+  if (!dateStr) return "";
+  try {
+    // Forzamos la interpretación local añadiendo la hora para evitar desfases UTC
+    const date = new Date(`${dateStr}T00:00:00`);
+    if (isNaN(date.getTime())) return dateStr;
+    return format(date, "EEEE, d 'de' MMMM", { locale: es });
+  } catch (e) {
+    return dateStr || "";
+  }
 }
