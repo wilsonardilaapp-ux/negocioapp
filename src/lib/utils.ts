@@ -48,15 +48,20 @@ export function normalizePhoneNumber(phone: string | undefined | null): string {
 /**
  * Formatea una fecha string (YYYY-MM-DD) a un formato legible en español.
  * Ej: "2026-08-21" -> "viernes, 21 de agosto"
+ * Implementación robusta para evitar desfases de zona horaria (UTC/Local).
  */
 export function formatReservationDate(dateStr: string | undefined | null): string {
   if (!dateStr) return "";
   try {
-    // Forzamos la interpretación local añadiendo la hora para evitar desfases UTC
-    const date = new Date(`${dateStr}T00:00:00`);
+    // Parseo manual para evitar que el constructor de Date lo interprete como UTC
+    const [year, month, day] = dateStr.split('-').map(Number);
+    const date = new Date(year, month - 1, day);
+    
     if (isNaN(date.getTime())) return dateStr;
+    
     return format(date, "EEEE, d 'de' MMMM", { locale: es });
   } catch (e) {
+    console.error("[formatReservationDate] Error:", e);
     return dateStr || "";
   }
 }
