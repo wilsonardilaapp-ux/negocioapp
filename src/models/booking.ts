@@ -52,7 +52,9 @@ export interface Reservation {
   customerPhone: string;
   customerEmail?: string;
   serviceId: string;
-  staffId?: string;
+  serviceName: string; // Agregado para persistencia y visualización
+  staffId: string | null; // Normalizado para soportar nulos
+  staffName: string; // Agregado para persistencia y visualización
   date: string;      // YYYY-MM-DD
   startTime: string; // HH:mm
   endTime: string;   // HH:mm

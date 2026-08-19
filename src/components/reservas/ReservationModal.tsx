@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -152,6 +151,8 @@ export function ReservationModal({ existingReservation, onSave, onClose }: Reser
         const service = services.find(s => s.id === data.serviceId);
         if (!service) throw new Error('Servicio no encontrado');
 
+        const staffMember = allStaff?.find(s => s.id === data.staffId);
+
         const reservationId = existingReservation?.id || doc(collection(firestore, 'placeholder')).id;
         const resRef = doc(firestore, `businesses/${user.uid}/reservations`, reservationId);
 
@@ -159,6 +160,8 @@ export function ReservationModal({ existingReservation, onSave, onClose }: Reser
             id: reservationId,
             businessId: user.uid,
             ...data,
+            serviceName: service.name,
+            staffName: staffMember?.name || 'No asignado',
             durationMinutes: service.durationMinutes,
             endTime: calculateEndTime(data.startTime, service.durationMinutes),
             price: service.price,
@@ -181,7 +184,6 @@ export function ReservationModal({ existingReservation, onSave, onClose }: Reser
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 pt-4">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Columna Izquierda: Servicio y Profesional */}
         <div className="space-y-4">
            <div className="space-y-2">
             <Label className="flex items-center gap-2"><Tag className="h-4 w-4 text-primary"/> Servicio</Label>
@@ -246,7 +248,6 @@ export function ReservationModal({ existingReservation, onSave, onClose }: Reser
           </div>
         </div>
 
-        {/* Columna Derecha: Cliente */}
         <div className="space-y-4">
           <div className="space-y-2">
             <Label className="flex items-center gap-2"><Phone className="h-4 w-4 text-primary"/> WhatsApp / Teléfono</Label>

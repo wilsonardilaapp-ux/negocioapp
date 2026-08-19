@@ -1,4 +1,3 @@
-
 /**
  * @fileOverview Orquestador de señales para el Motor de Oportunidades Diarias.
  * Consolida datos de Churn, Confirmaciones, Capacidad y Fidelización.
@@ -94,12 +93,10 @@ export class BookingDailyOpportunitiesService {
     });
 
     // --- 4. SEÑAL 🟢: HUECOS EN HORA PICO (Heurística Fase 11) ---
-    // Si hoy es un día abierto y hay franjas de alta demanda vacías
     const dayOfWeek = new Date().getDay();
     const todayAvail = availability.find(a => a.dayOfWeek === dayOfWeek);
     
     if (todayAvail?.isOpen) {
-        // Horas pico habituales: 10:00, 16:00, 17:00 (Simulado por ahora hasta tener agregación persistida)
         const peakHours = ['10:00', '16:00', '17:00'];
         peakHours.forEach(hour => {
             const isOccupied = reservations.some(r => r.date === todayStr && r.startTime === hour && r.status !== 'cancelled');

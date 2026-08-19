@@ -126,11 +126,11 @@ export function AgendaGrid() {
                 <div className="space-y-2 pt-2 border-t border-dashed">
                    <div className="flex justify-between text-xs">
                       <span className="text-muted-foreground font-medium uppercase tracking-wider text-[9px]">Servicio</span>
-                      <span className="font-bold">{res.serviceId}</span>
+                      <span className="font-bold">{res.serviceName}</span>
                    </div>
                    <div className="flex justify-between text-xs">
                       <span className="text-muted-foreground font-medium uppercase tracking-wider text-[9px]">Especialista</span>
-                      <span className="font-bold text-gray-600">{res.staffId || 'No asignado'}</span>
+                      <span className="font-bold text-gray-600">{res.staffName || 'No asignado'}</span>
                    </div>
                    {res.rescheduleHistory && res.rescheduleHistory.length > 0 && (
                       <div className="pt-1 text-[10px] text-orange-600 font-bold italic">
