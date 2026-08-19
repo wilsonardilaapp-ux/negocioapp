@@ -20,7 +20,7 @@ import { StatusBadge } from './StatusBadge';
 import { StatusActions } from './StatusActions';
 import type { Reservation } from '@/models/booking';
 import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, query, where, orderBy } from 'firebase/firestore';
+import { collection, query } from 'firebase/firestore';
 import { format, addDays, subDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cn, normalizePhoneNumber } from '@/lib/utils';
@@ -36,24 +36,37 @@ const formatCurrency = (value: number) => {
 };
 
 export function AgendaGrid() {
-  const { user } = useUser();
+  const { user, profile } = useUser();
   const firestore = useFirestore();
   
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingReservation, setEditingReservation] = useState<Reservation | null>(null);
 
-  // --- DATA FETCHING ---
-  const resQuery = useMemoFirebase(() => {
-    if (!user || !firestore) return null;
-    return query(
-      collection(firestore, `businesses/${user.uid}/reservations`),
-      where('date', '==', selectedDate),
-      orderBy('startTime', 'asc')
-    );
-  }, [user, firestore, selectedDate]);
+  // --- RESOLUCIÓN DE BUSINESS ID (Contexto SaaS) ---
+  const businessId = useMemo(() => {
+    return (profile as any)?.businessId || (user as any)?.businessId || user?.uid || '';
+  }, [user, profile]);
 
-  const { data: reservations, isLoading } = useCollection<Reservation>(resQuery);
+  // --- DATA FETCHING (Consulta base sin filtros complejos para evitar requisito de índices) ---
+  const resQuery = useMemoFirebase(() => {
+    if (!businessId || !firestore) return null;
+    return collection(firestore, `businesses/${businessId}/reservations`);
+  }, [businessId, firestore]);
+
+  const { data: rawReservations, isLoading } = useCollection<Reservation>(resQuery);
+
+  // --- FILTRADO Y ORDENAMIENTO EN MEMORIA (Client-side) ---
+  const dayReservations = useMemo(() => {
+    if (!rawReservations) return [];
+    
+    // La fecha seleccionada ya viene en formato YYYY-MM-DD
+    const targetDate = selectedDate;
+
+    return rawReservations
+      .filter(res => res.date === targetDate && res.status !== 'cancelled')
+      .sort((a, b) => (a.startTime || '00:00').localeCompare(b.startTime || '00:00'));
+  }, [rawReservations, selectedDate]);
 
   const navigateDay = (direction: 'prev' | 'next') => {
     const current = new Date(selectedDate + 'T00:00:00');
@@ -86,9 +99,9 @@ export function AgendaGrid() {
             <Loader2 className="h-10 w-10 animate-spin text-primary" />
             <p className="text-sm font-medium text-muted-foreground animate-pulse">Sincronizando agenda...</p>
         </div>
-      ) : reservations && reservations.length > 0 ? (
+      ) : dayReservations.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in fade-in duration-500">
-          {reservations.map((res) => (
+          {dayReservations.map((res) => (
             <Card key={res.id} className={cn("overflow-hidden transition-all hover:shadow-md border-gray-100", res.status === 'cancelled' && "opacity-50 grayscale")}>
               <CardHeader className="pb-3 border-b bg-muted/20">
                 <div className="flex justify-between items-center">
@@ -144,7 +157,7 @@ export function AgendaGrid() {
                 </div>
               </CardContent>
               <CardFooter className="bg-muted/30 pt-4">
-                 <StatusActions reservation={res} businessId={user?.uid!} />
+                 <StatusActions reservation={res} businessId={businessId} />
               </CardFooter>
             </Card>
           ))}
