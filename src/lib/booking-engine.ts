@@ -1,18 +1,26 @@
+/**
+ * @fileOverview Motor de lógica pura para el sistema de reservas.
+ * Contiene funciones matemáticas y de validación compartidas entre cliente y servidor.
+ */
+
 import type { BookingAvailability, TimeRange, Reservation } from '@/models/booking';
 
 /**
  * Calcula la hora de fin sumando la duración a la hora de inicio.
- * Implementación matemática pura para máxima compatibilidad.
  */
 export function calculateEndTime(startTime: string, durationMinutes: number): string {
   if (!startTime) return '00:00';
-  const [hoursStr, minutesStr] = startTime.split(':');
-  const hours = parseInt(hoursStr, 10) || 0;
-  const minutes = parseInt(minutesStr, 10) || 0;
-  const totalMinutes = hours * 60 + minutes + (Number(durationMinutes) || 0);
-  const endHours = Math.floor(totalMinutes / 60) % 24;
-  const endMinutes = totalMinutes % 60;
-  return `${String(endHours).padStart(2, '0')}:${String(endMinutes).padStart(2, '0')}`;
+  try {
+    const [hoursStr, minutesStr] = startTime.split(':');
+    const hours = parseInt(hoursStr, 10) || 0;
+    const minutes = parseInt(minutesStr, 10) || 0;
+    const totalMinutes = hours * 60 + minutes + (Number(durationMinutes) || 0);
+    const endHours = Math.floor(totalMinutes / 60) % 24;
+    const endMinutes = totalMinutes % 60;
+    return `${String(endHours).padStart(2, '0')}:${String(endMinutes).padStart(2, '0')}`;
+  } catch {
+    return startTime;
+  }
 }
 
 /**
@@ -32,7 +40,6 @@ export function isTimeContained(inner: TimeRange, outer: TimeRange): boolean {
   const innerEnd = timeToMinutes(inner.end);
   const outerStart = timeToMinutes(outer.start);
   const outerEnd = timeToMinutes(outer.end);
-
   return innerStart >= outerStart && innerEnd <= outerEnd;
 }
 
@@ -44,24 +51,21 @@ export function doTimesOverlap(range1: TimeRange, range2: TimeRange): boolean {
   const end1 = timeToMinutes(range1.end);
   const start2 = timeToMinutes(range2.start);
   const end2 = timeToMinutes(range2.end);
-
   return start1 < end2 && end1 > start2;
 }
 
 /**
- * Motor de validación de disponibilidad blindado contra valores undefined.
+ * Motor de validación de disponibilidad.
  */
 export function isSlotAvailable(
   proposed: TimeRange,
   availability: BookingAvailability | null | undefined,
   existingReservations: Reservation[] = []
 ): { available: boolean; reason?: string } {
-  // 1. Validar si el negocio/profesional está abierto
   if (!availability || !availability.isOpen) {
     return { available: false, reason: 'El profesional no atiende este día.' };
   }
 
-  // 2. Validar jornada (shifts)
   const shifts = Array.isArray(availability.shifts) ? availability.shifts : [];
   const inJornada = shifts.some(shift => isTimeContained(proposed, shift));
   
@@ -69,7 +73,6 @@ export function isSlotAvailable(
     return { available: false, reason: 'Fuera del horario de atención.' };
   }
 
-  // 3. Validar descansos (breaks)
   const breaks = Array.isArray(availability.breaks) ? availability.breaks : [];
   const inBreak = breaks.some(brk => doTimesOverlap(proposed, brk));
   
@@ -77,7 +80,6 @@ export function isSlotAvailable(
     return { available: false, reason: 'Coincide con el horario de descanso.' };
   }
 
-  // 4. Validar colisiones con otras reservas activas (con fallback seguro)
   const safeReservations = Array.isArray(existingReservations) ? existingReservations : [];
   const collision = safeReservations
     .filter(r => r && r.status !== 'cancelled' && r.status !== 'no_show')

@@ -1,68 +1,56 @@
-
 'use client';
 
 import React from 'react';
-import { Card, CardContent } from '@/components/ui/card';
-import { User, ChevronRight, Sparkles } from 'lucide-react';
-import type { BookingStaff } from '@/models/booking';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { User, ArrowLeft, ChevronRight, Briefcase } from "lucide-react";
+import type { BookingStaff } from "@/models/booking";
+import { cn } from "@/lib/utils";
 
-interface Props {
-  staff: BookingStaff[];
-  onSelect: (id: string) => void;
-}
+export function StaffStep({ staff, serviceId, selection, onSelect, onBack }: { staff: BookingStaff[], serviceId: string, selection: string, onSelect: (s: BookingStaff) => void, onBack: () => void }) {
+  const filteredStaff = staff.filter(s => s.assignedServiceIds.includes(serviceId) && s.isActive);
 
-export function StaffStep({ staff, onSelect }: Props) {
   return (
-    <div className="space-y-6">
-      <div className="text-center space-y-2">
-        <h2 className="text-2xl font-black text-gray-900">¿Quién quieres que te atienda?</h2>
-        <p className="text-muted-foreground text-sm">Elige a tu profesional de confianza.</p>
-      </div>
-
-      <div className="grid gap-4">
-        {/* Opción Automática */}
-        <Card 
-          className="cursor-pointer border-primary/20 bg-primary/5 hover:bg-primary/10 transition-all active:scale-[0.98] group"
-          onClick={() => onSelect(staff[0]?.id)} // Simplificación: toma el primero para demo
-        >
-          <CardContent className="p-5 flex items-center justify-between gap-4">
-            <div className="flex items-center gap-4">
-              <div className="h-12 w-12 rounded-full bg-primary flex items-center justify-center text-white shadow-inner">
-                <Sparkles className="h-6 w-6" />
-              </div>
-              <div>
-                <h3 className="font-bold text-primary">Cualquier profesional</h3>
-                <p className="text-[10px] font-black uppercase tracking-widest text-primary/60">Asignación automática</p>
-              </div>
-            </div>
-            <ChevronRight className="h-5 w-5 text-primary/30" />
-          </CardContent>
-        </Card>
-
-        {staff.map((member) => (
-          <Card 
-            key={member.id} 
-            className="cursor-pointer hover:border-primary/50 transition-all active:scale-[0.98] group"
-            onClick={() => onSelect(member.id)}
+    <div className="animate-in fade-in slide-in-from-right-4 duration-500">
+      <CardHeader className="p-8 text-center bg-primary/5 border-b relative">
+        <Button variant="ghost" size="icon" onClick={onBack} className="absolute left-6 top-8 rounded-full"><ArrowLeft className="h-5 w-5" /></Button>
+        <CardTitle className="text-3xl font-black tracking-tight text-gray-900">¿Con quién quieres tu cita?</CardTitle>
+        <CardDescription className="text-base font-medium">Elige a tu profesional de confianza o selecciona cualquiera disponible.</CardDescription>
+      </CardHeader>
+      <CardContent className="p-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Opción Cualquier Profesional */}
+          <button
+            onClick={() => onSelect({ id: 'any', name: 'Cualquier Profesional', assignedServiceIds: [], isActive: true, createdAt: '' })}
+            className="group flex items-center gap-4 p-6 rounded-3xl border-2 border-dashed border-primary/30 bg-primary/5 hover:bg-primary/10 transition-all text-left"
           >
-            <CardContent className="p-5 flex items-center justify-between gap-4">
-              <div className="flex items-center gap-4">
-                <Avatar className="h-12 w-12 border shadow-sm">
-                  <AvatarFallback className="bg-muted text-muted-foreground">
-                    <User className="h-6 w-6" />
-                  </AvatarFallback>
-                </Avatar>
-                <div>
-                  <h3 className="font-bold text-gray-900 group-hover:text-primary transition-colors">{member.name}</h3>
-                  <p className="text-xs text-muted-foreground">{member.specialty || 'Especialista'}</p>
-                </div>
+            <div className="h-14 w-14 rounded-full bg-white flex items-center justify-center border-2 border-primary/20 text-primary shadow-sm"><User className="h-7 w-7" /></div>
+            <div className="flex-1">
+                <h3 className="font-black text-lg text-gray-900">Cualquier Profesional</h3>
+                <p className="text-xs font-bold text-primary uppercase tracking-widest">Asignación automática</p>
+            </div>
+            <ChevronRight className="h-5 w-5 text-primary" />
+          </button>
+
+          {filteredStaff.map((s) => (
+            <button
+              key={s.id}
+              onClick={() => onSelect(s)}
+              className={cn(
+                "group flex items-center gap-4 p-6 rounded-3xl border-2 transition-all text-left",
+                selection === s.id ? "border-primary bg-primary/5 shadow-lg" : "border-muted hover:border-primary/20 hover:bg-muted/30"
+              )}
+            >
+              <div className="h-14 w-14 rounded-full bg-muted flex items-center justify-center border text-muted-foreground group-hover:text-primary group-hover:border-primary/20 transition-colors"><User className="h-7 w-7" /></div>
+              <div className="flex-1">
+                <h3 className="font-black text-lg text-gray-900">{s.name}</h3>
+                <p className="text-xs font-medium text-muted-foreground flex items-center gap-1"><Briefcase className="h-3 w-3" /> {s.specialty || 'Especialista'}</p>
               </div>
-              <ChevronRight className="h-5 w-5 text-muted-foreground/30 group-hover:text-primary transition-colors" />
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+              <ChevronRight className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity" />
+            </button>
+          ))}
+        </div>
+      </CardContent>
     </div>
   );
 }

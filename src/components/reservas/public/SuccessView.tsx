@@ -1,86 +1,75 @@
-
 'use client';
 
 import React from 'react';
-import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { CheckCircle2, Calendar, Clock, User, Phone, MessageSquare, ArrowRight } from 'lucide-react';
-import type { Reservation, BookingService } from '@/models/booking';
-import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
-import { WhatsAppIcon } from '@/components/icons';
-import { normalizePhoneNumber } from '@/lib/utils';
+import { CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { CheckCircle2, Calendar, Clock, User, Share2, Smartphone, Sparkles, Home } from "lucide-react";
+import type { Reservation } from "@/models/booking";
+import Link from 'next/link';
 
-interface Props {
-  reservation: Reservation;
-  service: BookingService;
-}
-
-export function SuccessView({ reservation, service }: Props) {
-  const formattedDate = format(new Date(reservation.date + 'T00:00:00'), "EEEE, d 'de' MMMM", { locale: es });
-  
-  const handleWhatsApp = () => {
-    const msg = `¡Hola! Acabo de agendar una cita para *${service.name}* a través de su plataforma.\n\n📅 Fecha: ${formattedDate}\n⏰ Hora: ${reservation.startTime}\n👤 Cliente: ${reservation.customerName}\n\n¡Nos vemos pronto!`;
-    window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
+export function SuccessView({ reservation, formatAction }: { reservation: Reservation, formatAction: (d: string) => string }) {
+  const handleAddToCalendar = () => {
+    const start = reservation.date.replace(/-/g, '') + 'T' + reservation.startTime.replace(':', '') + '00Z';
+    const end = reservation.date.replace(/-/g, '') + 'T' + reservation.endTime.replace(':', '') + '00Z';
+    const url = `https://www.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(reservation.serviceName || 'Cita de Servicio')}&dates=${start}/${end}&details=${encodeURIComponent('Reserva confirmada vía Markix SaaS')}&location=${encodeURIComponent('Local del negocio')}`;
+    window.open(url, '_blank');
   };
 
   return (
-    <div className="max-w-md mx-auto space-y-8 py-10 animate-in zoom-in duration-500">
-      <div className="text-center space-y-4">
-        <div className="flex justify-center">
-            <div className="p-4 bg-green-100 rounded-full animate-bounce">
-                <CheckCircle2 className="h-12 w-12 text-green-600" />
+    <div className="animate-in zoom-in-95 fade-in duration-700">
+      <CardHeader className="p-10 text-center bg-green-50 border-b">
+        <div className="flex justify-center mb-6">
+            <div className="p-4 bg-white rounded-[2rem] shadow-xl border-4 border-white ring-8 ring-green-500/10">
+                <CheckCircle2 className="h-16 w-16 text-green-500" />
             </div>
         </div>
-        <h2 className="text-3xl font-black text-gray-900">¡Reserva confirmada!</h2>
-        <p className="text-muted-foreground font-medium">Tu cita ha sido agendada exitosamente en el sistema.</p>
-      </div>
-
-      <Card className="border-2 shadow-2xl rounded-3xl overflow-hidden">
-        <div className="bg-primary p-4 text-center">
-            <span className="text-[10px] font-black text-white/80 uppercase tracking-[0.3em]">Comprobante de Reserva</span>
+        <CardTitle className="text-4xl font-black tracking-tighter text-green-900 mb-2">¡Cita Confirmada!</CardTitle>
+        <CardDescription className="text-lg font-bold text-green-700/70 uppercase tracking-widest">Reserva #{reservation.id.slice(-6).toUpperCase()}</CardDescription>
+      </CardHeader>
+      
+      <CardContent className="p-10 space-y-10">
+        <div className="text-center max-w-md mx-auto">
+            <p className="text-gray-600 leading-relaxed font-medium">
+                Hola <span className="text-gray-900 font-black">{reservation.customerName}</span>, tu reserva ha sido registrada con éxito. Hemos enviado una notificación al negocio para preparar tu llegada.
+            </p>
         </div>
-        <CardContent className="p-8 space-y-6">
-            <div className="space-y-1">
-                <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Servicio</p>
-                <p className="text-xl font-black text-gray-900">{service.name}</p>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="flex flex-col items-center p-6 bg-muted/30 rounded-[2.5rem] border border-dashed transition-transform hover:scale-105">
+                <div className="p-3 bg-white rounded-2xl shadow-sm mb-4"><Calendar className="h-6 w-6 text-primary" /></div>
+                <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest mb-1">Fecha</p>
+                <p className="font-bold text-gray-900 text-center leading-tight">{formatAction(reservation.date)}</p>
             </div>
-
-            <div className="grid grid-cols-2 gap-6">
-                <div className="space-y-1">
-                    <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Fecha</p>
-                    <div className="flex items-center gap-2 font-bold text-gray-800 capitalize">
-                        <Calendar className="h-4 w-4 text-primary" /> {formattedDate}
-                    </div>
-                </div>
-                <div className="space-y-1">
-                    <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Hora</p>
-                    <div className="flex items-center gap-2 font-bold text-gray-800">
-                        <Clock className="h-4 w-4 text-primary" /> {reservation.startTime}
-                    </div>
-                </div>
+            <div className="flex flex-col items-center p-6 bg-muted/30 rounded-[2.5rem] border border-dashed transition-transform hover:scale-105">
+                <div className="p-3 bg-white rounded-2xl shadow-sm mb-4"><Clock className="h-6 w-6 text-primary" /></div>
+                <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest mb-1">Hora</p>
+                <p className="font-black text-2xl text-gray-900">{reservation.startTime}</p>
             </div>
-
-            <div className="space-y-1 pt-4 border-t border-dashed">
-                <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Detalles del cliente</p>
-                <p className="font-bold text-gray-800">{reservation.customerName}</p>
-                <p className="text-sm text-muted-foreground">{reservation.customerPhone}</p>
+            <div className="flex flex-col items-center p-6 bg-muted/30 rounded-[2.5rem] border border-dashed transition-transform hover:scale-105">
+                <div className="p-3 bg-white rounded-2xl shadow-sm mb-4"><User className="h-6 w-6 text-primary" /></div>
+                <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest mb-1">Profesional</p>
+                <p className="font-bold text-gray-900 text-center leading-tight">{reservation.staffName || 'Asignado'}</p>
             </div>
-        </CardContent>
-      </Card>
+        </div>
 
-      <div className="space-y-3">
-        <Button onClick={handleWhatsApp} className="w-full h-14 bg-[#25D366] hover:bg-[#128C7E] font-black text-lg rounded-2xl shadow-lg border-none">
-            <WhatsAppIcon className="mr-2 h-5 w-5" /> Enviar por WhatsApp
-        </Button>
-        <Button variant="outline" className="w-full h-12 font-bold rounded-2xl" onClick={() => window.location.href = '/'}>
-            Finalizar y volver al inicio
-        </Button>
-      </div>
+        <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <Button onClick={handleAddToCalendar} variant="outline" className="h-12 px-8 font-black rounded-2xl border-primary text-primary hover:bg-primary/5">
+                <Calendar className="mr-2 h-4 w-4" /> Agregar a mi Calendario
+            </Button>
+            <Button asChild className="h-12 px-8 font-black rounded-2xl shadow-xl shadow-primary/10">
+                <Link href="/">
+                    <Home className="mr-2 h-4 w-4" /> Volver al Inicio
+                </Link>
+            </Button>
+        </div>
+      </CardContent>
 
-      <p className="text-center text-[10px] text-muted-foreground uppercase font-black tracking-widest opacity-40">
-        Reserva procesada por Markix Platform
-      </p>
+      <CardFooter className="bg-muted/10 p-8 text-center flex flex-col items-center gap-3">
+         <p className="text-xs text-muted-foreground font-medium italic">¿Necesitas ayuda con tu reserva?</p>
+         <Button variant="ghost" size="sm" className="gap-2 text-primary font-bold">
+            <Smartphone className="h-4 w-4" /> Contactar por WhatsApp
+         </Button>
+      </CardFooter>
     </div>
   );
 }
