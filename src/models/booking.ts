@@ -68,7 +68,8 @@ export interface Reservation {
   completedAt?: string;           // Marca de tiempo de finalización (Fase 8)
   cancellationReason?: string;
   rescheduleHistory?: RescheduleHistory[];
-  reminderSentAt?: string; // Marca de tiempo del último recordatorio manual enviado (Fase 7)
+  reminderSentAt?: string;        // Tracking flujo Automático (API YCloud/WHAPI)
+  reminderSentManualAt?: string;  // Tracking flujo Manual (wa.me)
   createdAt: string;
   updatedAt: string;
 }
