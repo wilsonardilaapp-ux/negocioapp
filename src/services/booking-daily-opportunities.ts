@@ -1,3 +1,4 @@
+
 /**
  * @fileOverview Orquestador de señales para el Motor de Oportunidades Diarias.
  * Consolida datos de Churn, Confirmaciones, Capacidad y Fidelización.

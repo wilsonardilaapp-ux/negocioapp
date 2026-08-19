@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -158,6 +159,7 @@ export function ReservationModal({ existingReservation, onSave, onClose }: Reser
             id: reservationId,
             businessId: user.uid,
             ...data,
+            durationMinutes: service.durationMinutes,
             endTime: calculateEndTime(data.startTime, service.durationMinutes),
             price: service.price,
             source: 'admin',
