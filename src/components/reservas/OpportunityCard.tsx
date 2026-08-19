@@ -134,7 +134,7 @@ export function OpportunityCard({ opportunity }: Props) {
         </CardFooter>
       </Card>
 
-      {isOpen && (
+      {isModalOpen && (
         <AiRecoveryModal 
           isOpen={isModalOpen}
           onClose={() => setIsModalOpen(false)}

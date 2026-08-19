@@ -106,11 +106,10 @@ export class BookingDailyOpportunitiesService {
                 opportunities.push({
                     id: `slot-${todayStr}-${hour}`,
                     type: 'empty_slot',
-                    priority: 'info',
+                    priority: 'medium',
                     title: 'Hora Pico Disponible',
                     description: `Tienes un espacio libre hoy a las ${hour}. Es una franja de alta demanda.`,
-                    timeLabel: hour,
-                    priority: 'medium'
+                    timeLabel: hour
                 });
             }
         });
