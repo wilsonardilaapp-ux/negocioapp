@@ -1,113 +1,140 @@
 'use client';
 
-import React from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import React from "react";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { 
-  CheckCircle2, 
-  Calendar, 
-  Clock, 
-  User, 
-  MapPin, 
-  Share2, 
-  ArrowRight,
-  Sparkles,
-  ExternalLink
-} from 'lucide-react';
-import { WhatsAppIcon } from '@/components/icons';
-import { formatReservationDate, normalizePhoneNumber } from '@/lib/utils';
-import Link from 'next/link';
+    CheckCircle2, 
+    Calendar, 
+    Clock, 
+    User, 
+    MapPin, 
+    ExternalLink, 
+    CalendarDays,
+    Sparkles,
+    Smartphone
+} from "lucide-react";
+import { WhatsAppIcon } from "@/components/icons";
+import type { Reservation } from "@/models/booking";
+import { formatReservationDate, normalizePhoneNumber } from "@/lib/utils";
+import Link from "next/link";
 
 interface SuccessViewProps {
-  reservation: any;
+  reservation: Reservation;
   businessName: string;
 }
 
 export function SuccessView({ reservation, businessName }: SuccessViewProps) {
+  const whatsappNumber = normalizePhoneNumber(reservation.customerPhone);
   
   const handleAddToCalendar = () => {
-    const text = `Cita en ${businessName}: ${reservation?.serviceName || 'Servicio'}`;
-    const details = `Profesional: ${reservation?.staffName || 'Asignado'}`;
-    const dateStr = reservation?.date?.replace(/-/g, '');
-    const timeStr = reservation?.startTime?.replace(':', '');
-    const url = `https://www.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(text)}&details=${encodeURIComponent(details)}&dates=${dateStr}T${timeStr}00/${dateStr}T${timeStr}00`;
-    window.open(url, '_blank');
-  };
-
-  const handleShareWhatsApp = () => {
-    const message = `¡Hola! 👋 Confirmé mi cita en *${businessName}* para el ${formatReservationDate(reservation?.date)} a las ${reservation?.startTime}. ¡Nos vemos allá!`;
-    window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, '_blank');
+    // Implementación simple de enlace a Google Calendar
+    const startTime = reservation.startTime.replace(':', '');
+    const endTime = reservation.endTime.replace(':', '');
+    const date = reservation.date.replace(/-/g, '');
+    const text = encodeURIComponent(`Cita en ${businessName}: ${reservation.serviceId}`);
+    const dates = `${date}T${startTime}00/${date}T${endTime}00`;
+    
+    window.open(`https://www.google.com/calendar/render?action=TEMPLATE&text=${text}&dates=${dates}&details=Cita+agendada+desde+Markix`, '_blank');
   };
 
   return (
-    <div className="max-w-2xl mx-auto animate-in fade-in zoom-in duration-500">
-      <Card className="rounded-[2.5rem] border-none shadow-2xl overflow-hidden bg-white text-center">
-        <CardHeader className="p-10 pb-6 bg-primary/5">
-          <div className="flex justify-center mb-6">
-            <div className="p-4 bg-white rounded-full shadow-xl ring-8 ring-primary/5">
-              <CheckCircle2 className="h-16 w-16 text-green-500" />
+    <div className="max-w-2xl mx-auto animate-in zoom-in duration-500 pb-20">
+      <Card className="border-none shadow-2xl rounded-[3rem] overflow-hidden bg-white">
+        <div className="bg-primary h-3 w-full" />
+        <CardHeader className="pt-12 pb-6 text-center space-y-4">
+          <div className="flex justify-center">
+            <div className="p-4 bg-green-50 rounded-full relative">
+                <div className="absolute inset-0 bg-green-200 rounded-full animate-ping opacity-20" />
+                <CheckCircle2 className="h-16 w-16 text-green-500 relative z-10" />
             </div>
           </div>
-          <CardTitle className="text-3xl font-black tracking-tight text-gray-900">¡Cita Agendada!</CardTitle>
-          <CardDescription className="text-lg font-medium text-gray-600 mt-2">
-            Tu reserva ha sido registrada correctamente.
-          </CardDescription>
+          <div className="space-y-1">
+            <CardTitle className="text-3xl font-black tracking-tight text-gray-900">¡Cita Confirmada!</CardTitle>
+            <CardDescription className="text-base font-medium">
+              Todo listo, {reservation.customerName}. Te esperamos en <strong>{businessName}</strong>.
+            </CardDescription>
+          </div>
         </CardHeader>
 
-        <CardContent className="p-10 pt-6 space-y-8">
-          {/* Ficha del Turno */}
-          <div className="p-8 bg-muted/30 rounded-[2rem] border-2 border-dashed border-primary/20 space-y-6">
-            <div className="space-y-1">
-                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Fecha Seleccionada</span>
-                <p className="text-xl font-black text-gray-900 leading-tight">
-                  {formatReservationDate(reservation?.date)}
-                </p>
+        <CardContent className="px-8 pb-8 space-y-8">
+            {/* Ficha de la Cita */}
+            <div className="bg-muted/30 rounded-[2.5rem] p-8 border-2 border-dashed border-muted relative">
+                <div className="absolute -top-3 left-8">
+                    <Badge className="bg-primary text-white font-black text-[10px] uppercase px-4 border-none shadow-lg">
+                        Ticket de Reserva #{reservation.id.slice(-6).toUpperCase()}
+                    </Badge>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
+                    <div className="space-y-4">
+                        <div className="flex items-start gap-4">
+                            <div className="p-3 bg-white rounded-2xl shadow-sm border border-gray-100"><CalendarDays className="h-5 w-5 text-primary" /></div>
+                            <div>
+                                <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Fecha</p>
+                                <p className="font-bold text-gray-900 capitalize">{formatReservationDate(reservation.date)}</p>
+                            </div>
+                        </div>
+                        <div className="flex items-start gap-4">
+                            <div className="p-3 bg-white rounded-2xl shadow-sm border border-gray-100"><Clock className="h-5 w-5 text-primary" /></div>
+                            <div>
+                                <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Hora</p>
+                                <p className="font-bold text-gray-900">{reservation.startTime} — {reservation.endTime}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="space-y-4">
+                        <div className="flex items-start gap-4">
+                            <div className="p-3 bg-white rounded-2xl shadow-sm border border-gray-100"><Sparkles className="h-5 w-5 text-primary" /></div>
+                            <div>
+                                <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Servicio</p>
+                                <p className="font-bold text-gray-900 truncate">{reservation.serviceId}</p>
+                            </div>
+                        </div>
+                        <div className="flex items-start gap-4">
+                            <div className="p-3 bg-white rounded-2xl shadow-sm border border-gray-100"><User className="h-5 w-5 text-primary" /></div>
+                            <div>
+                                <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Atendido por</p>
+                                <p className="font-bold text-gray-900">{reservation.staffName || 'Profesional asignado'}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4 pt-4 border-t border-primary/5">
+            <div className="flex items-start gap-4 p-5 bg-blue-50 border border-blue-100 rounded-[2rem] text-blue-800">
+                <Smartphone className="h-6 w-6 shrink-0 text-blue-600 mt-1" />
                 <div className="space-y-1">
-                    <div className="flex items-center justify-center gap-1.5">
-                        <Clock className="h-4 w-4 text-primary" />
-                        <span className="text-[10px] font-black uppercase text-muted-foreground">Hora</span>
-                    </div>
-                    <p className="font-bold text-base">{reservation?.startTime || '--'}</p>
-                </div>
-                <div className="space-y-1">
-                    <div className="flex items-center justify-center gap-1.5">
-                        <User className="h-4 w-4 text-primary" />
-                        <span className="text-[10px] font-black uppercase text-muted-foreground">Profesional</span>
-                    </div>
-                    <p className="font-bold text-base truncate px-2">{reservation?.staffName || 'Asignado'}</p>
+                    <p className="font-bold text-sm">Aviso de Recordatorio</p>
+                    <p className="text-xs leading-relaxed opacity-90 font-medium">
+                        Hemos enviado los detalles a tu WhatsApp <strong>{reservation.customerPhone}</strong>. Por favor, asegúrate de estar 10 minutos antes de la hora acordada.
+                    </p>
                 </div>
             </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-             <Button variant="outline" className="h-12 font-bold rounded-xl gap-2 bg-white" onClick={handleAddToCalendar}>
-                <ExternalLink className="h-4 w-4" /> Agregar a Calendar
-             </Button>
-             <Button variant="outline" className="h-12 font-bold rounded-xl gap-2 bg-white" onClick={handleShareWhatsApp}>
-                <Share2 className="h-4 w-4" /> Compartir Cita
-             </Button>
-          </div>
-
-          <div className="flex items-center justify-center gap-2 p-4 bg-blue-50 text-blue-700 rounded-2xl text-xs font-medium">
-             <Sparkles className="h-4 w-4 fill-blue-700" />
-             Te hemos enviado un mensaje de confirmación a tu WhatsApp.
-          </div>
         </CardContent>
 
-        <CardFooter className="p-8 pt-0 border-t bg-muted/10 flex flex-col gap-4">
-           <Button className="w-full h-14 text-lg font-black rounded-2xl group shadow-lg shadow-primary/10" asChild>
-              <Link href="/">
-                Volver al Inicio <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
-              </Link>
-           </Button>
-           <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">
-             Gracias por confiar en {businessName}
-           </p>
+        <CardFooter className="bg-muted/20 border-t p-8 flex flex-col gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full">
+                <Button onClick={handleAddToCalendar} variant="outline" className="h-12 font-bold rounded-2xl bg-white border-2 border-gray-100 hover:bg-gray-50 hover:border-primary/20">
+                    <Calendar className="mr-2 h-4 w-4 text-primary" /> Añadir al Calendario
+                </Button>
+                <Button asChild className="h-12 font-black rounded-2xl shadow-lg bg-[#25D366] hover:bg-[#128C7E] text-white border-none">
+                    <a href={`https://wa.me/${whatsappNumber}`} target="_blank" rel="noopener noreferrer">
+                        <WhatsAppIcon className="mr-2 h-5 w-5" /> Abrir WhatsApp
+                    </a>
+                </Button>
+            </div>
+            <Button asChild variant="ghost" className="w-full font-bold text-muted-foreground">
+                <Link href="/">Finalizar y Volver al Inicio</Link>
+            </Button>
         </CardFooter>
       </Card>
+      
+      <p className="text-center mt-8 text-[10px] font-black text-muted-foreground uppercase tracking-[0.3em] opacity-40">
+        Reserva procesada por Markix Secure Agendamiento
+      </p>
     </div>
   );
 }

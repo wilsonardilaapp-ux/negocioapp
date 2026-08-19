@@ -1,37 +1,25 @@
+'use client';
+
 import React, { useState, useEffect, useMemo } from "react";
-import { Card, CardHeader, CardContent, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Label } from "@/components/ui/label";
-import { cn, formatReservationDate } from "@/lib/utils";
+import { Calendar } from "@/components/ui/calendar";
 import { 
-  Calendar as CalendarIcon, 
-  Clock, 
-  ChevronLeft, 
-  ChevronRight, 
-  AlertCircle, 
-  Check,
-  Loader2
+    Clock, 
+    Calendar as CalendarIcon, 
+    ArrowLeft, 
+    ChevronRight, 
+    AlertCircle,
+    Loader2
 } from "lucide-react";
-import { 
-  format, 
-  isPast, 
-  isToday, 
-  addMonths, 
-  subMonths, 
-  startOfMonth, 
-  endOfMonth, 
-  eachDayOfInterval, 
-  isSameDay, 
-  getDay,
-  addDays,
-  startOfToday
-} from "date-fns";
-import { es } from "date-fns/locale";
 import { useFirestore, useCollection, useMemoFirebase } from "@/firebase";
 import { collection, query, where, getDocs } from "firebase/firestore";
+import { generateTimeSlots, isSlotAvailable } from "@/lib/booking-engine";
 import type { BookingAvailability, Reservation } from "@/models/booking";
-import { generateAvailableSlots } from "@/lib/booking-engine";
+import { calculateEndTime } from "@/models/booking";
+import { format, isBefore, startOfDay, addDays } from "date-fns";
+import { es } from "date-fns/locale";
+import { cn } from "@/lib/utils";
 
 interface TimeStepProps {
   businessId: string;
@@ -41,198 +29,173 @@ interface TimeStepProps {
   onBack: () => void;
 }
 
-export function TimeStep({ businessId, selectedStaffId, serviceDuration, onSelect, onBack }: TimeStepProps) {
+export function TimeStep({ 
+  businessId, 
+  selectedStaffId, 
+  serviceDuration, 
+  onSelect, 
+  onBack 
+}: TimeStepProps) {
   const firestore = useFirestore();
-  const [currentMonth, setCurrentMonth] = useState(new Date());
-  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
   const [availableSlots, setAvailableSlots] = useState<string[]>([]);
-  const [isLoadingSlots, setIsLoadingSlots] = useState(false);
+  const [isChecking, setIsChecking] = useState(false);
 
-  // --- 1. DATA FETCHING: DISPONIBILIDAD Y RESERVAS ---
-  const availQuery = useMemoFirebase(() => collection(firestore, `businesses/${businessId}/bookingAvailability`), [businessId, firestore]);
-  const { data: allAvailability } = useCollection<BookingAvailability>(availQuery);
+  const dateStr = selectedDate ? format(selectedDate, 'yyyy-MM-dd') : '';
 
-  const fetchSlots = async (date: Date) => {
-    setIsLoadingSlots(true);
-    try {
-      const dateStr = format(date, 'yyyy-MM-dd');
-      const dayOfWeek = getDay(date);
-      
-      const dayAvail = allAvailability?.find(a => a.dayOfWeek === dayOfWeek);
-      if (!dayAvail || !dayAvail.isOpen) {
-        setAvailableSlots([]);
-        return;
-      }
-
-      // Obtener reservas del staff para ese día
-      const resQuery = query(
-        collection(firestore, `businesses/${businessId}/reservations`),
-        where('date', '==', dateStr),
-        where('staffId', '==', selectedStaffId)
-      );
-      const resSnap = await getDocs(resQuery);
-      const existingRes = resSnap.docs.map(doc => ({ ...doc.data(), id: doc.id } as Reservation));
-
-      const slots = generateAvailableSlots(dayAvail, serviceDuration, existingRes, date);
-      setAvailableSlots(slots);
-    } catch (error) {
-      console.error("Error fetching slots:", error);
-      setAvailableSlots([]);
-    } finally {
-      setIsLoadingSlots(false);
-    }
-  };
-
+  // Consultar disponibilidad y reservas en tiempo real
   useEffect(() => {
-    if (selectedDate && allAvailability) {
-      fetchSlots(selectedDate);
-    }
-  }, [selectedDate, allAvailability, selectedStaffId]);
+    if (!selectedDate || !businessId || !firestore) return;
 
-  // --- LÓGICA DEL CALENDARIO ---
-  const days = useMemo(() => {
-    const start = startOfMonth(currentMonth);
-    const end = endOfMonth(currentMonth);
-    return eachDayOfInterval({ start, end });
-  }, [currentMonth]);
+    const fetchAvailability = async () => {
+      setIsChecking(true);
+      try {
+        const dayOfWeek = selectedDate.getDay();
+        
+        // 1. Obtener jornada del negocio para este día
+        const availSnap = await getDocs(query(
+            collection(firestore, `businesses/${businessId}/bookingAvailability`),
+            where('dayOfWeek', '==', dayOfWeek)
+        ));
 
-  const monthLabel = format(currentMonth, 'MMMM yyyy', { locale: es });
+        if (availSnap.empty) {
+            setAvailableSlots([]);
+            return;
+        }
 
-  const handleDateClick = (date: Date) => {
-    if (isPast(date) && !isToday(date)) return;
-    setSelectedDate(date);
-    setSelectedTime(null);
-  };
+        const availability = availSnap.docs[0].data() as BookingAvailability;
+        if (!availability.isOpen) {
+            setAvailableSlots([]);
+            return;
+        }
 
-  const handleConfirm = () => {
-    if (selectedDate && selectedTime) {
-      onSelect(format(selectedDate, 'yyyy-MM-dd'), selectedTime);
+        // 2. Obtener reservas existentes para el staff y fecha
+        const reservationsQuery = query(
+            collection(firestore, `businesses/${businessId}/reservations`),
+            where('date', '==', dateStr),
+            where('status', 'in', ['confirmed', 'completed', 'pending'])
+        );
+        const resSnap = await getDocs(reservationsQuery);
+        const allRes = resSnap.docs.map(doc => ({ ...doc.data(), id: doc.id } as Reservation));
+        
+        const staffRes = selectedStaffId === 'any' 
+            ? allRes 
+            : allRes.filter(r => r.staffId === selectedStaffId);
+
+        // 3. Calcular slots libres usando el motor compartido
+        const allPossibleSlots = generateTimeSlots(15);
+        const now = new Date();
+        const isToday = format(now, 'yyyy-MM-dd') === dateStr;
+        const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+        const validSlots = allPossibleSlots.filter(startTime => {
+            // Filtro de horas pasadas si es hoy
+            if (isToday) {
+                const [h, m] = startTime.split(':').map(Number);
+                if ((h * 60 + m) < currentMinutes + 30) return false; // Margen de 30 min
+            }
+
+            const endTime = calculateEndTime(startTime, serviceDuration);
+            return isSlotAvailable({ start: startTime, end: endTime }, availability, staffRes).available;
+        });
+
+        setAvailableSlots(validSlots);
+      } catch (e) {
+        console.error("Error checking slots:", e);
+        setAvailableSlots([]);
+      } finally {
+        setIsChecking(false);
+      }
+    };
+
+    fetchAvailability();
+  }, [selectedDate, dateStr, businessId, selectedStaffId, serviceDuration, firestore]);
+
+  const handleContinue = () => {
+    if (dateStr && selectedTime) {
+      onSelect(dateStr, selectedTime);
     }
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-      {/* Calendario */}
-      <Card className="rounded-[2.5rem] border-none shadow-xl bg-white overflow-hidden">
-        <CardHeader className="p-8 pb-4">
-           <div className="flex items-center justify-between mb-4">
-              <CardTitle className="text-2xl font-black">Selecciona el día</CardTitle>
-              <div className="flex gap-2">
-                <Button variant="outline" size="icon" className="rounded-full" onClick={() => setCurrentMonth(subMonths(currentMonth, 1))} disabled={isPast(startOfMonth(currentMonth))}><ChevronLeft className="h-4 w-4" /></Button>
-                <Button variant="outline" size="icon" className="rounded-full" onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}><ChevronRight className="h-4 w-4" /></Button>
-              </div>
-           </div>
-           <p className="text-sm font-bold text-primary uppercase tracking-widest text-center py-2 bg-primary/5 rounded-xl border border-primary/10">
-              {monthLabel}
-           </p>
-        </CardHeader>
-        <CardContent className="p-8 pt-2">
-            <div className="grid grid-cols-7 gap-2 mb-4">
-                {['D', 'L', 'M', 'M', 'J', 'V', 'S'].map((d, i) => (
-                    <div key={i} className="text-center text-[10px] font-black text-muted-foreground uppercase">{d}</div>
-                ))}
-            </div>
-            <div className="grid grid-cols-7 gap-2">
-                {/* Espaciado inicial */}
-                {Array.from({ length: getDay(days[0]) }).map((_, i) => (
-                    <div key={`empty-${i}`} />
-                ))}
-                {days.map((date) => {
-                    const isSelected = selectedDate && isSameDay(date, selectedDate);
-                    const isPastDate = isPast(date) && !isToday(date);
-                    const dayOfWeek = getDay(date);
-                    const isClosed = allAvailability && !allAvailability.find(a => a.dayOfWeek === dayOfWeek)?.isOpen;
+    <div className="space-y-6">
+      <div className="text-center space-y-2">
+        <h2 className="text-2xl font-black text-gray-900">¿Cuándo vienes?</h2>
+        <p className="text-muted-foreground">Selecciona el día y la hora de tu preferencia.</p>
+      </div>
 
-                    return (
-                        <button
-                            key={date.toString()}
-                            onClick={() => handleDateClick(date)}
-                            disabled={isPastDate || isClosed}
-                            className={cn(
-                                "aspect-square rounded-2xl flex flex-col items-center justify-center transition-all duration-300 relative group",
-                                isSelected ? "bg-primary text-white shadow-lg scale-110 z-10" : "bg-muted/30 hover:bg-primary/10",
-                                (isPastDate || isClosed) && "opacity-20 cursor-not-allowed bg-transparent"
-                            )}
-                        >
-                            <span className="text-sm font-black">{format(date, 'd')}</span>
-                            {isToday(date) && !isSelected && <div className="absolute bottom-2 h-1 w-1 rounded-full bg-primary" />}
-                        </button>
-                    );
-                })}
-            </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        {/* Calendario */}
+        <Card className="p-4 border-none shadow-xl rounded-3xl">
+          <Calendar
+            mode="single"
+            selected={selectedDate}
+            onSelect={setSelectedDate}
+            locale={es}
+            disabled={(date) => isBefore(date, startOfDay(new Date())) || isBefore(addDays(new Date(), 30), date)}
+            className="w-full"
+            classNames={{
+              day_selected: "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground rounded-xl",
+              day_today: "bg-muted text-foreground font-black rounded-xl",
+            }}
+          />
+        </Card>
 
-            <div className="mt-8 space-y-3">
-                <Label className="text-[10px] font-black uppercase text-muted-foreground flex items-center gap-2">
-                  <CalendarIcon className="h-3 w-3" /> Escoge un día
-                </Label>
-                <div className="flex flex-wrap gap-4 text-[10px] font-bold uppercase tracking-tighter">
-                   <div className="flex items-center gap-1.5"><div className="h-2 w-2 rounded-full bg-primary" /> Hoy</div>
-                   <div className="flex items-center gap-1.5 opacity-20"><div className="h-2 w-2 rounded-full bg-muted-foreground" /> No disponible</div>
-                </div>
-            </div>
-        </CardContent>
-      </Card>
-
-      {/* Horas */}
-      <Card className="rounded-[2.5rem] border-none shadow-xl bg-white overflow-hidden flex flex-col">
-        <CardHeader className="p-8 pb-4">
-           <CardTitle className="text-2xl font-black">Turnos Disponibles</CardTitle>
-           <CardDescription className="text-sm font-medium">
-              {selectedDate ? `Horarios para el ${format(selectedDate, 'd MMMM', { locale: es })}` : 'Selecciona un día para ver los turnos.'}
-           </CardDescription>
-        </CardHeader>
-        <CardContent className="p-8 pt-2 flex-1 overflow-y-auto max-h-[400px]">
-          {isLoadingSlots ? (
-             <div className="h-full flex flex-col items-center justify-center py-10 gap-3">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Calculando espacios...</p>
-             </div>
-          ) : selectedDate ? (
-            availableSlots.length > 0 ? (
-                <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
-                    {availableSlots.map((time) => (
-                        <button
-                            key={time}
-                            onClick={() => setSelectedTime(time)}
-                            className={cn(
-                                "h-12 rounded-xl flex items-center justify-center font-black text-sm transition-all duration-300",
-                                selectedTime === time 
-                                    ? "bg-primary text-white shadow-md scale-105" 
-                                    : "bg-muted/40 hover:bg-primary/10 text-gray-700"
-                            )}
-                        >
-                            {time}
-                        </button>
-                    ))}
-                </div>
-            ) : (
-                <div className="h-full flex flex-col items-center justify-center py-10 gap-4 text-center">
-                    <div className="p-4 bg-muted rounded-full text-muted-foreground/30"><Clock className="h-10 w-10" /></div>
-                    <div className="space-y-1">
-                        <p className="font-black text-gray-400 uppercase text-xs">Sin turnos disponibles</p>
-                        <p className="text-xs text-muted-foreground max-w-[200px]">Intenta seleccionar otro día u otro profesional.</p>
-                    </div>
-                </div>
-            )
-          ) : (
-            <div className="h-full flex flex-col items-center justify-center py-10 gap-4 text-center opacity-40">
-                <CalendarIcon className="h-12 w-12 text-muted-foreground" />
-                <p className="text-sm font-medium">Elige una fecha del calendario</p>
-            </div>
-          )}
-        </CardContent>
-        <CardFooter className="bg-muted/20 border-t p-6 flex justify-between items-center">
-            <Button variant="ghost" onClick={onBack} className="font-bold">Volver</Button>
-            <Button 
-              onClick={handleConfirm} 
-              disabled={!selectedTime} 
-              className="font-black px-8 shadow-lg shadow-primary/20"
-            >
-              Continuar <ChevronRight className="ml-2 h-4 w-4" />
-            </Button>
-        </CardFooter>
-      </Card>
+        {/* Slots de Tiempo */}
+        <div className="space-y-4">
+            <Card className="h-full border-none shadow-xl rounded-3xl overflow-hidden flex flex-col">
+                <CardHeader className="bg-muted/30 border-b pb-4">
+                    <CardTitle className="text-sm font-black uppercase tracking-widest flex items-center gap-2">
+                        <Clock className="h-4 w-4 text-primary" />
+                        Turnos para el {selectedDate ? format(selectedDate, 'd MMM', { locale: es }) : '...'}
+                    </CardTitle>
+                </CardHeader>
+                <CardContent className="p-6 flex-1">
+                    {isChecking ? (
+                        <div className="flex flex-col items-center justify-center h-48 gap-3 text-muted-foreground">
+                            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                            <p className="text-xs font-bold uppercase tracking-widest">Consultando agenda...</p>
+                        </div>
+                    ) : availableSlots.length > 0 ? (
+                        <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                            {availableSlots.map(time => (
+                                <button
+                                    key={time}
+                                    onClick={() => setSelectedTime(time)}
+                                    className={cn(
+                                        "h-12 rounded-xl text-sm font-black transition-all border-2",
+                                        selectedTime === time 
+                                            ? "bg-primary text-white border-primary shadow-lg scale-105" 
+                                            : "bg-white border-gray-100 text-gray-600 hover:border-primary/30"
+                                    )}
+                                >
+                                    {time}
+                                </button>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="flex flex-col items-center justify-center h-48 text-center gap-4 text-muted-foreground">
+                            <div className="p-3 bg-muted rounded-full"><AlertCircle className="h-6 w-6" /></div>
+                            <p className="text-sm font-medium">No hay turnos disponibles para este día.</p>
+                        </div>
+                    )}
+                </CardContent>
+                <CardFooter className="bg-muted/20 border-t p-6 flex justify-between items-center">
+                    <Button variant="ghost" onClick={onBack} className="font-bold text-muted-foreground">
+                        <ArrowLeft className="mr-2 h-4 w-4" /> Volver
+                    </Button>
+                    <Button 
+                        disabled={!selectedTime || isChecking} 
+                        onClick={handleContinue}
+                        className="font-black px-8 rounded-xl shadow-lg shadow-primary/20"
+                    >
+                        Continuar <ChevronRight className="ml-2 h-4 w-4" />
+                    </Button>
+                </CardFooter>
+            </Card>
+        </div>
+      </div>
     </div>
   );
 }
