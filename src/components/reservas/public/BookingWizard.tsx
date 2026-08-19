@@ -1,210 +1,187 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect } from 'react';
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { toast } from "@/hooks/use-toast";
-import { cn } from "@/lib/utils";
-import { 
-  Check, 
-  User, 
-  Clock, 
-  Calendar, 
-  ArrowLeft, 
-  ChevronRight,
-  Loader2,
-  Sparkles,
-  MapPin,
-  Smartphone,
-  CheckCircle2,
-  CalendarDays
-} from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { ServiceStep } from "./ServiceStep";
-import { StaffStep } from "./StaffStep";
-import { TimeStep } from "./TimeStep";
-import { ContactStep } from "./ContactStep";
-import { SuccessView } from "./SuccessView";
-import { confirmPublicBooking } from "@/actions/public-booking";
-import type { BookingService, BookingStaff, Reservation } from "@/models/booking";
+import { Card, CardHeader, CardContent, CardTitle, CardDescription } from "@/components/ui/card";
+import { 
+    Check, 
+    User, 
+    Clock, 
+    Calendar, 
+    ArrowLeft, 
+    ArrowRight, 
+    Loader2, 
+    ShieldCheck, 
+    CheckCircle2 
+} from "lucide-react";
+import { cn } from "@/lib/utils";
+import { ServiceStep } from './ServiceStep';
+import { StaffStep } from './StaffStep';
+import { TimeStep } from './TimeStep';
+import { ContactStep } from './ContactStep';
+import { SuccessView } from './SuccessView';
+import { confirmPublicBooking } from '@/actions/public-booking';
+import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import { collection, query, where, orderBy } from 'firebase/firestore';
+import type { BookingService, BookingStaff, BookingAvailability, Reservation } from '@/models/booking';
 
-interface BookingWizardProps {
-  businessId: string;
-  services: BookingService[];
-  staff: BookingStaff[];
-  initialServiceId?: string;
-}
-
-export function BookingWizard({ businessId, services, staff, initialServiceId }: BookingWizardProps) {
-  const [mounted, setMounted] = useState(false);
-  const [step, setStep] = useState(1);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [createdReservation, setCreatedReservation] = useState<Reservation | null>(null);
-
-  const [bookingData, setBookingData] = useState({
-    serviceId: initialServiceId || '',
-    serviceName: '',
-    durationMinutes: 30,
-    price: 0,
-    staffId: '',
-    staffName: '',
-    date: '',
-    startTime: '',
-    endTime: '',
-    customerName: '',
-    customerPhone: '',
-    customerEmail: '',
-    notes: '',
-  });
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  const STEPS = [
-    { s: 1, label: "SERVICIO", icon: CheckCircle2 },
+const STEPS = [
+    { s: 1, label: "SERVICIO", icon: Check },
     { s: 2, label: "PROFESIONAL", icon: User },
     { s: 3, label: "HORARIO", icon: Clock },
-    { s: 4, label: "TUS DATOS", icon: CalendarDays },
-  ];
+    { s: 4, label: "TUS DATOS", icon: Calendar },
+];
 
-  const handleSelectService = (service: BookingService) => {
-    setBookingData(prev => ({
-      ...prev,
-      serviceId: service.id,
-      serviceName: service.name,
-      durationMinutes: service.durationMinutes,
-      price: service.price
-    }));
-    setStep(2);
-  };
+export function BookingWizard({ businessId, services, staff }: { businessId: string, services: BookingService[], staff: BookingStaff[] }) {
+    const [step, setStep] = useState(1);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [createdReservation, setCreatedReservation] = useState<Reservation | null>(null);
+    const [mounted, setMounted] = useState(false);
 
-  const handleSelectStaff = (staffId: string, staffMember?: BookingStaff) => {
-    setBookingData(prev => ({
-      ...prev,
-      staffId: staffId,
-      staffName: staffMember ? staffMember.name : 'Cualquier Profesional'
-    }));
-    setStep(3);
-  };
+    useEffect(() => { setMounted(true); }, []);
 
-  const handleSelectDateTime = (data: { date: string; startTime: string; endTime: string }) => {
-    setBookingData(prev => ({
-      ...prev,
-      date: data.date,
-      startTime: data.startTime,
-      endTime: data.endTime
-    }));
-    setStep(4);
-  };
+    const [bookingData, setBookingData] = useState({
+        serviceId: '',
+        serviceName: '',
+        price: 0,
+        durationMinutes: 30,
+        staffId: 'any',
+        staffName: 'Cualquier Profesional',
+        date: '',
+        startTime: '',
+        endTime: '',
+        customerName: '',
+        customerPhone: '',
+        customerEmail: '',
+        notes: '',
+    });
 
-  const handleConfirm = async (contactData: any) => {
-    setIsSubmitting(true);
-    const finalData = { ...bookingData, ...contactData };
+    const firestore = useFirestore();
 
-    try {
-      const res = await confirmPublicBooking(businessId, finalData);
-      if (res.success) {
-        setCreatedReservation(res.reservation);
-        setStep(5);
-      } else {
-        toast({
-          variant: "destructive",
-          title: "Error al agendar",
-          description: res.error || "No se pudo procesar tu cita. Por favor intenta de nuevo.",
-        });
-      }
-    } catch (err: any) {
-      toast({
-        variant: "destructive",
-        title: "Error técnico",
-        description: err.message || "Ocurrió un error inesperado.",
-      });
-    } finally {
-      setIsSubmitting(false);
+    const availabilityQuery = useMemoFirebase(() => 
+        businessId ? collection(firestore, `businesses/${businessId}/bookingAvailability`) : null, 
+    [businessId, firestore]);
+    
+    const reservationsQuery = useMemoFirebase(() => 
+        businessId ? collection(firestore, `businesses/${businessId}/reservations`) : null, 
+    [businessId, firestore]);
+
+    const { data: availabilityList } = useCollection<BookingAvailability>(availabilityQuery);
+    const { data: allReservations } = useCollection<Reservation>(reservationsQuery);
+
+    const formatReservationDate = (dateVal: any) => {
+        try {
+            if (!dateVal) return "";
+            const d = typeof dateVal === 'string' ? new Date(dateVal.includes('T') ? dateVal : `${dateVal}T00:00:00`) : new Date(dateVal);
+            if (isNaN(d.getTime())) return String(dateVal);
+            return format(d, "EEEE, d 'de' MMMM 'de' yyyy", { locale: es });
+        } catch {
+            return String(dateVal || "");
+        }
+    };
+
+    const handleConfirm = async () => {
+        setIsSubmitting(true);
+        try {
+            const res = await confirmPublicBooking(businessId, bookingData);
+            if (res.success) {
+                setCreatedReservation(res.reservation);
+                setStep(5);
+            } else {
+                toast({ variant: "destructive", title: "Error al agendar", description: res.error });
+            }
+        } catch (err: any) {
+            toast({ variant: "destructive", title: "Error de conexión", description: err?.message || "Ocurrió un error inesperado." });
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    if (!mounted) return <div className="flex justify-center py-20"><Loader2 className="animate-spin" /></div>;
+
+    if (step === 5 && createdReservation) {
+        return <SuccessView reservation={createdReservation} businessId={businessId} />;
     }
-  };
 
-  if (!mounted) return null;
+    const selectedService = services.find(s => s.id === bookingData.serviceId);
+    const selectedStaff = staff.find(s => s.id === bookingData.staffId) || null;
 
-  // Pantalla de Éxito (Fuera del layout estándar del wizard)
-  if (step === 5 && createdReservation) {
-    return <SuccessView reservation={createdReservation} businessId={businessId} />;
-  }
-
-  return (
-    <div className="w-full max-w-4xl mx-auto space-y-10 py-4 px-2">
-      {/* STEPPER SUPERIOR RESTAURADO */}
-      <div className="flex justify-between items-center relative max-w-2xl mx-auto px-4">
-        {/* Línea de fondo */}
-        <div className="absolute top-5 left-8 right-8 h-0.5 bg-gray-200 -z-0" />
-        
-        {STEPS.map((item) => {
-          const isActive = step === item.s;
-          const isCompleted = step > item.s;
-          const Icon = isCompleted ? Check : item.icon;
-
-          return (
-            <div key={item.s} className="flex flex-col items-center gap-3 relative z-10">
-              <div 
-                className={cn(
-                  "w-10 h-10 rounded-full flex items-center justify-center transition-all duration-500 border-2 shadow-sm",
-                  isCompleted ? "bg-primary border-primary text-white" :
-                  isActive ? "bg-primary border-primary text-white scale-110 shadow-lg" :
-                  "bg-white border-gray-200 text-gray-300"
-                )}
-              >
-                <Icon className={cn("w-5 h-5", isActive && "animate-in zoom-in duration-300")} />
-              </div>
-              <span className={cn(
-                "text-[10px] font-black tracking-widest uppercase",
-                isActive || isCompleted ? "text-primary" : "text-gray-400"
-              )}>
-                {item.label}
-              </span>
+    return (
+        <div className="max-w-4xl mx-auto space-y-8">
+            {/* Stepper */}
+            <div className="flex items-center justify-between px-4 sm:px-10 relative">
+                <div className="absolute top-5 left-10 right-10 h-0.5 bg-muted -z-0 hidden sm:block"></div>
+                {STEPS.map((item) => {
+                    const Icon = item.icon;
+                    const isActive = step === item.s;
+                    const isCompleted = step > item.s;
+                    return (
+                        <div key={item.s} className="flex flex-col items-center gap-2 z-10">
+                            <div className={cn(
+                                "w-10 h-10 rounded-full flex items-center justify-center transition-all border-2",
+                                isCompleted ? "bg-primary border-primary text-white" :
+                                isActive ? "bg-white border-primary text-primary shadow-lg shadow-primary/20 scale-110" :
+                                "bg-white border-muted text-muted-foreground"
+                            )}>
+                                {isCompleted ? <Check className="w-5 h-5" /> : <Icon className="w-5 h-5" />}
+                            </div>
+                            <span className={cn("text-[9px] font-black tracking-widest", isActive || isCompleted ? "text-primary" : "text-muted-foreground")}>
+                                {item.label}
+                            </span>
+                        </div>
+                    );
+                })}
             </div>
-          );
-        })}
-      </div>
 
-      {/* CONTENIDO DE LOS PASOS */}
-      <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
-        {step === 1 && (
-          <ServiceStep 
-            services={services} 
-            onSelect={handleSelectService} 
-            selectedServiceId={bookingData.serviceId} 
-          />
-        )}
-
-        {step === 2 && (
-          <StaffStep 
-            staffList={staff.filter(s => s.assignedServiceIds.includes(bookingData.serviceId))} 
-            onSelectStaff={handleSelectStaff}
-            onBack={() => setStep(1)}
-            selectedStaffId={bookingData.staffId}
-          />
-        )}
-
-        {step === 3 && (
-          <TimeStep 
-            businessId={businessId}
-            selectedService={services.find(s => s.id === bookingData.serviceId)}
-            selectedStaffId={bookingData.staffId}
-            onSelectDateTime={handleSelectDateTime}
-            onBack={() => setStep(2)}
-          />
-        )}
-
-        {step === 4 && (
-          <ContactStep 
-            bookingData={bookingData}
-            onConfirm={handleConfirm}
-            onBack={() => setStep(3)}
-            isSubmitting={isSubmitting}
-          />
-        )}
-      </div>
-    </div>
-  );
+            {/* Render Steps */}
+            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                {step === 1 && (
+                    <ServiceStep 
+                        services={services} 
+                        onSelect={(s) => {
+                            setBookingData(prev => ({ ...prev, serviceId: s.id, serviceName: s.name, price: s.price, durationMinutes: s.durationMinutes }));
+                            setStep(2);
+                        }} 
+                    />
+                )}
+                {step === 2 && (
+                    <StaffStep 
+                        staffList={staff.filter(s => s.assignedServiceIds.includes(bookingData.serviceId))}
+                        selectedStaffId={bookingData.staffId}
+                        onSelectStaff={(id, s) => {
+                            setBookingData(prev => ({ ...prev, staffId: id, staffName: s?.name || 'Cualquier Profesional' }));
+                            setStep(3);
+                        }}
+                        onBack={() => setStep(1)}
+                    />
+                )}
+                {step === 3 && selectedService && (
+                    <TimeStep 
+                        selectedService={selectedService}
+                        selectedStaff={selectedStaff}
+                        availabilityList={availabilityList || []}
+                        existingReservations={allReservations || []}
+                        onSelectDateTime={(data) => {
+                            setBookingData(prev => ({ ...prev, ...data }));
+                            setStep(4);
+                        }}
+                        onBack={() => setStep(2)}
+                    />
+                )}
+                {step === 4 && (
+                    <ContactStep 
+                        bookingData={bookingData}
+                        setBookingData={setBookingData}
+                        onConfirm={handleConfirm}
+                        onBack={() => setStep(3)}
+                        isSubmitting={isSubmitting}
+                        formatDate={formatReservationDate}
+                    />
+                )}
+            </div>
+        </div>
+    );
 }

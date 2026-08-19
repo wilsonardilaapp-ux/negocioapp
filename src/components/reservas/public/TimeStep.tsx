@@ -1,190 +1,185 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { Calendar } from '@/components/ui/calendar';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Calendar } from '@/components/ui/calendar';
-import { 
-  Clock, 
-  Calendar as CalendarIcon, 
-  ChevronRight, 
-  AlertCircle,
-  CheckCircle2,
-  ChevronLeft
-} from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { isPast, isToday, format } from 'date-fns';
+import { format, isPast, isToday } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { Clock, Loader2, ChevronRight, Info, ArrowLeft, CalendarDays } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { calculateEndTime, isSlotAvailable, generateTimeSlots } from '@/lib/booking-engine';
 import type { BookingService, BookingStaff, BookingAvailability, Reservation } from '@/models/booking';
-import { generateTimeSlots, isSlotAvailable, calculateEndTime } from '@/lib/booking-engine';
+import { Label } from '@/components/ui/label';
 
 interface TimeStepProps {
-  businessId: string;
   selectedService: BookingService;
-  selectedStaff: BookingStaff;
+  selectedStaff: BookingStaff | null;
   availabilityList: BookingAvailability[];
   existingReservations: Reservation[];
   onSelectDateTime: (data: { date: string; startTime: string; endTime: string }) => void;
   onBack: () => void;
 }
 
-/**
- * Función utilitaria para obtener YYYY-MM-DD local sin desfase de zona horaria
- */
-const formatToDateString = (d: Date): string => {
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-};
-
 export function TimeStep({ 
-  businessId, 
   selectedService, 
   selectedStaff, 
   availabilityList, 
-  existingReservations,
-  onSelectDateTime,
+  existingReservations, 
+  onSelectDateTime, 
   onBack 
 }: TimeStepProps) {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
-  const [month, setMonth] = useState<Date>(new Date());
 
-  // --- LÓGICA DE TURNOS ---
+  // Helper para obtener el string YYYY-MM-DD local
+  const formatToDateString = (d: Date): string => {
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  // Cálculo de turnos disponibles
   const availableSlots = useMemo(() => {
-    if (!selectedDate || !availabilityList) return [];
+    if (!selectedDate) return [];
 
+    const dateStr = formatToDateString(selectedDate);
     const dayOfWeek = selectedDate.getDay();
-    const dayConfig = availabilityList.find(a => Number(a.dayOfWeek) === dayOfWeek);
     
-    // Fallback: Si no hay configuración, Lunes a Sábado abierto (8-18), Domingo cerrado
-    const isDayOpen = dayConfig !== undefined ? Boolean(dayConfig.isOpen) : dayOfWeek !== 0;
+    // PROTECCIÓN DEFENSIVA: Extracción segura de variables con fallbacks
+    const currentStaffId = selectedStaff?.id || 'any';
+    const currentDuration = Number(selectedService?.durationMinutes) || 30;
 
+    const dayConfig = availabilityList?.find(a => Number(a.dayOfWeek) === dayOfWeek);
+
+    // Fallback: Si no hay config, asumimos abierto L-S 08:00-18:00
+    const isDayOpen = dayConfig !== undefined ? Boolean(dayConfig.isOpen) : dayOfWeek !== 0;
+    
     if (!isDayOpen) return [];
 
     const effectiveShifts = (dayConfig?.shifts && dayConfig.shifts.length > 0)
       ? dayConfig.shifts
       : [{ start: '08:00', end: '18:00' }];
 
-    const dayStr = formatToDateString(selectedDate);
-    const dayReservations = existingReservations.filter(r => r.date === dayStr && r.staffId === selectedStaff.id);
+    const dailyReservations = existingReservations?.filter(r => 
+      r.date === dateStr && (currentStaffId === 'any' || r.staffId === currentStaffId)
+    ) || [];
 
     const allSlots = generateTimeSlots(15);
     
-    return allSlots.filter(startTime => {
-      const endTime = calculateEndTime(startTime, selectedService.durationMinutes);
+    return allSlots.filter(time => {
+      const endTime = calculateEndTime(time, currentDuration);
       return isSlotAvailable(
-        { start: startTime, end: endTime },
-        { ...dayConfig, isOpen: true, shifts: effectiveShifts, dayOfWeek } as BookingAvailability,
-        dayReservations
+        { start: time, end: endTime },
+        { ...dayConfig, isOpen: true, shifts: effectiveShifts, dayOfWeek } as any,
+        dailyReservations
       ).available;
     });
-  }, [selectedDate, availabilityList, existingReservations, selectedStaff.id, selectedService.durationMinutes]);
+
+  // LÍNEA 83: Protección con encadenamiento opcional en dependencias
+  }, [
+    selectedDate, 
+    availabilityList, 
+    existingReservations, 
+    selectedStaff?.id, 
+    selectedService?.id, 
+    selectedService?.durationMinutes
+  ]);
 
   const handleContinue = () => {
     if (selectedDate && selectedTime) {
       onSelectDateTime({
         date: formatToDateString(selectedDate),
         startTime: selectedTime,
-        endTime: calculateEndTime(selectedTime, selectedService.durationMinutes)
+        endTime: calculateEndTime(selectedTime, Number(selectedService?.durationMinutes) || 30)
       });
     }
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start animate-in fade-in slide-in-from-bottom-4 duration-500">
-      {/* Calendario */}
-      <Card className="lg:col-span-2 rounded-[2rem] border-none shadow-xl shadow-gray-100/50 bg-white overflow-hidden">
-        <CardHeader className="bg-primary/5 border-b pb-6">
-          <CardTitle className="text-xl font-black text-gray-900 flex items-center gap-2">
-            <CalendarIcon className="h-5 w-5 text-primary" />
-            1. Selecciona el día
-          </CardTitle>
-          <CardDescription>Explora las fechas disponibles para tu cita.</CardDescription>
-        </CardHeader>
-        <CardContent className="p-6">
+    <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-6 sm:p-8 max-w-4xl mx-auto relative animate-in fade-in duration-500">
+      <button
+        onClick={onBack}
+        className="absolute left-6 top-6 p-2 rounded-full hover:bg-muted/50 text-gray-500 hover:text-gray-900 transition-colors"
+        aria-label="Volver"
+      >
+        <ArrowLeft className="w-5 h-5" />
+      </button>
+
+      <div className="text-center mb-8">
+        <h2 className="text-2xl sm:text-3xl font-black text-gray-900 mb-2">Agenda tu Turno</h2>
+        <p className="text-sm text-muted-foreground">Selecciona la fecha y hora que mejor te convenga.</p>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="space-y-4">
+          <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">1. Selecciona el día</Label>
           <Calendar
             mode="single"
             selected={selectedDate}
             onSelect={(date) => {
-              setSelectedDate(date);
-              setSelectedTime(null);
+                setSelectedDate(date);
+                setSelectedTime(null);
             }}
-            month={month}
-            onMonthChange={setMonth}
             locale={es}
+            className="rounded-2xl border shadow-sm bg-white"
             disabled={(date) => isPast(date) && !isToday(date)}
-            className="w-full flex justify-center"
-            classNames={{
-              day_selected: "bg-primary text-white font-black hover:bg-primary hover:text-white rounded-xl shadow-lg shadow-primary/20",
-              day_today: "bg-muted text-primary font-bold rounded-xl",
-              day: "h-12 w-12 md:h-14 md:w-14 text-sm font-medium hover:bg-muted hover:rounded-xl transition-all",
-              head_cell: "text-muted-foreground font-bold uppercase text-[10px] tracking-widest pb-4",
-              nav_button: "hover:bg-primary/10 rounded-lg p-1 text-primary",
-            }}
           />
-        </CardContent>
-      </Card>
+        </div>
 
-      {/* Horas */}
-      <div className="space-y-6">
-        <Card className="rounded-[2rem] border-none shadow-xl shadow-gray-100/50 bg-white overflow-hidden">
-          <CardHeader className="bg-primary/5 border-b pb-6">
-            <CardTitle className="text-xl font-black text-gray-900 flex items-center gap-2">
-              <Clock className="h-5 w-5 text-primary" />
-              2. Horarios
-            </CardTitle>
-            <CardDescription>
-              {selectedDate 
-                ? format(selectedDate, "EEEE, d 'de' MMMM", { locale: es }) 
-                : 'Selecciona un día'}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="p-6">
-            {availableSlots.length > 0 ? (
-              <div className="grid grid-cols-2 gap-2">
-                {availableSlots.map((slot) => (
+        <div className="space-y-4 flex flex-col">
+          <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">2. Turnos Disponibles</Label>
+          
+          <div className="flex-1 min-h-[300px] border rounded-2xl p-4 bg-muted/20 overflow-y-auto">
+            {!selectedDate ? (
+              <div className="h-full flex flex-col items-center justify-center text-center p-4">
+                <CalendarDays className="h-10 w-10 text-muted-foreground/30 mb-2" />
+                <p className="text-xs text-muted-foreground">Selecciona un día del calendario</p>
+              </div>
+            ) : availableSlots.length > 0 ? (
+              <div className="grid grid-cols-3 gap-2">
+                {availableSlots.map(time => (
                   <Button
-                    key={slot}
-                    variant={selectedTime === slot ? "default" : "outline"}
-                    onClick={() => setSelectedTime(slot)}
+                    key={time}
+                    variant={selectedTime === time ? "default" : "outline"}
                     className={cn(
-                      "h-12 font-bold rounded-xl transition-all",
-                      selectedTime === slot 
-                        ? "bg-primary text-white shadow-lg shadow-primary/20 scale-105" 
-                        : "hover:border-primary hover:text-primary hover:bg-primary/5"
+                      "h-10 font-bold rounded-xl transition-all",
+                      selectedTime === time ? "shadow-md scale-105" : "bg-white hover:border-primary/50"
                     )}
+                    onClick={() => setSelectedTime(time)}
                   >
-                    {slot}
+                    {time}
                   </Button>
                 ))}
               </div>
             ) : (
-              <div className="flex flex-col items-center justify-center py-10 text-center gap-3 bg-muted/20 rounded-2xl border border-dashed">
-                <AlertCircle className="h-8 w-8 text-muted-foreground/30" />
-                <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest px-4">
-                  {selectedDate ? 'No hay turnos disponibles para este día' : 'Selecciona un día del calendario'}
-                </p>
+              <div className="h-full flex flex-col items-center justify-center text-center p-4">
+                <Clock className="h-10 w-10 text-muted-foreground/30 mb-2" />
+                <p className="text-xs text-muted-foreground font-medium">No hay turnos disponibles para este día.</p>
               </div>
             )}
-          </CardContent>
-        </Card>
+          </div>
 
-        {/* Acciones */}
-        <div className="flex flex-col gap-3">
-          <Button 
-            size="lg" 
-            className="w-full h-14 text-lg font-black rounded-2xl shadow-xl shadow-primary/10"
-            disabled={!selectedDate || !selectedTime}
-            onClick={handleContinue}
-          >
-            Continuar al registro
-            <ChevronRight className="ml-2 h-5 w-5" />
-          </Button>
-          <Button variant="ghost" className="font-bold text-muted-foreground" onClick={onBack}>
-            <ChevronLeft className="mr-2 h-4 w-4" /> Volver a profesionales
-          </Button>
+          <div className="pt-4">
+             <Button 
+              className="w-full h-12 font-black rounded-xl shadow-lg shadow-primary/10" 
+              disabled={!selectedDate || !selectedTime}
+              onClick={handleContinue}
+            >
+              Continuar <ChevronRight className="ml-2 h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      </div>
+      
+      <div className="mt-8 p-4 bg-primary/5 rounded-2xl border border-primary/10 flex items-start gap-3">
+        <Info className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+        <div className="space-y-1">
+            <p className="text-xs font-bold text-primary uppercase tracking-widest">Resumen de selección</p>
+            <p className="text-xs text-gray-600 leading-relaxed">
+                Has seleccionado a <strong>{selectedStaff?.name || 'Cualquier Profesional'}</strong> para un servicio de <strong>{selectedService?.name || 'Servicio'}</strong>.
+            </p>
         </div>
       </div>
     </div>
