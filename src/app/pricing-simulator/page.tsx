@@ -198,20 +198,15 @@ function SimulatorView() {
 
     // 1. Determinar plan ideal según desafío (Perfil de usuario)
     let challengePlanId = 'crecimiento';
-    let challengeReason = '';
     
     if (mainChallenge === 'no_shows') {
       challengePlanId = 'basico';
-      challengeReason = 'Incluye recordatorios de WhatsApp para eliminar inasistencias.';
     } else if (mainChallenge === 'commissions') {
       challengePlanId = 'estandar';
-      challengeReason = 'Reduce tus costos bajando al 9% de comisión con pagos integrados.';
     } else if (mainChallenge === 'no_online') {
       challengePlanId = 'crecimiento';
-      challengeReason = 'Empieza tu digitalización profesional con inversión base de $0.';
     } else if (mainChallenge === 'automation') {
       challengePlanId = 'profesional';
-      challengeReason = 'Potencia tu negocio con Radar de Churn e Inteligencia Artificial.';
     }
 
     const calculated = HYBRID_PLANS_DATA.map(plan => {
@@ -253,10 +248,6 @@ function SimulatorView() {
       winner = calculated
         .filter(p => p.isSuitable)
         .sort((a, b) => a.order - b.order)[0];
-        
-      if (winner) {
-        challengeReason = `Tu volumen de pedidos requiere la capacidad del ${winner.name}.`;
-      }
     }
 
     return {
@@ -271,12 +262,41 @@ function SimulatorView() {
         ahorroAppsProyectado,
         gananciaBrutaTotal
       },
-      recommendation: {
-        ...(winner || calculated[0]),
-        reason: challengeReason
-      }
+      recommendation: winner || calculated[0]
     };
   }, [pedidosActuales, ticketPromedio, margenNeto, crecimientoEstimado, comisionApps, mainChallenge]);
+
+  /**
+   * Helper para generar el copy estratégico dinámico según el desafío seleccionado.
+   */
+  const getStrategicAnalysisText = () => {
+    if (!recommendation) return "";
+
+    const planName = recommendation.name;
+    const comisionActual = comisionApps; // % ingresado en slider
+    const feePlan = Math.round(recommendation.fee * 100);
+    const ahorroComision = formatCOP(recommendation.ahorroComisionVsGratis || 0);
+    const gananciaExtra = formatCOP(recommendation.gananciaNetaExtra || 0);
+    const basePlan = formatCOP(recommendation.base);
+    const roi = recommendation.roi || '1.0';
+
+    switch (mainChallenge) {
+      case 'commissions':
+        return `Hoy pagas el ${comisionActual}% en comisiones en apps externas. Con el ${planName} bajas tu comisión al ${feePlan}%, ahorrando ${ahorroComision} cada mes en comisiones. Sumado a tu crecimiento proyectado, este cambio pone ${gananciaExtra} adicionales en tu bolsillo mensualmente.`;
+
+      case 'no_shows':
+        return `Al activar los recordatorios automáticos de WhatsApp de este plan, reduces drásticamente las citas perdidas y cancelaciones. Recuperar la asistencia de tus clientes te permite capturar una utilidad extra de ${gananciaExtra} al mes, logrando un retorno de inversión estimado de ${roi}x sobre el costo del software.`;
+
+      case 'no_online':
+        return `Digitalizas tu operación con un catálogo online profesional y pedidos directos por WhatsApp. Con una inversión base de solo ${basePlan}/mes, eliminas intermediarios y generas una ganancia neta estimada de ${gananciaExtra} mensuales desde tu propia plataforma independiente.`;
+
+      case 'automation':
+        return `Desbloqueas el Radar de Clientes y el Asistente con IA para recuperar ventas inactivas y atender a tus clientes 24/7. Esta automatización no solo libera tu tiempo, sino que proyecta un incremento de ingresos de ${gananciaExtra} cada mes gracias a una gestión inteligente.`;
+
+      default:
+        return `El ${planName} es la opción más equilibrada para tu volumen de ventas. Te permite optimizar tus costos y capturar una utilidad adicional de ${gananciaExtra} mensuales.`;
+    }
+  };
 
   if (!mounted) return null;
 
@@ -542,12 +562,6 @@ function SimulatorView() {
                     </div>
                   </div>
 
-                  {isRecommended && (
-                      <p className="text-[11px] font-bold text-primary bg-primary/5 p-3 rounded-2xl border border-primary/20 animate-in fade-in slide-in-from-top-1 duration-700">
-                          {recommendation.reason}
-                      </p>
-                  )}
-
                   <div className="space-y-2 py-4 border-y border-dashed border-slate-200">
                     {res.id === 'crecimiento' ? (
                         <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Comisión estándar del 15%</p>
@@ -697,11 +711,8 @@ function SimulatorView() {
                    </div>
                    <div className="flex-1 space-y-4 text-center md:text-left">
                       <h3 className="text-2xl font-black uppercase tracking-tight text-white">Análisis Estratégico: {recommendation?.name}</h3>
-                      <p className="text-lg text-white/70 font-medium leading-relaxed max-w-4xl">
-                        {recommendation?.isProfitable 
-                          ? `Este plan maximiza tu retorno de inversión (${recommendation.roi}x) al balancear eficiencia operativa y escalabilidad. Te permite capturar una utilidad adicional de ${formatCOP(recommendation.gananciaNetaExtra)} mensuales, optimizando tu rentabilidad frente a canales tradicionales.` 
-                          : `Tu negocio está en fase de inversión digital. El plan ${recommendation?.name} es la opción más sensata para tu volumen actual, minimizando el impacto en tu flujo de caja fijo mientras preparas la infraestructura para escalar tu rentabilidad futura.`
-                        }
+                      <p className="text-base sm:text-lg text-white/80 font-medium leading-relaxed max-w-4xl">
+                        {getStrategicAnalysisText()}
                       </p>
                       <div className="flex flex-wrap justify-center md:justify-start gap-4 pt-2">
                         <div className="flex items-center gap-2 bg-white/5 px-4 py-2 rounded-xl border border-white/10 text-[10px] font-black uppercase tracking-widest text-white">
@@ -752,3 +763,4 @@ export default function PricingSimulatorPage() {
     </>
   );
 }
+
