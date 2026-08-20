@@ -54,6 +54,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useSubscription } from '@/hooks/useSubscription';
 import type { BookingService } from '@/models/booking';
 import { cn } from '@/lib/utils';
+import { ReservasTabs } from '@/components/reservas/ReservasTabs';
 
 const formatCurrency = (value: number) => {
   return new Intl.NumberFormat('es-CO', {
@@ -198,6 +199,9 @@ export default function BookingServicesPage() {
           Nuevo Servicio
         </Button>
       </header>
+
+      {/* Inyección de la barra de pestañas unificada */}
+      <ReservasTabs />
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {services && services.length > 0 ? (
