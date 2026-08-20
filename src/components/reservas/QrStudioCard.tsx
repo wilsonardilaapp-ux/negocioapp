@@ -14,6 +14,7 @@ import type { Business } from '@/models/business';
 
 /**
  * @fileOverview Estudio visual para la generación y descarga de códigos QR de reservas.
+ * Incluye parámetro de tracking para detectar escaneos físicos.
  */
 
 export function QrStudioCard({ businessId }: { businessId: string }) {
@@ -22,8 +23,6 @@ export function QrStudioCard({ businessId }: { businessId: string }) {
   const [isExporting, setIsExporting] = useState(false);
   const qrRef = useRef<HTMLDivElement>(null);
 
-  // Obtener branding del negocio para el poster
-  // Se añade validación para evitar que el SDK de Firestore falle si los argumentos son indefinidos
   const businessRef = useMemoFirebase(() => {
     if (!firestore || !businessId) return null;
     return doc(firestore, 'businesses', businessId);
@@ -33,7 +32,8 @@ export function QrStudioCard({ businessId }: { businessId: string }) {
 
   const bookingUrl = useMemo(() => {
     if (typeof window === 'undefined' || !businessId) return '';
-    return `${window.location.origin}/reservar/${businessId}`;
+    // Agregar parámetro de tracking para origen QR
+    return `${window.location.origin}/reservar/${businessId}?src=qr_stand`;
   }, [businessId]);
 
   const handleDownload = async () => {

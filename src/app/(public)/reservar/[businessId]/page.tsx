@@ -2,10 +2,12 @@ import { getAdminFirestore } from '@/firebase/server-init';
 import { BookingWizard } from '@/components/reservas/public/BookingWizard';
 import { notFound } from 'next/navigation';
 import type { BookingService, BookingStaff } from '@/models/booking';
+import { BookingTracker } from '@/components/reservas/public/BookingTracker';
 
 /**
  * @fileOverview Página de entrada pública para el agendamiento de citas.
- * Soporta parámetros de búsqueda para pre-selección de servicios (Deep Linking).
+ * Soporta parámetros de búsqueda para pre-selección de servicios (Deep Linking)
+ * e incluye el rastreador de visitas para analíticas.
  */
 
 export const dynamic = 'force-dynamic';
@@ -60,12 +62,15 @@ export default async function PublicBookingPage({
   }
 
   return (
-    <BookingWizard 
-      businessId={businessId} 
-      businessName={businessName}
-      services={services} 
-      staff={staff} 
-      initialServiceId={searchParams.service}
-    />
+    <>
+      <BookingTracker businessId={businessId} />
+      <BookingWizard 
+        businessId={businessId} 
+        businessName={businessName}
+        services={services} 
+        staff={staff} 
+        initialServiceId={searchParams.service}
+      />
+    </>
   );
 }

@@ -23,6 +23,7 @@ import type { BookingService } from '@/models/booking';
 
 /**
  * @fileOverview Generador dinámico de enlaces con Deep Linking para servicios específicos.
+ * Incluye parámetros de tracking (?src=) para medición de impacto.
  */
 
 export function ShareLinksList({ businessId, services }: { businessId: string, services: BookingService[] }) {
@@ -59,7 +60,7 @@ export function ShareLinksList({ businessId, services }: { businessId: string, s
         <CardContent className="p-6">
             <div className="flex gap-2">
                 <div className="relative flex-1">
-                    <Input readOnly value={baseUrl} className="bg-muted/30 font-mono text-xs h-12 pr-12 focus-visible:ring-0 border-none" />
+                    <Input readOnly value={`${baseUrl}?src=direct_link`} className="bg-muted/30 font-mono text-xs h-12 pr-12 focus-visible:ring-0 border-none" />
                     <div className="absolute right-3 top-1/2 -translate-y-1/2 h-6 w-6 bg-white rounded-lg shadow-sm border flex items-center justify-center">
                         <Check className="h-3 w-3 text-green-500" />
                     </div>
@@ -67,7 +68,7 @@ export function ShareLinksList({ businessId, services }: { businessId: string, s
                 <Button 
                     variant={copiedId === 'master' ? 'default' : 'outline'} 
                     className="h-12 px-6 font-bold rounded-xl"
-                    onClick={() => handleCopy(baseUrl, 'master')}
+                    onClick={() => handleCopy(`${baseUrl}?src=direct_link`, 'master')}
                 >
                     {copiedId === 'master' ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4 mr-2" />}
                     {copiedId === 'master' ? 'Copiado' : 'Copiar URL'}
@@ -88,7 +89,7 @@ export function ShareLinksList({ businessId, services }: { businessId: string, s
         <CardContent className="px-0 pt-4">
           <div className="grid grid-cols-1 gap-4">
             {services.map((service) => {
-              const trackedUrl = `${baseUrl}?service=${service.id}`;
+              const trackedUrl = `${baseUrl}?service=${service.id}&src=service_link`;
               const isCopied = copiedId === service.id;
 
               return (

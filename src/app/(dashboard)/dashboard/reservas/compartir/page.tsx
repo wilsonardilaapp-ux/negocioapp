@@ -7,11 +7,13 @@ import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/ca
 import { ReservasTabs } from '@/components/reservas/ReservasTabs';
 import { QrStudioCard } from '@/components/reservas/QrStudioCard';
 import { ShareLinksList } from '@/components/reservas/ShareLinksList';
+import { DiffusionAnalyticsCard } from '@/components/reservas/DiffusionAnalyticsCard';
 import { Share2, Loader2 } from 'lucide-react';
 import type { BookingService } from '@/models/booking';
 
 /**
  * @fileOverview Página administrativa del Centro de Difusión de Reservas.
+ * Integra el panel de métricas de alcance y las herramientas de promoción.
  */
 
 export default function ReservasCompartirPage() {
@@ -36,7 +38,7 @@ export default function ReservasCompartirPage() {
           <Share2 className="h-8 w-8 text-primary" />
           Centro de Difusión
         </h1>
-        <p className="text-muted-foreground">Herramientas para promocionar tu agenda y recibir citas desde cualquier canal.</p>
+        <p className="text-muted-foreground">Herramientas para promocionar tu agenda y medir el impacto de tus canales.</p>
       </header>
 
       <ReservasTabs />
@@ -47,15 +49,20 @@ export default function ReservasCompartirPage() {
             <p className="text-sm font-medium text-muted-foreground animate-pulse">Preparando herramientas de marketing...</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
-            <div className="lg:col-span-1">
-                <QrStudioCard businessId={user?.uid!} />
-            </div>
-            <div className="lg:col-span-2">
-                <ShareLinksList 
-                    businessId={user?.uid!} 
-                    services={services || []} 
-                />
+        <div className="space-y-8">
+            {/* Panel de métricas de alcance */}
+            <DiffusionAnalyticsCard businessId={user?.uid!} />
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+                <div className="lg:col-span-1">
+                    <QrStudioCard businessId={user?.uid!} />
+                </div>
+                <div className="lg:col-span-2">
+                    <ShareLinksList 
+                        businessId={user?.uid!} 
+                        services={services || []} 
+                    />
+                </div>
             </div>
         </div>
       )}
