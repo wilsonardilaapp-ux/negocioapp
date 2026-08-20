@@ -38,16 +38,53 @@ import PublicHeader from '../../components/layout/public-header';
 import { motion, AnimatePresence } from 'framer-motion';
 
 /**
- * @fileOverview Simulador Comercial Menfy (Public Mode).
+ * @fileOverview Simulador Comercial Markix (Public Mode).
  * Motor de recomendación Estratégico: "Suficiencia primero, costo después".
+ * Planes actualizados a Datos Oficiales de Markix.
  */
 
 const HYBRID_PLANS_DATA = [
-  { id: 'arranque', name: 'Arranque Digital', base: 0, fee: 0.15, maxOrders: 600, icon: Zap, color: 'blue', order: 1 },
-  { id: 'crecimiento', name: 'Crecimiento', base: 29000, fee: 0.10, maxOrders: 1000, icon: TrendingUp, color: 'green', order: 2 },
-  { id: 'profesional', name: 'Profesional', base: 49000, fee: 0.09, maxOrders: 1500, icon: Star, color: 'purple', order: 3 },
-  { id: 'expansion', name: 'Expansión Pro', base: 79000, fee: 0.08, maxOrders: 3000, icon: Rocket, color: 'orange', order: 4 },
-  { id: 'unlimited', name: 'Unlimited', base: 149000, fee: 0.07, maxOrders: 999999, icon: Sparkles, color: 'red', order: 5 }
+  { 
+    id: 'crecimiento', 
+    name: 'Plan Crecimiento', 
+    base: 0, 
+    fee: 0.15, 
+    maxOrders: 300, 
+    icon: Zap, 
+    color: 'blue', 
+    order: 1 
+  },
+  { 
+    id: 'basico', 
+    name: 'Plan Básico', 
+    base: 19900, 
+    fee: 0.10, 
+    maxOrders: 800, 
+    icon: TrendingUp, 
+    color: 'green', 
+    order: 2 
+  },
+  { 
+    id: 'estandar', 
+    name: 'Plan Estándar', 
+    base: 39900, 
+    fee: 0.09, 
+    maxOrders: 2000, 
+    icon: Star, 
+    color: 'purple', 
+    order: 3, 
+    isMostPopular: true 
+  },
+  { 
+    id: 'profesional', 
+    name: 'Plan Profesional', 
+    base: 69900, 
+    fee: 0.08, 
+    maxOrders: 999999, 
+    icon: Rocket, 
+    color: 'orange', 
+    order: 4 
+  }
 ];
 
 class SimulatorErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
@@ -120,37 +157,26 @@ function SimulatorView() {
     });
 
     // 🚀 ALGORITMO DE RECOMENDACIÓN ESTRATÉGICO: "Suficiencia primero, costo después"
-    
-    // Paso 1: Filtrar solo los planes que cubren la demanda
     const capablePlans = calculated
       .filter(p => p.isSuitable)
-      .sort((a, b) => a.maxOrders - b.maxOrders); // De menor a mayor capacidad
+      .sort((a, b) => a.maxOrders - b.maxOrders);
 
-    // Paso 2: ETAPA 1 - Filtro de planes "Adecuados" con Margen de Seguridad
-    // Un plan solo se considera adecuado si deja margen para crecer (Uso <= 85%)
     let suitableRangePlans = capablePlans.filter(p => {
       const utilization = pedidosProyectados / p.maxOrders;
-      // Evitamos sobredimensionamiento (ej. no recomendar Unlimited si uno de 900 sirve)
       const isEfficientRange = p.maxOrders <= Math.max(10000, pedidosProyectados * 2.5);
       const hasSafetyMargin = utilization <= 0.85;
-
       return isEfficientRange && hasSafetyMargin;
     });
 
-    // Fallback: Si todos los planes están muy ajustados (>85%) o fuera del rango 2.5x,
-    // buscamos el plan más pequeño que SÍ tenga margen de seguridad.
     if (suitableRangePlans.length === 0) {
       const firstWithMargin = capablePlans.find(p => (pedidosProyectados / p.maxOrders) <= 0.85);
       suitableRangePlans = [firstWithMargin || capablePlans[0]];
     }
 
-    // Paso 3: ETAPA 2 - Selección final basada en perfil de volumen
     let winner;
     if (pedidosProyectados < 500) {
-      // PERFIL INVERSIÓN: Priorizamos el Riesgo Mínimo (Menor Cargo Fijo)
       winner = [...suitableRangePlans].sort((a, b) => a.base - b.base)[0];
     } else {
-      // PERFIL ESCALABILIDAD: Priorizamos la Eficiencia (Menor Costo Total)
       winner = [...suitableRangePlans].sort((a, b) => a.totalCost - b.totalCost)[0];
     }
 
@@ -299,7 +325,7 @@ function SimulatorView() {
       </div>
 
       {/* CATÁLOGO DE PLANES */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
         {initialCalculated?.map((res, idx) => {
           const isWinner = res.id === recommendation?.id;
           const isBlocked = !res.isSuitable;
@@ -379,7 +405,6 @@ function SimulatorView() {
         })}
       </div>
 
-      {/* INICIO ZONA PROTEGIDA - PROHIBIDO ELIMINAR SECCIONES INFORMATIVAS */}
       <Card className="rounded-[3rem] border-2 border-slate-100 bg-white shadow-2xl overflow-hidden">
           <CardHeader className="bg-slate-50/80 border-b p-10">
              <div className="flex flex-col md:flex-row items-center gap-6">
@@ -466,7 +491,6 @@ function SimulatorView() {
              </div>
           </CardContent>
       </Card>
-      {/* FIN ZONA PROTEGIDA */}
     </div>
   );
 }
