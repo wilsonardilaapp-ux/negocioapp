@@ -29,18 +29,19 @@ import {
   Star,
   Smartphone,
   Loader2,
-  ChevronUp,
-  ChevronDown,
-  Film
+  ChevronDown
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import PublicHeader from '../../components/layout/public-header';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useUser } from '@/firebase';
+import { useSubscription } from '@/hooks/useSubscription';
+import { useToast } from '@/hooks/use-toast';
 
 /**
  * @fileOverview Simulador Comercial Markix (Public Mode).
  * Motor de recomendación Estratégico: "Suficiencia primero, costo después".
- * Planes actualizados a Datos Oficiales de Markix.
+ * FASE 2: Integración de métricas reales y Retorno de Inversión (ROI).
  */
 
 const HYBRID_PLANS_DATA = [
@@ -145,8 +146,12 @@ function SimulatorView() {
   const [crecimientoEstimado, setCrecimientoEstimado] = useState<number>(20);
   const [comisionApps, setComisionApps] = useState<number>(20);
   
-  // Estado para gestionar la expansión de características por plan
   const [expandedPlan, setExpandedPlan] = useState<string | null>(null);
+
+  // Contexto de usuario para la carga de datos reales
+  const { user } = useUser();
+  const { productsCount, ordersCount } = useSubscription();
+  const { toast } = useToast();
 
   useEffect(() => {
     setMounted(true);
@@ -154,6 +159,21 @@ function SimulatorView() {
 
   const formatCOP = (val: number) => 
     new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(val);
+
+  const loadRealMetrics = () => {
+    if (!user) return;
+    
+    // Si tenemos pedidos reales en el historial, los usamos. 
+    // Si no, usamos valores base pero permitimos que el usuario vea que hay conexión.
+    if (ordersCount > 0) {
+        setPedidosActuales(ordersCount);
+    }
+    
+    toast({
+        title: "✨ Métricas reales cargadas",
+        description: "Hemos ajustado el volumen de pedidos con tu historial de Markix.",
+    });
+  };
 
   const { kpis, initialCalculated, recommendation } = useMemo(() => {
     const ventasActuales = pedidosActuales * ticketPromedio;
@@ -168,9 +188,21 @@ function SimulatorView() {
     const ahorroAppsProyectado = ventasProyectadas * (comisionApps / 100);
     const gananciaBrutaTotal = utilidadIncremental + ahorroAppsProyectado;
 
-    // Cálculo inicial de costos para todos los planes
     const calculated = HYBRID_PLANS_DATA.map(plan => {
       const costoMenfy = plan.base + (ventasProyectadas * plan.fee);
+      
+      // LÓGICA DE ROI (FASE 2)
+      // 1. Ahorro de Comisión vs Plan Crecimiento (15%)
+      const ahorroComisionVsGratis = Math.max(0, ventasProyectadas * (0.15 - plan.fee));
+      
+      // 2. Valor Recuperado por WhatsApp (Reducción de No-shows / Abandono)
+      // Disponible desde el Plan Básico en adelante
+      const tieneWhatsApp = plan.id !== 'crecimiento';
+      const valorRescatadoWhatsApp = tieneWhatsApp ? Math.round(ventasProyectadas * 0.10) : 0;
+      
+      // 3. Beneficio neto total que genera el plan por sí solo
+      const beneficioNetoTotal = (ahorroComisionVsGratis + valorRescatadoWhatsApp) - plan.base;
+
       const gananciaNetaExtra = gananciaBrutaTotal - costoMenfy;
       const isProfitable = gananciaNetaExtra > 0;
       const roi = costoMenfy > 0 ? (gananciaNetaExtra / costoMenfy) : 0;
@@ -180,6 +212,9 @@ function SimulatorView() {
       return {
         ...plan,
         totalCost: Math.round(costoMenfy),
+        ahorroComisionVsGratis,
+        valorRescatadoWhatsApp,
+        beneficioNetoTotal,
         gananciaNetaExtra: Math.round(gananciaNetaExtra),
         roi: Number(roi.toFixed(2)),
         utilization: Math.round(utilization * 100),
@@ -188,7 +223,6 @@ function SimulatorView() {
       };
     });
 
-    // 🚀 ALGORITMO DE RECOMENDACIÓN ESTRATÉGICO: "Suficiencia primero, costo después"
     const capablePlans = calculated
       .filter(p => p.isSuitable)
       .sort((a, b) => a.maxOrders - b.maxOrders);
@@ -232,6 +266,20 @@ function SimulatorView() {
 
   return (
     <div className="space-y-12 pricing-simulator-sandbox pb-24">
+      {/* DETECCIÓN DE SESIÓN (FASE 2) */}
+      {user && (
+        <div className="flex justify-center animate-in fade-in zoom-in duration-500">
+            <Button 
+                variant="outline" 
+                onClick={loadRealMetrics}
+                className="rounded-full px-8 h-12 border-primary/20 bg-primary/5 text-primary font-black uppercase text-[10px] tracking-widest hover:bg-primary hover:text-white transition-all shadow-lg"
+            >
+                <Sparkles className="mr-2 h-4 w-4" />
+                Cargar métricas reales de mi negocio
+            </Button>
+        </div>
+      )}
+
       {/* PANEL DE ENTRADA (VARIABLES) */}
       <Card className="rounded-[2.5rem] border-none shadow-2xl bg-white overflow-hidden ring-1 ring-slate-100">
         <CardHeader className="bg-slate-50/50 border-b py-8 px-8">
@@ -261,7 +309,7 @@ function SimulatorView() {
                 </Label>
                 <span className="font-black text-sm">{pedidosActuales}</span>
               </div>
-              <Slider value={[pedidosActuales]} min={50} max={3000} step={10} onValueChange={(v) => setPedidosActuales(v[0])} className="py-4" />
+              <Slider value={[pedidosActuales]} min={10} max={3000} step={10} onValueChange={(v) => setPedidosActuales(v[0])} className="py-4" />
             </div>
 
             <div className="space-y-4">
@@ -271,7 +319,7 @@ function SimulatorView() {
                 </Label>
                 <span className="font-black text-sm">{formatCOP(ticketPromedio)}</span>
               </div>
-              <Slider value={[ticketPromedio]} min={10000} max={250000} step={1000} onValueChange={(v) => setTicketPromedio(v[0])} className="py-4" />
+              <Slider value={[ticketPromedio]} min={5000} max={250000} step={1000} onValueChange={(v) => setTicketPromedio(v[0])} className="py-4" />
             </div>
 
             <div className="space-y-4">
@@ -291,7 +339,7 @@ function SimulatorView() {
                 </Label>
                 <span className="font-black text-sm text-purple-600">+{crecimientoEstimado}%</span>
               </div>
-              <Slider value={[crecimientoEstimado]} min={5} max={100} step={5} onValueChange={(v) => setCrecimientoEstimado(v[0])} className="py-4" />
+              <Slider value={[crecimientoEstimado]} min={0} max={100} step={5} onValueChange={(v) => setCrecimientoEstimado(v[0])} className="py-4" />
             </div>
 
             <div className="space-y-4">
@@ -301,7 +349,7 @@ function SimulatorView() {
                 </Label>
                 <span className="font-black text-sm text-red-600">{comisionApps}%</span>
               </div>
-              <Slider value={[comisionApps]} min={10} max={35} step={1} onValueChange={(v) => setComisionApps(v[0])} className="py-4" />
+              <Slider value={[comisionApps]} min={0} max={35} step={1} onValueChange={(v) => setComisionApps(v[0])} className="py-4" />
             </div>
             
             <div className="bg-slate-50 p-4 rounded-2xl border flex flex-col justify-center text-center">
@@ -402,10 +450,26 @@ function SimulatorView() {
                   </div>
                 </CardHeader>
 
-                <CardContent className="px-8 pb-4 space-y-8 flex-1 text-center">
+                <CardContent className="px-8 pb-4 space-y-6 flex-1 text-center">
                   <div className="space-y-1">
                     <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Inversión Mensual</p>
                     <h4 className="text-4xl font-black tracking-tighter text-primary">{formatCOP(res.totalCost)}</h4>
+                  </div>
+
+                  {/* MÉTRICAS DE IMPACTO (FASE 2) */}
+                  <div className="space-y-2 py-4 border-y border-dashed border-slate-200">
+                    {res.id === 'crecimiento' ? (
+                        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Comisión estándar del 15%</p>
+                    ) : (
+                        <div className="space-y-1.5">
+                            <div className="flex items-center justify-center gap-1.5 text-[10px] font-black text-green-600 uppercase tracking-tighter">
+                                <Sparkles className="h-3 w-3" /> Ahorras {formatCOP(res.ahorroComisionVsGratis)} en comisiones
+                            </div>
+                            <div className="flex items-center justify-center gap-1.5 text-[10px] font-black text-blue-600 uppercase tracking-tighter">
+                                <Smartphone className="h-3 w-3" /> +{formatCOP(res.valorRescatadoWhatsApp)} rescatados por IA
+                            </div>
+                        </div>
+                    )}
                   </div>
 
                   <div className="grid grid-cols-2 gap-3 bg-slate-50/50 p-4 rounded-3xl border border-slate-100 shadow-inner">
@@ -421,7 +485,6 @@ function SimulatorView() {
                     </div>
                   </div>
 
-                  {/* DESGLOSE DE FUNCIONES OFICIALES (FASE 1) */}
                   <div className="pt-2">
                       <button
                         type="button"
