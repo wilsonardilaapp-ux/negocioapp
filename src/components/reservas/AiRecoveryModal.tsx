@@ -23,16 +23,18 @@ import {
   Smartphone, 
   Clock,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  MessageSquare
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { doc } from 'firebase/firestore';
 import type { Business } from '@/models/business';
+import type { ChatbotConfig, WhatsAppProviderType } from '@/models/chatbot-config';
 import type { BookingOpportunity } from '@/services/booking-churn';
 import { generateRecoveryMessage, type RecoveryTone } from '@/services/booking-ai-recovery';
 import { sendRecoveryWhatsApp } from '@/actions/booking-ai-actions';
-import { cn } from '@/lib/utils';
+import { cn, normalizePhoneNumber } from '@/lib/utils';
 
 interface AiRecoveryModalProps {
   isOpen: boolean;
@@ -47,6 +49,7 @@ export function AiRecoveryModal({ isOpen, onClose, opportunity }: AiRecoveryModa
 
   const [message, setMessage] = useState('');
   const [tone, setTone] = useState<RecoveryTone>('cercano');
+  const [selectedProvider, setSelectedProvider] = useState<WhatsAppProviderType>('whapi');
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSending, setIsSending] = useState(false);
 
@@ -55,6 +58,21 @@ export function AiRecoveryModal({ isOpen, onClose, opportunity }: AiRecoveryModa
     [user, firestore]
   );
   const { data: business } = useDoc<Business>(businessRef);
+
+  const configRef = useMemoFirebase(
+    () => (user ? doc(firestore, `businesses/${user.uid}/chatbotConfig/main`) : null),
+    [user, firestore]
+  );
+  const { data: chatbotConfig } = useDoc<ChatbotConfig>(configRef);
+
+  const isYCloudConfigured = !!chatbotConfig?.yCloud?.apiKey && !!chatbotConfig?.yCloud?.phoneNumber;
+  const isWhapiConfigured = !!chatbotConfig?.whatsApp?.token;
+
+  useEffect(() => {
+    if (chatbotConfig?.provider && (chatbotConfig.provider === 'whapi' || chatbotConfig.provider === 'ycloud')) {
+      setSelectedProvider(chatbotConfig.provider);
+    }
+  }, [chatbotConfig?.provider]);
 
   const handleGenerate = async (selectedTone: RecoveryTone = tone) => {
     if (!business) return;
@@ -86,10 +104,10 @@ export function AiRecoveryModal({ isOpen, onClose, opportunity }: AiRecoveryModa
         messageText: message,
         tone: tone,
         status: 'sent'
-      });
+      }, selectedProvider);
 
       if (result.success) {
-        toast({ title: '¡Mensaje enviado!', description: `Hemos contactado a ${opportunity.customerName} por WhatsApp.` });
+        toast({ title: '¡Mensaje enviado!', description: `Hemos contactado a ${opportunity.customerName} vía API (${selectedProvider.toUpperCase()}).` });
         onClose();
       } else {
         toast({ variant: 'destructive', title: 'Error al enviar', description: result.error });
@@ -101,12 +119,24 @@ export function AiRecoveryModal({ isOpen, onClose, opportunity }: AiRecoveryModa
     }
   };
 
+  const handleManualSend = () => {
+    const rawPhone = opportunity.customerPhone;
+    if (!rawPhone) {
+      toast({ variant: "destructive", title: "Error", description: "El cliente no tiene teléfono válido." });
+      return;
+    }
+    const phone = normalizePhoneNumber(rawPhone);
+    const encodedMsg = encodeURIComponent(message);
+    window.open(`https://wa.me/${phone}?text=${encodedMsg}`, "_blank", "noopener,noreferrer");
+    toast({ title: "WhatsApp Manual Abierto", description: "Completa el envío en la nueva pestaña." });
+  };
+
   const charCount = message.length;
   const isOverLimit = charCount > 250;
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !isSending && !open && onClose()}>
-      <DialogContent className="sm:max-w-[550px] p-0 overflow-hidden border-none rounded-[2rem] shadow-2xl">
+      <DialogContent className="sm:max-w-[600px] p-0 overflow-hidden border-none rounded-[2rem] shadow-2xl">
         <DialogHeader className="p-8 pb-4 bg-primary/5 border-b">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -124,7 +154,7 @@ export function AiRecoveryModal({ isOpen, onClose, opportunity }: AiRecoveryModa
           </div>
         </DialogHeader>
 
-        <div className="p-8 space-y-6">
+        <div className="p-8 space-y-6 max-h-[60vh] overflow-y-auto">
           {/* Ficha rápida del cliente */}
           <div className="grid grid-cols-2 gap-4">
              <div className="flex items-center gap-3 p-3 bg-muted/30 rounded-2xl border border-dashed">
@@ -135,6 +165,41 @@ export function AiRecoveryModal({ isOpen, onClose, opportunity }: AiRecoveryModa
                 <div className="p-2 bg-white rounded-lg shadow-sm"><Clock className="h-4 w-4 text-muted-foreground" /></div>
                 <div className="flex flex-col"><span className="text-[10px] font-bold text-muted-foreground uppercase">Inactividad</span><span className="text-xs font-black text-red-600">{opportunity.daysSinceLastVisit} días</span></div>
              </div>
+          </div>
+
+          {/* Selector de Canal de Envío API */}
+          <div className="space-y-3">
+            <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Canal de Envío (API)</Label>
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => setSelectedProvider('ycloud')}
+                disabled={!isYCloudConfigured || isSending}
+                className={cn(
+                  "px-4 py-2 rounded-xl text-xs font-bold transition-all border-2 flex items-center gap-2",
+                  selectedProvider === 'ycloud' 
+                    ? "bg-primary/10 text-primary border-primary shadow-sm" 
+                    : "bg-white border-gray-100 text-gray-500 hover:border-gray-200",
+                  !isYCloudConfigured && "opacity-40 cursor-not-allowed"
+                )}
+              >
+                <Smartphone className="h-3.5 w-3.5" /> YCloud
+                {!isYCloudConfigured && <span className="text-[8px] font-normal ml-1">(No config.)</span>}
+              </button>
+              <button
+                onClick={() => setSelectedProvider('whapi')}
+                disabled={!isWhapiConfigured || isSending}
+                className={cn(
+                  "px-4 py-2 rounded-xl text-xs font-bold transition-all border-2 flex items-center gap-2",
+                  selectedProvider === 'whapi' 
+                    ? "bg-primary/10 text-primary border-primary shadow-sm" 
+                    : "bg-white border-gray-100 text-gray-500 hover:border-gray-200",
+                  !isWhapiConfigured && "opacity-40 cursor-not-allowed"
+                )}
+              >
+                <WhatsAppIcon className="h-3.5 w-3.5" /> WHAPI
+                {!isWhapiConfigured && <span className="text-[8px] font-normal ml-1">(No config.)</span>}
+              </button>
+            </div>
           </div>
 
           {/* Selector de Tono */}
@@ -195,7 +260,7 @@ export function AiRecoveryModal({ isOpen, onClose, opportunity }: AiRecoveryModa
           </div>
         </div>
 
-        <DialogFooter className="bg-muted/20 -mx-6 -mb-6 p-8 border-t flex flex-col sm:flex-row gap-3">
+        <DialogFooter className="bg-muted/20 -mx-6 -mb-6 p-6 border-t flex flex-col sm:flex-row flex-wrap gap-3">
           <Button variant="ghost" onClick={onClose} disabled={isSending} className="font-bold flex-1">
             Ahora no
           </Button>
@@ -208,12 +273,20 @@ export function AiRecoveryModal({ isOpen, onClose, opportunity }: AiRecoveryModa
             <RotateCcw className="h-4 w-4" /> Regenerar
           </Button>
           <Button 
+            variant="outline"
+            onClick={handleManualSend} 
+            disabled={isGenerating || isSending || !message.trim()}
+            className="font-bold flex-1 gap-2 bg-white border-green-200 text-green-700 hover:bg-green-50"
+          >
+            <MessageSquare className="h-4 w-4" /> Enviar Manual
+          </Button>
+          <Button 
             onClick={handleSend} 
             disabled={isGenerating || isSending || !message.trim() || isOverLimit}
             className="font-black flex-[1.5] gap-2 h-12 shadow-xl shadow-primary/10 bg-primary hover:bg-primary/90"
           >
             {isSending ? <Loader2 className="h-4 w-4 animate-spin" /> : <WhatsAppIcon className="h-4 w-4" />}
-            Enviar por WhatsApp
+            Enviar por WhatsApp 🚀
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -9,6 +9,7 @@ import { WhatsAppFactory } from '@/services/whatsapp-factory';
 import { normalizePhoneNumber } from '@/lib/utils';
 import { FieldValue } from 'firebase-admin/firestore';
 import { revalidatePath } from 'next/cache';
+import type { WhatsAppProviderType } from '@/models/chatbot-config';
 
 interface RecoveryLogData {
   customerPhone: string;
@@ -20,10 +21,12 @@ interface RecoveryLogData {
 
 /**
  * Despacha el mensaje de recuperación vía WhatsApp y registra la actividad.
+ * Acepta un proveedor opcional para el envío (Fase 10).
  */
 export async function sendRecoveryWhatsApp(
   businessId: string,
-  data: RecoveryLogData
+  data: RecoveryLogData,
+  explicitProvider?: WhatsAppProviderType
 ) {
   if (!businessId || !data.customerPhone) {
     return { success: false, error: 'Datos insuficientes para el envío.' };
@@ -33,10 +36,10 @@ export async function sendRecoveryWhatsApp(
   const cleanPhone = normalizePhoneNumber(data.customerPhone);
   
   try {
-    // 1. Obtener proveedor de WhatsApp
-    const provider = await WhatsAppFactory.getProvider(businessId);
+    // 1. Obtener proveedor de WhatsApp (Respetando el override si existe)
+    const provider = await WhatsAppFactory.getProvider(businessId, explicitProvider);
     if (!provider) {
-      throw new Error('No tienes un proveedor de WhatsApp (YCloud/WHAPI) configurado y activo.');
+      throw new Error('No tienes un proveedor de WhatsApp configurado para el canal seleccionado.');
     }
 
     // 2. Realizar el envío
@@ -57,7 +60,7 @@ export async function sendRecoveryWhatsApp(
     batch.set(logRef, {
       ...data,
       sentAt: now.toISOString(),
-      channel: 'whatsapp',
+      channel: explicitProvider || 'api_default',
       messageId: result.messageId || null
     });
 
