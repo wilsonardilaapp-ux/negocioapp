@@ -1,7 +1,5 @@
 import { getAdminFirestore } from '@/firebase/server-init';
 import { WhapiProvider } from './providers/whapi-provider';
-import { getAdminFirestore } from '@/firebase/server-init';
-import { WhapiProvider } from './providers/whapi-provider';
 import { YCloudProvider } from './providers/ycloud-provider';
 import type { IWhatsAppProvider } from './providers/whatsapp-provider.interface';
 import type { ChatbotConfig, WhatsAppProviderType } from '@/models/chatbot-config';
