@@ -52,7 +52,14 @@ const HYBRID_PLANS_DATA = [
     maxOrders: 300, 
     icon: Zap, 
     color: 'blue', 
-    order: 1 
+    order: 1,
+    features: [
+      'Catálogo online con código QR',
+      'Pedidos directos por WhatsApp',
+      'Hasta 20 Productos en catálogo',
+      '1 Landing Page & 1 Post de Blog',
+      'Soporte estándar de plataforma'
+    ]
   },
   { 
     id: 'basico', 
@@ -62,7 +69,14 @@ const HYBRID_PLANS_DATA = [
     maxOrders: 800, 
     icon: TrendingUp, 
     color: 'green', 
-    order: 2 
+    order: 2,
+    features: [
+      'Todo lo del Plan Crecimiento',
+      'Asistente WHAPI (WhatsApp)',
+      'Hasta 40 Productos en catálogo',
+      'Hasta 20 Artículos de Blog',
+      'Gestión de Pedidos y Empaque'
+    ]
   },
   { 
     id: 'estandar', 
@@ -73,7 +87,15 @@ const HYBRID_PLANS_DATA = [
     icon: Star, 
     color: 'purple', 
     order: 3, 
-    isMostPopular: true 
+    isMostPopular: true,
+    features: [
+      'Todo lo del Plan Básico',
+      'Asistente YCloud oficial v2',
+      'Sistema de Fidelización y Puntos',
+      'Hasta 80 Productos en catálogo',
+      'Hasta 50 Artículos de Blog',
+      'Módulo de Inventario Kardex'
+    ]
   },
   { 
     id: 'profesional', 
@@ -83,7 +105,14 @@ const HYBRID_PLANS_DATA = [
     maxOrders: 999999, 
     icon: Rocket, 
     color: 'orange', 
-    order: 4 
+    order: 4,
+    features: [
+      'Todo lo del Plan Estándar',
+      'Catálogo y Productos Ilimitados',
+      'Motor de Sugerencias con IA',
+      'Radar de Churn y Recuperación',
+      'Soporte prioritario 24/7'
+    ]
   }
 ];
 
@@ -115,6 +144,9 @@ function SimulatorView() {
   const [margenNeto, setMargenNeto] = useState<number>(30);
   const [crecimientoEstimado, setCrecimientoEstimado] = useState<number>(20);
   const [comisionApps, setComisionApps] = useState<number>(20);
+  
+  // Estado para gestionar la expansión de características por plan
+  const [expandedPlan, setExpandedPlan] = useState<string | null>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -329,6 +361,7 @@ function SimulatorView() {
         {initialCalculated?.map((res, idx) => {
           const isWinner = res.id === recommendation?.id;
           const isBlocked = !res.isSuitable;
+          const isExpanded = expandedPlan === res.id;
           const Icon = res.icon;
 
           return (
@@ -369,7 +402,7 @@ function SimulatorView() {
                   </div>
                 </CardHeader>
 
-                <CardContent className="px-8 pb-8 space-y-8 flex-1 text-center">
+                <CardContent className="px-8 pb-4 space-y-8 flex-1 text-center">
                   <div className="space-y-1">
                     <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Inversión Mensual</p>
                     <h4 className="text-4xl font-black tracking-tighter text-primary">{formatCOP(res.totalCost)}</h4>
@@ -387,9 +420,46 @@ function SimulatorView() {
                        </span>
                     </div>
                   </div>
+
+                  {/* DESGLOSE DE FUNCIONES OFICIALES (FASE 1) */}
+                  <div className="pt-2">
+                      <button
+                        type="button"
+                        onClick={() => setExpandedPlan(isExpanded ? null : res.id)}
+                        className="w-full text-[10px] font-black uppercase tracking-widest text-muted-foreground hover:text-primary flex items-center justify-center gap-2 py-2 transition-colors border rounded-xl hover:bg-muted/30"
+                      >
+                        <span>{isExpanded ? 'Ocultar funciones' : 'Ver funciones incluidas'}</span>
+                        <ChevronDown className={cn("w-4 h-4 transition-transform duration-300", isExpanded && "rotate-180")} />
+                      </button>
+
+                      <AnimatePresence>
+                        {isExpanded && (
+                          <motion.div
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: 'auto' }}
+                            exit={{ opacity: 0, height: 0 }}
+                            transition={{ duration: 0.3, ease: 'easeInOut' }}
+                            className="overflow-hidden text-left"
+                          >
+                            <div className="pt-6 space-y-3">
+                                {res.features.map((feature, fIdx) => (
+                                    <div key={fIdx} className="flex items-start gap-2.5 group/feat">
+                                        <div className="p-1 bg-green-50 rounded-md group-hover/feat:bg-green-500 transition-colors">
+                                            <Check className="w-3 h-3 text-green-600 group-hover/feat:text-white" />
+                                        </div>
+                                        <span className="text-[11px] font-bold text-slate-600 leading-tight">
+                                            {feature}
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                  </div>
                 </CardContent>
 
-                <CardFooter className="p-8 pt-0">
+                <CardFooter className="p-8 pt-4">
                    <Button asChild disabled={isBlocked} className={cn(
                      "w-full h-16 rounded-2xl font-black uppercase tracking-widest shadow-xl border-none transition-all active:scale-95 text-lg",
                      isWinner ? "bg-orange-600 hover:bg-orange-700 text-white" : "bg-slate-900 hover:bg-black text-white"
