@@ -35,7 +35,8 @@ import {
   Briefcase,
   Target,
   Globe,
-  Clock
+  Clock,
+  Building2
 } from 'lucide-react';
 import { cn, normalizePhoneNumber } from '../../lib/utils';
 import PublicHeader from '../../components/layout/public-header';
@@ -45,7 +46,7 @@ import { useSubscription } from '@/hooks/useSubscription';
 import { useToast } from '@/hooks/use-toast';
 
 /**
- * @fileOverview Simulador Comercial Markix (Public Mode).
+ * @fileOverview Simulador Comercial Menfy (Public Mode).
  * FASE 3: Implementación de Asesor Inteligente y Recomendación Personalizada.
  */
 
