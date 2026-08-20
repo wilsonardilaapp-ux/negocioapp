@@ -1,12 +1,13 @@
+
 "use client";
 
 import React, { useState, useMemo, Component, ReactNode, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Slider } from '@/components/ui/slider';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '../../components/ui/card';
+import { Input } from '../../components/ui/input';
+import { Label } from '../../components/ui/label';
+import { Badge } from '../../components/ui/badge';
+import { Button } from '../../components/ui/button';
+import { Slider } from '../../components/ui/slider';
 import { 
   DollarSign, 
   ShoppingBag, 
@@ -32,7 +33,7 @@ import {
   ChevronDown,
   Film
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn } from '../../lib/utils';
 import PublicHeader from '../../components/layout/public-header';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -420,7 +421,7 @@ function SimulatorView() {
                   <p className="text-[10px] font-black uppercase tracking-[0.2em] text-green-600">3. Impacto en Ventas</p>
                   <div className="space-y-3">
                     <div className="flex justify-between items-end border-b pb-2"><span className="text-xs font-bold text-green-800">Ventas Extra:</span><span className="font-black text-sm text-green-600">{formatCOP(kpis.crecimientoVentas)}</span></div>
-                    <div className="flex justify-between items-end text-green-600 font-black pt-2"><span className="text-xs uppercase">Ahorro Apps:</span><span className="text-xl">{formatCOP(kpis.ahorroAppsProyectado)}</span></div>
+                    <div className="flex justify-between items-end text-orange-600 font-black pt-2"><span className="text-xs uppercase">Ahorro Apps:</span><span className="text-xl">{formatCOP(kpis.ahorroAppsProyectado)}</span></div>
                     <p className="text-[8px] text-green-700 italic border-t border-green-200 pt-2">Eficiencia en comisiones de terceros</p>
                   </div>
                 </div>
