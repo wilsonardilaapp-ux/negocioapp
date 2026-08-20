@@ -47,7 +47,7 @@ import { useToast } from '@/hooks/use-toast';
 
 /**
  * @fileOverview Simulador Comercial Menfy (Public Mode).
- * FASE 3: Implementación de Asesor Inteligente y Recomendación Personalizada.
+ * LÓGICA UNIFICADA: Recomendación viable + Desglose transparente de precios.
  */
 
 const HYBRID_PLANS_DATA = [
@@ -154,14 +154,12 @@ function SimulatorView() {
   const [crecimientoEstimado, setCrecimientoEstimado] = useState<number>(20);
   const [comisionApps, setComisionApps] = useState<number>(20);
   
-  // FASE 3: Estados del Asesor Inteligente
+  // Estados del Asesor Inteligente
   const [businessType, setBusinessType] = useState<'salon' | 'restaurant' | 'store' | 'services'>('salon');
   const [mainChallenge, setMainChallenge] = useState<'no_shows' | 'commissions' | 'no_online' | 'automation'>('no_shows');
 
-  // FASE 1: Estado para expansión de funciones
   const [expandedPlan, setExpandedPlan] = useState<string | null>(null);
 
-  // FASE 2: Contexto de usuario
   const { user } = useUser();
   const { ordersCount } = useSubscription();
   const { toast } = useToast();
@@ -184,28 +182,7 @@ function SimulatorView() {
     });
   };
 
-  // FASE 3: Motor de recomendación personalizada
-  const advisorRecommendation = useMemo(() => {
-    let planId = 'crecimiento';
-    let reason = '';
-
-    if (mainChallenge === 'no_shows') {
-      planId = 'basico';
-      reason = 'Incluye recordatorios de WhatsApp para eliminar inasistencias.';
-    } else if (mainChallenge === 'commissions') {
-      planId = 'estandar';
-      reason = 'Reduce tus costos bajando al 9% de comisión con pagos integrados.';
-    } else if (mainChallenge === 'no_online') {
-      planId = 'crecimiento';
-      reason = 'Empieza tu digitalización profesional con inversión base de $0.';
-    } else if (mainChallenge === 'automation') {
-      planId = 'profesional';
-      reason = 'Potencia tu negocio con Radar de Churn e Inteligencia Artificial.';
-    }
-
-    return { planId, reason };
-  }, [mainChallenge]);
-
+  // MOTOR DE RECOMENDACIÓN Y CÁLCULOS (UNIFICADO)
   const { kpis, initialCalculated, recommendation } = useMemo(() => {
     const ventasActuales = pedidosActuales * ticketPromedio;
     const utilidadActual = ventasActuales * (margenNeto / 100);
@@ -219,10 +196,27 @@ function SimulatorView() {
     const ahorroAppsProyectado = ventasProyectadas * (comisionApps / 100);
     const gananciaBrutaTotal = utilidadIncremental + ahorroAppsProyectado;
 
+    // 1. Determinar plan ideal según desafío (Perfil de usuario)
+    let challengePlanId = 'crecimiento';
+    let challengeReason = '';
+    
+    if (mainChallenge === 'no_shows') {
+      challengePlanId = 'basico';
+      challengeReason = 'Incluye recordatorios de WhatsApp para eliminar inasistencias.';
+    } else if (mainChallenge === 'commissions') {
+      challengePlanId = 'estandar';
+      challengeReason = 'Reduce tus costos bajando al 9% de comisión con pagos integrados.';
+    } else if (mainChallenge === 'no_online') {
+      challengePlanId = 'crecimiento';
+      challengeReason = 'Empieza tu digitalización profesional con inversión base de $0.';
+    } else if (mainChallenge === 'automation') {
+      challengePlanId = 'profesional';
+      challengeReason = 'Potencia tu negocio con Radar de Churn e Inteligencia Artificial.';
+    }
+
     const calculated = HYBRID_PLANS_DATA.map(plan => {
       const costoMenfy = plan.base + (ventasProyectadas * plan.fee);
       
-      // FASE 2: LÓGICA DE ROI
       const ahorroComisionVsGratis = Math.max(0, ventasProyectadas * (0.15 - plan.fee));
       const tieneWhatsApp = plan.id !== 'crecimiento';
       const valorRescatadoWhatsApp = tieneWhatsApp ? Math.round(ventasProyectadas * 0.10) : 0;
@@ -231,6 +225,8 @@ function SimulatorView() {
       const gananciaNetaExtra = gananciaBrutaTotal - costoMenfy;
       const isProfitable = gananciaNetaExtra > 0;
       const roi = costoMenfy > 0 ? (gananciaNetaExtra / costoMenfy) : 0;
+      
+      // Validación de Capacidad
       const isSuitable = plan.maxOrders === 999999 || pedidosProyectados <= plan.maxOrders;
       const utilization = plan.maxOrders === 999999 ? 0.75 : (pedidosProyectados / plan.maxOrders);
 
@@ -248,27 +244,19 @@ function SimulatorView() {
       };
     });
 
-    const capablePlans = calculated
-      .filter(p => p.isSuitable)
-      .sort((a, b) => a.maxOrders - b.maxOrders);
-
-    let suitableRangePlans = capablePlans.filter(p => {
-      const utilization = pedidosProyectados / p.maxOrders;
-      const isEfficientRange = p.maxOrders <= Math.max(10000, pedidosProyectados * 2.5);
-      const hasSafetyMargin = utilization <= 0.85;
-      return isEfficientRange && hasSafetyMargin;
-    });
-
-    if (suitableRangePlans.length === 0) {
-      const firstWithMargin = capablePlans.find(p => (pedidosProyectados / p.maxOrders) <= 0.85);
-      suitableRangePlans = [firstWithMargin || capablePlans[0]];
-    }
-
-    let winner;
-    if (pedidosProyectados < 500) {
-      winner = [...suitableRangePlans].sort((a, b) => a.base - b.base)[0];
-    } else {
-      winner = [...suitableRangePlans].sort((a, b) => a.totalCost - b.totalCost)[0];
+    // 2. Lógica de Selección de Ganador (Viabilidad + Perfil)
+    // El ganador debe ser el plan preferido del desafío PERO que tenga capacidad suficiente.
+    let winner = calculated.find(p => p.id === challengePlanId);
+    
+    // Si el plan sugerido por el desafío NO tiene capacidad, buscamos el primer superior que sí la tenga.
+    if (!winner || !winner.isSuitable) {
+      winner = calculated
+        .filter(p => p.isSuitable)
+        .sort((a, b) => a.order - b.order)[0];
+        
+      if (winner) {
+        challengeReason = `Tu volumen de pedidos requiere la capacidad del ${winner.name}.`;
+      }
     }
 
     return {
@@ -283,25 +271,27 @@ function SimulatorView() {
         ahorroAppsProyectado,
         gananciaBrutaTotal
       },
-      recommendation: winner || calculated[0]
+      recommendation: {
+        ...(winner || calculated[0]),
+        reason: challengeReason
+      }
     };
-  }, [pedidosActuales, ticketPromedio, margenNeto, crecimientoEstimado, comisionApps]);
+  }, [pedidosActuales, ticketPromedio, margenNeto, crecimientoEstimado, comisionApps, mainChallenge]);
 
   if (!mounted) return null;
 
   return (
     <div className="space-y-12 pricing-simulator-sandbox pb-24">
-      {/* FASE 2: CARGA DE MÉTRICAS REALES */}
+      {/* CARGA DE MÉTRICAS REALES */}
       {user && (
         <div className="flex justify-center animate-in fade-in zoom-in duration-500">
-            <Button 
-                variant="outline" 
+            <button 
                 onClick={loadRealMetrics}
-                className="rounded-full px-8 h-12 border-primary/20 bg-primary/5 text-primary font-black uppercase text-[10px] tracking-widest hover:bg-primary hover:text-white transition-all shadow-lg"
+                className="rounded-full px-8 h-12 border-2 border-primary/20 bg-primary/5 text-primary font-black uppercase text-[10px] tracking-widest hover:bg-primary hover:text-white transition-all shadow-lg flex items-center"
             >
                 <Sparkles className="mr-2 h-4 w-4" />
                 Cargar métricas reales de mi negocio
-            </Button>
+            </button>
         </div>
       )}
 
@@ -327,7 +317,6 @@ function SimulatorView() {
         </CardHeader>
         <CardContent className="p-8 space-y-10">
           
-          {/* FASE 3: SELECTORES DEL ASESOR */}
           <div className="space-y-6 pb-8 border-b border-dashed">
             <div className="space-y-3">
               <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
@@ -386,7 +375,6 @@ function SimulatorView() {
             </div>
           </div>
 
-          {/* SLIDERS DE VARIABLES */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-12 gap-y-10">
             <div className="space-y-4">
               <div className="flex justify-between items-center px-1">
@@ -490,10 +478,10 @@ function SimulatorView() {
         </Card>
       </div>
 
-      {/* CATÁLOGO DE PLANES CON RECOMENDACIÓN INTELIGENTE */}
+      {/* CATÁLOGO DE PLANES */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
         {initialCalculated?.map((res, idx) => {
-          const isAdvisorRecommended = res.id === advisorRecommendation.planId;
+          const isRecommended = res.id === recommendation.id;
           const isBlocked = !res.isSuitable;
           const isExpanded = expandedPlan === res.id;
           const Icon = res.icon;
@@ -506,24 +494,24 @@ function SimulatorView() {
               animate={{ 
                 opacity: 1, 
                 y: 0,
-                scale: isAdvisorRecommended ? 1.03 : 1 
+                scale: isRecommended ? 1.03 : 1 
               }}
               transition={{ delay: idx * 0.1 }}
             >
               <Card className={cn(
                 "relative h-full rounded-[2.5rem] border-2 transition-all duration-500 overflow-hidden shadow-lg flex flex-col",
-                isAdvisorRecommended ? "border-primary shadow-2xl z-10 bg-white" : "border-slate-100 hover:border-primary/10 bg-white/80",
+                isRecommended ? "border-primary shadow-2xl z-10 bg-white" : "border-slate-100 hover:border-primary/10 bg-white/80",
                 isBlocked && "opacity-60 grayscale bg-slate-50"
               )}>
                 <CardHeader className="pb-6 text-center space-y-4 pt-8">
                   <div className="flex justify-center mb-2">
-                     {isAdvisorRecommended ? (
+                     {isRecommended ? (
                        <Badge className="bg-primary text-white border-none font-black text-[9px] uppercase tracking-[0.2em] px-4 py-1.5 rounded-full shadow-lg">
                          ✨ Recomendado para ti
                        </Badge>
                      ) : isBlocked ? (
                        <Badge variant="destructive" className="uppercase font-black text-[9px] px-4 h-7 border-none shadow-md">
-                         ✕ Capacidad Excedida
+                         ✕ Capacidad Insuficiente
                        </Badge>
                      ) : (
                        <Badge variant="outline" className={cn("uppercase font-black text-[9px] px-4 h-7 border-2", res.isProfitable ? "text-green-600 border-green-200" : "text-slate-400")}>
@@ -533,7 +521,7 @@ function SimulatorView() {
                   </div>
                   
                   <div className="flex flex-col items-center gap-2">
-                      <div className={cn("p-4 rounded-2xl shadow-inner", isAdvisorRecommended ? "bg-primary/10 text-primary" : "bg-slate-100 text-slate-400")}>
+                      <div className={cn("p-4 rounded-2xl shadow-inner", isRecommended ? "bg-primary/10 text-primary" : "bg-slate-100 text-slate-400")}>
                           <Icon size={32} />
                       </div>
                       <CardTitle className="text-2xl font-black uppercase tracking-tight text-slate-900 mt-2">{res.name}</CardTitle>
@@ -542,18 +530,24 @@ function SimulatorView() {
 
                 <CardContent className="px-8 pb-4 space-y-6 flex-1 text-center">
                   <div className="space-y-1">
-                    <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Inversión Mensual</p>
-                    <h4 className="text-4xl font-black tracking-tighter text-primary">{formatCOP(res.totalCost)}</h4>
+                    <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Inversión Total Proyectada</p>
+                    <h4 className="text-3xl sm:text-4xl font-black tracking-tighter text-gray-900">{formatCOP(res.totalCost)}</h4>
+                    
+                    {/* DESGLOSE TRANSPARENTE */}
+                    <div className="flex flex-col text-[11px] font-semibold text-slate-500 mt-1">
+                        <span>Cuota fija: <strong className="text-gray-700">{formatCOP(res.base)} / mes</strong></span>
+                        <span className="text-orange-600">
+                            Comisión estimada ({res.fee * 100}%): <strong>{formatCOP(res.totalCost - res.base)}</strong>
+                        </span>
+                    </div>
                   </div>
 
-                  {/* FASE 3: NOTA DE VALOR PERSONALIZADA */}
-                  {isAdvisorRecommended && (
+                  {isRecommended && (
                       <p className="text-[11px] font-bold text-primary bg-primary/5 p-3 rounded-2xl border border-primary/20 animate-in fade-in slide-in-from-top-1 duration-700">
-                          {advisorRecommendation.reason}
+                          {recommendation.reason}
                       </p>
                   )}
 
-                  {/* FASE 2: MÉTRICAS DE IMPACTO */}
                   <div className="space-y-2 py-4 border-y border-dashed border-slate-200">
                     {res.id === 'crecimiento' ? (
                         <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Comisión estándar del 15%</p>
@@ -582,7 +576,6 @@ function SimulatorView() {
                     </div>
                   </div>
 
-                  {/* FASE 1: ACORDEÓN DE FUNCIONES */}
                   <div className="pt-2">
                       <button
                         type="button"
@@ -623,7 +616,7 @@ function SimulatorView() {
                 <CardFooter className="p-8 pt-4">
                    <Button asChild disabled={isBlocked} className={cn(
                      "w-full h-16 rounded-2xl font-black uppercase tracking-widest shadow-xl border-none transition-all active:scale-95 text-lg",
-                     isAdvisorRecommended ? "bg-primary hover:bg-primary/90 text-white" : "bg-slate-900 hover:bg-black text-white"
+                     isRecommended ? "bg-primary hover:bg-primary/90 text-white" : "bg-slate-900 hover:bg-black text-white"
                    )}>
                       <a href={!isBlocked ? `/register?plan=${res.id}` : '#'}>
                         {isBlocked ? 'Capacidad Insuficiente' : `Elegir ${res.name}`} <ArrowRight className="ml-3 h-6 w-6" />
@@ -636,7 +629,7 @@ function SimulatorView() {
         })}
       </div>
 
-      {/* SECCIÓN EDUCATIVA SOBRE LA PROYECCIÓN */}
+      {/* ANÁLISIS ESTRATÉGICO */}
       <Card className="rounded-[3rem] border-2 border-slate-100 bg-white shadow-2xl overflow-hidden">
           <CardHeader className="bg-slate-50/80 border-b p-10">
              <div className="flex flex-col md:flex-row items-center gap-6">
