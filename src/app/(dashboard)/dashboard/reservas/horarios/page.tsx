@@ -83,7 +83,7 @@ export default function HorariosPage() {
     <div className="space-y-6 animate-in fade-in duration-500 pb-20">
       <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div className="space-y-1">
-          <h1 className="text-3xl font-black tracking-tight flex items-center gap-3">
+          <h1 className="text-3xl font-black tracking-tight text-gray-900 flex items-center gap-3">
             <Clock className="h-8 w-8 text-primary" />
             Horarios de Atención
           </h1>
@@ -97,7 +97,7 @@ export default function HorariosPage() {
 
       <ReservasTabs />
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-10 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
         <div className="lg:col-span-2 space-y-4">
           {isLoading ? (
             <div className="flex flex-col items-center justify-center py-24 gap-4 bg-white rounded-3xl border border-dashed">

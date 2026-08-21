@@ -43,12 +43,12 @@ export function AvailabilityGrid({ availability, onChange }: AvailabilityGridPro
         const day = availability[i] || { dayOfWeek: i, isOpen: false, shifts: [{start: '08:00', end: '18:00'}], breaks: [{start: '13:00', end: '14:00'}] };
         return (
           <Card key={i} className={cn(
-            "transition-all border-l-4 shadow-sm", 
+            "transition-all border-l-4 shadow-sm overflow-hidden", 
             day.isOpen ? "border-l-primary bg-white" : "border-l-gray-300 bg-muted/20 opacity-80"
           )}>
             <CardContent className="p-6 flex flex-col lg:flex-row lg:items-center gap-6">
               {/* Día y Estado Principal */}
-              <div className="flex items-center justify-between lg:w-56 shrink-0 border-b lg:border-b-0 lg:border-r pb-4 lg:pb-0 lg:pr-6">
+              <div className="flex items-center justify-between lg:w-48 shrink-0 border-b lg:border-b-0 lg:border-r pb-4 lg:pb-0 lg:pr-6">
                 <div className="space-y-0.5">
                   <span className="font-black text-base uppercase tracking-tighter text-gray-900">{name}</span>
                   <p className={cn("text-[10px] font-bold uppercase tracking-widest", day.isOpen ? "text-primary" : "text-muted-foreground")}>
@@ -63,9 +63,9 @@ export function AvailabilityGrid({ availability, onChange }: AvailabilityGridPro
               </div>
 
               {day.isOpen ? (
-                <div className="flex flex-col sm:flex-row flex-1 gap-8 animate-in fade-in slide-in-from-left-2 duration-400">
+                <div className="flex flex-col sm:flex-row flex-1 gap-6 animate-in fade-in slide-in-from-left-2 duration-400 min-w-0">
                   {/* Jornada Principal */}
-                  <div className="space-y-2.5 flex-1">
+                  <div className="space-y-2.5 flex-1 min-w-0">
                     <Label className="text-[10px] font-black uppercase text-muted-foreground flex items-center gap-2 tracking-widest">
                       <div className="p-1 bg-primary/10 rounded-md"><Clock className="h-3 w-3 text-primary" /></div> 
                       Horario de Atención
@@ -92,7 +92,7 @@ export function AvailabilityGrid({ availability, onChange }: AvailabilityGridPro
                   </div>
 
                   {/* Descanso */}
-                  <div className="space-y-2.5 flex-1">
+                  <div className="space-y-2.5 flex-1 min-w-0">
                     <Label className="text-[10px] font-black uppercase text-muted-foreground flex items-center gap-2 tracking-widest">
                       <div className="p-1 bg-amber-100 rounded-md"><Coffee className="h-3 w-3 text-amber-600" /></div> 
                       Pausa / Almuerzo
