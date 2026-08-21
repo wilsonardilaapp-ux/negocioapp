@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState } from "react";
@@ -49,17 +48,29 @@ export default function ForgotPasswordPage() {
     if (!auth) return;
     try {
       await sendPasswordResetEmail(auth, values.email);
+      
+      // BLINDAJE DE SEGURIDAD: Mensaje idéntico tanto si el correo existe como si no.
       toast({
         title: "Correo de recuperación enviado",
-        description: "Revisa tu bandeja de entrada para restablecer tu contraseña.",
+        description: "Si tu cuenta está registrada en Markix, recibirás un enlace para restablecer tu contraseña en unos minutos.",
       });
       setIsSent(true);
     } catch (error: any) {
-      // Firebase returns 'auth/user-not-found' but for security we don't expose this.
-      // We show a generic success message as a good practice.
-       toast({
+      // Manejo silencioso de errores de Firebase para evitar enumeración de usuarios
+      // Solo mostramos error real si es un problema técnico (ej. red)
+      if (error.code === 'auth/network-request-failed') {
+          toast({
+            variant: "destructive",
+            title: "Error de conexión",
+            description: "No se pudo contactar con el servidor. Inténtalo de nuevo más tarde.",
+          });
+          return;
+      }
+
+      // Para cualquier otro error (usuario no encontrado, etc.), procedemos con la respuesta genérica y éxito visual
+      toast({
         title: "Correo de recuperación enviado",
-        description: "Si tu correo está registrado, recibirás un enlace para restablecer tu contraseña.",
+        description: "Si tu cuenta está registrada en Markix, recibirás un enlace para restablecer tu contraseña en unos minutos.",
       });
       setIsSent(true);
     }
@@ -71,7 +82,7 @@ export default function ForgotPasswordPage() {
             <CardHeader className="text-center">
                 <CardTitle className="text-2xl font-headline">Revisa tu correo</CardTitle>
                 <CardDescription>
-                Se ha enviado un enlace para restablecer tu contraseña a tu dirección de correo electrónico.
+                  Si el correo proporcionado está asociado a una cuenta activa en Markix, hemos enviado las instrucciones para restablecer tu acceso.
                 </CardDescription>
             </CardHeader>
             <CardFooter>
