@@ -48,7 +48,7 @@ export function AvailabilityGrid({ availability, onChange }: AvailabilityGridPro
           )}>
             <CardContent className="p-6 flex flex-col lg:flex-row lg:items-center gap-6">
               {/* Día y Estado Principal */}
-              <div className="flex items-center justify-between lg:w-48 shrink-0 border-b lg:border-b-0 lg:border-r pb-4 lg:pb-0 lg:pr-6">
+              <div className="flex items-center justify-between lg:w-44 shrink-0 border-b lg:border-b-0 lg:border-r pb-4 lg:pb-0 lg:pr-6">
                 <div className="space-y-0.5">
                   <span className="font-black text-base uppercase tracking-tighter text-gray-900">{name}</span>
                   <p className={cn("text-[10px] font-bold uppercase tracking-widest", day.isOpen ? "text-primary" : "text-muted-foreground")}>
@@ -63,7 +63,7 @@ export function AvailabilityGrid({ availability, onChange }: AvailabilityGridPro
               </div>
 
               {day.isOpen ? (
-                <div className="flex flex-col sm:flex-row flex-1 gap-6 animate-in fade-in slide-in-from-left-2 duration-400 min-w-0">
+                <div className="flex flex-col sm:flex-row flex-1 gap-4 animate-in fade-in slide-in-from-left-2 duration-400 min-w-0">
                   {/* Jornada Principal */}
                   <div className="space-y-2.5 flex-1 min-w-0">
                     <Label className="text-[10px] font-black uppercase text-muted-foreground flex items-center gap-2 tracking-widest">
