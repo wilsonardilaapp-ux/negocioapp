@@ -46,7 +46,7 @@ interface ImportRow {
   Cantidad?: number | string;
   Precio_Unitario?: number | string;
   Total?: number | string;
-  Fecha?: string;
+  Fecha?: Date | string | null;
   Estado?: string;
   error?: string;
   isValid: boolean;
@@ -93,7 +93,8 @@ export function ImportOrdersModal({ isOpen, onOpenChange }: ImportOrdersModalPro
     reader.onload = (event) => {
       try {
         const bstr = event.target?.result;
-        const wb = XLSX.read(bstr, { type: 'binary' });
+        // Configura XLSX para leer fechas reales de Excel
+        const wb = XLSX.read(bstr, { type: 'binary', cellDates: true, dateNF: 'yyyy-mm-dd' });
         const wsname = wb.SheetNames[0];
         const ws = wb.Sheets[wsname];
         const data = XLSX.utils.sheet_to_json<any>(ws);
@@ -111,14 +112,27 @@ export function ImportOrdersModal({ isOpen, onOpenChange }: ImportOrdersModalPro
           const qty = parseInt(String(row.Cantidad || '1'), 10);
           const price = parseFloat(String(row.Precio_Unitario || '0'));
           const total = parseFloat(String(row.Total || '0'));
-          const date = String(row.Fecha || '').trim();
           const status = String(row.Estado || 'Pendiente').trim();
 
           const errors = [];
           if (!name) errors.push("Cliente requerido");
           if (!product) errors.push("Producto requerido");
           if (isNaN(total) || total <= 0) errors.push("Total inválido");
-          if (!date || isNaN(Date.parse(date))) errors.push("Fecha inválida (AAAA-MM-DD)");
+          
+          // Validación robusta de fecha
+          let orderDateObj: Date | null = null;
+          const rawDate = row.Fecha;
+
+          if (rawDate instanceof Date && !isNaN(rawDate.getTime())) {
+            orderDateObj = rawDate;
+          } else if (rawDate) {
+            const d = new Date(rawDate);
+            if (!isNaN(d.getTime())) orderDateObj = d;
+          }
+
+          if (!orderDateObj) {
+            errors.push("Fecha inválida (AAAA-MM-DD)");
+          }
 
           return {
             Cliente: name,
@@ -129,7 +143,7 @@ export function ImportOrdersModal({ isOpen, onOpenChange }: ImportOrdersModalPro
             Cantidad: qty,
             Precio_Unitario: price,
             Total: total,
-            Fecha: date,
+            Fecha: orderDateObj,
             Estado: status,
             isValid: errors.length === 0,
             error: errors.join(", ")
@@ -161,6 +175,7 @@ export function ImportOrdersModal({ isOpen, onOpenChange }: ImportOrdersModalPro
           const orderRef = doc(ordersColRef);
           const orderId = orderRef.id;
           
+          // Esquema completo del modelo Order para asegurar visibilidad en consultas ordenadas
           const newOrder: Order = {
             id: orderId,
             businessId: user.uid,
@@ -183,7 +198,8 @@ export function ImportOrdersModal({ isOpen, onOpenChange }: ImportOrdersModalPro
             deliveryFee: 0,
             vatAmount: 0,
             paymentMethod: 'manual',
-            orderDate: new Date(row.Fecha!).toISOString(),
+            // Normalización a ISO String seguro
+            orderDate: row.Fecha instanceof Date ? row.Fecha.toISOString() : new Date().toISOString(),
             orderStatus: (row.Estado as OrderStatus) || 'Pendiente',
             tipoEntrega: (row.Dirección ? 'domicilio' : 'recoger_en_tienda') as TipoEntrega,
             origin: 'import_manual'
@@ -274,7 +290,9 @@ export function ImportOrdersModal({ isOpen, onOpenChange }: ImportOrdersModalPro
                         <TableCell className="text-sm font-medium">{row.Cliente || '-'}</TableCell>
                         <TableCell className="text-sm truncate max-w-[150px]">{row.Producto || '-'}</TableCell>
                         <TableCell className="text-right text-sm font-bold">${Number(row.Total || 0).toLocaleString()}</TableCell>
-                        <TableCell className="text-xs">{row.Fecha || '-'}</TableCell>
+                        <TableCell className="text-xs">
+                          {row.Fecha instanceof Date ? row.Fecha.toLocaleDateString() : '-'}
+                        </TableCell>
                         <TableCell className="text-right">
                           {!row.isValid ? (
                             <TooltipProvider>
