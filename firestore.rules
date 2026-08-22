@@ -68,13 +68,13 @@ service cloud.firestore {
       allow read, list: if true;
       // Corregido: Separar create/update de delete para evitar error de resource null
       allow create, update: if isSuperAdmin() || isOwner(request.resource.data.businessId);
-      allow delete: if isSuperAdmin() || isOwner(resource.data.businessId);
+      allow delete: if isSuperAdmin() || isOwner(request.resource.data.businessId);
     }
 
     match /blog_posts/{postId} {
       allow read, list: if true;
       allow create, update: if isSuperAdmin() || isOwner(request.resource.data.businessId);
-      allow delete: if isSuperAdmin() || isOwner(resource.data.businessId);
+      allow delete: if isSuperAdmin() || isOwner(request.resource.data.businessId);
     }
 
     // --- PROGRAMA DE SOCIOS (REFERIDOS) ---
@@ -125,22 +125,7 @@ service cloud.firestore {
 
     match /businesses/{businessId} {
       allow get, list: if true;
-      
-      // Permitir creación inicial durante el registro (incluye campos de arranque)
-      allow create: if isAuthenticated() && request.auth.uid == businessId;
-
-      // Permitir actualización al dueño PERO bloqueando quirúrgicamente campos administrativos
-      allow update: if isSuperAdmin() || (
-        isBusinessMember(businessId) && 
-        !request.resource.data.diff(resource.data).affectedKeys().hasAny([
-          'status', 
-          'planName', 
-          'productLimit', 
-          'imageLimit', 
-          'limitesExtra', 
-          'directoryStatus'
-        ])
-      );
+      allow write: if isSuperAdmin() || isBusinessMember(businessId);
 
       match /publicData/{docId=**} {
         allow read, list: if true;

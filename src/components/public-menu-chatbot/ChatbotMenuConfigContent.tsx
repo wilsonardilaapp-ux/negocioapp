@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
@@ -79,6 +80,9 @@ import Image from 'next/image';
 import * as XLSX from 'xlsx';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
+import { setDocumentNonBlocking, addDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError, type SecurityRuleContext } from '@/firebase/errors';
 
 const chunkArray = <T,>(array: T[], size: number): T[][] => {
   const chunks: T[][] = [];
@@ -170,21 +174,33 @@ export function ChatbotMenuConfigContent({ businessId: activeBusinessId }: Chatb
     if (savedConfig) setLocalConfig(savedConfig);
   }, [savedConfig]);
 
+  /**
+   * Limpia el objeto eliminando valores undefined antes de enviar a Firestore.
+   */
+  const sanitize = (obj: any) => JSON.parse(JSON.stringify(obj, (k, v) => v === undefined ? null : v));
+
   const handleSaveConfig = async () => {
     if (!configRef || !isGlobalActive) return;
     setIsSaving(true);
-    try {
-      const dataToSave = {
-        ...localConfig,
-        updatedAt: new Date().toISOString()
-      };
-      await setDocumentNonBlocking(configRef, dataToSave, { merge: true });
-      toast({ title: '¡Guardado!', description: 'La configuración del chatbot ha sido actualizada.' });
-    } catch (e) {
-      toast({ variant: 'destructive', title: 'Error', description: 'No se pudo guardar la configuración.' });
-    } finally {
-      setIsSaving(false);
-    }
+    const dataToSave = {
+      ...localConfig,
+      updatedAt: new Date().toISOString()
+    };
+    const cleanData = sanitize(dataToSave);
+
+    setDocumentNonBlocking(configRef, cleanData, { merge: true })
+      .then(() => {
+        toast({ title: '¡Guardado!', description: 'La configuración del chatbot ha sido actualizada.' });
+      })
+      .catch(async (serverError) => {
+        const permissionError = new FirestorePermissionError({
+          path: configRef.path,
+          operation: 'write',
+          requestResourceData: cleanData,
+        } satisfies SecurityRuleContext);
+        errorEmitter.emit('permission-error', permissionError);
+      })
+      .finally(() => setIsSaving(false));
   };
 
   const handleUploadImage = async (e: React.ChangeEvent<HTMLInputElement>, field: keyof PublicMenuChatbotConfig) => {
@@ -390,27 +406,28 @@ export function ChatbotMenuConfigContent({ businessId: activeBusinessId }: Chatb
   const handleSaveResponse = async () => {
     if (!responsesRef || !respForm.question.trim() || !respForm.answer.trim()) return;
     setIsSaving(true);
-    try {
-      const data = {
-        ...respForm,
-        updatedAt: new Date().toISOString()
-      };
+    const dataToSave = {
+      ...respForm,
+      updatedAt: new Date().toISOString(),
+      ...( !editingResponse && { createdAt: new Date().toISOString() } )
+    };
+    const cleanData = sanitize(dataToSave);
+    const docRef = editingResponse ? doc(responsesRef, editingResponse.id) : doc(responsesRef);
 
-      if (editingResponse) {
-        await setDocumentNonBlocking(doc(responsesRef, editingResponse.id), data, { merge: true });
-      } else {
-        await addDocumentNonBlocking(responsesRef, {
-          ...data,
-          createdAt: new Date().toISOString()
-        });
-      }
-      setIsResponseModalOpen(false);
-      toast({ title: 'Respuesta guardada' });
-    } catch (e) {
-      toast({ variant: 'destructive', title: 'Error al guardar respuesta' });
-    } finally {
-      setIsSaving(false);
-    }
+    setDocumentNonBlocking(docRef, cleanData, { merge: true })
+      .then(() => {
+        setIsResponseModalOpen(false);
+        toast({ title: 'Respuesta guardada' });
+      })
+      .catch(async (serverError) => {
+        const permissionError = new FirestorePermissionError({
+          path: docRef.path,
+          operation: editingResponse ? 'update' : 'create',
+          requestResourceData: cleanData,
+        } satisfies SecurityRuleContext);
+        errorEmitter.emit('permission-error', permissionError);
+      })
+      .finally(() => setIsSaving(false));
   };
 
   const handleDeleteResponse = async (id: string) => {
@@ -419,7 +436,7 @@ export function ChatbotMenuConfigContent({ businessId: activeBusinessId }: Chatb
       await deleteDoc(doc(responsesRef, id));
       toast({ title: 'Respuesta eliminada' });
     } catch (e) {
-      toast({ variant: 'destructive', title: 'Error al eliminar' });
+      toast({ variant: 'destructive', title: 'Error', description: 'No tienes permisos para eliminar este documento.' });
     }
   };
 
