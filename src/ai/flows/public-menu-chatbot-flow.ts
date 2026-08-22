@@ -74,58 +74,61 @@ export const publicMenuChatbotFlow = ai.defineFlow(
       console.warn("[Chatbot] Error in business info lookup:", e);
     }
 
-    // --- PASO 3 & 4: IA GENERATIVA (BLOQUE CON RECUPEARACIÓN ANTE FALLOS) ---
+    // --- PASO 3 & 4: IA GENERATIVA (BLOQUE CON RECUPERACIÓN ANTE FALLOS) ---
     try {
-      // Obtener Catálogo
+      // 1. Obtener Catálogo
       const catalogSnap = await db.collection(`businesses/${businessId}/publicData`).doc('catalog').get();
       const catalogData = catalogSnap.exists ? catalogSnap.data() : null;
 
-      // Obtener Configuración de IA con Blindaje
+      // 2. Obtener Configuración de IA con Blindaje (Parseo Defensivo OBLIGATORIO)
       const aiConfigSnap = await db.doc('integrations/chatbot-integrado-con-whatsapp-para-soporte-y-ventas').get();
-      
       const aiData = aiConfigSnap.exists ? aiConfigSnap.data() : null;
-      let fields: AIProviderFields = {};
       
+      let fields: AIProviderFields = {};
       if (aiData?.fields) {
-        try {
-          fields = typeof aiData.fields === 'string' ? JSON.parse(aiData.fields) : (aiData.fields || {});
-        } catch (e) {
-          console.error("[PMC-Flow] Error parsing AI fields:", e);
+        const rawFields = aiData.fields;
+        if (typeof rawFields === 'string') {
+          try {
+            fields = JSON.parse(rawFields);
+          } catch (e) {
+            console.error("[PMC-Flow] Error parsing AI fields string:", e);
+          }
+        } else if (typeof rawFields === 'object' && rawFields !== null) {
+          fields = rawFields as AIProviderFields;
         }
       }
 
-      let activeProvider: string = 'googleai';
-      let apiKey: string | null = null;
-      let modelName: string = 'gemini-1.5-flash';
+      // 3. Resolución Maestra de API Key
+      // Prioridad: 1. Firestore del negocio, 2. Variables de entorno (Motor Maestro)
+      let activeProvider = 'googleai';
+      let modelName = 'gemini-1.5-flash';
+      let resolvedApiKey = fields?.google?.apiKey || process.env.GOOGLE_GENAI_API_KEY || process.env.GEMINI_API_KEY;
 
-      // Resolución segura de proveedor y llave (Encadenamiento opcional estricto)
-      if (fields?.google?.apiKey) {
-        activeProvider = 'googleai'; 
-        apiKey = fields.google.apiKey;
-      } else if (fields?.openai?.apiKey) {
-        activeProvider = 'openai'; 
-        apiKey = fields.openai.apiKey; 
-        modelName = 'gpt-4o-mini';
-      } else if (fields?.groq?.apiKey) {
-        activeProvider = 'groq'; 
-        apiKey = fields.groq.apiKey; 
-        modelName = 'llama-3.1-8b-instant';
+      // Soporte para otros proveedores si están configurados (Priorizando Google para estabilidad)
+      if (!resolvedApiKey) {
+          if (fields?.openai?.apiKey) {
+            activeProvider = 'openai'; 
+            resolvedApiKey = fields.openai.apiKey; 
+            modelName = 'gpt-4o-mini';
+          } else if (fields?.groq?.apiKey) {
+            activeProvider = 'groq'; 
+            resolvedApiKey = fields.groq.apiKey; 
+            modelName = 'llama-3.1-8b-instant';
+          }
       }
 
-      // FALLBACK CRÍTICO: Si no hay llave en Firestore, intentar usar variables de entorno del sistema
-      const finalApiKey = apiKey || process.env.GOOGLE_GENAI_API_KEY || process.env.GEMINI_API_KEY;
-
-      if (!finalApiKey && !isPlatformBot) {
+      if (!resolvedApiKey && !isPlatformBot) {
+        console.error(`[Chatbot] Error: No se encontró API Key válida para el negocio ${businessId}`);
         return { 
           answer: "Lo siento, el servicio de inteligencia no está configurado correctamente en este momento.", 
           source: 'fallback' 
         };
       }
 
-      // Mapeo defensivo del catálogo de productos
+      // 4. Formateo de Catálogo para Contexto
       const products = catalogData?.products || [];
-      const safeProducts = Array.isArray(products) ? products : Object.values(products || {});
-      const formattedCatalog = safeProducts.map((p: any) => 
+      const safeProducts = (Array.isArray(products) ? products : Object.values(products || {})) as Record<string, any>[];
+      const formattedCatalog = safeProducts.map((p) => 
         `- ${p?.nombre || p?.name || 'Producto'}: $${p?.precio ?? p?.price ?? 0} (${p?.categoria || p?.category || 'General'})`
       ).join('\n');
 
@@ -140,7 +143,7 @@ export const publicMenuChatbotFlow = ai.defineFlow(
         ? "Eres el asistente de Markix, una plataforma SaaS. Responde con el contexto entregado (planes, precios, funciones). No inventes precios ni funciones que no estén en el contexto."
         : `Eres el asistente de ${businessName}. Responde con el contexto de forma amable y concisa. No inventes precios.`;
 
-      // Llamada a la IA en su propio sub-bloque
+      // 5. Llamada a la IA (Bloque Localizado para depuración)
       try {
         const response = await ai.generate({
           model: `${activeProvider}/${modelName}`,
@@ -148,20 +151,20 @@ export const publicMenuChatbotFlow = ai.defineFlow(
           prompt: `Contexto: ${context}\n\nPregunta: ${question}`,
           config: { 
             temperature: 0.2,
-            apiKey: finalApiKey || undefined
+            apiKey: resolvedApiKey || undefined // Inyección garantizada
           }
         });
 
         return { answer: response.text || "No pude generar una respuesta.", source: 'ai_generated' };
       } catch (aiError: any) {
-        console.error("[Chatbot AI Generate Error]:", aiError.message);
+        console.error("[Chatbot AI Generate Fatal Error]:", aiError.message);
         return { 
           answer: "Lo siento, el motor de inteligencia está saturado o mal configurado. Por favor contacta al soporte del negocio.", 
           source: 'fallback' 
         };
       }
     } catch (error: any) {
-      console.error("[Chatbot Logic Error]:", error);
+      console.error("[Chatbot Global Logic Error]:", error.message);
       return { answer: "Lo siento, el asistente está teniendo dificultades técnicas en este momento.", source: 'fallback' };
     }
   }
