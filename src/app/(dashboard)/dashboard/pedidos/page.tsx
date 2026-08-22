@@ -25,6 +25,7 @@ import { columns } from './columns';
 import type { Order, OrderStatus } from '@/models/order';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
+import * as XLSX from 'xlsx';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
@@ -253,6 +254,49 @@ export default function PedidosPage() {
     doc.save('pedidos.pdf');
   };
 
+  const handleDownloadTemplate = () => {
+    const today = new Date().toISOString().split('T')[0];
+    const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+
+    const data = [
+        ["Cliente", "Email", "WhatsApp", "Dirección", "Producto", "Cantidad", "Precio_Unitario", "Total", "Fecha", "Estado"],
+        ["Juan Pérez", "juan@ejemplo.com", "3001234567", "Calle 123 #45-67", "Hamburguesa Clásica", 2, 15000, 30000, today, "Entregado"],
+        ["María García", "maria@ejemplo.com", "3007654321", "Av Principal 10-20", "Pizza Pepperoni", 1, 25000, 25000, yesterday, "Pendiente"]
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Plantilla_Pedidos");
+    XLSX.writeFile(wb, "Plantilla_Importacion_Pedidos.xlsx");
+  };
+
+  const handleExportExcel = () => {
+    if (!filteredOrders || filteredOrders.length === 0) return;
+
+    const dataToExport = filteredOrders.map((order) => {
+        const isNew = order.items && Array.isArray(order.items);
+        const productText = isNew 
+          ? (order.items!.length > 1 ? `${order.items![0].productName} y ${order.items!.length - 1} más` : order.items![0].productName)
+          : (order as any).productName;
+        
+        const qty = isNew ? order.items!.reduce((s, i) => s + i.quantity, 0) : (order as any).quantity;
+        const total = order.total || order.subtotal;
+
+        return {
+          "Cliente": order.customerName,
+          "Pedido": productText,
+          "Cantidad": qty,
+          "Total": total,
+          "Estado": order.orderStatus,
+          "Fecha": new Date(order.orderDate).toLocaleDateString(),
+        };
+    });
+
+    const ws = XLSX.utils.json_to_sheet(dataToExport);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Pedidos");
+    XLSX.writeFile(wb, `Reporte_Pedidos_${new Date().toISOString().split('T')[0]}.xlsx`);
+  };
+
   const isLoading = areOrdersLoading || isSubscriptionLoading;
 
   return (
@@ -286,11 +330,14 @@ export default function PedidosPage() {
               </CardDescription>
             </div>
             <div className="flex flex-wrap gap-2">
-              <Button variant="outline" size="sm" onClick={() => {}} className="font-bold border-primary text-primary hover:bg-primary/5 cursor-default opacity-50">
-                  <FileSpreadsheet className="mr-2 h-4 w-4" /> Plantillas
+              <Button variant="outline" size="sm" onClick={handleDownloadTemplate} className="font-bold border-primary text-primary hover:bg-primary/5">
+                  <FileSpreadsheet className="mr-2 h-4 w-4" /> Plantilla
               </Button>
               <Button variant="outline" size="sm" onClick={() => setIsImportModalOpen(true)} className="font-bold border-primary text-primary hover:bg-primary/5">
                   <Upload className="mr-2 h-4 w-4" /> Importar
+              </Button>
+              <Button variant="outline" size="sm" onClick={handleExportExcel} className="font-bold border-primary text-primary hover:bg-primary/5">
+                  <FileSpreadsheet className="mr-2 h-4 w-4" /> Excel
               </Button>
               <Button variant="outline" size="sm" onClick={handlePrint}>
                 <Printer className="mr-2 h-4 w-4" />
