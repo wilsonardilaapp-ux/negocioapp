@@ -52,12 +52,12 @@ async function seedPlatformBot() {
   const faqs = [
     {
       question: 'cuanto cuesta',
-      answer: 'Contamos con planes desde $0 (Crecimiento) hasta soluciones profesionales. Nuestro Plan Estándar de $39.900/mes es el más popular e incluye asistente IA y fidelización.',
+      answer: 'Contamos con 4 planes híbridos (Pago base + % comisión por pedido). 1) Plan Gratis: $0/mes + 15%. 2) Plan Básico: $19.900/mes + 10%. 3) Plan Estándar: $39.900/mes + 9%. 4) Plan Profesional: $69.900/mes + 8%.',
       isActive: true,
     },
     {
       question: 'prueba gratis',
-      answer: '¡Claro! El Plan Crecimiento es gratuito para siempre y te permite tener hasta 10 productos en tu catálogo y recibir pedidos por WhatsApp.',
+      answer: '¡Claro! El Plan Gratis / Inicio te permite arrancar sin costo fijo mensual, pagando solo el 15% de comisión por cada pedido exitoso que recibas.',
       isActive: true,
     },
     {
@@ -96,32 +96,32 @@ async function seedPlatformBot() {
     },
     products: [
       {
-        id: 'plan-crecimiento',
-        name: 'Plan Crecimiento',
+        id: 'plan-gratis',
+        name: 'Plan Gratis / Inicio',
         price: 0,
         category: 'Planes',
-        description: 'Ideal para empezar. Catálogo QR, 10 productos y pedidos por WhatsApp.',
+        description: 'Plan Híbrido: $0 de base mensual + 15% de comisión por cada pedido recibido.',
       },
       {
         id: 'plan-basico',
         name: 'Plan Básico',
         price: 19900,
         category: 'Planes',
-        description: 'Para negocios activos. Incluye Asistente WHAPI y gestión de empaque.',
+        description: 'Plan Híbrido: $19.900 de base mensual + 10% de comisión por cada pedido recibido.',
       },
       {
         id: 'plan-estandar',
         name: 'Plan Estándar',
         price: 39900,
         category: 'Planes',
-        description: 'Nuestro plan estrella. Asistente YCloud v2 oficial y sistema de fidelización por puntos.',
+        description: 'Plan Híbrido: $39.900 de base mensual + 9% de comisión por cada pedido recibido.',
       },
       {
         id: 'plan-profesional',
         name: 'Plan Profesional',
         price: 69900,
         category: 'Planes',
-        description: 'Potencia total. IA avanzada, radar de clientes (churn) y catálogo ilimitado.',
+        description: 'Plan Híbrido: $69.900 de base mensual + 8% de comisión por cada pedido recibido.',
       },
     ],
   });

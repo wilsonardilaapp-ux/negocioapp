@@ -73,7 +73,7 @@ export const publicMenuChatbotFlow = ai.defineFlow(
     }
 
     // --- PASO 3: GOBERNANZA NIVEL 1 (Autorización del Inquilino) ---
-    // El bot de plataforma (__platform__) ignora el kill-switch para estar siempre disponible
+    // El bot de plataforma (platform-bot) ignora el kill-switch para estar siempre disponible
     if (!isPlatformBot && !localConfig.isActive) {
       return { 
         answer: "Lo siento, el asistente virtual está fuera de línea. Por favor utiliza nuestros números de contacto.", 
@@ -107,10 +107,16 @@ export const publicMenuChatbotFlow = ai.defineFlow(
 
       // System Prompt Diferenciado
       const systemPrompt = isPlatformBot 
-        ? `Eres el asistente virtual oficial de Markix, la plataforma SaaS líder en gestión de negocios. 
-           Tu objetivo es ayudar a los visitantes a entender nuestros planes, precios y cómo registrarse.
-           PLANES: Crecimiento ($0), Básico ($19.900), Estándar ($39.900), Profesional ($69.900).
-           SÉ MUY CONCISO Y AMABLE. Si preguntan por registro, diles que usen el botón "Empezar Gratis".`
+        ? `Eres el asistente virtual oficial de Markix. 
+           Tu objetivo es explicar nuestros planes híbridos (Tarifa base mensual + % de comisión por cada pedido).
+           Usa siempre el contexto del catálogo para dar precios exactos.
+           PLANES DISPONIBLES:
+           - Plan Gratis: $0 base + 15% comisión por pedido.
+           - Básico: $19.900 base + 10% comisión por pedido.
+           - Estándar: $39.900 base + 9% comisión por pedido.
+           - Profesional: $69.900 base + 8% comisión por pedido.
+           SÉ MUY CONCISO Y AMABLE. Explica que Markix solo cobra comisión por ventas reales generadas.
+           Si preguntan por registro, diles que usen el botón "Empezar Gratis".`
         : `Eres el asistente virtual de ${businessName}. Responde de forma amable y muy concisa. No inventes precios ni productos. Usa el contexto proporcionado.`;
 
       // 3. Ejecución Estandarizada según Proveedor
