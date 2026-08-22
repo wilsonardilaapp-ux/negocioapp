@@ -657,6 +657,20 @@ export default function ChatbotMenuConfigPage() {
                 rows={4}
               />
             </div>
+
+            {/* CONTROL DE ACTIVACIÓN ADITIVO */}
+            <div className="flex items-center justify-between p-3 bg-muted/30 rounded-xl border border-dashed animate-in fade-in slide-in-from-top-1 duration-300">
+                <div className="space-y-0.5">
+                    <Label className="text-sm font-bold">Estado de la respuesta</Label>
+                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">
+                        {respForm.isActive ? 'Activa y visible para el bot' : 'Inactiva (Oculta)'}
+                    </p>
+                </div>
+                <Switch 
+                    checked={respForm.isActive} 
+                    onCheckedChange={(v) => setRespForm({ ...respForm, isActive: v })}
+                />
+            </div>
           </div>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setIsResponseModalOpen(false)}>Cancelar</Button>
