@@ -6,7 +6,7 @@
  * 1. Respuestas Manuales (Triggers exactos)
  * 2. Info Negocio (Teléfono/Dirección/Ubicación)
  * 3. Gobernanza Nivel 1: Validación de Activación (SaaS Inquilino)
- * 4. Gobernanza Nivel 2: Motor de IA con Fallback dinámico (Google -> OpenAI -> Groq)
+ * 4. Gobernanza Nivel 2: Motor de IA oficial de la plataforma (getAIConfig)
  */
 
 import { ai } from '@/ai/genkit';
@@ -15,9 +15,10 @@ import {
   PublicMenuChatbotInputSchema, 
   PublicMenuChatbotOutputSchema, 
   PublicMenuChatbotOutput,
-  DEFAULT_CHATBOT_CONFIG
+  DEFAULT_CHATBOT_CONFIG,
+  PublicMenuChatbotConfig
 } from '@/models/public-menu-chatbot';
-import type { AIProviderFields } from '@/models/integration';
+import { getAIConfig } from './chat-flow';
 
 export const publicMenuChatbotFlow = ai.defineFlow(
   {
@@ -32,7 +33,7 @@ export const publicMenuChatbotFlow = ai.defineFlow(
 
     // --- PASO 0: OBTENER CONFIGURACIÓN LOCAL DEL NEGOCIO ---
     const localConfigSnap = await db.doc(`businesses/${businessId}/publicMenuChatbot/main`).get();
-    const localConfig = localConfigSnap.exists ? localConfigSnap.data() : DEFAULT_CHATBOT_CONFIG;
+    const localConfig = (localConfigSnap.exists ? localConfigSnap.data() : DEFAULT_CHATBOT_CONFIG) as PublicMenuChatbotConfig;
 
     // --- PASO 1: RESPUESTAS PERSONALIZADAS (Retorno Directo) ---
     try {
@@ -52,7 +53,7 @@ export const publicMenuChatbotFlow = ai.defineFlow(
       console.warn("[Chatbot] Error in custom responses lookup:", e);
     }
 
-    // --- PASO 2: INFORMACIÓN DEL NEGOCIO (Retorno Directo de Datos Estáticos) ---
+    // --- PASO 2: INFORMACIÓN DEL NEGOCIO (Retorno Directo) ---
     let businessName = "nuestro negocio";
     let businessDescription = "";
     try {
@@ -74,7 +75,6 @@ export const publicMenuChatbotFlow = ai.defineFlow(
     }
 
     // --- PASO 3: GOBERNANZA NIVEL 1 (Autorización del Inquilino) ---
-    // Si el negocio ha desactivado el bot, no permitimos el uso del motor de IA global.
     if (!localConfig.isActive) {
       return { 
         answer: "Lo siento, el asistente virtual está fuera de línea. Por favor utiliza nuestros números de contacto.", 
@@ -82,7 +82,7 @@ export const publicMenuChatbotFlow = ai.defineFlow(
       };
     }
 
-    // --- PASO 4: MOTOR DE IA CON RESILIENCIA Y GOBERNANZA NIVEL 2 ---
+    // --- PASO 4: MOTOR DE IA OFICIAL DE MARKIX (Gobernanza Nivel 2) ---
     try {
       // 1. Obtener Catálogo denormalizado
       const catalogSnap = await db.collection(`businesses/${businessId}/publicData`).doc('catalog').get();
@@ -92,26 +92,11 @@ export const publicMenuChatbotFlow = ai.defineFlow(
         `- ${p?.name || 'Producto'}: $${p?.price ?? 0} (${p?.category || 'General'})`
       ).join('\n');
 
-      // 2. Obtener Pool de Proveedores Globales (Super Admin)
-      const aiConfigSnap = await db.doc('integrations/chatbot-integrado-con-whatsapp-para-soporte-y-ventas').get();
-      const aiData = aiConfigSnap.exists ? aiConfigSnap.data() : null;
-      
-      let fields: AIProviderFields = {};
-      if (typeof aiData?.fields === 'string') {
-        try { fields = JSON.parse(aiData.fields); } catch { fields = {}; }
-      } else {
-        fields = (aiData?.fields || {}) as AIProviderFields;
-      }
+      // 2. Resolver Proveedor y Credenciales usando la función maestra de la plataforma
+      const aiConfig = await getAIConfig(businessId);
 
-      // 3. Resolución de Pipeline de Ejecución (Google -> OpenAI -> Groq)
-      const providersToTry = [
-        { id: 'google', apiKey: fields.google?.apiKey, model: 'gemini-1.5-flash' },
-        { id: 'openai', apiKey: fields.openai?.apiKey, model: 'gpt-4o-mini', endpoint: 'https://api.openai.com/v1/chat/completions' },
-        { id: 'groq', apiKey: fields.groq?.apiKey, model: 'llama-3.1-8b-instant', endpoint: 'https://api.groq.com/openai/v1/chat/completions' }
-      ].filter(p => !!p.apiKey);
-
-      if (providersToTry.length === 0) {
-        throw new Error("No hay proveedores de IA configurados en el Motor Maestro.");
+      if (!aiConfig.apiKey) {
+        throw new Error("No hay API Key configurada para el motor de IA.");
       }
 
       const context = `
@@ -123,54 +108,58 @@ export const publicMenuChatbotFlow = ai.defineFlow(
 
       const systemPrompt = `Eres el asistente virtual de ${businessName}. Responde de forma amable y muy concisa. No inventes precios ni productos. Usa el contexto proporcionado.`;
 
-      // 4. Bucle de ejecución con Fallback Automático
-      for (const provider of providersToTry) {
-        try {
-          console.log(`[Chatbot] Intentando resolución con: ${provider.id.toUpperCase()}`);
-          
-          if (provider.id === 'google') {
-            const response = await ai.generate({
-              model: `googleai/${provider.model}`,
-              system: systemPrompt,
-              prompt: `Contexto: ${context}\n\nPregunta: ${question}`,
-              config: { temperature: 0.2, apiKey: provider.apiKey }
-            });
-            if (response.text) return { answer: response.text, source: 'ai_generated' };
-          } else {
-            // Ejecución vía Fetch para proveedores compatibles con OpenAI (OpenAI, Groq)
-            const res = await fetch(provider.endpoint!, {
-              method: 'POST',
-              headers: { 
-                'Authorization': `Bearer ${provider.apiKey}`, 
-                'Content-Type': 'application/json' 
-              },
-              body: JSON.stringify({
-                model: provider.model,
-                messages: [
-                  { role: 'system', content: systemPrompt },
-                  { role: 'user', content: `Contexto: ${context}\n\nPregunta: ${question}` }
-                ],
-                temperature: 0.2,
-                max_tokens: 300
-              }),
-            });
-            
-            if (res.ok) {
-              const data = await res.json();
-              const answer = data.choices?.[0]?.message?.content;
-              if (answer) return { answer, source: 'ai_generated' };
-            } else {
-              const errorBody = await res.text();
-              console.warn(`[Chatbot] Proveedor ${provider.id} respondió con error:`, errorBody);
-            }
+      // 3. Ejecución Estandarizada según Proveedor
+      if (aiConfig.provider === 'googleai') {
+        const response = await ai.generate({
+          model: `googleai/${aiConfig.model}`,
+          messages: [
+            { role: 'system', content: [{ text: systemPrompt }] },
+            { role: 'user', content: [{ text: `Contexto: ${context}\n\nPregunta: ${question}` }] }
+          ],
+          config: { 
+            temperature: 0.2, 
+            apiKey: aiConfig.apiKey 
           }
-        } catch (providerError) {
-          console.error(`[Chatbot] Fallo crítico en proveedor ${provider.id}:`, providerError);
-          // El bucle continúa al siguiente proveedor disponible
-        }
+        });
+        
+        return { 
+          answer: response.text || "Lo siento, no pude generar una respuesta clara. Intenta de nuevo.", 
+          source: 'ai_generated' 
+        };
       }
 
-      throw new Error("Todos los proveedores del pool fallaron o están saturados.");
+      // Fallback para proveedores compatibles con OpenAI (OpenAI, Groq, DeepSeek)
+      const endpoint = aiConfig.provider === 'groq' 
+        ? 'https://api.groq.com/openai/v1/chat/completions' 
+        : (aiConfig.provider === 'deepseek' ? 'https://api.deepseek.com/v1/chat/completions' : 'https://api.openai.com/v1/chat/completions');
+
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 
+          'Authorization': `Bearer ${aiConfig.apiKey}`, 
+          'Content-Type': 'application/json' 
+        },
+        body: JSON.stringify({
+          model: aiConfig.model,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: `Contexto: ${context}\n\nPregunta: ${question}` }
+          ],
+          temperature: 0.2,
+          max_tokens: 300
+        }),
+      });
+      
+      if (res.ok) {
+        const data = await res.json();
+        const answer = data.choices?.[0]?.message?.content;
+        if (answer) return { answer, source: 'ai_generated' };
+      } else {
+        const errorBody = await res.text();
+        console.error(`[Chatbot] Proveedor ${aiConfig.provider} falló:`, errorBody);
+      }
+
+      throw new Error("El motor de IA no respondió exitosamente.");
 
     } catch (error: any) {
       console.error("[Chatbot Pipeline Error]:", error.message);
