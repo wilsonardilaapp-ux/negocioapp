@@ -3,7 +3,7 @@
 /**
  * @fileOverview Flujo de Genkit para el chatbot del menú público.
  * Implementa una jerarquía de respuesta (Manual -> Info Negocio -> Catálogo -> IA Global).
- * Corregido para usar rutas de 5 segmentos en colecciones y manejo defensivo de datos.
+ * Corregido para inyectar API Key dinámicamente y fallback a variables de entorno.
  */
 
 import { ai } from '@/ai/genkit';
@@ -49,7 +49,7 @@ export const publicMenuChatbotFlow = ai.defineFlow(
       const businessData = businessSnap.exists ? businessSnap.data() : null;
       const isPlatformBot = businessData?.isPlatformBot === true;
 
-      // Normalización defensiva de datos del negocio (Resuelve fallos en "cómo se llama")
+      // Normalización defensiva de datos del negocio
       const businessName = businessData?.nombre || businessData?.name || businessData?.businessName || "nuestro negocio";
 
       if (businessData) {
@@ -70,39 +70,46 @@ export const publicMenuChatbotFlow = ai.defineFlow(
       // --- PASO 4: IA GENERATIVA (USANDO MOTOR GLOBAL) ---
       const aiConfigSnap = await db.doc('integrations/chatbot-integrado-con-whatsapp-para-soporte-y-ventas').get();
       
-      if (!isPlatformBot && (!aiConfigSnap.exists || aiConfigSnap.data()?.status !== 'active')) {
+      const aiData = aiConfigSnap.exists ? aiConfigSnap.data() : null;
+      let fields: AIProviderFields = {};
+      
+      if (aiData) {
+        try {
+          fields = typeof aiData.fields === 'string' ? JSON.parse(aiData.fields) : (aiData.fields || {});
+        } catch (e) {
+          console.error("[PMC-Flow] Error parsing AI fields:", e);
+        }
+      }
+
+      let activeProvider: string = 'googleai';
+      let apiKey: string | null = null;
+      let modelName: string = 'gemini-1.5-flash';
+
+      // Resolución de proveedor y llave
+      if (fields.google?.apiKey) {
+        activeProvider = 'googleai'; 
+        apiKey = fields.google.apiKey;
+      } else if (fields.openai?.apiKey) {
+        activeProvider = 'openai'; 
+        apiKey = fields.openai.apiKey; 
+        modelName = 'gpt-4o-mini';
+      } else if (fields.groq?.apiKey) {
+        activeProvider = 'groq'; 
+        apiKey = fields.groq.apiKey; 
+        modelName = 'llama-3.1-8b-instant';
+      }
+
+      // FALLBACK CRÍTICO: Si no hay llave en Firestore, intentar usar variables de entorno del sistema
+      const finalApiKey = apiKey || process.env.GOOGLE_GENAI_API_KEY || process.env.GEMINI_API_KEY;
+
+      if (!finalApiKey && !isPlatformBot) {
         return { 
-          answer: `Lo siento, el asistente no está disponible en este momento.`, 
+          answer: "Lo siento, el servicio de inteligencia no está configurado correctamente en este momento.", 
           source: 'fallback' 
         };
       }
 
-      const aiData = aiConfigSnap.data();
-      let fields: AIProviderFields = {};
-      
-      try {
-        fields = typeof aiData?.fields === 'string' ? JSON.parse(aiData.fields) : (aiData?.fields || {});
-      } catch (e) {
-        console.error("[PMC-Flow] Error parsing AI fields:", e);
-      }
-
-      let activeProvider: string | null = null;
-      let apiKey: string | null = null;
-      let modelName: string = 'gemini-1.5-flash';
-
-      if (fields.google?.apiKey) {
-        activeProvider = 'googleai'; apiKey = fields.google.apiKey;
-      } else if (fields.openai?.apiKey) {
-        activeProvider = 'openai'; apiKey = fields.openai.apiKey; modelName = 'gpt-4o-mini';
-      } else if (fields.groq?.apiKey) {
-        activeProvider = 'groq'; apiKey = fields.groq.apiKey; modelName = 'llama-3.1-8b-instant';
-      }
-
-      if (!activeProvider || !apiKey) {
-        return { answer: "Lo siento, no puedo procesar tu solicitud ahora.", source: 'fallback' };
-      }
-
-      // Mapeo defensivo del catálogo de productos (Mejor comprensión para la IA)
+      // Mapeo defensivo del catálogo de productos
       const products = catalogData?.products || [];
       const safeProducts = Array.isArray(products) ? products : Object.values(products || {});
       const formattedCatalog = safeProducts.map((p: any) => 
@@ -125,7 +132,10 @@ export const publicMenuChatbotFlow = ai.defineFlow(
           model: `${activeProvider}/${modelName}`,
           system: systemPrompt,
           prompt: `Contexto: ${context}\n\nPregunta: ${question}`,
-          config: { temperature: 0.2 }
+          config: { 
+            temperature: 0.2,
+            apiKey: finalApiKey || undefined // Inyección de la llave recuperada
+          }
         });
 
         return { answer: response.text || "No pude generar una respuesta.", source: 'ai_generated' };
