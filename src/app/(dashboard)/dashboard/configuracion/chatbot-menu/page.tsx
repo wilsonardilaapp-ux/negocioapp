@@ -12,6 +12,7 @@ import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
 import { 
   Select, 
   SelectContent, 
@@ -35,6 +36,17 @@ import {
   TableHeader, 
   TableRow 
 } from '@/components/ui/table';
+import { 
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { 
   Loader2, 
@@ -53,7 +65,10 @@ import {
   CheckCircle,
   Upload,
   Download,
-  FileSpreadsheet
+  FileSpreadsheet,
+  X,
+  CheckCircle2,
+  MinusCircle
 } from 'lucide-react';
 import { PublicMenuChatbotConfig, DEFAULT_CHATBOT_CONFIG, PublicMenuAutoResponse, PUBLIC_MENU_CHATBOT_MODULE_ID } from '@/models/public-menu-chatbot';
 import { PublicMenuChatWidget } from '@/components/public-menu-chatbot/PublicMenuChatWidget';
@@ -64,6 +79,7 @@ import { useSubscription } from '@/hooks/useSubscription';
 import Image from 'next/image';
 import * as XLSX from 'xlsx';
 import { cn } from '@/lib/utils';
+import { motion, AnimatePresence } from 'framer-motion';
 
 /**
  * Función auxiliar para dividir un array en trozos (chunks)
@@ -92,6 +108,10 @@ export default function ChatbotMenuConfigPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+
+  // Estados para Selección Múltiple y Acciones Masivas
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [isBulkProcessing, setIsBulkProcessing] = useState(false);
 
   // Estados para Importación Masiva
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
@@ -182,6 +202,80 @@ export default function ChatbotMenuConfigPage() {
       toast({ variant: 'destructive', title: 'Error de carga' });
     } finally {
       setIsUploading(false);
+    }
+  };
+
+  // --- LÓGICA DE ACCIONES MASIVAS ---
+
+  const filteredResponses = useMemo(() => {
+    if (!rawResponses) return [];
+    return rawResponses.filter(r => 
+      r.question.toLowerCase().includes(searchTerm.toLowerCase()) || 
+      r.answer.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [rawResponses, searchTerm]);
+
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedIds(filteredResponses.map(r => r.id));
+    } else {
+      setSelectedIds([]);
+    }
+  };
+
+  const handleSelectOne = (id: string, checked: boolean) => {
+    if (checked) {
+      setSelectedIds(prev => [...prev, id]);
+    } else {
+      setSelectedIds(prev => prev.filter(selectedId => selectedId !== id));
+    }
+  };
+
+  const handleBulkStatusUpdate = async (active: boolean) => {
+    if (!firestore || !user || selectedIds.length === 0) return;
+    setIsBulkProcessing(true);
+    try {
+      const batch = writeBatch(firestore);
+      const now = new Date().toISOString();
+
+      selectedIds.forEach(id => {
+        const docRef = doc(firestore, `businesses/${user.uid}/publicMenuChatbot/main/responses`, id);
+        batch.update(docRef, { isActive: active, updatedAt: now });
+      });
+
+      await batch.commit();
+      toast({ 
+        title: active ? 'Respuestas activadas' : 'Respuestas desactivadas', 
+        description: `Se han actualizado ${selectedIds.length} registros.` 
+      });
+      setSelectedIds([]);
+    } catch (e) {
+      toast({ variant: 'destructive', title: 'Error en proceso masivo' });
+    } finally {
+      setIsBulkProcessing(false);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (!firestore || !user || selectedIds.length === 0) return;
+    setIsBulkProcessing(true);
+    try {
+      const batch = writeBatch(firestore);
+      selectedIds.forEach(id => {
+        const docRef = doc(firestore, `businesses/${user.uid}/publicMenuChatbot/main/responses`, id);
+        batch.delete(docRef);
+      });
+
+      await batch.commit();
+      toast({ 
+        title: 'Respuestas eliminadas', 
+        description: `Se han borrado ${selectedIds.length} registros permanentemente.` 
+      });
+      setSelectedIds([]);
+    } catch (e) {
+      toast({ variant: 'destructive', title: 'Error al eliminar masivamente' });
+    } finally {
+      setIsBulkProcessing(false);
     }
   };
 
@@ -326,14 +420,6 @@ export default function ChatbotMenuConfigPage() {
       toast({ variant: 'destructive', title: 'Error al eliminar' });
     }
   };
-
-  const filteredResponses = useMemo(() => {
-    if (!rawResponses) return [];
-    return rawResponses.filter(r => 
-      r.question.toLowerCase().includes(searchTerm.toLowerCase()) || 
-      r.answer.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-  }, [rawResponses, searchTerm]);
 
   if (loadingConfig || loadingResponses || loadingGlobalModule || isSubLoading) {
     return (
@@ -493,20 +579,78 @@ export default function ChatbotMenuConfigPage() {
               </div>
             </CardHeader>
             <CardContent className="pt-6 space-y-4">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input 
-                  placeholder="Buscar en mis respuestas..." 
-                  className="pl-10" 
-                  value={searchTerm} 
-                  onChange={e => setSearchTerm(e.target.value)} 
-                />
+              
+              <div className="flex flex-col md:flex-row justify-between gap-4">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input 
+                      placeholder="Buscar en mis respuestas..." 
+                      className="pl-10 h-11" 
+                      value={searchTerm} 
+                      onChange={e => setSearchTerm(e.target.value)} 
+                    />
+                  </div>
+
+                  {/* BARRA DE ACCIONES MASIVAS */}
+                  <AnimatePresence>
+                    {selectedIds.length > 0 && (
+                      <motion.div 
+                        initial={{ opacity: 0, x: 20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: 20 }}
+                        className="flex items-center gap-2 p-2 bg-primary/5 border border-primary/20 rounded-xl"
+                      >
+                        <span className="text-[10px] font-black uppercase text-primary px-3 border-r mr-1">
+                          {selectedIds.length} Seleccionadas
+                        </span>
+                        <Button size="sm" variant="outline" className="h-8 text-[10px] font-bold uppercase gap-1.5" onClick={() => handleBulkStatusUpdate(true)} disabled={isBulkProcessing}>
+                          <CheckCircle2 className="h-3 w-3" /> Activar
+                        </Button>
+                        <Button size="sm" variant="outline" className="h-8 text-[10px] font-bold uppercase gap-1.5" onClick={() => handleBulkStatusUpdate(false)} disabled={isBulkProcessing}>
+                          <MinusCircle className="h-3 w-3" /> Desactivar
+                        </Button>
+                        
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button size="sm" variant="destructive" className="h-8 text-[10px] font-bold uppercase gap-1.5" disabled={isBulkProcessing}>
+                              <Trash2 className="h-3 w-3" /> Eliminar
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>¿Confirmar eliminación masiva?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Estás a punto de eliminar permanentemente <strong>{selectedIds.length}</strong> respuestas. Esta acción no se puede deshacer.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                              <AlertDialogAction onClick={handleBulkDelete} className="bg-destructive hover:bg-destructive/90">
+                                {isBulkProcessing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                                Sí, eliminar todas
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+
+                        <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => setSelectedIds([])}>
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
               </div>
 
               <div className="rounded-xl border overflow-hidden">
                 <Table>
                   <TableHeader className="bg-muted/50">
                     <TableRow>
+                      <TableHead className="w-[40px]">
+                        <Checkbox 
+                          checked={selectedIds.length === filteredResponses.length && filteredResponses.length > 0}
+                          onCheckedChange={handleSelectAll}
+                        />
+                      </TableHead>
                       <TableHead>Trigger (Pregunta)</TableHead>
                       <TableHead>Respuesta</TableHead>
                       <TableHead className="text-center">Estado</TableHead>
@@ -515,7 +659,13 @@ export default function ChatbotMenuConfigPage() {
                   </TableHeader>
                   <TableBody>
                     {filteredResponses.length > 0 ? filteredResponses.map(res => (
-                      <TableRow key={res.id}>
+                      <TableRow key={res.id} className={cn(selectedIds.includes(res.id) && "bg-primary/5")}>
+                        <TableCell>
+                          <Checkbox 
+                            checked={selectedIds.includes(res.id)}
+                            onCheckedChange={(checked) => handleSelectOne(res.id, checked === true)}
+                          />
+                        </TableCell>
                         <TableCell className="font-bold">{res.question}</TableCell>
                         <TableCell className="max-w-xs truncate text-xs text-muted-foreground">{res.answer}</TableCell>
                         <TableCell className="text-center">
@@ -528,7 +678,7 @@ export default function ChatbotMenuConfigPage() {
                       </TableRow>
                     )) : (
                       <TableRow>
-                        <TableCell colSpan={4} className="h-32 text-center text-muted-foreground italic">
+                        <TableCell colSpan={5} className="h-32 text-center text-muted-foreground italic">
                           No se encontraron respuestas.
                         </TableCell>
                       </TableRow>
@@ -658,7 +808,6 @@ export default function ChatbotMenuConfigPage() {
               />
             </div>
 
-            {/* CONTROL DE ACTIVACIÓN ADITIVO */}
             <div className="flex items-center justify-between p-3 bg-muted/30 rounded-xl border border-dashed animate-in fade-in slide-in-from-top-1 duration-300">
                 <div className="space-y-0.5">
                     <Label className="text-sm font-bold">Estado de la respuesta</Label>
