@@ -74,10 +74,14 @@ export function ImportOrdersModal({ isOpen, onOpenChange }: ImportOrdersModalPro
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const downloadTemplate = () => {
+    // Generar fechas recientes para que aparezcan en la primera página de la tabla de Markix
+    const today = new Date().toISOString().split('T')[0];
+    const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+
     const data = [
       ["Cliente", "Email", "WhatsApp", "Dirección", "Producto", "Cantidad", "Precio_Unitario", "Total", "Fecha", "Estado"],
-      ["Juan Pérez", "juan@ejemplo.com", "3001234567", "Calle 123 #45-67", "Hamburguesa Clásica", 2, 15000, 30000, "2024-03-27", "Entregado"],
-      ["María García", "maria@ejemplo.com", "3007654321", "Av Principal 10-20", "Pizza Pepperoni", 1, 25000, 25000, "2024-03-28", "Pendiente"]
+      ["Juan Pérez", "juan@ejemplo.com", "3001234567", "Calle 123 #45-67", "Hamburguesa Clásica", 2, 15000, 30000, today, "Entregado"],
+      ["María García", "maria@ejemplo.com", "3007654321", "Av Principal 10-20", "Pizza Pepperoni", 1, 25000, 25000, yesterday, "Pendiente"]
     ];
     const ws = XLSX.utils.aoa_to_sheet(data);
     const wb = XLSX.utils.book_new();
@@ -209,7 +213,10 @@ export function ImportOrdersModal({ isOpen, onOpenChange }: ImportOrdersModalPro
         await batch.commit();
       }
 
-      toast({ title: 'Importación exitosa', description: `Se han cargado ${validRows.length} pedidos correctamente.` });
+      toast({ 
+        title: 'Importación exitosa', 
+        description: `Se han cargado ${validRows.length} pedidos. Puedes localizarlos usando el buscador por nombre o revisando la fecha correspondiente en el historial.` 
+      });
       onOpenChange(false);
       setImportRows([]);
     } catch (e) {
