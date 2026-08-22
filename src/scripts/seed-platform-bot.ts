@@ -1,8 +1,9 @@
+
 /**
- * Script de ACTUALIZACIÓN Y SINCRONIZACIÓN (seed) para businesses/platform-bot.
+ * Script de ACTUALIZACIÓN, PURGA Y SINCRONIZACIÓN (seed) para businesses/platform-bot.
  *
- * Este script permite la sobrescritura forzada para garantizar que el catálogo
- * de la plataforma siempre esté sincronizado con los precios oficiales de Markix.
+ * Realiza una limpieza profunda de la subcolección 'products' para eliminar planes obsoletos
+ * e inyecta la nueva estructura de planes híbridos oficiales de Markix.
  */
 
 import { getAdminFirestore } from '@/firebase/server-init';
@@ -11,10 +12,76 @@ async function seedPlatformBot() {
   const db = await getAdminFirestore();
   const platformRef = db.collection('businesses').doc('platform-bot');
 
-  console.log('🚀 Iniciando sincronización forzada de datos para platform-bot...');
+  console.log('🚀 Iniciando purga y sincronización total de datos para platform-bot...');
 
-  // --- 1. Documento raíz (Datos de plataforma) ---
-  // Actualizamos la descripción para que la IA tenga contexto claro del modelo híbrido
+  // --- 1. PURGA TOTAL DE PRODUCTOS FANTASMA (Starter, Pro, Enterprise) ---
+  const productsSubColRef = platformRef.collection('products');
+  const oldProductsSnap = await productsSubColRef.get();
+  
+  if (!oldProductsSnap.empty) {
+    const purgeBatch = db.batch();
+    oldProductsSnap.forEach(doc => purgeBatch.delete(doc.ref));
+    await purgeBatch.commit();
+    console.log(`🧹 Se han eliminado ${oldProductsSnap.size} productos antiguos de la subcolección.`);
+  }
+
+  // --- 2. DEFINICIÓN DE LOS 4 PLANES HÍBRIDOS OFICIALES ---
+  const officialPlans = [
+    {
+      id: 'plan-gratis',
+      businessId: 'platform-bot',
+      name: 'Plan Gratis / Inicio',
+      price: 0,
+      category: 'Planes',
+      description: 'Plan Híbrido: Tarifa base $0/mes + 15% de comisión por cada pedido recibido a través de la plataforma.',
+      stock: 9999,
+      images: [],
+      rating: 5,
+      ratingCount: 1,
+      updatedAt: new Date().toISOString()
+    },
+    {
+      id: 'plan-basico',
+      businessId: 'platform-bot',
+      name: 'Plan Básico',
+      price: 19900,
+      category: 'Planes',
+      description: 'Plan Híbrido: Tarifa base $19.900/mes + 10% de comisión por cada pedido recibido. Incluye asistente WhatsApp WHAPI.',
+      stock: 9999,
+      images: [],
+      rating: 5,
+      ratingCount: 1,
+      updatedAt: new Date().toISOString()
+    },
+    {
+      id: 'plan-estandar',
+      businessId: 'platform-bot',
+      name: 'Plan Estándar',
+      price: 39900,
+      category: 'Planes',
+      description: 'Plan Híbrido: Tarifa base $39.900/mes + 9% de comisión por cada pedido recibido. Incluye asistente YCloud v2 y Fidelización.',
+      stock: 9999,
+      images: [],
+      rating: 5,
+      ratingCount: 1,
+      updatedAt: new Date().toISOString()
+    },
+    {
+      id: 'plan-profesional',
+      businessId: 'platform-bot',
+      name: 'Plan Profesional',
+      price: 69900,
+      category: 'Planes',
+      description: 'Plan Híbrido: Tarifa base $69.900/mes + 8% de comisión por cada pedido recibido. Incluye Catálogo Ilimitado y Motor de Sugerencias IA.',
+      stock: 9999,
+      images: [],
+      rating: 5,
+      ratingCount: 1,
+      updatedAt: new Date().toISOString()
+    }
+  ];
+
+  // --- 3. ACTUALIZACIÓN DEL DOCUMENTO RAÍZ (Contexto del Bot) ---
   await platformRef.set({
     name: 'Markix Support',
     phone: '+57 322 883 1634',
@@ -27,7 +94,7 @@ async function seedPlatformBot() {
     updatedAt: new Date().toISOString(),
   }, { merge: true });
 
-  // --- 2. Configuración del Chatbot (Capa 1: main) ---
+  // --- 4. CONFIGURACIÓN DEL CHATBOT (Capa 1: main) ---
   const configRef = platformRef.collection('publicMenuChatbot').doc('main');
   await configRef.set({
     assistantName: 'Asistente Markix',
@@ -42,34 +109,27 @@ async function seedPlatformBot() {
     updatedAt: new Date().toISOString()
   }, { merge: true });
 
-  // --- 3. FAQs (Capa 1: responses) ---
+  // --- 5. FAQs Y RESPUESTAS (Capa 1: responses) ---
   const responsesRef = configRef.collection('responses');
-  
-  // Purgar respuestas antiguas para evitar duplicados o info vieja
   const oldResponses = await responsesRef.get();
-  const batch = db.batch();
-  oldResponses.forEach(doc => batch.delete(doc.ref));
-  await batch.commit();
+  const respBatch = db.batch();
+  oldResponses.forEach(doc => respBatch.delete(doc.ref));
+  await respBatch.commit();
 
   const faqs = [
     {
       question: 'cuanto cuesta',
-      answer: 'Contamos con 4 planes híbridos diseñados para crecer contigo: 1) Plan Gratis: $0 base + 15% comisión. 2) Plan Básico: $19.900 base + 10% comisión. 3) Plan Estándar: $39.900 base + 9% comisión. 4) Plan Profesional: $69.900 base + 8% comisión.',
+      answer: 'Markix ofrece un modelo híbrido justo. Contamos con 4 planes: 1) Gratis: $0 base + 15% comisión. 2) Básico: $19.900 base + 10% comisión. 3) Estándar: $39.900 base + 9% comisión. 4) Profesional: $69.900 base + 8% comisión.',
       isActive: true,
     },
     {
       question: 'comisiones',
-      answer: 'Markix utiliza un modelo de éxito: pagas una pequeña tarifa base y una comisión por cada pedido generado. Si tú no vendes, nosotros no ganamos. Las comisiones van desde el 15% en el plan gratis hasta el 8% en el profesional.',
+      answer: 'Nuestras comisiones son por éxito: solo pagas cuando vendes. Van desde el 15% (Gratis) hasta el 8% (Profesional). El porcentaje se aplica sobre el valor total de los pedidos recibidos.',
       isActive: true,
     },
     {
       question: 'registro',
-      answer: 'Puedes empezar ahora mismo haciendo clic en el botón "Empezar Gratis" en la parte superior. Solo necesitas tu nombre y correo para activar tu asistente virtual en minutos.',
-      isActive: true,
-    },
-    {
-      question: 'plan basico',
-      answer: 'El Plan Básico cuesta $19.900 pesos mensuales e incluye una comisión del 10% por pedido. Es ideal para negocios que ya tienen un flujo constante de ventas y quieren profesionalizar su atención.',
+      answer: 'Es muy simple. Haz clic en "Empezar Gratis" arriba, ingresa tus datos y tu asistente virtual estará listo para atender a tus clientes en minutos.',
       isActive: true,
     }
   ];
@@ -82,9 +142,11 @@ async function seedPlatformBot() {
     });
   }
 
-  // --- 4. Catálogo de Planes (Capa 3: "productos" para la IA) ---
-  // Sobrescribimos el catálogo completo para eliminar Starter/Pro antiguos
-  await platformRef.collection('publicData').doc('catalog').set({
+  // --- 6. SINCRONIZACIÓN ATÓMICA DE PRODUCTOS-PLAN ---
+  const finalBatch = db.batch();
+
+  // A. Actualizar Catálogo denormalizado (Para lecturas rápidas)
+  finalBatch.set(platformRef.collection('publicData').doc('catalog'), {
     headerConfig: {
       businessInfo: {
         name: 'Markix Platform',
@@ -92,46 +154,21 @@ async function seedPlatformBot() {
         phone: '3228831634'
       }
     },
-    products: [
-      {
-        id: 'plan-gratis',
-        name: 'Plan Gratis / Inicio',
-        price: 0,
-        category: 'Planes',
-        description: 'Plan Híbrido: Tarifa base $0/mes + 15% de comisión por cada pedido recibido a través de la plataforma.',
-      },
-      {
-        id: 'plan-basico',
-        name: 'Plan Básico',
-        price: 19900,
-        category: 'Planes',
-        description: 'Plan Híbrido: Tarifa base $19.900/mes + 10% de comisión por cada pedido recibido. Incluye asistente WhatsApp WHAPI.',
-      },
-      {
-        id: 'plan-estandar',
-        name: 'Plan Estándar',
-        price: 39900,
-        category: 'Planes',
-        description: 'Plan Híbrido: Tarifa base $39.900/mes + 9% de comisión por cada pedido recibido. Incluye asistente YCloud v2 y Fidelización.',
-      },
-      {
-        id: 'plan-profesional',
-        name: 'Plan Profesional',
-        price: 69900,
-        category: 'Planes',
-        description: 'Plan Híbrido: Tarifa base $69.900/mes + 8% de comisión por cada pedido recibido. Incluye Catálogo Ilimitado y Motor de Sugerencias IA.',
-      },
-    ],
+    products: officialPlans,
     updatedAt: new Date().toISOString()
   });
 
-  console.log('✅ Sincronización de businesses/platform-bot finalizada con éxito. Planes actualizados.');
+  // B. Actualizar subcolección 'products' (Para búsquedas individuales y RAG)
+  officialPlans.forEach(plan => {
+    const docRef = productsSubColRef.doc(plan.id);
+    finalBatch.set(docRef, plan);
+  });
+
+  await finalBatch.commit();
+
+  console.log('✅ Sincronización de platform-bot FINALIZADA. Productos fantasma eliminados.');
 }
 
 seedPlatformBot()
-  .then(() => {
-      console.log('Proceso terminado.');
-  })
-  .catch((err) => {
-    console.error('❌ Error fatal en el seed:', err);
-  });
+  .then(() => console.log('Proceso terminado.'))
+  .catch((err) => console.error('❌ Error fatal en el seed:', err));
