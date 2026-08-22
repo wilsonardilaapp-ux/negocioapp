@@ -19,7 +19,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
-import { Printer, FileDown, Trash2, Info, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Printer, FileDown, Trash2, Info, ChevronLeft, ChevronRight, FileSpreadsheet, Upload } from 'lucide-react';
 import { DataTable } from './data-table';
 import { columns } from './columns';
 import type { Order, OrderStatus } from '@/models/order';
@@ -31,6 +31,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { useSubscription } from '@/hooks/useSubscription';
 import { LimitBanner } from '@/components/dashboard/LimitBanner';
 import { awardLoyaltyPoints } from '@/actions/loyalty';
+import { ImportOrdersModal } from './components/ImportOrdersModal';
 
 
 declare module 'jspdf' {
@@ -53,6 +54,7 @@ export default function PedidosPage() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteProgress, setDeleteProgress] = useState(0);
   const [totalToDelete, setTotalToDelete] = useState(0);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
 
   // --- LÓGICA DE PAGINACIÓN VISUAL ---
   const [currentPage, setCurrentPage] = useState(1);
@@ -131,9 +133,6 @@ export default function PedidosPage() {
       toast({ variant: 'destructive', description: '⚠️ Debes seleccionar fecha inicio y fecha fin' });
       return;
     }
-    // La lógica de filtrado ya está en el useMemo filteredOrders, 
-    // este botón ahora sirve para forzar la UI si fuera necesario, 
-    // pero el useMemo reacciona automáticamente.
     toast({ description: `✅ Filtrado por fecha aplicado` });
   };
   
@@ -279,21 +278,27 @@ export default function PedidosPage() {
 
       <Card>
         <CardHeader>
-          <div className="flex justify-between items-center">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div>
               <CardTitle>Listado de Pedidos</CardTitle>
               <CardDescription>
                 Visualiza tus ventas y actualiza estados de despacho.
               </CardDescription>
             </div>
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={handlePrint}>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" size="sm" onClick={() => {}} className="font-bold border-primary text-primary hover:bg-primary/5 cursor-default opacity-50">
+                  <FileSpreadsheet className="mr-2 h-4 w-4" /> Plantillas
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setIsImportModalOpen(true)} className="font-bold border-primary text-primary hover:bg-primary/5">
+                  <Upload className="mr-2 h-4 w-4" /> Importar
+              </Button>
+              <Button variant="outline" size="sm" onClick={handlePrint}>
                 <Printer className="mr-2 h-4 w-4" />
                 Imprimir
               </Button>
-              <Button onClick={handleDownloadPDF}>
+              <Button size="sm" onClick={handleDownloadPDF}>
                 <FileDown className="mr-2 h-4 w-4" />
-                Exportar PDF
+                PDF
               </Button>
             </div>
           </div>
@@ -401,6 +406,11 @@ export default function PedidosPage() {
           </div>
         </CardContent>
       </Card>
+
+      <ImportOrdersModal 
+        isOpen={isImportModalOpen} 
+        onOpenChange={setIsImportModalOpen} 
+      />
     </div>
   );
 }
