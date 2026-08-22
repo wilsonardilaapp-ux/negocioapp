@@ -142,7 +142,6 @@ export default function ChatbotIAPage() {
                 </div>
                 <Switch
                     checked={isActive}
-                    onSnapshot={handleStatusChange}
                     onCheckedChange={handleStatusChange}
                     disabled={isUpdatingStatus}
                 />
@@ -185,7 +184,7 @@ export default function ChatbotIAPage() {
                 <p className="text-xs font-mono font-bold text-primary">platform-bot</p>
              </div>
              <Button asChild variant="default" className="font-black px-6 shadow-md shadow-primary/20">
-                <Link href="/dashboard/configuracion/chatbot-menu?businessId=platform-bot">
+                <Link href="/superadmin/chatbot-ia/contenido">
                   Gestionar Contenido y Respuestas
                 </Link>
              </Button>
