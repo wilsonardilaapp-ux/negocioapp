@@ -63,6 +63,13 @@ export function PublicMenuChatWidget({ businessId, isPreview = false }: PublicMe
     if (!input.trim() || isLoading || !sessionId) return;
 
     const userMsg = input.trim();
+    
+    // Capturar historial antes de limpiar input (últimos 6 turnos)
+    const chatHistory = messages.slice(-6).map(m => ({
+      role: m.role,
+      content: m.content
+    }));
+
     setInput('');
     setMessages(prev => [...prev, { role: 'user', content: userMsg, timestamp: new Date() }]);
     setIsLoading(true);
@@ -78,7 +85,12 @@ export function PublicMenuChatWidget({ businessId, isPreview = false }: PublicMe
         }, { merge: true }).catch(() => {});
       }
 
-      const result = await publicMenuChatbotFlow({ businessId, question: userMsg, sessionId });
+      const result = await publicMenuChatbotFlow({ 
+        businessId, 
+        question: userMsg, 
+        sessionId,
+        history: chatHistory
+      });
       setMessages(prev => [...prev, { role: 'model', content: result.answer, timestamp: new Date() }]);
     } catch (error) {
       setMessages(prev => [...prev, { role: 'model', content: 'Error técnico.', timestamp: new Date() }]);

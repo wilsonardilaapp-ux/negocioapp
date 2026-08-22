@@ -70,6 +70,10 @@ export const PublicMenuChatbotInputSchema = z.object({
   businessId: z.string().describe('ID único del negocio'),
   question: z.string().describe('Pregunta del cliente'),
   sessionId: z.string().describe('ID de sesión del visitante'),
+  history: z.array(z.object({
+    role: z.string(),
+    content: z.string(),
+  })).optional().describe('Historial reciente de la conversación'),
 });
 
 export type PublicMenuChatbotInput = z.infer<typeof PublicMenuChatbotInputSchema>;
