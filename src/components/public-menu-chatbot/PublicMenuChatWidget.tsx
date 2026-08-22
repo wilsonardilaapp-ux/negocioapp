@@ -38,8 +38,8 @@ export function PublicMenuChatWidget({ businessId, isPreview = false }: PublicMe
   const { data: globalModule } = useDoc<Module>(globalModuleRef);
 
   // 2. Suscripción a la configuración del negocio (Control local del cliente)
-  const configRef = useMemoFirebase(() => 
-    doc(firestore, `businesses/${businessId}/publicMenuChatbot`, 'main'), 
+  const configRef = useMemoFirebase(
+    () => doc(firestore, `businesses/${businessId}/publicMenuChatbot`, 'main'), 
     [firestore, businessId]
   );
   const { data: configData } = useDoc<PublicMenuChatbotConfig>(configRef);
@@ -87,16 +87,20 @@ export function PublicMenuChatWidget({ businessId, isPreview = false }: PublicMe
     }
   };
 
-  // LÓGICA DE VISIBILIDAD: El módulo debe estar activo globalmente Y habilitado por el negocio
-  const isGlobalActive = globalModule?.status === 'active';
-  const isLocalActive = config.isActive === true;
+  // LÓGICA DE VISIBILIDAD:
+  // Si es el bot de plataforma ('platform-bot'), forzamos la visibilidad ignorando el kill-switch.
+  const isPlatformBot = businessId === 'platform-bot';
+  const isGlobalActive = globalModule?.status === 'active' || isPlatformBot;
+  const isLocalActive = config.isActive === true || isPlatformBot;
 
   if (!isPreview && (!isGlobalActive || !isLocalActive)) return null;
 
+  // Ajuste de posición para evitar colisión con el botón de WhatsApp (bottom-8) en la landing
+  const bottomClass = isPlatformBot ? 'bottom-28' : 'bottom-6';
   const positionClass = config.position === 'bottom-left' ? 'left-6' : 'right-6';
 
   return (
-    <div className={cn("fixed bottom-6 z-[100] flex flex-col items-end", positionClass)}>
+    <div className={cn("fixed z-[100] flex flex-col items-end", bottomClass, positionClass)}>
       {isOpen && (
         <Card className="w-[320px] sm:w-[380px] h-[500px] mb-4 shadow-2xl flex flex-col border-2 overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-300">
           <CardHeader className="p-4 border-b flex flex-row items-center justify-between" style={{ backgroundColor: config.headerColor }}>
