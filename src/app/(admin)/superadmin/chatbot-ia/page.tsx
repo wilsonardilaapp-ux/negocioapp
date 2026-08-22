@@ -22,9 +22,10 @@ import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Bot, Settings, CheckCircle, XCircle, Loader2, MessageSquare } from 'lucide-react';
+import { Bot, Settings, CheckCircle, XCircle, Loader2, MessageSquare, RefreshCw } from 'lucide-react';
 import type { Integration } from '@/models/integration';
 import { saveIntegrationFields, updateIntegrationStatus } from '@/actions/integrations';
+import { syncPlatformBotAction } from '@/actions/admin-actions';
 import { AIProviderForm } from '../integraciones/AIProviderForm';
 import Link from 'next/link';
 
@@ -36,6 +37,7 @@ export default function ChatbotIAPage() {
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, startSavingTransition] = useTransition();
   const [isUpdatingStatus, startStatusTransition] = useTransition();
+  const [isSyncing, startSyncTransition] = useTransition();
 
   const aiDocRef = useMemoFirebase(
     () => (!firestore ? null : doc(firestore, 'integrations', AI_INTEGRATION_ID)),
@@ -90,10 +92,28 @@ export default function ChatbotIAPage() {
     });
   };
 
+  const handleSyncBotData = () => {
+    startSyncTransition(async () => {
+        const result = await syncPlatformBotAction();
+        if (result.success) {
+            toast({
+                title: "Sincronización Exitosa",
+                description: `Se purgaron ${result.purgedCount} registros. Planes activos: ${result.confirmedPlans.join(', ')}`,
+            });
+        } else {
+            toast({
+                variant: 'destructive',
+                title: "Error de Sincronización",
+                description: result.error || 'Fallo crítico al actualizar Firestore.',
+            });
+        }
+    });
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin" />
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
@@ -177,21 +197,37 @@ export default function ChatbotIAPage() {
             </div>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
           <div className="flex items-center justify-between border border-primary/10 p-4 rounded-xl bg-white shadow-sm">
              <div className="space-y-1">
                 <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Identificador de Plataforma</p>
                 <p className="text-xs font-mono font-bold text-primary">platform-bot</p>
              </div>
-             <Button asChild variant="default" className="font-black px-6 shadow-md shadow-primary/20">
+             <Button asChild variant="outline" className="font-black px-6 border-primary text-primary hover:bg-primary/5">
                 <Link href="/superadmin/chatbot-ia/contenido">
-                  Gestionar Contenido y Respuestas
+                  Gestionar Respuestas
                 </Link>
+             </Button>
+          </div>
+
+          <div className="flex items-center justify-between border border-orange-200 p-4 rounded-xl bg-orange-50/50">
+             <div className="space-y-1">
+                <p className="text-[10px] font-black uppercase text-orange-600 tracking-widest">Sincronización Crítica</p>
+                <p className="text-xs font-medium text-orange-800">Forzar purga de datos viejos y cargar planes híbridos.</p>
+             </div>
+             <Button 
+                onClick={handleSyncBotData} 
+                disabled={isSyncing} 
+                variant="default" 
+                className="bg-orange-600 hover:bg-orange-700 text-white font-black px-6 shadow-md"
+             >
+                {isSyncing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+                Sincronizar Catálogo
              </Button>
           </div>
         </CardContent>
         <CardFooter className="bg-muted/10 border-t p-4 text-[10px] text-muted-foreground uppercase font-bold tracking-widest text-center">
-            Este acceso abre la interfaz de configuración del chatbot bajo el contexto del tenant de plataforma.
+            Este panel garantiza que el bot de la landing use el modelo híbrido oficial.
         </CardFooter>
       </Card>
 
