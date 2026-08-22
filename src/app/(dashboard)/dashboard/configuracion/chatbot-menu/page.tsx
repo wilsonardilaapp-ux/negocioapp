@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, Suspense } from 'react';
 import { useUser, useFirestore, useDoc, useMemoFirebase, setDocumentNonBlocking, addDocumentNonBlocking, useCollection } from '@/firebase';
 import { doc, collection, query, orderBy, deleteDoc, writeBatch } from 'firebase/firestore';
+import { useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
@@ -100,14 +101,28 @@ interface ImportRow {
   isValid: boolean;
 }
 
-export default function ChatbotMenuConfigPage() {
-  const { user } = useUser();
+function ChatbotMenuConfigContent() {
+  const { user, profile } = useUser();
+  const searchParams = useSearchParams();
   const firestore = useFirestore();
   const { toast } = useToast();
   const { isModuleAuthorized, isLoading: isSubLoading } = useSubscription();
   const [isSaving, setIsSaving] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+
+  // --- RESOLUCIÓN SEGURA DE BUSINESS ID (MULTI-TENANT / PLATFORM BOT) ---
+  const activeBusinessId = useMemo(() => {
+      const paramId = searchParams.get('businessId');
+      // CAPA DE SEGURIDAD: Solo si el rol es super_admin permitimos el override del ID.
+      // De lo contrario, forzamos el uso del ID del usuario autenticado.
+      if (profile?.role === 'super_admin' && paramId) {
+          return paramId;
+      }
+      return user?.uid || '';
+  }, [user?.uid, profile?.role, searchParams]);
+
+  const isPlatformBot = activeBusinessId === 'platform-bot';
 
   // Estados para Selección Múltiple y Acciones Masivas
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -126,20 +141,20 @@ export default function ChatbotMenuConfigPage() {
   );
   const { data: globalModule, isLoading: loadingGlobalModule } = useDoc<Module>(globalModuleRef);
   
-  const isGlobalActive = globalModule?.status === 'active';
+  const isGlobalActive = globalModule?.status === 'active' || isPlatformBot;
 
   // 1. Suscripción a Configuración Principal (Documento main)
   const configRef = useMemoFirebase(
-    () => (user ? doc(firestore, 'businesses', user.uid, 'publicMenuChatbot', 'main') : null),
-    [firestore, user]
+    () => (activeBusinessId ? doc(firestore, 'businesses', activeBusinessId, 'publicMenuChatbot', 'main') : null),
+    [firestore, activeBusinessId]
   );
   const { data: savedConfig, isLoading: loadingConfig } = useDoc<PublicMenuChatbotConfig>(configRef);
   const [localConfig, setLocalConfig] = useState<PublicMenuChatbotConfig>(DEFAULT_CHATBOT_CONFIG);
 
   // 2. Suscripción a Respuestas Automáticas
   const responsesRef = useMemoFirebase(
-    () => (user ? collection(firestore, 'businesses', user.uid, 'publicMenuChatbot', 'main', 'responses') : null),
-    [firestore, user]
+    () => (activeBusinessId ? collection(firestore, 'businesses', activeBusinessId, 'publicMenuChatbot', 'main', 'responses') : null),
+    [firestore, activeBusinessId]
   );
   const { data: rawResponses, isLoading: loadingResponses } = useCollection<PublicMenuAutoResponse>(
     useMemoFirebase(() => (responsesRef ? query(responsesRef, orderBy('updatedAt', 'desc')) : null), [responsesRef])
@@ -147,15 +162,15 @@ export default function ChatbotMenuConfigPage() {
 
   // 3. Suscripción a Datos del Negocio
   const businessRef = useMemoFirebase(
-    () => (user ? doc(firestore, 'businesses', user.uid) : null),
-    [firestore, user]
+    () => (activeBusinessId ? doc(firestore, 'businesses', activeBusinessId) : null),
+    [firestore, activeBusinessId]
   );
   const { data: business } = useDoc<Business>(businessRef);
 
   // 4. Suscripción a Catálogo Público
   const catalogRef = useMemoFirebase(
-    () => (user ? doc(firestore, 'businesses', user.uid, 'publicData', 'catalog') : null),
-    [firestore, user]
+    () => (activeBusinessId ? doc(firestore, 'businesses', activeBusinessId, 'publicData', 'catalog') : null),
+    [firestore, activeBusinessId]
   );
   const { data: catalog } = useDoc<any>(catalogRef);
 
@@ -205,8 +220,6 @@ export default function ChatbotMenuConfigPage() {
     }
   };
 
-  // --- LÓGICA DE ACCIONES MASIVAS ---
-
   const filteredResponses = useMemo(() => {
     if (!rawResponses) return [];
     return rawResponses.filter(r => 
@@ -232,14 +245,14 @@ export default function ChatbotMenuConfigPage() {
   };
 
   const handleBulkStatusUpdate = async (active: boolean) => {
-    if (!firestore || !user || selectedIds.length === 0) return;
+    if (!firestore || !activeBusinessId || selectedIds.length === 0) return;
     setIsBulkProcessing(true);
     try {
       const batch = writeBatch(firestore);
       const now = new Date().toISOString();
 
       selectedIds.forEach(id => {
-        const docRef = doc(firestore, `businesses/${user.uid}/publicMenuChatbot/main/responses`, id);
+        const docRef = doc(firestore, `businesses/${activeBusinessId}/publicMenuChatbot/main/responses`, id);
         batch.update(docRef, { isActive: active, updatedAt: now });
       });
 
@@ -257,12 +270,12 @@ export default function ChatbotMenuConfigPage() {
   };
 
   const handleBulkDelete = async () => {
-    if (!firestore || !user || selectedIds.length === 0) return;
+    if (!firestore || !activeBusinessId || selectedIds.length === 0) return;
     setIsBulkProcessing(true);
     try {
       const batch = writeBatch(firestore);
       selectedIds.forEach(id => {
-        const docRef = doc(firestore, `businesses/${user.uid}/publicMenuChatbot/main/responses`, id);
+        const docRef = doc(firestore, `businesses/${activeBusinessId}/publicMenuChatbot/main/responses`, id);
         batch.delete(docRef);
       });
 
@@ -278,8 +291,6 @@ export default function ChatbotMenuConfigPage() {
       setIsBulkProcessing(false);
     }
   };
-
-  // --- LÓGICA DE IMPORTACIÓN MASIVA ---
 
   const downloadTemplate = () => {
     const data = [
@@ -376,8 +387,6 @@ export default function ChatbotMenuConfigPage() {
     }
   };
 
-  // --- CRUD MANUAL ---
-
   const handleOpenResponseDialog = (res: PublicMenuAutoResponse | null = null) => {
     if (!isGlobalActive) return;
     setEditingResponse(res);
@@ -423,7 +432,7 @@ export default function ChatbotMenuConfigPage() {
 
   if (loadingConfig || loadingResponses || loadingGlobalModule || isSubLoading) {
     return (
-      <div className="flex flex-col items-center justify-center h-screen gap-4">
+      <div className="flex flex-col items-center justify-center h-[60vh] gap-4">
         <Loader2 className="h-10 w-10 animate-spin text-primary" />
         <p className="text-muted-foreground font-medium">Sincronizando asistente...</p>
       </div>
@@ -433,7 +442,12 @@ export default function ChatbotMenuConfigPage() {
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
       
-      {/* AVISO DE MÓDULO DESACTIVADO GLOBALMENTE */}
+      {isPlatformBot && (
+        <Badge variant="default" className="bg-primary text-white font-black uppercase tracking-[0.2em] px-4 py-1.5 rounded-full shadow-lg mb-2">
+            MODO ADMINISTRADOR: ASISTENTE DE PLATAFORMA
+        </Badge>
+      )}
+
       {!isGlobalActive && (
         <Card className="border-destructive bg-destructive/5 border-2">
             <CardContent className="p-6 flex flex-col sm:flex-row items-center gap-4 text-center sm:text-left">
@@ -591,7 +605,6 @@ export default function ChatbotMenuConfigPage() {
                     />
                   </div>
 
-                  {/* BARRA DE ACCIONES MASIVAS */}
                   <AnimatePresence>
                     {selectedIds.length > 0 && (
                       <motion.div 
@@ -731,7 +744,7 @@ export default function ChatbotMenuConfigPage() {
 
         <TabsContent value="preview" className="pt-2 h-[550px] relative">
           <div className="absolute inset-0 bg-slate-100 rounded-2xl flex items-center justify-center overflow-hidden border-4 border-white shadow-inner">
-             {user?.uid && <PublicMenuChatWidget businessId={user.uid} isPreview={true} />}
+             {activeBusinessId && <PublicMenuChatWidget businessId={activeBusinessId} isPreview={true} />}
           </div>
         </TabsContent>
 
@@ -783,7 +796,6 @@ export default function ChatbotMenuConfigPage() {
         </TabsContent>
       </Tabs>
 
-      {/* DIÁLOGO CRUD RESPUESTAS MANUALES */}
       <Dialog open={isResponseModalOpen} onOpenChange={setIsResponseModalOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -831,7 +843,6 @@ export default function ChatbotMenuConfigPage() {
         </DialogContent>
       </Dialog>
 
-      {/* MODAL DE VISTA PREVIA DE IMPORTACIÓN MASIVA */}
       <Dialog open={isImportModalOpen} onOpenChange={setIsImportModalOpen}>
         <DialogContent className="sm:max-w-3xl max-h-[90vh] flex flex-col p-0">
           <DialogHeader className="p-6 pb-0">
@@ -906,4 +917,12 @@ export default function ChatbotMenuConfigPage() {
       </Dialog>
     </div>
   );
+}
+
+export default function ChatbotMenuConfigPage() {
+    return (
+        <Suspense fallback={<div className="flex justify-center items-center py-20"><Loader2 className="h-8 w-8 animate-spin" /></div>}>
+            <ChatbotMenuConfigContent />
+        </Suspense>
+    );
 }

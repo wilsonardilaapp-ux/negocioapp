@@ -22,10 +22,11 @@ import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Bot, Settings, CheckCircle, XCircle, Loader2 } from 'lucide-react';
+import { Bot, Settings, CheckCircle, XCircle, Loader2, MessageSquare } from 'lucide-react';
 import type { Integration } from '@/models/integration';
 import { saveIntegrationFields, updateIntegrationStatus } from '@/actions/integrations';
 import { AIProviderForm } from '../integraciones/AIProviderForm';
+import Link from 'next/link';
 
 const AI_INTEGRATION_ID = 'chatbot-integrado-con-whatsapp-para-soporte-y-ventas';
 
@@ -141,6 +142,7 @@ export default function ChatbotIAPage() {
                 </div>
                 <Switch
                     checked={isActive}
+                    onSnapshot={handleStatusChange}
                     onCheckedChange={handleStatusChange}
                     disabled={isUpdatingStatus}
                 />
@@ -161,8 +163,36 @@ export default function ChatbotIAPage() {
                 </Button>
             </div>
         </CardContent>
+      </Card>
+
+      {/* TARJETA ADITIVA: GESTIÓN DEL BOT DE LA LANDING PAGE */}
+      <Card className="border-primary/20 bg-primary/5">
+        <CardHeader>
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-primary text-white rounded-lg shadow-sm">
+              <MessageSquare className="h-6 w-6" />
+            </div>
+            <div>
+              <CardTitle>Asistente de la Landing Page (Markix Bot)</CardTitle>
+              <CardDescription className="text-primary/70 font-medium">Personaliza las respuestas, el catálogo y el conocimiento del bot oficial.</CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-between border border-primary/10 p-4 rounded-xl bg-white shadow-sm">
+             <div className="space-y-1">
+                <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Identificador de Plataforma</p>
+                <p className="text-xs font-mono font-bold text-primary">platform-bot</p>
+             </div>
+             <Button asChild variant="default" className="font-black px-6 shadow-md shadow-primary/20">
+                <Link href="/dashboard/configuracion/chatbot-menu?businessId=platform-bot">
+                  Gestionar Contenido y Respuestas
+                </Link>
+             </Button>
+          </div>
+        </CardContent>
         <CardFooter className="bg-muted/10 border-t p-4 text-[10px] text-muted-foreground uppercase font-bold tracking-widest text-center">
-            Este motor es consumido por los módulos publicMenuChatbot y Chatbot de Soporte
+            Este acceso abre la interfaz de configuración del chatbot bajo el contexto del tenant de plataforma.
         </CardFooter>
       </Card>
 
