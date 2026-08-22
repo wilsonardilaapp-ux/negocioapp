@@ -1,6 +1,7 @@
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+    // Forced recompile to clear dynamic route resolution errors
     experimental: {
         serverComponentsExternalPackages: [
             'firebase-admin', 

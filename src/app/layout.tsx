@@ -32,31 +32,49 @@ async function getGlobalConfig() {
  * incluyendo el favicon dinámico de la plataforma.
  */
 export async function generateMetadata(): Promise<Metadata> {
-  const globalConfig = await getGlobalConfig();
-  const faviconSource = globalConfig?.faviconUrl || null;
+  try {
+    const globalConfig = await getGlobalConfig();
+    const faviconSource = globalConfig?.faviconUrl || null;
+    const updatedAt = globalConfig?.updatedAt;
 
-  return {
-    metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'https://markix-saas.vercel.app'),
-    title: 'Markix Platform',
-    description: 'Centraliza y automatiza tu negocio con Markix.',
-    icons: faviconSource
-      ? {
-          icon: [{ 
-            url: buildFaviconUrl({ faviconUrl: faviconSource, updatedAt: globalConfig?.updatedAt }, 32), 
-            type: 'image/png', 
-            sizes: '32x32' 
-          }],
-          apple: [{ 
-            url: buildFaviconUrl({ faviconUrl: faviconSource, updatedAt: globalConfig?.updatedAt }, 180), 
-            type: 'image/png', 
-            sizes: '180x180' 
-          }],
-        }
-      : {
-          icon: '/favicon.ico',
-          apple: '/favicon.ico',
-        },
-  };
+    if (!faviconSource) {
+      return {
+        metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'https://markix-saas.vercel.app'),
+        title: 'Markix Platform',
+        description: 'Centraliza y automatiza tu negocio con Markix.',
+      };
+    }
+
+    const faviconObj = { faviconUrl: faviconSource, updatedAt };
+
+    return {
+      metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'https://markix-saas.vercel.app'),
+      title: globalConfig?.name || 'Markix Platform',
+      description: globalConfig?.description || 'Centraliza y automatiza tu negocio con Markix.',
+      icons: {
+        icon: [
+          { 
+            url: buildFaviconUrl(faviconObj, 32), 
+            type: "image/png", 
+            sizes: "32x32" 
+          }
+        ],
+        apple: [
+          { 
+            url: buildFaviconUrl(faviconObj, 180), 
+            type: "image/png", 
+            sizes: "180x180" 
+          }
+        ],
+      },
+    };
+  } catch (error) {
+    console.error('[RootLayout] Error generating metadata:', error);
+    return {
+      title: 'Markix Platform',
+      description: 'Centraliza y automatiza tu negocio con Markix.',
+    };
+  }
 }
 
 export default function RootLayout({

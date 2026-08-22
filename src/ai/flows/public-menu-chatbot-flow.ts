@@ -31,9 +31,15 @@ export const publicMenuChatbotFlow = ai.defineFlow(
     const { businessId, question } = input;
     const lowQuestion = question.toLowerCase().trim();
 
-    // --- PASO 0: OBTENER CONFIGURACIÓN LOCAL DEL NEGOCIO ---
-    const localConfigSnap = await db.doc(`businesses/${businessId}/publicMenuChatbot/main`).get();
+    // --- PASO 0: OBTENER DATOS RAÍZ Y CONFIGURACIÓN ---
+    const [businessSnap, localConfigSnap] = await Promise.all([
+      db.collection('businesses').doc(businessId).get(),
+      db.doc(`businesses/${businessId}/publicMenuChatbot/main`).get()
+    ]);
+
+    const bData = businessSnap.exists ? businessSnap.data() : null;
     const localConfig = (localConfigSnap.exists ? localConfigSnap.data() : DEFAULT_CHATBOT_CONFIG) as PublicMenuChatbotConfig;
+    const isPlatformBot = bData?.isPlatformBot === true;
 
     // --- PASO 1: RESPUESTAS PERSONALIZADAS (Retorno Directo) ---
     try {
@@ -54,28 +60,21 @@ export const publicMenuChatbotFlow = ai.defineFlow(
     }
 
     // --- PASO 2: INFORMACIÓN DEL NEGOCIO (Retorno Directo) ---
-    let businessName = "nuestro negocio";
-    let businessDescription = "";
-    try {
-      const businessSnap = await db.collection('businesses').doc(businessId).get();
-      if (businessSnap.exists) {
-        const bData = businessSnap.data();
-        businessName = bData?.name || bData?.nombre || "nuestro negocio";
-        businessDescription = bData?.description || "";
-        
+    let businessName = bData?.name || bData?.nombre || "nuestro negocio";
+    let businessDescription = bData?.description || "";
+    
+    if (bData) {
         const infoTriggers = ['donde queda', 'ubicación', 'direccion', 'teléfono', 'contacto', 'whatsapp', 'horario', 'redes'];
         if (infoTriggers.some(t => lowQuestion.includes(t))) {
           let infoMsg = `Estamos ubicados en ${bData?.address || 'nuestra sede principal'}. `;
           if (bData?.phone) infoMsg += `Puedes contactarnos al ${bData.phone}. `;
           return { answer: infoMsg, source: 'business_info' };
         }
-      }
-    } catch (e) {
-      console.warn("[Chatbot] Error in business info lookup:", e);
     }
 
     // --- PASO 3: GOBERNANZA NIVEL 1 (Autorización del Inquilino) ---
-    if (!localConfig.isActive) {
+    // El bot de plataforma (__platform__) ignora el kill-switch para estar siempre disponible
+    if (!isPlatformBot && !localConfig.isActive) {
       return { 
         answer: "Lo siento, el asistente virtual está fuera de línea. Por favor utiliza nuestros números de contacto.", 
         source: 'fallback' 
@@ -92,7 +91,7 @@ export const publicMenuChatbotFlow = ai.defineFlow(
         `- ${p?.name || 'Producto'}: $${p?.price ?? 0} (${p?.category || 'General'})`
       ).join('\n');
 
-      // 2. Resolver Proveedor y Credenciales usando la función maestra de la plataforma
+      // 2. Resolver Proveedor y Credenciales
       const aiConfig = await getAIConfig(businessId);
 
       if (!aiConfig.apiKey) {
@@ -106,7 +105,13 @@ export const publicMenuChatbotFlow = ai.defineFlow(
         ${formattedCatalog || 'Consulta con un asesor para disponibilidad.'}
       `;
 
-      const systemPrompt = `Eres el asistente virtual de ${businessName}. Responde de forma amable y muy concisa. No inventes precios ni productos. Usa el contexto proporcionado.`;
+      // System Prompt Diferenciado
+      const systemPrompt = isPlatformBot 
+        ? `Eres el asistente virtual oficial de Markix, la plataforma SaaS líder en gestión de negocios. 
+           Tu objetivo es ayudar a los visitantes a entender nuestros planes, precios y cómo registrarse.
+           PLANES: Crecimiento ($0), Básico ($19.900), Estándar ($39.900), Profesional ($69.900).
+           SÉ MUY CONCISO Y AMABLE. Si preguntan por registro, diles que usen el botón "Empezar Gratis".`
+        : `Eres el asistente virtual de ${businessName}. Responde de forma amable y muy concisa. No inventes precios ni productos. Usa el contexto proporcionado.`;
 
       // 3. Ejecución Estandarizada según Proveedor
       if (aiConfig.provider === 'googleai') {
@@ -128,7 +133,7 @@ export const publicMenuChatbotFlow = ai.defineFlow(
         };
       }
 
-      // Fallback para proveedores compatibles con OpenAI (OpenAI, Groq, DeepSeek)
+      // Fallback para proveedores compatibles con OpenAI
       const endpoint = aiConfig.provider === 'groq' 
         ? 'https://api.groq.com/openai/v1/chat/completions' 
         : (aiConfig.provider === 'deepseek' ? 'https://api.deepseek.com/v1/chat/completions' : 'https://api.openai.com/v1/chat/completions');
@@ -154,9 +159,6 @@ export const publicMenuChatbotFlow = ai.defineFlow(
         const data = await res.json();
         const answer = data.choices?.[0]?.message?.content;
         if (answer) return { answer, source: 'ai_generated' };
-      } else {
-        const errorBody = await res.text();
-        console.error(`[Chatbot] Proveedor ${aiConfig.provider} falló:`, errorBody);
       }
 
       throw new Error("El motor de IA no respondió exitosamente.");

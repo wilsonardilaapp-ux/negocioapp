@@ -7,6 +7,7 @@ import type { HybridPlan } from '@/models/hybrid-plan';
 import { getLandingData } from '@/lib/get-landing-data';
 import type { Metadata } from 'next';
 import { buildFaviconUrl } from "@/lib/favicon-url";
+import { PublicMenuChatWidget } from '@/components/public-menu-chatbot/PublicMenuChatWidget';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -50,22 +51,34 @@ export async function generateMetadata(): Promise<Metadata> {
     const faviconSource = business?.faviconUrl || globalConfig?.faviconUrl || business?.logoURL || null;
     const updatedAt = business?.updatedAt || globalConfig?.updatedAt;
 
+    if (!faviconSource) {
+      return {
+        title: siteTitle,
+        description: business?.description || globalConfig?.description || "Centraliza y automatiza tu negocio con Markix.",
+      };
+    }
+
     // Construir objeto compatible con el helper buildFaviconUrl
     const faviconObj = { faviconUrl: faviconSource, updatedAt };
-
-    const faviconIcon = buildFaviconUrl(faviconObj, 32);
-    const appleIcon = buildFaviconUrl(faviconObj, 180);
 
     return {
       title: siteTitle,
       description: business?.description || globalConfig?.description || "Centraliza y automatiza tu negocio con Markix.",
       icons: {
-        icon: faviconSource 
-          ? [{ url: faviconIcon, type: "image/png", sizes: "32x32" }]
-          : "/favicon.ico",
-        apple: faviconSource 
-          ? [{ url: appleIcon, type: "image/png", sizes: "180x180" }]
-          : "/favicon.ico",
+        icon: [
+          { 
+            url: buildFaviconUrl(faviconObj, 32), 
+            type: "image/png", 
+            sizes: "32x32" 
+          }
+        ],
+        apple: [
+          { 
+            url: buildFaviconUrl(faviconObj, 180), 
+            type: "image/png", 
+            sizes: "180x180" 
+          }
+        ],
       }
     };
   } catch (e) {
@@ -199,6 +212,8 @@ export default async function RootPage() {
           businessId={mainBusiness.id || undefined}
           showPlatformPlans={true}
         />
+        {/* Asistente Virtual Oficial de Markix */}
+        <PublicMenuChatWidget businessId="platform-bot" />
       </main>
     );
   } catch (error) {
@@ -206,6 +221,7 @@ export default async function RootPage() {
     return (
       <main className="w-full">
           <LandingPageContent data={fallbackData} plans={DefaultSubscriptionPlans} hybridPlans={[]} showPlatformPlans={true} />
+          <PublicMenuChatWidget businessId="platform-bot" />
       </main>
     );
   }
