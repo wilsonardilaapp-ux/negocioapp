@@ -2,8 +2,8 @@
 
 /**
  * @fileOverview Flujo de Genkit para el chatbot del menú público.
- * Implementa una jerarquía de respuesta (Manual -> Info Negocio -> Catálogo -> IA Global).
- * Corregido para inyectar API Key dinámicamente y fallback a variables de entorno.
+ * Implementa una jerarquía de respuesta resiliente (Manual -> Info Negocio -> Catálogo -> IA Global).
+ * Aísla las respuestas directas de la lógica de IA para evitar regresiones totales.
  */
 
 import { ai } from '@/ai/genkit';
@@ -29,51 +29,64 @@ export const publicMenuChatbotFlow = ai.defineFlow(
     const { businessId, question } = input;
     const lowQuestion = question.toLowerCase().trim();
 
+    // --- PASO 1: RESPUESTAS PERSONALIZADAS (AISLADO) ---
     try {
-      // --- PASO 1: RESPUESTAS PERSONALIZADAS (Ruta de 5 segmentos) ---
       const responsesSnap = await db.collection(`businesses/${businessId}/publicMenuChatbot/main/responses`)
         .where('isActive', '==', true)
         .get();
       
       const matchedCustom = responsesSnap.docs.find(doc => {
         const data = doc.data();
-        return lowQuestion.includes(data.question.toLowerCase().trim());
+        return lowQuestion.includes(data.question?.toLowerCase().trim() || '');
       });
 
       if (matchedCustom) {
         return { answer: matchedCustom.data().answer, source: 'custom_response' };
       }
+    } catch (e) {
+      console.warn("[Chatbot] Error in custom responses lookup:", e);
+      // Continuamos al siguiente paso en lugar de fallar
+    }
 
-      // --- PASO 2: INFORMACIÓN DEL NEGOCIO ---
+    // --- PASO 2: INFORMACIÓN DEL NEGOCIO (INCLUYE TELÉFONO - AISLADO) ---
+    let businessName = "nuestro negocio";
+    let businessDescription = "";
+    let isPlatformBot = false;
+
+    try {
       const businessSnap = await db.collection('businesses').doc(businessId).get();
-      const businessData = businessSnap.exists ? businessSnap.data() : null;
-      const isPlatformBot = businessData?.isPlatformBot === true;
+      if (businessSnap.exists) {
+        const businessData = businessSnap.data();
+        businessName = businessData?.nombre || businessData?.name || businessData?.businessName || "nuestro negocio";
+        businessDescription = businessData?.description || "";
+        isPlatformBot = businessData?.isPlatformBot === true;
 
-      // Normalización defensiva de datos del negocio
-      const businessName = businessData?.nombre || businessData?.name || businessData?.businessName || "nuestro negocio";
-
-      if (businessData) {
         const infoTriggers = ['donde queda', 'ubicación', 'direccion', 'teléfono', 'contacto', 'whatsapp', 'horario', 'redes'];
         const isAskingInfo = infoTriggers.some(t => lowQuestion.includes(t));
 
         if (isAskingInfo) {
-          let infoMsg = `Estamos ubicados en ${businessData.address || 'nuestra sede principal'}. `;
-          if (businessData.phone) infoMsg += `Puedes contactarnos al ${businessData.phone}. `;
+          let infoMsg = `Estamos ubicados en ${businessData?.address || 'nuestra sede principal'}. `;
+          if (businessData?.phone) infoMsg += `Puedes contactarnos al ${businessData.phone}. `;
           return { answer: infoMsg, source: 'business_info' };
         }
       }
+    } catch (e) {
+      console.warn("[Chatbot] Error in business info lookup:", e);
+    }
 
-      // --- PASO 3: CATÁLOGO DENORMALIZADO ---
+    // --- PASO 3 & 4: IA GENERATIVA (BLOQUE CON RECUPEARACIÓN ANTE FALLOS) ---
+    try {
+      // Obtener Catálogo
       const catalogSnap = await db.collection(`businesses/${businessId}/publicData`).doc('catalog').get();
       const catalogData = catalogSnap.exists ? catalogSnap.data() : null;
 
-      // --- PASO 4: IA GENERATIVA (USANDO MOTOR GLOBAL) ---
+      // Obtener Configuración de IA con Blindaje
       const aiConfigSnap = await db.doc('integrations/chatbot-integrado-con-whatsapp-para-soporte-y-ventas').get();
       
       const aiData = aiConfigSnap.exists ? aiConfigSnap.data() : null;
       let fields: AIProviderFields = {};
       
-      if (aiData) {
+      if (aiData?.fields) {
         try {
           fields = typeof aiData.fields === 'string' ? JSON.parse(aiData.fields) : (aiData.fields || {});
         } catch (e) {
@@ -85,15 +98,15 @@ export const publicMenuChatbotFlow = ai.defineFlow(
       let apiKey: string | null = null;
       let modelName: string = 'gemini-1.5-flash';
 
-      // Resolución de proveedor y llave
-      if (fields.google?.apiKey) {
+      // Resolución segura de proveedor y llave (Encadenamiento opcional estricto)
+      if (fields?.google?.apiKey) {
         activeProvider = 'googleai'; 
         apiKey = fields.google.apiKey;
-      } else if (fields.openai?.apiKey) {
+      } else if (fields?.openai?.apiKey) {
         activeProvider = 'openai'; 
         apiKey = fields.openai.apiKey; 
         modelName = 'gpt-4o-mini';
-      } else if (fields.groq?.apiKey) {
+      } else if (fields?.groq?.apiKey) {
         activeProvider = 'groq'; 
         apiKey = fields.groq.apiKey; 
         modelName = 'llama-3.1-8b-instant';
@@ -118,7 +131,7 @@ export const publicMenuChatbotFlow = ai.defineFlow(
 
       const context = `
         NEGOCIO: ${businessName}
-        DESCRIPCIÓN: ${businessData?.description || ''}
+        DESCRIPCIÓN: ${businessDescription}
         PRODUCTOS DISPONIBLES EN EL CATÁLOGO:
         ${formattedCatalog || 'No hay productos disponibles actualmente.'}
       `;
@@ -127,6 +140,7 @@ export const publicMenuChatbotFlow = ai.defineFlow(
         ? "Eres el asistente de Markix, una plataforma SaaS. Responde con el contexto entregado (planes, precios, funciones). No inventes precios ni funciones que no estén en el contexto."
         : `Eres el asistente de ${businessName}. Responde con el contexto de forma amable y concisa. No inventes precios.`;
 
+      // Llamada a la IA en su propio sub-bloque
       try {
         const response = await ai.generate({
           model: `${activeProvider}/${modelName}`,
@@ -134,17 +148,20 @@ export const publicMenuChatbotFlow = ai.defineFlow(
           prompt: `Contexto: ${context}\n\nPregunta: ${question}`,
           config: { 
             temperature: 0.2,
-            apiKey: finalApiKey || undefined // Inyección de la llave recuperada
+            apiKey: finalApiKey || undefined
           }
         });
 
         return { answer: response.text || "No pude generar una respuesta.", source: 'ai_generated' };
-      } catch (aiError) {
-        console.error("[Chatbot AI Error Detail]:", aiError);
-        return { answer: "Hubo un problema técnico al procesar tu duda.", source: 'fallback' };
+      } catch (aiError: any) {
+        console.error("[Chatbot AI Generate Error]:", aiError.message);
+        return { 
+          answer: "Lo siento, el motor de inteligencia está saturado o mal configurado. Por favor contacta al soporte del negocio.", 
+          source: 'fallback' 
+        };
       }
     } catch (error: any) {
-      console.error("[Chatbot Error Detail]:", error);
+      console.error("[Chatbot Logic Error]:", error);
       return { answer: "Lo siento, el asistente está teniendo dificultades técnicas en este momento.", source: 'fallback' };
     }
   }
