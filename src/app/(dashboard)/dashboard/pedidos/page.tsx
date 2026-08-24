@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useMemo, useState, useEffect } from 'react';
@@ -19,7 +20,18 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
-import { Printer, FileDown, Trash2, Info, ChevronLeft, ChevronRight, FileSpreadsheet, Upload } from 'lucide-react';
+import { 
+  Printer, 
+  FileDown, 
+  Trash2, 
+  Info, 
+  ChevronLeft, 
+  ChevronRight, 
+  FileSpreadsheet, 
+  Upload,
+  LayoutGrid,
+  Table as TableIcon
+} from 'lucide-react';
 import { DataTable } from './data-table';
 import { columns } from './columns';
 import type { Order, OrderStatus } from '@/models/order';
@@ -33,6 +45,8 @@ import { useSubscription } from '@/hooks/useSubscription';
 import { LimitBanner } from '@/components/dashboard/LimitBanner';
 import { awardLoyaltyPoints } from '@/actions/loyalty';
 import { ImportOrdersModal } from './components/ImportOrdersModal';
+import { KanbanPedidos } from '@/components/pedidos/KanbanPedidos';
+import { cn } from '@/lib/utils';
 
 
 declare module 'jspdf' {
@@ -56,6 +70,9 @@ export default function PedidosPage() {
   const [deleteProgress, setDeleteProgress] = useState(0);
   const [totalToDelete, setTotalToDelete] = useState(0);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  
+  // --- ESTADO PARA MODO DE VISTA ---
+  const [viewMode, setViewMode] = useState<'table' | 'kanban'>('table');
 
   // --- LÓGICA DE PAGINACIÓN VISUAL ---
   const [currentPage, setCurrentPage] = useState(1);
@@ -302,11 +319,33 @@ export default function PedidosPage() {
   return (
     <div className="flex flex-col gap-6">
       <Card>
-        <CardHeader>
-          <CardTitle>Gestión de Pedidos</CardTitle>
-          <CardDescription>
-            Revisa y administra los pedidos de tus clientes. Los pedidos ahora agrupan múltiples productos.
-          </CardDescription>
+        <CardHeader className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div className="space-y-1">
+            <CardTitle>Gestión de Pedidos</CardTitle>
+            <CardDescription>
+              Revisa y administra los pedidos de tus clientes.
+            </CardDescription>
+          </div>
+          
+          {/* TOGGLE DE VISTA */}
+          <div className="flex bg-muted p-1 rounded-xl border shadow-inner">
+            <Button 
+                variant={viewMode === 'table' ? 'default' : 'ghost'} 
+                size="sm" 
+                onClick={() => setViewMode('table')}
+                className={cn("h-8 px-4 font-bold rounded-lg", viewMode === 'table' && "shadow-md")}
+            >
+                <TableIcon className="h-4 w-4 mr-2" /> Tabla
+            </Button>
+            <Button 
+                variant={viewMode === 'kanban' ? 'default' : 'ghost'} 
+                size="sm" 
+                onClick={() => setViewMode('kanban')}
+                className={cn("h-8 px-4 font-bold rounded-lg", viewMode === 'kanban' && "shadow-md")}
+            >
+                <LayoutGrid className="h-4 w-4 mr-2" /> Kanban
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
             <div className="flex items-center gap-2 rounded-lg border bg-secondary/50 p-3 text-sm">
@@ -324,7 +363,7 @@ export default function PedidosPage() {
         <CardHeader>
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div>
-              <CardTitle>Listado de Pedidos</CardTitle>
+              <CardTitle>{viewMode === 'table' ? 'Listado de Pedidos' : 'Tablero Kanban'}</CardTitle>
               <CardDescription>
                 Visualiza tus ventas y actualiza estados de despacho.
               </CardDescription>
@@ -394,63 +433,68 @@ export default function PedidosPage() {
                        </AlertDialog>
                   </div>
               </div>
-              {selectedOrders.length > 0 && !isDeleting && (
-                <div className="flex items-center gap-4 p-2 bg-orange-50 border border-orange-200 rounded-md text-sm text-orange-800">
-                  <span>☑️ {selectedOrders.length} pedidos seleccionados</span>
-                  {dateFrom && dateTo && (
-                    <span className="hidden sm:inline">│ 📅 {format(new Date(dateFrom),'dd/MM/yy')} → {format(new Date(dateTo),'dd/MM/yy')}</span>
-                  )}
-                  <Button variant="ghost" size="sm" className="ml-auto text-orange-800 hover:bg-orange-100" onClick={clearSelection}>✕ Limpiar</Button>
-                </div>
-              )}
-              {isDeleting && (
-                <div className="p-3 bg-orange-50 border border-orange-200 rounded-md space-y-1">
-                    <div className="flex justify-between text-sm font-medium text-orange-900">
-                        <span>🔄 Eliminando pedidos...</span>
-                        <span>{deleteProgress}%</span>
+          </div>
+
+          {/* RENDERIZADO CONDICIONAL DE VISTAS */}
+          {viewMode === 'table' ? (
+            <>
+                <DataTable
+                    columns={columns({ 
+                        handleDeleteOrder, 
+                        handleUpdateStatus, 
+                        selectedOrders, 
+                        onSelectAll: handleSelectAll, 
+                        onSelectRow: handleSelectRow, 
+                        isAllSelected, 
+                        isSomeSelected 
+                    })}
+                    data={paginatedOrders}
+                    isLoading={isLoading}
+                    selectedOrderIds={selectedOrders}
+                />
+
+                <div className="flex items-center justify-between py-4 border-t mt-4">
+                    <div className="text-sm text-muted-foreground font-medium">
+                        Mostrando {paginatedOrders.length} de {filteredOrders.length} pedidos 
+                        (Página {currentPage} de {totalPages || 1})
                     </div>
-                    <Progress value={deleteProgress} className="h-2 [&>div]:bg-orange-500" />
-                    <p className="text-xs text-muted-foreground">
-                        {Math.round(deleteProgress * totalToDelete / 100)} de {totalToDelete} pedidos
-                    </p>
+                    <div className="flex gap-2">
+                        <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                            disabled={currentPage === 1 || isDeleting || areOrdersLoading}
+                            className="font-bold"
+                        >
+                            <ChevronLeft className="mr-2 h-4 w-4" /> Anterior
+                        </Button>
+                        <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                            disabled={currentPage >= totalPages || isDeleting || areOrdersLoading}
+                            className="font-bold"
+                        >
+                            Siguiente <ChevronRight className="ml-2 h-4 w-4" />
+                        </Button>
+                    </div>
                 </div>
-              )}
-          </div>
+            </>
+          ) : (
+            <KanbanPedidos 
+              orders={filteredOrders} 
+              isLoading={isLoading} 
+              handleUpdateStatus={handleUpdateStatus}
+              onViewDetails={(order) => {
+                  // Reutilización táctica: el modal ya está integrado en columns.tsx
+                  // Para la Fase 2, el botón "Ver Detalles" del Kanban disparará 
+                  // la misma lógica que la tabla si logramos referenciar el componente.
+                  // Simplificaremos para la Fase 2 usando un toast informativo hasta extraer el modal.
+                  toast({ title: `Detalle del Pedido #${order.id.slice(-7).toUpperCase()}`, description: `Cliente: ${order.customerName}` });
+              }}
+            />
+          )}
 
-          <DataTable
-            columns={columns({ handleDeleteOrder, handleUpdateStatus, selectedOrders, onSelectAll: handleSelectAll, onSelectRow: handleSelectRow, isAllSelected, isSomeSelected })}
-            data={paginatedOrders}
-            isLoading={isLoading}
-            selectedOrderIds={selectedOrders}
-          />
-
-          {/* CONTROLES DE PAGINACIÓN */}
-          <div className="flex items-center justify-between py-4 border-t mt-4">
-              <div className="text-sm text-muted-foreground font-medium">
-                  Mostrando {paginatedOrders.length} de {filteredOrders.length} pedidos 
-                  (Página {currentPage} de {totalPages || 1})
-              </div>
-              <div className="flex gap-2">
-                  <Button 
-                      variant="outline" 
-                      size="sm" 
-                      onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                      disabled={currentPage === 1 || isDeleting || areOrdersLoading}
-                      className="font-bold"
-                  >
-                      <ChevronLeft className="mr-2 h-4 w-4" /> Anterior
-                  </Button>
-                  <Button 
-                      variant="outline" 
-                      size="sm" 
-                      onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                      disabled={currentPage >= totalPages || isDeleting || areOrdersLoading}
-                      className="font-bold"
-                  >
-                      Siguiente <ChevronRight className="ml-2 h-4 w-4" />
-                  </Button>
-              </div>
-          </div>
         </CardContent>
       </Card>
 
@@ -461,3 +505,4 @@ export default function PedidosPage() {
     </div>
   );
 }
+
