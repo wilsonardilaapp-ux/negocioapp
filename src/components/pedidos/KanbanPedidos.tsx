@@ -168,7 +168,7 @@ function OrderCard({ order, handleUpdateStatus, onViewDetails }: {
             className="flex-1 h-8 text-[9px] font-bold uppercase gap-1.5 hover:bg-primary/5 hover:text-primary"
             onClick={() => window.open(`/dashboard/pedidos/print/${order.id}`, '_blank')}
         >
-            <Printer className="h-3 w-3" /> Comanda
+            <Printer className="h-3 w-3" /> IMPRIMIR
         </Button>
         <Button 
             onClick={() => handleUpdateStatus(order.id, 'Entregado')}
