@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useTransition } from 'react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -40,13 +40,12 @@ import {
 import type { Invoice, VerticalType } from '@/types/billing';
 import { VERTICAL_LABELS } from '@/types/billing';
 import { InvoiceDetailModal } from './InvoiceDetailModal';
-import { useFirestore, useUser, updateDocumentNonBlocking } from '@/firebase';
-import { doc, runTransaction, collection, increment } from 'firebase/firestore';
+import { useUser } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
 import { normalizePhoneNumber } from '@/lib/utils';
-import { cn } from '@/lib/utils';
+import { updateInvoiceOperation, voidInvoiceAndRevertStock } from '@/services/billing/order-lifecycle-service';
 
 interface InvoiceActionsMenuProps {
   invoice: Invoice;
@@ -55,12 +54,11 @@ interface InvoiceActionsMenuProps {
 
 export function InvoiceActionsMenu({ invoice, businessType }: InvoiceActionsMenuProps) {
   const { user } = useUser();
-  const firestore = useFirestore();
   const { toast } = useToast();
+  const [isPending, startTransition] = useTransition();
   
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [isCancelAlertOpen, setIsCancelAlertOpen] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
 
   const labels = VERTICAL_LABELS[businessType] || VERTICAL_LABELS.Retail;
 
@@ -73,7 +71,6 @@ export function InvoiceActionsMenu({ invoice, businessType }: InvoiceActionsMenu
   // 2. Imprimir Ticket
   const handlePrint = () => {
     toast({ title: "Enviando a impresora...", description: `Imprimiendo factura ${invoice.consecutiveNumber}` });
-    // Aquí iría la lógica de window.open('/dashboard/pos/print/' + invoice.id) similar a pedidos
   };
 
   // 3. Enviar WhatsApp
@@ -87,34 +84,22 @@ export function InvoiceActionsMenu({ invoice, businessType }: InvoiceActionsMenu
     window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, '_blank');
   };
 
-  // 4. Estado de Pago
-  const handleUpdateStatus = async (newStatus: 'completada' | 'anulada') => {
+  // 4. Estado de Pago & 7. Consumir (Usando Lifecycle Service)
+  const handleUpdateStatus = (statusUpdate: any) => {
     if (!user) return;
-    setIsProcessing(true);
-    try {
-        const docRef = doc(firestore, `businesses/${user.uid}/invoices`, invoice.id);
-        await updateDocumentNonBlocking(docRef, { status: newStatus });
-        toast({ title: "Estado actualizado", description: `Factura marcada como ${newStatus}.` });
-    } catch (e: any) {
-        toast({ variant: "destructive", title: "Error", description: e.message });
-    } finally {
-        setIsProcessing(false);
-    }
+    startTransition(async () => {
+      const result = await updateInvoiceOperation(user.uid, invoice.id, statusUpdate);
+      if (result.success) {
+        toast({ title: "Registro actualizado", description: "El cambio se ha sincronizado con pedidos." });
+      } else {
+        toast({ variant: "destructive", title: "Error", description: result.error });
+      }
+    });
   };
 
   // 5. Asignar Staff
-  const handleAssignStaff = async (staffName: string) => {
-    if (!user) return;
-    setIsProcessing(true);
-    try {
-        const docRef = doc(firestore, `businesses/${user.uid}/invoices`, invoice.id);
-        await updateDocumentNonBlocking(docRef, { atendidoPor: staffName });
-        toast({ title: "Personal asignado", description: `${labels.staff} actualizado a ${staffName}.` });
-    } catch (e: any) {
-        toast({ variant: "destructive", title: "Error", description: e.message });
-    } finally {
-        setIsProcessing(false);
-    }
+  const handleAssignStaff = (staffName: string) => {
+    handleUpdateStatus({ atendidoPor: staffName });
   };
 
   // 6. Descargar PDF
@@ -137,63 +122,18 @@ export function InvoiceActionsMenu({ invoice, businessType }: InvoiceActionsMenu
     toast({ title: "PDF Generado", description: "La descarga ha comenzado." });
   };
 
-  // 7. Consumir / Completar
-  const handleComplete = async () => {
-     if (!user) return;
-     setIsProcessing(true);
-     try {
-         const docRef = doc(firestore, `businesses/${user.uid}/invoices`, invoice.id);
-         await updateDocumentNonBlocking(docRef, { orderStatus: 'completado' });
-         toast({ title: "Servicio completado", description: "El pedido ha sido marcado como consumido." });
-     } catch (e: any) {
-         toast({ variant: "destructive", title: "Error", description: e.message });
-     } finally {
-         setIsProcessing(false);
-     }
-  };
-
-  // 8. Cancelar / Eliminar (Anulación con reversión de stock)
-  const handleCancelAndRevert = async () => {
-    if (!user || !firestore) return;
-    setIsProcessing(true);
-    try {
-      await runTransaction(firestore, async (transaction) => {
-        const invRef = doc(firestore, `businesses/${user.uid}/invoices`, invoice.id);
-        const invSnap = await transaction.get(invRef);
-        
-        if (!invSnap.exists()) throw new Error("La factura no existe.");
-        if (invSnap.data().status === 'anulada') throw new Error("La factura ya está anulada.");
-
-        // 1. Anular Factura
-        transaction.update(invRef, { status: 'anulada', updatedAt: new Date().toISOString() });
-
-        // 2. Revertir Stock
-        for (const item of invoice.items) {
-          const productRef = doc(firestore, `businesses/${user.uid}/products`, item.productId);
-          transaction.update(productRef, { stock: increment(item.quantity) });
-
-          // Registrar movimiento de reversión
-          const movementRef = doc(collection(firestore, `businesses/${user.uid}/stock_movements`));
-          transaction.set(movementRef, {
-            productId: item.productId,
-            productName: item.name,
-            type: 'void_reversal',
-            change: item.quantity,
-            referenceId: invoice.id,
-            consecutive: invoice.consecutiveNumber,
-            createdAt: new Date().toISOString(),
-            userId: user.uid
-          });
-        }
-      });
-
-      toast({ title: "Venta anulada", description: "Se ha revertido el stock de los productos." });
-    } catch (e: any) {
-      toast({ variant: "destructive", title: "Error al anular", description: e.message });
-    } finally {
-      setIsProcessing(false);
-      setIsCancelAlertOpen(false);
-    }
+  // 8. Cancelar / Eliminar (Usando Lifecycle Service)
+  const handleCancelAndRevert = () => {
+    if (!user) return;
+    startTransition(async () => {
+      const result = await voidInvoiceAndRevertStock(user.uid, invoice.id, user.uid);
+      if (result.success) {
+        toast({ title: "Venta anulada", description: "Se ha revertido el stock y cancelado el pedido." });
+        setIsCancelAlertOpen(false);
+      } else {
+        toast({ variant: "destructive", title: "Error al anular", description: result.error });
+      }
+    });
   };
 
   return (
@@ -227,10 +167,10 @@ export function InvoiceActionsMenu({ invoice, businessType }: InvoiceActionsMenu
             </DropdownMenuSubTrigger>
             <DropdownMenuPortal>
               <DropdownMenuSubContent className="rounded-xl">
-                <DropdownMenuItem onClick={() => handleUpdateStatus('completada')} className="text-xs font-bold">
+                <DropdownMenuItem onClick={() => handleUpdateStatus({ status: 'completada' })} className="text-xs font-bold">
                   Pagado
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleUpdateStatus('anulada')} className="text-xs font-bold text-red-600">
+                <DropdownMenuItem onClick={() => setIsCancelAlertOpen(true)} className="text-xs font-bold text-red-600">
                   Anulado
                 </DropdownMenuItem>
               </DropdownMenuSubContent>
@@ -243,7 +183,6 @@ export function InvoiceActionsMenu({ invoice, businessType }: InvoiceActionsMenu
             </DropdownMenuSubTrigger>
             <DropdownMenuPortal>
               <DropdownMenuSubContent className="rounded-xl">
-                {/* Placeholders para personal - En producción vendría de la colección de staff */}
                 <DropdownMenuItem onClick={() => handleAssignStaff('Personal de Turno')} className="text-xs font-bold">Personal de Turno</DropdownMenuItem>
                 <DropdownMenuItem onClick={() => handleAssignStaff('Caja Principal')} className="text-xs font-bold">Caja Principal</DropdownMenuItem>
               </DropdownMenuSubContent>
@@ -254,7 +193,7 @@ export function InvoiceActionsMenu({ invoice, businessType }: InvoiceActionsMenu
             <FileText size={14} className="text-slate-600" /> Descargar PDF
           </DropdownMenuItem>
 
-          <DropdownMenuItem onClick={handleComplete} className="text-xs font-bold gap-2 cursor-pointer">
+          <DropdownMenuItem onClick={() => handleUpdateStatus({ orderStatus: 'completado' })} className="text-xs font-bold gap-2 cursor-pointer">
             <CheckCircle size={14} className="text-green-600" /> Consumir pedido
           </DropdownMenuItem>
 
@@ -273,7 +212,7 @@ export function InvoiceActionsMenu({ invoice, businessType }: InvoiceActionsMenu
                 <AlertDialogHeader>
                     <AlertDialogTitle>¿Anular Factura {invoice.consecutiveNumber}?</AlertDialogTitle>
                     <AlertDialogDescription>
-                        Esta acción marcará la factura como anulada y <strong>revertirá automáticamente el stock</strong> de los productos al inventario.
+                        Esta acción marcará la factura como anulada, cancelará el pedido en el Kanban y <strong>revertirá automáticamente el stock</strong> al inventario.
                     </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
@@ -281,9 +220,9 @@ export function InvoiceActionsMenu({ invoice, businessType }: InvoiceActionsMenu
                     <AlertDialogAction 
                         onClick={handleCancelAndRevert}
                         className="bg-red-600 hover:bg-red-700 rounded-xl font-bold"
-                        disabled={isProcessing}
+                        disabled={isPending}
                     >
-                        {isProcessing ? <Loader2 size={16} className="animate-spin mr-2" /> : null}
+                        {isPending ? <Loader2 size={16} className="animate-spin mr-2" /> : null}
                         Confirmar Anulación
                     </AlertDialogAction>
                 </AlertDialogFooter>
