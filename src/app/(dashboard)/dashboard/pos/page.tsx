@@ -5,17 +5,18 @@ import { useUser, useFirestore, useCollection, useDoc, useMemoFirebase } from '@
 import { collection, doc } from 'firebase/firestore';
 import type { Business } from '@/models/business';
 import type { Product } from '@/models/product';
-import type { POSItem, VerticalType, DiscountType } from '@/types/billing';
+import type { POSItem, VerticalType, DiscountType, Invoice } from '@/types/billing';
 import ProductCatalog from '@/components/billing/ProductCatalog';
 import InvoiceCart from '@/components/billing/InvoiceCart';
 import CashControl from '@/components/billing/CashControl';
+import InvoiceHistoryTable from '@/components/billing/InvoiceHistoryTable';
 import { Loader2, Calculator } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { processSale } from '@/services/billing/billing-service';
 
 /**
  * @fileOverview Página principal de la Terminal de Facturación (POS).
- * Orquestador de la Fase 3: Persistencia atómica y Kardex.
+ * Orquestador central del módulo POS.
  */
 export default function POSPage() {
   const { user } = useUser();
@@ -35,7 +36,14 @@ export default function POSPage() {
   );
   const { data: products, isLoading: loadingProducts } = useCollection<Product>(productsQuery);
 
-  // 2. Estado local del carrito y financiera
+  // 2. Suscripción al Historial de Facturas (Fase 4)
+  const invoicesQuery = useMemoFirebase(
+    () => (user?.uid ? collection(firestore, `businesses/${user.uid}/invoices`) : null),
+    [user, firestore]
+  );
+  const { data: invoices, isLoading: loadingInvoices } = useCollection<Invoice>(invoicesQuery);
+
+  // 3. Estado local del carrito y financiera
   const [cart, setCart] = useState<POSItem[]>([]);
   const [customerName, setCustomerName] = useState('Cliente General');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -50,7 +58,7 @@ export default function POSPage() {
 
   const businessType = (business?.category || 'Retail') as VerticalType;
 
-  // 3. Motor de Cálculos Reactivos
+  // 4. Motor de Cálculos Reactivos
   const financialSummary = useMemo(() => {
     const subtotal = cart.reduce((sum, item) => sum + item.subtotal, 0);
     
@@ -73,7 +81,7 @@ export default function POSPage() {
     };
   }, [cart, discountType, discountValue, taxRate, tipAmount, cashReceived]);
 
-  // 4. Handlers
+  // 5. Handlers de Carrito
   const handleAddToCart = (product: Product) => {
     if (isProcessing) return;
     setCart(prev => {
@@ -179,9 +187,9 @@ export default function POSPage() {
   }
 
   return (
-    <div className="flex flex-col gap-6 h-[calc(100vh-140px)] animate-in fade-in duration-500">
+    <div className="flex flex-col gap-8 h-full min-h-screen pb-20 animate-in fade-in duration-500">
       {/* Header POS */}
-      <header className="flex items-center justify-between bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100">
+      <header className="flex items-center justify-between bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100 shrink-0">
          <div className="flex items-center gap-4">
             <div className="p-3 bg-primary/10 rounded-2xl text-primary shadow-inner">
                 <Calculator size={32} />
@@ -199,10 +207,10 @@ export default function POSPage() {
          </div>
       </header>
 
-      {/* Main POS Layout */}
-      <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-6 overflow-hidden">
+      {/* Main POS Grid (Doble Columna) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-auto">
         {/* Lado Izquierdo: Catálogo */}
-        <div className="lg:col-span-7 xl:col-span-8 h-full overflow-hidden">
+        <div className="lg:col-span-7 xl:col-span-8 overflow-hidden">
           <ProductCatalog 
             products={products || []} 
             onAddToCart={handleAddToCart}
@@ -211,8 +219,8 @@ export default function POSPage() {
         </div>
 
         {/* Lado Derecho: Carrito y Efectivo */}
-        <div className="lg:col-span-5 xl:col-span-4 flex flex-col gap-6 h-full overflow-hidden">
-          <div className="flex-1 overflow-hidden">
+        <div className="lg:col-span-5 xl:col-span-4 flex flex-col gap-6 overflow-hidden">
+          <div className="overflow-hidden">
             <InvoiceCart 
               items={cart}
               onUpdateQuantity={handleUpdateQuantity}
@@ -248,6 +256,15 @@ export default function POSPage() {
           </div>
         </div>
       </div>
+
+      {/* SECCIÓN 3: HISTORIAL DE VENTAS (Fase 4) */}
+      <section className="mt-4">
+         <InvoiceHistoryTable 
+           invoices={invoices || []} 
+           isLoading={loadingInvoices} 
+           businessType={businessType} 
+         />
+      </section>
     </div>
   );
 }
