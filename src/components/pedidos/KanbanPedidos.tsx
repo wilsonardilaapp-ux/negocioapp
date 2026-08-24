@@ -38,7 +38,7 @@ export function KanbanPedidos({ orders, isLoading, handleUpdateStatus, onViewDet
   const columns = useMemo(() => {
     return {
       mesa: {
-        title: "EN RESTAURANTE (MESA)",
+        title: "EN EL LOCAL",
         icon: <Store className="h-4 w-4 text-blue-600" />,
         items: orders.filter(o => o.tipoEntrega === 'recoger_en_tienda' || (o.origin && o.origin.startsWith('mesa')))
       },
