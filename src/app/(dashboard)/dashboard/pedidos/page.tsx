@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useMemo, useState, useEffect } from 'react';
@@ -19,7 +18,6 @@ import {
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Progress } from '@/components/ui/progress';
 import { 
   Printer, 
   FileDown, 
@@ -39,7 +37,6 @@ import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import { useToast } from '@/hooks/use-toast';
-import { format } from 'date-fns';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { useSubscription } from '@/hooks/useSubscription';
 import { LimitBanner } from '@/components/dashboard/LimitBanner';
@@ -67,14 +64,10 @@ export default function PedidosPage() {
   const [dateFrom, setDateFrom] = useState<string>('');
   const [dateTo, setDateTo] = useState<string>('');
   const [isDeleting, setIsDeleting] = useState(false);
-  const [deleteProgress, setDeleteProgress] = useState(0);
-  const [totalToDelete, setTotalToDelete] = useState(0);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   
-  // --- ESTADO PARA MODO DE VISTA ---
   const [viewMode, setViewMode] = useState<'table' | 'kanban'>('table');
 
-  // --- LÓGICA DE PAGINACIÓN VISUAL ---
   const [currentPage, setCurrentPage] = useState(1);
   const PAGE_SIZE = 20;
 
@@ -117,7 +110,6 @@ export default function PedidosPage() {
     return result;
   }, [orders, searchTerm, dateFrom, dateTo]);
 
-  // Reiniciar a la primera página si cambian los filtros
   useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm, dateFrom, dateTo]);
@@ -173,8 +165,6 @@ export default function PedidosPage() {
     if (!firestore || !user) return;
     
     setIsDeleting(true);
-    setDeleteProgress(0);
-    setTotalToDelete(selectedOrders.length);
     let deletedCount = 0;
 
     try {
@@ -188,10 +178,6 @@ export default function PedidosPage() {
         });
         await batch.commit();
         deletedCount += chunks[i].length;
-        setDeleteProgress(Math.round((deletedCount / selectedOrders.length) * 100));
-        if (i < chunks.length - 1) {
-          await new Promise(resolve => setTimeout(resolve, 100));
-        }
       }
 
       clearSelection();
@@ -199,11 +185,9 @@ export default function PedidosPage() {
 
     } catch (error) {
       console.error('Error en eliminación masiva:', error);
-      toast({ variant: 'destructive', description: `❌ Error parcial: eliminados ${deletedCount} de ${totalToDelete}` });
+      toast({ variant: 'destructive', description: `❌ Error parcial al eliminar pedidos` });
     } finally {
       setIsDeleting(false);
-      setDeleteProgress(0);
-      setTotalToDelete(0);
     }
   };
 
@@ -327,7 +311,6 @@ export default function PedidosPage() {
             </CardDescription>
           </div>
           
-          {/* TOGGLE DE VISTA */}
           <div className="flex bg-muted p-1 rounded-xl border shadow-inner">
             <Button 
                 variant={viewMode === 'table' ? 'default' : 'ghost'} 
@@ -435,7 +418,6 @@ export default function PedidosPage() {
               </div>
           </div>
 
-          {/* RENDERIZADO CONDICIONAL DE VISTAS */}
           {viewMode === 'table' ? (
             <>
                 <DataTable
@@ -472,7 +454,7 @@ export default function PedidosPage() {
                             variant="outline" 
                             size="sm" 
                             onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                            disabled={currentPage >= totalPages || isDeleting || areOrdersLoading}
+                            disabled={currentPage >= totalPages}
                             className="font-bold"
                         >
                             Siguiente <ChevronRight className="ml-2 h-4 w-4" />
@@ -486,10 +468,6 @@ export default function PedidosPage() {
               isLoading={isLoading} 
               handleUpdateStatus={handleUpdateStatus}
               onViewDetails={(order) => {
-                  // Reutilización táctica: el modal ya está integrado en columns.tsx
-                  // Para la Fase 2, el botón "Ver Detalles" del Kanban disparará 
-                  // la misma lógica que la tabla si logramos referenciar el componente.
-                  // Simplificaremos para la Fase 2 usando un toast informativo hasta extraer el modal.
                   toast({ title: `Detalle del Pedido #${order.id.slice(-7).toUpperCase()}`, description: `Cliente: ${order.customerName}` });
               }}
             />
@@ -505,4 +483,3 @@ export default function PedidosPage() {
     </div>
   );
 }
-

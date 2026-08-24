@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useMemo, useEffect, useState } from 'react';
@@ -12,13 +11,12 @@ import {
   Clock, 
   MapPin, 
   Store,
-  ArrowRight,
   Loader2
 } from 'lucide-react';
 import type { Order, OrderStatus } from '@/models/order';
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { cn, normalizePhoneNumber } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 import { OrderCardMenu } from './OrderCardMenu';
 
 interface KanbanPedidosProps {

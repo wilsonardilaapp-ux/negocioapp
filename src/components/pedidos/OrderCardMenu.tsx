@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState } from 'react';
@@ -36,9 +35,8 @@ import {
   Printer, 
   FileDown, 
   Trash2,
-  CheckCircle2,
-  Clock,
-  Ban
+  Ban,
+  Info
 } from "lucide-react";
 import { WhatsAppIcon } from "@/components/icons";
 import type { Order, OrderStatus } from "@/models/order";
@@ -46,6 +44,12 @@ import { cn, normalizePhoneNumber } from "@/lib/utils";
 import Link from 'next/link';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface OrderCardMenuProps {
   order: Order;
@@ -124,6 +128,25 @@ export function OrderCardMenu({ order, handleUpdateStatus, onViewDetails }: Orde
     window.open(`https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`, '_blank');
   };
 
+  const DisabledOption = ({ children, label }: { children: React.ReactNode, label: string }) => (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <div className="w-full opacity-50 cursor-not-allowed">
+            <DropdownMenuItem disabled className="flex items-center gap-2">
+              {children}
+              <span>{label}</span>
+              <Badge variant="outline" className="ml-auto text-[8px] h-4">Próximamente</Badge>
+            </DropdownMenuItem>
+          </div>
+        </TooltipTrigger>
+        <TooltipContent side="left">
+          <p>Módulo no disponible en esta versión</p>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+
   return (
     <>
       <DropdownMenu>
@@ -139,9 +162,9 @@ export function OrderCardMenu({ order, handleUpdateStatus, onViewDetails }: Orde
             <Eye className="mr-2 h-4 w-4" /> Ver detalles
           </DropdownMenuItem>
 
-          <DropdownMenuItem disabled className="opacity-50 cursor-not-allowed">
-            <Edit2 className="mr-2 h-4 w-4" /> Editar pedido <Badge variant="outline" className="ml-auto text-[8px] h-4">Beta</Badge>
-          </DropdownMenuItem>
+          <DisabledOption label="Editar pedido">
+            <Edit2 className="h-4 w-4" />
+          </DisabledOption>
 
           <DropdownMenuSeparator />
 
@@ -164,17 +187,17 @@ export function OrderCardMenu({ order, handleUpdateStatus, onViewDetails }: Orde
             </DropdownMenuPortal>
           </DropdownMenuSub>
 
-          <DropdownMenuItem disabled className="opacity-50 cursor-not-allowed">
-            <CreditCard className="mr-2 h-4 w-4" /> Estado de pago
-          </DropdownMenuItem>
+          <DisabledOption label="Estado de pago">
+            <CreditCard className="h-4 w-4" />
+          </DisabledOption>
 
-          <DropdownMenuItem disabled className="opacity-50 cursor-not-allowed">
-            <UserPlus className="mr-2 h-4 w-4" /> Asignar mesero
-          </DropdownMenuItem>
+          <DisabledOption label="Asignar mesero">
+            <UserPlus className="h-4 w-4" />
+          </DisabledOption>
 
-          <DropdownMenuItem disabled className="opacity-50 cursor-not-allowed">
-            <Truck className="mr-2 h-4 w-4" /> Asignar mensajero
-          </DropdownMenuItem>
+          <DisabledOption label="Asignar mensajero">
+            <Truck className="h-4 w-4" />
+          </DisabledOption>
 
           <DropdownMenuSeparator />
 
