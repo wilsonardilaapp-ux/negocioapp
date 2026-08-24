@@ -5,20 +5,21 @@ import { useUser, useFirestore, useCollection, useDoc, useMemoFirebase } from '@
 import { collection, doc } from 'firebase/firestore';
 import type { Business } from '@/models/business';
 import type { Product } from '@/models/product';
-import type { POSItem, VerticalType } from '@/types/billing';
+import type { POSItem, VerticalType, DiscountType } from '@/types/billing';
 import ProductCatalog from '@/components/billing/ProductCatalog';
 import InvoiceCart from '@/components/billing/InvoiceCart';
 import CashControl from '@/components/billing/CashControl';
 import { Loader2, Calculator } from 'lucide-react';
-import { Card, CardContent } from '@/components/ui/card';
+import { useToast } from '@/hooks/use-toast';
 
 /**
  * @fileOverview Página principal de la Terminal de Facturación (POS).
- * Orquestador de la Fase 1: Catálogo + Carrito + Control de Efectivo.
+ * Orquestador de la Fase 2: Motor de cálculos reactivos.
  */
 export default function POSPage() {
   const { user } = useUser();
   const firestore = useFirestore();
+  const { toast } = useToast();
 
   // 1. Obtener contexto del negocio y productos
   const businessRef = useMemoFirebase(
@@ -33,15 +34,42 @@ export default function POSPage() {
   );
   const { data: products, isLoading: loadingProducts } = useCollection<Product>(productsQuery);
 
-  // 2. Estado local del carrito y transacción
+  // 2. Estado local del carrito y financiera
   const [cart, setCart] = useState<POSItem[]>([]);
-  const [cashReceived, setCashReceived] = useState(0);
   const [customerName, setCustomerName] = useState('Cliente General');
+  
+  // Variables Financieras
+  const [discountType, setDiscountType] = useState<DiscountType>('amount');
+  const [discountValue, setDiscountValue] = useState(0);
+  const [taxRate, setTaxRate] = useState(19); // Default IVA
+  const [tipAmount, setTipAmount] = useState(0);
+  const [paymentMethod, setPaymentMethod] = useState<string>('efectivo');
+  const [cashReceived, setCashReceived] = useState(0);
 
   const businessType = (business?.category || 'Retail') as VerticalType;
 
-  // 3. Cálculos
-  const total = useMemo(() => cart.reduce((sum, item) => sum + item.subtotal, 0), [cart]);
+  // 3. Motor de Cálculos Reactivos
+  const financialSummary = useMemo(() => {
+    const subtotal = cart.reduce((sum, item) => sum + item.subtotal, 0);
+    
+    // Cálculo de descuento
+    const calculatedDiscount = discountType === 'percent' 
+      ? (subtotal * discountValue / 100) 
+      : discountValue;
+
+    const baseTaxable = Math.max(0, subtotal - calculatedDiscount);
+    const calculatedTax = baseTaxable * (taxRate / 100);
+    const totalFinal = baseTaxable + calculatedTax + tipAmount;
+    const change = Math.max(0, cashReceived - totalFinal);
+
+    return {
+      subtotal,
+      discount: calculatedDiscount,
+      tax: calculatedTax,
+      total: totalFinal,
+      change
+    };
+  }, [cart, discountType, discountValue, taxRate, tipAmount, cashReceived]);
 
   // 4. Handlers
   const handleAddToCart = (product: Product) => {
@@ -80,6 +108,22 @@ export default function POSPage() {
     setCart(prev => prev.filter(item => item.productId !== productId));
   };
 
+  const handleProcessSale = async () => {
+    if (paymentMethod === 'efectivo' && cashReceived < financialSummary.total) {
+      toast({
+        variant: "destructive",
+        title: "Efectivo insuficiente",
+        description: "El monto recibido es menor al total de la venta.",
+      });
+      return;
+    }
+
+    toast({
+        title: "🚀 Venta lista para procesar",
+        description: "En la Fase 3 habilitaremos la persistencia y el Kardex.",
+    });
+  };
+
   if (loadingBusiness && !business) {
     return (
       <div className="flex flex-col items-center justify-center h-[80vh] gap-4">
@@ -113,7 +157,7 @@ export default function POSPage() {
       {/* Main POS Layout */}
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-6 overflow-hidden">
         {/* Lado Izquierdo: Catálogo */}
-        <div className="lg:col-span-8 h-full overflow-hidden">
+        <div className="lg:col-span-7 xl:col-span-8 h-full overflow-hidden">
           <ProductCatalog 
             products={products || []} 
             onAddToCart={handleAddToCart}
@@ -122,7 +166,7 @@ export default function POSPage() {
         </div>
 
         {/* Lado Derecho: Carrito y Efectivo */}
-        <div className="lg:col-span-4 flex flex-col gap-6 h-full overflow-hidden">
+        <div className="lg:col-span-5 xl:col-span-4 flex flex-col gap-6 h-full overflow-hidden">
           <div className="flex-1 overflow-hidden">
             <InvoiceCart 
               items={cart}
@@ -131,13 +175,27 @@ export default function POSPage() {
               businessType={businessType}
               customerName={customerName}
               setCustomerName={setCustomerName}
-              total={total}
+              
+              // Financial Props
+              discountType={discountType}
+              setDiscountType={setDiscountType}
+              discountValue={discountValue}
+              setDiscountValue={setDiscountValue}
+              taxRate={taxRate}
+              setTaxRate={setTaxRate}
+              tipAmount={tipAmount}
+              setTipAmount={setTipAmount}
+              paymentMethod={paymentMethod}
+              setPaymentMethod={setPaymentMethod}
+              
+              summary={financialSummary}
+              onProcessSale={handleProcessSale}
             />
           </div>
           
           <div className="shrink-0">
              <CashControl 
-               total={total} 
+               total={financialSummary.total} 
                cashReceived={cashReceived}
                onCashChange={setCashReceived}
              />

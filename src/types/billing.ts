@@ -4,6 +4,7 @@
  */
 
 export type VerticalType = 'Restaurante' | 'Belleza' | 'Retail' | 'Servicios';
+export type DiscountType = 'amount' | 'percent';
 
 export interface POSItem {
   productId: string;
