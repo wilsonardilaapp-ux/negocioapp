@@ -18,7 +18,7 @@ import {
 import type { Order, OrderStatus } from '@/models/order';
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { cn } from '@/lib/utils';
+import { cn, normalizePhoneNumber } from '@/lib/utils';
 import { OrderCardMenu } from './OrderCardMenu';
 
 interface KanbanPedidosProps {
@@ -37,7 +37,6 @@ const formatCurrency = (value: number) => {
 };
 
 export function KanbanPedidos({ orders, isLoading, handleUpdateStatus, onViewDetails }: KanbanPedidosProps) {
-  // --- AGRUPACIÓN DE COLUMNAS ---
   const columns = useMemo(() => {
     return {
       mesa: {
@@ -153,7 +152,12 @@ function OrderCard({ order, handleUpdateStatus, onViewDetails }: {
         </div>
       </CardContent>
       <CardFooter className="p-2 pt-0 flex gap-1">
-        <Button variant="ghost" size="sm" className="flex-1 h-8 text-[9px] font-bold uppercase gap-1.5 hover:bg-primary/5 hover:text-primary">
+        <Button 
+            variant="ghost" 
+            size="sm" 
+            className="flex-1 h-8 text-[9px] font-bold uppercase gap-1.5 hover:bg-primary/5 hover:text-primary"
+            onClick={() => window.open(`/dashboard/pedidos/print/${order.id}`, '_blank')}
+        >
             <Printer className="h-3 w-3" /> Comanda
         </Button>
         <Button 

@@ -42,13 +42,24 @@ import {
 } from "lucide-react";
 import { WhatsAppIcon } from "@/components/icons";
 import type { Order, OrderStatus } from "@/models/order";
-import { cn } from "@/lib/utils";
+import { cn, normalizePhoneNumber } from "@/lib/utils";
+import Link from 'next/link';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
 
 interface OrderCardMenuProps {
   order: Order;
   handleUpdateStatus: (id: string, status: OrderStatus) => Promise<void>;
   onViewDetails: (order: Order) => void;
 }
+
+const formatCurrency = (value: number) => {
+  return new Intl.NumberFormat('es-CO', {
+    style: 'currency',
+    currency: 'COP',
+    minimumFractionDigits: 0,
+  }).format(value);
+};
 
 export function OrderCardMenu({ order, handleUpdateStatus, onViewDetails }: OrderCardMenuProps) {
   const [isCancelAlertOpen, setIsCancelAlertOpen] = useState(false);
@@ -63,6 +74,56 @@ export function OrderCardMenu({ order, handleUpdateStatus, onViewDetails }: Orde
     setIsCancelAlertOpen(false);
   };
 
+  const handleDownloadSinglePDF = () => {
+    const doc = new jsPDF();
+    const orderId = order.id.slice(-7).toUpperCase();
+    
+    doc.setFontSize(18);
+    doc.text(`Comprobante de Pedido #${orderId}`, 14, 20);
+    
+    doc.setFontSize(10);
+    doc.text(`Cliente: ${order.customerName}`, 14, 30);
+    doc.text(`Email: ${order.customerEmail}`, 14, 35);
+    doc.text(`WhatsApp: ${order.customerPhone}`, 14, 40);
+    doc.text(`Fecha: ${new Date(order.orderDate).toLocaleString()}`, 14, 45);
+    doc.text(`Dirección: ${order.customerAddress}`, 14, 50);
+
+    const isNewFormat = order.items && Array.isArray(order.items);
+    const tableData = isNewFormat 
+      ? order.items.map(item => [item.productName, item.quantity, formatCurrency(item.unitPrice), formatCurrency(item.subtotal)])
+      : [[(order as any).productName || 'Producto', (order as any).quantity || 1, formatCurrency((order as any).unitPrice || 0), formatCurrency(order.subtotal)]];
+
+    (doc as any).autoTable({
+      startY: 60,
+      head: [['Producto', 'Cant.', 'Precio Unit.', 'Subtotal']],
+      body: tableData,
+    });
+
+    const finalY = (doc as any).lastAutoTable.finalY || 70;
+    doc.setFontSize(12);
+    doc.text(`TOTAL: ${formatCurrency(order.total || order.subtotal)}`, 140, finalY + 15);
+
+    doc.save(`Pedido_${orderId}.pdf`);
+  };
+
+  const handleWhatsAppShare = () => {
+    const orderId = order.id.slice(-7).toUpperCase();
+    const isNewFormat = order.items && Array.isArray(order.items);
+    const itemLines = isNewFormat 
+      ? order.items.map(i => `- ${i.quantity} x ${i.productName}`).join('\n')
+      : `- ${(order as any).quantity} x ${(order as any).productName}`;
+
+    const message = `Hola *${order.customerName}*! 👋\n\n` +
+      `Tu pedido *#${orderId}* en nuestro negocio ha sido registrado.\n\n` +
+      `📦 *Resumen:*\n${itemLines}\n\n` +
+      `💰 *Total:* ${formatCurrency(order.total || order.subtotal)}\n` +
+      `📍 *Entrega:* ${order.customerAddress}\n\n` +
+      `Te avisaremos cuando esté en camino. ¡Gracias por tu compra! 🚀`;
+
+    const cleanPhone = normalizePhoneNumber(order.customerPhone);
+    window.open(`https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`, '_blank');
+  };
+
   return (
     <>
       <DropdownMenu>
@@ -74,7 +135,7 @@ export function OrderCardMenu({ order, handleUpdateStatus, onViewDetails }: Orde
         <DropdownMenuContent align="end" className="w-56">
           <DropdownMenuLabel className="text-[10px] uppercase font-black text-muted-foreground tracking-widest">Acciones del Pedido</DropdownMenuLabel>
           
-          <DropdownMenuItem onClick={() => onViewDetails(order)} className="cursor-pointer">
+          <DropdownMenuItem onClick={() => onViewDetails(order)} className="cursor-pointer font-bold">
             <Eye className="mr-2 h-4 w-4" /> Ver detalles
           </DropdownMenuItem>
 
@@ -117,15 +178,17 @@ export function OrderCardMenu({ order, handleUpdateStatus, onViewDetails }: Orde
 
           <DropdownMenuSeparator />
 
-          <DropdownMenuItem disabled className="opacity-50 cursor-not-allowed">
-            <Printer className="mr-2 h-4 w-4" /> Imprimir
+          <DropdownMenuItem asChild>
+            <Link href={`/dashboard/pedidos/print/${order.id}`} target="_blank" rel="noopener noreferrer">
+              <Printer className="mr-2 h-4 w-4" /> Imprimir Ticket
+            </Link>
           </DropdownMenuItem>
 
-          <DropdownMenuItem disabled className="opacity-50 cursor-not-allowed">
+          <DropdownMenuItem onClick={handleDownloadSinglePDF} className="cursor-pointer">
             <FileDown className="mr-2 h-4 w-4" /> Descargar PDF
           </DropdownMenuItem>
 
-          <DropdownMenuItem disabled className="opacity-50 cursor-not-allowed">
+          <DropdownMenuItem onClick={handleWhatsAppShare} className="cursor-pointer">
             <WhatsAppIcon className="mr-2 h-4 w-4" /> Enviar por WhatsApp
           </DropdownMenuItem>
 
@@ -146,7 +209,7 @@ export function OrderCardMenu({ order, handleUpdateStatus, onViewDetails }: Orde
             <AlertDialogTitle>¿Confirmar cancelación?</AlertDialogTitle>
             <AlertDialogDescription>
               Esta acción marcará el pedido #{order.id.slice(-7).toUpperCase()} como cancelado. 
-              Los productos volverán al stock si aplica. Esta acción no se puede deshacer.
+              Esta acción no se puede deshacer.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
