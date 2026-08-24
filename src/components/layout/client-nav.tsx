@@ -50,49 +50,50 @@ const allNavItems = [
   { href: "/dashboard/landing-page", icon: FileText, label: "Landing Page" },
   { href: "/dashboard/share-landing", icon: Share2, label: "Compartir Landing Page" },
   
-  // 4-5: CATÁLOGO Y PRODUCTOS
+  // 4-6: TERMINAL Y CATÁLOGO
+  { href: "/dashboard/pos", icon: Calculator, label: "Terminal POS", moduleId: 'catalogo' },
   { href: "/dashboard/catalogo", icon: ShoppingCart, label: "Catálogo", moduleId: 'catalogo' },
   { href: "/dashboard/catalogo/estadisticas", icon: BarChart2, label: "Estadísticas de Productos", moduleId: 'catalogo' },
   
-  // 6-10: MEDICIÓN Y ANALÍTICA
+  // 7-11: MEDICIÓN Y ANALÍTICA
   { href: "/dashboard/medicion/numero-pedidos", icon: FileText, label: "N° Pedidos" },
   { href: "/dashboard/medicion/ticket-promedio", icon: DollarSign, label: "Ticket Promedio" },
   { href: "/dashboard/medicion/clientes-nuevos", icon: UserPlus, label: "Clientes Nuevos" },
   { href: "/dashboard/medicion/clientes-recurrentes", icon: Users, label: "Retención Clientes" },
   { href: "/dashboard/medicion/pedidos-por-canal", icon: TrendingUp, label: "Canales de Venta" },
   
-  // 11-14: FIDELIZACIÓN Y BLOG
+  // 12-15: FIDELIZACIÓN Y BLOG
   { href: "/dashboard/loyalty", icon: Sparkles, label: "Fidelización", moduleId: 'loyalty' },
   { href: "/dashboard/share", icon: Share2, label: "Compartir Menú" },
   { href: "/dashboard/blog", icon: BookOpen, label: "Blog", moduleId: 'blog' },
   { href: "/dashboard/valoraciones-directorio", icon: Star, label: "Valoraciones del Directorio" },
   { href: "/dashboard/reservas", icon: CalendarCheck, label: "Reservas y Citas", moduleId: "reservas-agendamiento" },
   
-  // 15-18: COMUNICACIÓN
+  // 16-19: COMUNICACIÓN
   { href: "/dashboard/chatbot", icon: MessageSquare, label: "Asistente WHAPI", moduleId: 'whapi-whatsapp' },
   { href: "/dashboard/configuracion/ycloud", icon: Smartphone, label: "Asistente YCloud", moduleId: 'ycloud-whatsapp' },
   { href: "/dashboard/messages", icon: Bell, label: "Notificaciones" },
   { href: "/dashboard/mensajes-clientes", icon: Mail, label: "Mensajes de Clientes" },
   
-  // 19-22: PARTNERS Y SOPORTE
+  // 20-23: PARTNERS Y SOPORTE
   { href: "/dashboard/referidos", icon: Users, label: "Programa de Socios" },
   { href: "/dashboard/promotions", icon: Megaphone, label: "Promociones", moduleId: 'promotions' },
   { href: "/dashboard/cupones", icon: Ticket, label: "Cupones", moduleId: 'promotions' },
   { href: "/dashboard/contacto", icon: LifeBuoy, label: "Soporte" },
   
-  // 23-25: OPERACIÓN VENTAS
+  // 24-26: OPERACIÓN VENTAS
   { href: "/dashboard/pedidos", icon: Package, label: "Pedidos", moduleId: 'catalogo' },
   { href: "/dashboard/empaque", icon: Box, label: "Empaque", moduleId: 'catalogo' },
   { href: "/dashboard/pagos", icon: CreditCard, label: "Pagos", moduleId: 'catalogo' },
   
-  // 26-30: GESTIÓN Y CONFIGURACIÓN
+  // 27-31: GESTIÓN Y CONFIGURACIÓN
   { href: "/dashboard/contabilidad", icon: Calculator, label: "Contabilidad", moduleId: 'contabilidad' },
   { href: "/dashboard/kardex", icon: Layers, label: "Inventario Kardex", moduleId: 'inventario-kardex' },
   { href: "/dashboard/configuracion/factura", icon: Receipt, label: "Editor Factura" },
   { href: "/dashboard/configuracion/impresoras", icon: Printer, label: "Impresoras" },
   { href: "/dashboard/configuracion/chatbot-menu", icon: Bot, label: "Chatbot Menú", moduleId: 'chatbot-menu-publico' },
   
-  // 31-34: SISTEMA Y PERFIL
+  // 32-35: SISTEMA Y PERFIL
   { href: "/dashboard/backups", icon: Database, label: "Backups" },
   { href: "/dashboard/subscription", icon: ShieldCheck, label: "Suscripción" },
   { href: "/dashboard/suggestions", icon: Lightbulb, label: "Sugerencias", moduleId: 'motor-de-sugerencias-inteligentes' },

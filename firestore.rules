@@ -66,7 +66,6 @@ service cloud.firestore {
 
     match /cupones/{couponId} {
       allow read, list: if true;
-      // Corregido: Separar create/update de delete para evitar error de resource null
       allow create, update: if isSuperAdmin() || isOwner(request.resource.data.businessId);
       allow delete: if isSuperAdmin() || isOwner(request.resource.data.businessId);
     }
@@ -151,6 +150,10 @@ service cloud.firestore {
       match /orders/{orderId} {
         allow create: if true;
         allow read, update, delete: if isSuperAdmin() || isBusinessMember(businessId);
+      }
+
+      match /invoices/{invoiceId} {
+        allow read, write: if isSuperAdmin() || isBusinessMember(businessId);
       }
 
       match /notifications/{notificationId} {
