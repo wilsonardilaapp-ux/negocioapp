@@ -5,6 +5,7 @@ import type { Product } from '@/models/product';
 /**
  * @fileOverview Servicio de persistencia para la Terminal POS.
  * Ejecuta transacciones atómicas para garantizar la integridad del stock y consecutivos.
+ * Reestructurado para cumplir la regla "Read before Write" de Firestore.
  */
 
 export async function processSale(
@@ -15,46 +16,68 @@ export async function processSale(
   businessType: VerticalType
 ) {
   return await runTransaction(db, async (transaction) => {
-    // 1. Lectura de stock y validación de integridad
-    for (const item of invoiceData.items) {
-      const productRef = doc(db, `businesses/${businessId}/products`, item.productId);
-      const productSnap = await transaction.get(productRef);
-      
-      if (!productSnap.exists()) {
+    // --- FASE 1: TODAS LAS LECTURAS Y VALIDACIONES PRIMERO ---
+    
+    // 1. Preparar referencias y recolectar promesas de lectura para productos
+    const itemRefs = invoiceData.items.map(item => ({
+      item,
+      ref: doc(db, `businesses/${businessId}/products`, item.productId)
+    }));
+
+    // 2. Leer todos los productos en paralelo antes de cualquier escritura
+    const productSnaps = await Promise.all(itemRefs.map(itemRef => transaction.get(itemRef.ref)));
+
+    // 3. Leer el contador de facturas (también debe ser lectura previa)
+    const counterRef = doc(db, `businesses/${businessId}/counters`, 'invoices');
+    const counterSnap = await transaction.get(counterRef);
+
+    // --- FASE 2: VALIDACIONES Y CÁLCULOS EN MEMORIA ---
+
+    // Validar integridad y stock disponible para cada producto
+    productSnaps.forEach((snap, index) => {
+      const item = invoiceData.items[index];
+      if (!snap.exists()) {
         throw new Error(`El producto "${item.name}" ya no existe en el catálogo.`);
       }
 
-      const productData = productSnap.data() as Product;
+      const productData = snap.data() as Product;
       
-      // Validar stock si el producto tiene stock controlado (no es null/undefined)
+      // Validar stock si el producto tiene stock controlado
       if (productData.stock !== null && productData.stock !== undefined) {
         if (productData.stock < item.quantity) {
           throw new Error(`Stock insuficiente para "${item.name}". Disponible: ${productData.stock}`);
         }
-        
-        // Descuento automático de cantidades en el maestro de productos
-        transaction.update(productRef, {
-          stock: increment(-item.quantity)
-        });
       }
-    }
+    });
 
-    // 2. Generación de Consecutivo Atómico
-    const counterRef = doc(db, `businesses/${businessId}/counters`, 'invoices');
-    const counterSnap = await transaction.get(counterRef);
+    // Calcular el siguiente consecutivo
     let nextNumber = 1;
-    
     if (counterSnap.exists()) {
       nextNumber = (counterSnap.data().current || 0) + 1;
     }
-    
-    transaction.set(counterRef, { current: nextNumber }, { merge: true });
 
     const consecutiveStr = `POS-${String(nextNumber).padStart(4, '0')}`;
     const invoiceId = doc(collection(db, 'placeholder')).id;
     const now = new Date().toISOString();
 
-    // 3. Registro de Factura
+    // --- FASE 3: TODAS LAS ESCRITURAS AL FINAL ---
+
+    // 1. Aplicar descuentos de stock en el maestro de productos
+    itemRefs.forEach((itemRef, index) => {
+      const snap = productSnaps[index];
+      const productData = snap.data() as Product;
+      
+      if (productData.stock !== null && productData.stock !== undefined) {
+        transaction.update(itemRef.ref, {
+          stock: increment(-itemRef.item.quantity)
+        });
+      }
+    });
+
+    // 2. Actualizar Consecutivo Atómico
+    transaction.set(counterRef, { current: nextNumber }, { merge: true });
+
+    // 3. Registrar Factura Oficial
     const invoiceRef = doc(db, `businesses/${businessId}/invoices`, invoiceId);
     const finalInvoice: Invoice = {
       ...invoiceData,
@@ -102,7 +125,7 @@ export async function processSale(
             orderDate: now,
             orderStatus: 'Pendiente',
             paymentMethod: invoiceData.paymentMethod,
-            paymentStatus: 'paid', // En POS la venta se asume cobrada para ir a cocina
+            paymentStatus: 'paid', // En POS la venta se asume cobrada
             origin: `pos-${invoiceData.mesa || 'barra'}`,
             tipoEntrega: invoiceData.tipoConsumo === 'domicilio' ? 'domicilio' : 'recoger_en_tienda'
         });
