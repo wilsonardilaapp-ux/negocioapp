@@ -23,7 +23,18 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { 
   MoreHorizontal, 
   Eye, 
@@ -36,7 +47,10 @@ import {
   FileDown, 
   Trash2,
   Ban,
-  Info
+  Info,
+  CheckCircle,
+  Clock,
+  Loader2
 } from "lucide-react";
 import { WhatsAppIcon } from "@/components/icons";
 import type { Order, OrderStatus } from "@/models/order";
@@ -50,6 +64,9 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { useFirestore, useUser, updateDocumentNonBlocking } from '@/firebase';
+import { doc } from 'firebase/firestore';
+import { useToast } from '@/hooks/use-toast';
 
 interface OrderCardMenuProps {
   order: Order;
@@ -66,8 +83,34 @@ const formatCurrency = (value: number) => {
 };
 
 export function OrderCardMenu({ order, handleUpdateStatus, onViewDetails }: OrderCardMenuProps) {
+  const firestore = useFirestore();
+  const { user } = useUser();
+  const { toast } = useToast();
   const [isCancelAlertOpen, setIsCancelAlertOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
+  
+  // Local form state for quick edit
+  const [editForm, setEditForm] = useState({
+    customerAddress: order.customerAddress || '',
+    notes: order.notes || ''
+  });
+
   const statuses: OrderStatus[] = ["Pendiente", "En proceso", "Enviado", "Entregado"];
+
+  const handleUpdateField = async (field: string, value: any) => {
+    if (!firestore || !user?.uid) return;
+    setIsUpdating(true);
+    try {
+        const docRef = doc(firestore, `businesses/${user.uid}/orders`, order.id);
+        await updateDocumentNonBlocking(docRef, { [field]: value, updatedAt: new Date().toISOString() });
+        toast({ title: "Pedido actualizado" });
+    } catch (e) {
+        toast({ variant: 'destructive', title: "Error al actualizar" });
+    } finally {
+        setIsUpdating(false);
+    }
+  };
 
   const handleStatusChange = async (status: OrderStatus) => {
     await handleUpdateStatus(order.id, status);
@@ -76,6 +119,25 @@ export function OrderCardMenu({ order, handleUpdateStatus, onViewDetails }: Orde
   const handleCancelOrder = async () => {
     await handleUpdateStatus(order.id, "Cancelado");
     setIsCancelAlertOpen(false);
+  };
+
+  const handleQuickEditSave = async () => {
+    if (!firestore || !user?.uid) return;
+    setIsUpdating(true);
+    try {
+        const docRef = doc(firestore, `businesses/${user.uid}/orders`, order.id);
+        await updateDocumentNonBlocking(docRef, { 
+            customerAddress: editForm.customerAddress,
+            notes: editForm.notes,
+            updatedAt: new Date().toISOString()
+        });
+        toast({ title: "Cambios guardados" });
+        setIsEditDialogOpen(false);
+    } catch (e) {
+        toast({ variant: 'destructive', title: "Error al guardar cambios" });
+    } finally {
+        setIsUpdating(false);
+    }
   };
 
   const handleDownloadSinglePDF = () => {
@@ -162,9 +224,9 @@ export function OrderCardMenu({ order, handleUpdateStatus, onViewDetails }: Orde
             <Eye className="mr-2 h-4 w-4" /> Ver detalles
           </DropdownMenuItem>
 
-          <DisabledOption label="Editar pedido">
-            <Edit2 className="h-4 w-4" />
-          </DisabledOption>
+          <DropdownMenuItem onClick={() => setIsEditDialogOpen(true)} className="cursor-pointer font-bold">
+            <Edit2 className="mr-2 h-4 w-4" /> Editar pedido
+          </DropdownMenuItem>
 
           <DropdownMenuSeparator />
 
@@ -187,9 +249,29 @@ export function OrderCardMenu({ order, handleUpdateStatus, onViewDetails }: Orde
             </DropdownMenuPortal>
           </DropdownMenuSub>
 
-          <DisabledOption label="Estado de pago">
-            <CreditCard className="h-4 w-4" />
-          </DisabledOption>
+          <DropdownMenuSub>
+            <DropdownMenuSubTrigger className="cursor-pointer">
+              <CreditCard className="mr-2 h-4 w-4" /> Estado de pago
+            </DropdownMenuSubTrigger>
+            <DropdownMenuPortal>
+              <DropdownMenuSubContent>
+                <DropdownMenuItem 
+                  onClick={() => handleUpdateField('paymentStatus', 'paid')}
+                  className={cn(order.paymentStatus === 'paid' && "bg-muted font-bold")}
+                  disabled={isUpdating}
+                >
+                  <CheckCircle className="mr-2 h-4 w-4 text-green-600" /> Pagado
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  onClick={() => handleUpdateField('paymentStatus', 'pending')}
+                  className={cn((!order.paymentStatus || order.paymentStatus === 'pending') && "bg-muted font-bold")}
+                  disabled={isUpdating}
+                >
+                  <Clock className="mr-2 h-4 w-4 text-amber-600" /> Pendiente de pago
+                </DropdownMenuItem>
+              </DropdownMenuSubContent>
+            </DropdownMenuPortal>
+          </DropdownMenuSub>
 
           <DisabledOption label="Asignar mesero">
             <UserPlus className="h-4 w-4" />
@@ -226,10 +308,48 @@ export function OrderCardMenu({ order, handleUpdateStatus, onViewDetails }: Orde
         </DropdownMenuContent>
       </DropdownMenu>
 
+      {/* QUICK EDIT DIALOG */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+                <DialogTitle>Editar Pedido #{order.id.slice(-7).toUpperCase()}</DialogTitle>
+                <DialogDescription>Modifica la información logística del pedido.</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                    <Label htmlFor="edit-address">Dirección de Entrega</Label>
+                    <Input 
+                        id="edit-address" 
+                        value={editForm.customerAddress} 
+                        onChange={(e) => setEditForm(prev => ({...prev, customerAddress: e.target.value}))}
+                        placeholder="Ej. Calle 123 #45-67..."
+                    />
+                </div>
+                <div className="space-y-2">
+                    <Label htmlFor="edit-notes">Notas / Instrucciones</Label>
+                    <Textarea 
+                        id="edit-notes" 
+                        value={editForm.notes} 
+                        onChange={(e) => setEditForm(prev => ({...prev, notes: e.target.value}))}
+                        placeholder="Indicaciones para el repartidor o cocina..."
+                        rows={4}
+                    />
+                </div>
+            </div>
+            <DialogFooter className="bg-muted/50 -mx-6 -mb-6 p-6 border-t">
+                <Button variant="ghost" onClick={() => setIsEditDialogOpen(false)} disabled={isUpdating}>Cancelar</Button>
+                <Button onClick={handleQuickEditSave} disabled={isUpdating}>
+                    {isUpdating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Guardar Cambios
+                </Button>
+            </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <AlertDialog open={isCancelAlertOpen} onOpenChange={setIsCancelAlertOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Confirmar cancelación?</AlertDialogTitle>
+            <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
             <AlertDialogDescription>
               Esta acción marcará el pedido #{order.id.slice(-7).toUpperCase()} como cancelado. 
               Esta acción no se puede deshacer.

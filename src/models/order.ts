@@ -65,6 +65,8 @@ export type Order = {
   orderStatus: OrderStatus;
   tipoEntrega: TipoEntrega;
   origin?: string;              // Canal de origen (ej. 'qr', 'whatsapp', 'web')
+  paymentStatus?: 'pending' | 'paid'; // Estado del cobro
+  notes?: string;               // Requerimientos especiales o notas de despacho
   // --- Campos de Atribución ROI (Fase 4.1) ---
   isRecovered?: boolean;
   recoverySourceId?: string;

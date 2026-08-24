@@ -111,6 +111,8 @@ function OrderCard({ order, handleUpdateStatus, onViewDetails }: {
   const isMesa = order.origin && order.origin.startsWith('mesa');
   const mesaNumber = isMesa ? order.origin?.split('-')[1] : null;
 
+  const isPaid = order.paymentStatus === 'paid';
+
   return (
     <Card className="shadow-sm border-gray-100 hover:shadow-md transition-all group border-l-4 border-l-primary/10 hover:border-l-primary">
       <CardContent className="p-4 space-y-3">
@@ -137,7 +139,17 @@ function OrderCard({ order, handleUpdateStatus, onViewDetails }: {
                 {order.tipoEntrega === 'domicilio' ? 'Domicilio' : 'Recogida'}
               </Badge>
             )}
-            <Badge variant="outline" className="text-[9px] font-black uppercase bg-gray-50 text-gray-600 border-gray-200">Pendiente de Pago</Badge>
+            <Badge 
+              variant="outline" 
+              className={cn(
+                "text-[9px] font-black uppercase",
+                isPaid 
+                  ? "bg-green-50 text-green-700 border-green-200" 
+                  : "bg-amber-50 text-amber-600 border-amber-200"
+              )}
+            >
+              {isPaid ? 'Pagado' : 'Pendiente de Pago'}
+            </Badge>
           </div>
         </div>
 
