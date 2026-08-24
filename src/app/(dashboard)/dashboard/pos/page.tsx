@@ -11,10 +11,11 @@ import InvoiceCart from '@/components/billing/InvoiceCart';
 import CashControl from '@/components/billing/CashControl';
 import { Loader2, Calculator } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { processSale } from '@/services/billing/billing-service';
 
 /**
  * @fileOverview Página principal de la Terminal de Facturación (POS).
- * Orquestador de la Fase 2: Motor de cálculos reactivos.
+ * Orquestador de la Fase 3: Persistencia atómica y Kardex.
  */
 export default function POSPage() {
   const { user } = useUser();
@@ -37,6 +38,7 @@ export default function POSPage() {
   // 2. Estado local del carrito y financiera
   const [cart, setCart] = useState<POSItem[]>([]);
   const [customerName, setCustomerName] = useState('Cliente General');
+  const [isProcessing, setIsProcessing] = useState(false);
   
   // Variables Financieras
   const [discountType, setDiscountType] = useState<DiscountType>('amount');
@@ -73,6 +75,7 @@ export default function POSPage() {
 
   // 4. Handlers
   const handleAddToCart = (product: Product) => {
+    if (isProcessing) return;
     setCart(prev => {
       const existing = prev.find(item => item.productId === product.id);
       if (existing) {
@@ -109,6 +112,8 @@ export default function POSPage() {
   };
 
   const handleProcessSale = async () => {
+    if (!user || !firestore) return;
+
     if (paymentMethod === 'efectivo' && cashReceived < financialSummary.total) {
       toast({
         variant: "destructive",
@@ -118,10 +123,50 @@ export default function POSPage() {
       return;
     }
 
-    toast({
-        title: "🚀 Venta lista para procesar",
-        description: "En la Fase 3 habilitaremos la persistencia y el Kardex.",
-    });
+    setIsProcessing(true);
+    try {
+        const result = await processSale(
+            firestore,
+            user.uid,
+            user.uid,
+            {
+                businessId: user.uid,
+                vendedorId: user.uid,
+                customer: { name: customerName },
+                items: cart,
+                subtotal: financialSummary.subtotal,
+                tax: financialSummary.tax,
+                discount: financialSummary.discount,
+                tip: tipAmount,
+                total: financialSummary.total,
+                paymentMethod: paymentMethod as any,
+                cashReceived,
+                changeAmount: financialSummary.change
+            },
+            businessType
+        );
+
+        toast({
+            title: "✅ Venta exitosa",
+            description: `Factura ${result.consecutiveStr} registrada. Stock actualizado.`,
+        });
+
+        // Limpiar estados
+        setCart([]);
+        setCustomerName('Cliente General');
+        setCashReceived(0);
+        setDiscountValue(0);
+        setTipAmount(0);
+
+    } catch (error: any) {
+        toast({
+            variant: "destructive",
+            title: "Fallo al registrar venta",
+            description: error.message || "Error técnico en la transacción.",
+        });
+    } finally {
+        setIsProcessing(false);
+    }
   };
 
   if (loadingBusiness && !business) {
@@ -190,6 +235,7 @@ export default function POSPage() {
               
               summary={financialSummary}
               onProcessSale={handleProcessSale}
+              isProcessing={isProcessing}
             />
           </div>
           

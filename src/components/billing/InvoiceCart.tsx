@@ -17,7 +17,7 @@ import {
   CreditCard,
   Percent,
   HandHeart,
-  AlertCircle
+  Loader2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { POSItem, VerticalType, DiscountType } from '@/types/billing';
@@ -49,7 +49,8 @@ interface InvoiceCartProps {
       tax: number;
       total: number;
   };
-  onProcessSale: () => void;
+  onProcessSale: () => Promise<void>;
+  isProcessing: boolean;
 }
 
 export default function InvoiceCart({ 
@@ -70,7 +71,8 @@ export default function InvoiceCart({
   paymentMethod,
   setPaymentMethod,
   summary,
-  onProcessSale
+  onProcessSale,
+  isProcessing
 }: InvoiceCartProps) {
   const labels = VERTICAL_LABELS[businessType] || VERTICAL_LABELS.Retail;
 
@@ -97,17 +99,18 @@ export default function InvoiceCart({
               value={customerName}
               onChange={(e) => setCustomerName(e.target.value)}
               className="h-8 font-bold bg-muted/30 border-none text-xs"
+              disabled={isProcessing}
             />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
              <div className="space-y-1">
                 <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">{labels.location}</Label>
-                <Input placeholder={labels.location} className="h-8 font-bold bg-muted/30 border-none text-xs" />
+                <Input placeholder={labels.location} className="h-8 font-bold bg-muted/30 border-none text-xs" disabled={isProcessing} />
              </div>
              <div className="space-y-1">
                 <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">{labels.staff}</Label>
-                <Input placeholder={labels.staff} className="h-8 font-bold bg-muted/30 border-none text-xs" />
+                <Input placeholder={labels.staff} className="h-8 font-bold bg-muted/30 border-none text-xs" disabled={isProcessing} />
              </div>
           </div>
         </div>
@@ -123,17 +126,33 @@ export default function InvoiceCart({
                   <div key={item.productId} className="flex flex-col gap-1.5 p-2 rounded-xl bg-slate-50/50 border border-slate-100 animate-in fade-in slide-in-from-right-1 duration-300">
                     <div className="flex justify-between items-start gap-2">
                       <span className="text-[11px] font-black text-slate-700 leading-tight flex-1 uppercase truncate">{item.name}</span>
-                      <button onClick={() => onRemoveItem(item.productId)} className="text-slate-400 hover:text-red-500 transition-colors">
+                      <button 
+                        onClick={() => onRemoveItem(item.productId)} 
+                        disabled={isProcessing}
+                        className="text-slate-400 hover:text-red-500 transition-colors disabled:opacity-30"
+                      >
                         <Trash2 size={12} />
                       </button>
                     </div>
                     <div className="flex justify-between items-center">
                       <div className="flex items-center gap-2">
-                        <Button variant="outline" size="icon" className="h-6 w-6 rounded-full bg-white shadow-sm" onClick={() => onUpdateQuantity(item.productId, -1)}>
+                        <Button 
+                          variant="outline" 
+                          size="icon" 
+                          className="h-6 w-6 rounded-full bg-white shadow-sm" 
+                          onClick={() => onUpdateQuantity(item.productId, -1)}
+                          disabled={isProcessing}
+                        >
                           <Minus size={10} />
                         </Button>
                         <span className="text-xs font-black w-4 text-center">{item.quantity}</span>
-                        <Button variant="outline" size="icon" className="h-6 w-6 rounded-full bg-white shadow-sm" onClick={() => onUpdateQuantity(item.productId, 1)}>
+                        <Button 
+                          variant="outline" 
+                          size="icon" 
+                          className="h-6 w-6 rounded-full bg-white shadow-sm" 
+                          onClick={() => onUpdateQuantity(item.productId, 1)}
+                          disabled={isProcessing}
+                        >
                           <Plus size={10} />
                         </Button>
                       </div>
@@ -163,6 +182,7 @@ export default function InvoiceCart({
                         <button 
                             onClick={() => setDiscountType(discountType === 'amount' ? 'percent' : 'amount')}
                             className="text-[9px] font-black text-primary uppercase"
+                            disabled={isProcessing}
                         >
                             {discountType === 'amount' ? '$' : '%'}
                         </button>
@@ -174,6 +194,7 @@ export default function InvoiceCart({
                             value={discountValue || ''}
                             onChange={(e) => setDiscountValue(Number(e.target.value))}
                             className="h-7 pl-6 text-xs font-bold bg-white"
+                            disabled={isProcessing}
                         />
                     </div>
                 </div>
@@ -184,6 +205,7 @@ export default function InvoiceCart({
                         <button 
                             onClick={() => setTipAmount(Math.round(summary.subtotal * 0.1))}
                             className="text-[9px] font-black text-primary uppercase"
+                            disabled={isProcessing}
                         >
                             10%
                         </button>
@@ -195,6 +217,7 @@ export default function InvoiceCart({
                             value={tipAmount || ''}
                             onChange={(e) => setTipAmount(Number(e.target.value))}
                             className="h-7 pl-6 text-xs font-bold bg-white"
+                            disabled={isProcessing}
                         />
                     </div>
                 </div>
@@ -207,6 +230,7 @@ export default function InvoiceCart({
                         <button
                             key={method}
                             onClick={() => setPaymentMethod(method)}
+                            disabled={isProcessing}
                             className={cn(
                                 "flex-1 py-1 rounded-lg text-[9px] font-black uppercase border transition-all",
                                 paymentMethod === method ? "bg-primary text-white border-primary shadow-sm" : "bg-white text-muted-foreground border-slate-100"
@@ -245,10 +269,14 @@ export default function InvoiceCart({
 
         <Button 
           className="w-full h-12 rounded-2xl text-md font-black uppercase tracking-widest shadow-lg bg-primary hover:bg-primary/90 transition-transform active:scale-95 disabled:opacity-30"
-          disabled={items.length === 0}
+          disabled={items.length === 0 || isProcessing}
           onClick={onProcessSale}
         >
-          <CreditCard size={18} className="mr-2" /> Registrar Venta (F8)
+          {isProcessing ? (
+              <><Loader2 size={18} className="mr-2 animate-spin" /> Procesando...</>
+          ) : (
+              <><CreditCard size={18} className="mr-2" /> Registrar Venta (F8)</>
+          )}
         </Button>
       </CardFooter>
     </Card>
