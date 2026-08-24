@@ -37,7 +37,6 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { 
   MoreHorizontal, 
-  Eye, 
   Edit2, 
   RefreshCcw, 
   CreditCard, 
@@ -47,7 +46,6 @@ import {
   FileDown, 
   Trash2,
   Ban,
-  Info,
   CheckCircle,
   Clock,
   Loader2
@@ -67,11 +65,12 @@ import {
 import { useFirestore, useUser, updateDocumentNonBlocking } from '@/firebase';
 import { doc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
+import { ViewOrderDialog } from "./ViewOrderDialog";
 
 interface OrderCardMenuProps {
   order: Order;
   handleUpdateStatus: (id: string, status: OrderStatus) => Promise<void>;
-  onViewDetails: (order: Order) => void;
+  onViewDetails?: (order: Order) => void;
 }
 
 const formatCurrency = (value: number) => {
@@ -82,7 +81,7 @@ const formatCurrency = (value: number) => {
   }).format(value);
 };
 
-export function OrderCardMenu({ order, handleUpdateStatus, onViewDetails }: OrderCardMenuProps) {
+export function OrderCardMenu({ order, handleUpdateStatus }: OrderCardMenuProps) {
   const firestore = useFirestore();
   const { user } = useUser();
   const { toast } = useToast();
@@ -90,7 +89,6 @@ export function OrderCardMenu({ order, handleUpdateStatus, onViewDetails }: Orde
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   
-  // Local form state for quick edit
   const [editForm, setEditForm] = useState({
     customerAddress: order.customerAddress || '',
     notes: order.notes || ''
@@ -220,9 +218,7 @@ export function OrderCardMenu({ order, handleUpdateStatus, onViewDetails }: Orde
         <DropdownMenuContent align="end" className="w-56">
           <DropdownMenuLabel className="text-[10px] uppercase font-black text-muted-foreground tracking-widest">Acciones del Pedido</DropdownMenuLabel>
           
-          <DropdownMenuItem onClick={() => onViewDetails(order)} className="cursor-pointer font-bold">
-            <Eye className="mr-2 h-4 w-4" /> Ver detalles
-          </DropdownMenuItem>
+          <ViewOrderDialog order={order} />
 
           <DropdownMenuItem onClick={() => setIsEditDialogOpen(true)} className="cursor-pointer font-bold">
             <Edit2 className="mr-2 h-4 w-4" /> Editar pedido
@@ -308,7 +304,6 @@ export function OrderCardMenu({ order, handleUpdateStatus, onViewDetails }: Orde
         </DropdownMenuContent>
       </DropdownMenu>
 
-      {/* QUICK EDIT DIALOG */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent className="sm:max-w-md">
             <DialogHeader>

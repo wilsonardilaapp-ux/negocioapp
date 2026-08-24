@@ -131,7 +131,7 @@ export default function PedidosPage() {
 
   const handleSelectRow = (orderId: string) => {
     setSelectedOrders(prev => 
-      prev.includes(orderId) ? prev.filter(id => id !== orderId) : [...prev, orderId]
+      prev.includes(orderId) ? prev.filter(id => id !== orderId) : [...prev, id]
     );
   };
   
@@ -467,9 +467,6 @@ export default function PedidosPage() {
               orders={filteredOrders} 
               isLoading={isLoading} 
               handleUpdateStatus={handleUpdateStatus}
-              onViewDetails={(order) => {
-                  toast({ title: `Detalle del Pedido #${order.id.slice(-7).toUpperCase()}`, description: `Cliente: ${order.customerName}` });
-              }}
             />
           )}
 
