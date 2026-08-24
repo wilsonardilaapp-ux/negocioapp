@@ -40,12 +40,13 @@ import {
 import type { Invoice, VerticalType } from '@/types/billing';
 import { VERTICAL_LABELS } from '@/types/billing';
 import { InvoiceDetailModal } from './InvoiceDetailModal';
-import { useUser } from '@/firebase';
+import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
+import { doc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import { jsPDF } from 'jspdf';
-import 'jspdf-autotable';
 import { normalizePhoneNumber } from '@/lib/utils';
 import { updateInvoiceOperation, voidInvoiceAndRevertStock } from '@/services/billing/order-lifecycle-service';
+import { InvoiceOutputService } from '@/services/billing/invoice-output-service';
+import type { Business } from '@/models/business';
 
 interface InvoiceActionsMenuProps {
   invoice: Invoice;
@@ -54,43 +55,46 @@ interface InvoiceActionsMenuProps {
 
 export function InvoiceActionsMenu({ invoice, businessType }: InvoiceActionsMenuProps) {
   const { user } = useUser();
+  const firestore = useFirestore();
   const { toast } = useToast();
   const [isPending, startTransition] = useTransition();
   
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [isCancelAlertOpen, setIsCancelAlertOpen] = useState(false);
 
-  const labels = VERTICAL_LABELS[businessType] || VERTICAL_LABELS.Retail;
+  // Obtener nombre del negocio para WhatsApp/PDF
+  const businessRef = useMemoFirebase(() => user ? doc(firestore, 'businesses', user.uid) : null, [user, firestore]);
+  const { data: business } = useDoc<Business>(businessRef);
 
-  const formatCurrency = (val: number) => 
-    new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(val);
+  const labels = VERTICAL_LABELS[businessType] || VERTICAL_LABELS.Retail;
 
   // 1. Ver Detalle
   const handleViewDetail = () => setIsDetailOpen(true);
 
-  // 2. Imprimir Ticket
+  // 2. Imprimir Ticket (Ruta dedicada)
   const handlePrint = () => {
-    toast({ title: "Enviando a impresora...", description: `Imprimiendo factura ${invoice.consecutiveNumber}` });
+    window.open(`/dashboard/pos/print/${invoice.id}`, '_blank', 'width=400,height=600');
+    toast({ title: "Iniciando impresión", description: `Generando ticket para ${invoice.consecutiveNumber}` });
   };
 
-  // 3. Enviar WhatsApp
+  // 3. Enviar WhatsApp (wa.me)
   const handleWhatsApp = () => {
     if (!invoice.customer.phone) {
         toast({ variant: "destructive", title: "Sin teléfono", description: "El cliente no tiene un número registrado." });
         return;
     }
     const phone = normalizePhoneNumber(invoice.customer.phone);
-    const message = `Hola ${invoice.customer.name}! 👋 Aquí tienes el resumen de tu compra ${invoice.consecutiveNumber} por un total de ${formatCurrency(invoice.total)}. ¡Gracias por tu visita!`;
+    const message = InvoiceOutputService.generateWhatsAppMessage(invoice, business?.name || 'Nuestro Negocio');
     window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, '_blank');
   };
 
-  // 4. Estado de Pago & 7. Consumir (Usando Lifecycle Service)
+  // 4. Estado de Pago & 7. Consumir
   const handleUpdateStatus = (statusUpdate: any) => {
     if (!user) return;
     startTransition(async () => {
       const result = await updateInvoiceOperation(user.uid, invoice.id, statusUpdate);
       if (result.success) {
-        toast({ title: "Registro actualizado", description: "El cambio se ha sincronizado con pedidos." });
+        toast({ title: "Registro actualizado", description: "Cambio sincronizado." });
       } else {
         toast({ variant: "destructive", title: "Error", description: result.error });
       }
@@ -102,33 +106,19 @@ export function InvoiceActionsMenu({ invoice, businessType }: InvoiceActionsMenu
     handleUpdateStatus({ atendidoPor: staffName });
   };
 
-  // 6. Descargar PDF
+  // 6. Descargar PDF Formal
   const handleDownloadPDF = () => {
-    const doc = new jsPDF();
-    doc.setFontSize(18);
-    doc.text(`Comprobante de Venta ${invoice.consecutiveNumber}`, 14, 20);
-    doc.setFontSize(10);
-    doc.text(`Cliente: ${invoice.customer.name}`, 14, 30);
-    doc.text(`Fecha: ${new Date(invoice.createdAt).toLocaleString()}`, 14, 35);
-    
-    const tableData = invoice.items.map(item => [item.name, item.quantity, formatCurrency(item.unitPrice), formatCurrency(item.subtotal)]);
-    (doc as any).autoTable({
-      startY: 45,
-      head: [['Producto', 'Cant.', 'Precio', 'Subtotal']],
-      body: tableData,
-    });
-    
-    doc.save(`Factura_${invoice.consecutiveNumber}.pdf`);
+    InvoiceOutputService.downloadPDF(invoice, business?.name || 'Markix Business', businessType);
     toast({ title: "PDF Generado", description: "La descarga ha comenzado." });
   };
 
-  // 8. Cancelar / Eliminar (Usando Lifecycle Service)
+  // 8. Cancelar / Eliminar
   const handleCancelAndRevert = () => {
     if (!user) return;
     startTransition(async () => {
       const result = await voidInvoiceAndRevertStock(user.uid, invoice.id, user.uid);
       if (result.success) {
-        toast({ title: "Venta anulada", description: "Se ha revertido el stock y cancelado el pedido." });
+        toast({ title: "Venta anulada", description: "Stock revertido exitosamente." });
         setIsCancelAlertOpen(false);
       } else {
         toast({ variant: "destructive", title: "Error al anular", description: result.error });
@@ -145,7 +135,7 @@ export function InvoiceActionsMenu({ invoice, businessType }: InvoiceActionsMenu
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-56 rounded-2xl shadow-xl">
-          <DropdownMenuLabel className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Gestión de Factura</DropdownMenuLabel>
+          <DropdownMenuLabel className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Acciones de Venta</DropdownMenuLabel>
           
           <DropdownMenuItem onClick={handleViewDetail} className="text-xs font-bold gap-2 cursor-pointer">
             <Eye size={14} className="text-primary" /> Ver detalle
@@ -190,7 +180,7 @@ export function InvoiceActionsMenu({ invoice, businessType }: InvoiceActionsMenu
           </DropdownMenuSub>
 
           <DropdownMenuItem onClick={handleDownloadPDF} className="text-xs font-bold gap-2 cursor-pointer">
-            <FileText size={14} className="text-slate-600" /> Descargar PDF
+            <FileText size={14} className="text-slate-600" /> Descargar PDF Formal
           </DropdownMenuItem>
 
           <DropdownMenuItem onClick={() => handleUpdateStatus({ orderStatus: 'completado' })} className="text-xs font-bold gap-2 cursor-pointer">
@@ -205,14 +195,14 @@ export function InvoiceActionsMenu({ invoice, businessType }: InvoiceActionsMenu
                     className="text-xs font-bold gap-2 cursor-pointer text-red-600 focus:text-red-700 focus:bg-red-50"
                     onSelect={(e) => e.preventDefault()}
                 >
-                    <Trash2 size={14} /> Cancelar / Eliminar
+                    <Trash2 size={14} /> Anular / Eliminar
                 </DropdownMenuItem>
             </AlertDialogTrigger>
             <AlertDialogContent className="rounded-[2rem]">
                 <AlertDialogHeader>
                     <AlertDialogTitle>¿Anular Factura {invoice.consecutiveNumber}?</AlertDialogTitle>
                     <AlertDialogDescription>
-                        Esta acción marcará la factura como anulada, cancelará el pedido en el Kanban y <strong>revertirá automáticamente el stock</strong> al inventario.
+                        Esta acción marcará la factura como anulada y <strong>revertirá automáticamente el stock</strong> al inventario.
                     </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>

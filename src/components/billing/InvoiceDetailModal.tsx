@@ -26,12 +26,20 @@ import {
   UserCheck, 
   Users, 
   Clock,
-  X
+  X,
+  Printer,
+  FileText,
+  MessageCircle
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import type { Invoice, VerticalType } from '@/types/billing';
-import { cn } from '@/lib/utils';
+import { cn, normalizePhoneNumber } from '@/lib/utils';
+import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
+import { doc } from 'firebase/firestore';
+import { InvoiceOutputService } from '@/services/billing/invoice-output-service';
+import type { Business } from '@/models/business';
+import { useToast } from '@/hooks/use-toast';
 
 interface InvoiceDetailModalProps {
   invoice: Invoice | null;
@@ -42,6 +50,13 @@ interface InvoiceDetailModalProps {
 }
 
 export function InvoiceDetailModal({ invoice, isOpen, onClose, mode = 'view', businessType }: InvoiceDetailModalProps) {
+  const { user } = useUser();
+  const firestore = useFirestore();
+  const { toast } = useToast();
+
+  const businessRef = useMemoFirebase(() => user ? doc(firestore, 'businesses', user.uid) : null, [user, firestore]);
+  const { data: business } = useDoc<Business>(businessRef);
+
   if (!invoice) return null;
 
   const formatCurrency = (val: number) => 
@@ -49,6 +64,25 @@ export function InvoiceDetailModal({ invoice, isOpen, onClose, mode = 'view', bu
 
   const formattedDate = format(new Date(invoice.createdAt), "dd 'DE' MMMM 'DE' yyyy 'A LAS' HH:mm", { locale: es }).toUpperCase();
   const taxLabel = businessType === 'Restaurante' ? 'Impoconsumo' : 'IVA';
+
+  // --- HANDLERS DE SALIDA ---
+  const handlePrint = () => {
+    window.open(`/dashboard/pos/print/${invoice.id}`, '_blank', 'width=400,height=600');
+  };
+
+  const handleDownloadPDF = () => {
+    InvoiceOutputService.downloadPDF(invoice, business?.name || 'Markix Business', businessType);
+  };
+
+  const handleWhatsApp = () => {
+    if (!invoice.customer.phone) {
+        toast({ variant: "destructive", title: "Sin teléfono", description: "El cliente no tiene un número registrado." });
+        return;
+    }
+    const phone = normalizePhoneNumber(invoice.customer.phone);
+    const message = InvoiceOutputService.generateWhatsAppMessage(invoice, business?.name || 'Nuestro Negocio');
+    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, '_blank');
+  };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -63,17 +97,17 @@ export function InvoiceDetailModal({ invoice, isOpen, onClose, mode = 'view', bu
           </button>
           
           <p className="text-[10px] font-black text-primary uppercase tracking-[0.2em] mb-2">
-            {mode === 'success' ? '¡VENTA REGISTRADA!' : 'CONSULTA DE AUDITORÍA'}
+            {mode === 'success' ? '¡VENTA REGISTRADA CON ÉXITO!' : 'CONSULTA DE AUDITORÍA'}
           </p>
           <DialogTitle className="text-2xl font-black tracking-tighter text-slate-900 uppercase">
-            DETALLE DE FACTURA {invoice.consecutiveNumber}
+            FACTURA {invoice.consecutiveNumber}
           </DialogTitle>
           <p className="text-[10px] font-bold text-slate-400 mt-1 flex items-center justify-center gap-1">
             <Clock size={10} /> {formattedDate}
           </p>
         </div>
 
-        <div className="p-6 space-y-6 overflow-y-auto max-h-[60vh] no-scrollbar">
+        <div className="p-6 space-y-6 overflow-y-auto max-h-[50vh] no-scrollbar">
           {/* Badges de Estado */}
           <div className="flex justify-center gap-3">
             <Badge className={cn(
@@ -105,7 +139,7 @@ export function InvoiceDetailModal({ invoice, isOpen, onClose, mode = 'view', bu
                     </p>
                 </div>
                 <div className="space-y-0.5">
-                    <p className="text-[9px] font-black uppercase text-slate-400 tracking-tighter">Vendedor</p>
+                    <p className="text-[9px] font-black uppercase text-slate-400 tracking-tighter">Atendido por</p>
                     <p className="text-[11px] font-bold text-slate-800 flex items-center gap-1.5 truncate">
                         <UserCheck size={12} className="text-primary shrink-0"/> {invoice.atendidoPor || 'Caja Central'}
                     </p>
@@ -116,51 +150,33 @@ export function InvoiceDetailModal({ invoice, isOpen, onClose, mode = 'view', bu
                         <CreditCard size={12} className="text-primary shrink-0"/> {invoice.paymentMethod.toUpperCase()}
                     </p>
                 </div>
-                {invoice.pax && (
-                   <div className="space-y-0.5">
-                        <p className="text-[9px] font-black uppercase text-slate-400 tracking-tighter">Personas (Pax)</p>
-                        <p className="text-[11px] font-bold text-slate-800 flex items-center gap-1.5">
-                            <Users size={12} className="text-primary shrink-0"/> {invoice.pax} pax
-                        </p>
-                    </div>
-                )}
              </div>
           </Card>
 
           {/* Tabla de Ítems */}
-          <div className="space-y-3">
-             <div className="flex items-center gap-2 px-1">
-                <div className="h-1 w-4 bg-primary rounded-full"></div>
-                <span className="text-[10px] font-black uppercase tracking-widest text-slate-600">Productos del Pedido</span>
-             </div>
-             <div className="rounded-2xl border bg-white overflow-hidden shadow-sm">
-                <Table>
-                    <TableHeader className="bg-slate-50">
-                        <TableRow>
-                            <TableHead className="text-[9px] font-black uppercase h-8 px-4">ITEM</TableHead>
-                            <TableHead className="text-[9px] font-black uppercase h-8 text-center">CANT</TableHead>
-                            <TableHead className="text-[9px] font-black uppercase h-8 text-right px-4">TOTAL</TableHead>
+          <div className="rounded-2xl border bg-white overflow-hidden shadow-sm">
+            <Table>
+                <TableHeader className="bg-slate-50">
+                    <TableRow>
+                        <TableHead className="text-[9px] font-black uppercase h-8 px-4">ITEM</TableHead>
+                        <TableHead className="text-[9px] font-black uppercase h-8 text-center">CANT</TableHead>
+                        <TableHead className="text-[9px] font-black uppercase h-8 text-right px-4">TOTAL</TableHead>
+                    </TableRow>
+                </TableHeader>
+                <TableBody>
+                    {invoice.items.map((item, idx) => (
+                        <TableRow key={idx} className="h-10 border-slate-50">
+                            <TableCell className="text-[10px] font-black text-slate-700 uppercase px-4">{item.name}</TableCell>
+                            <TableCell className="text-[11px] font-black text-center">{item.quantity}</TableCell>
+                            <TableCell className="text-[11px] font-black text-right px-4 text-primary">{formatCurrency(item.subtotal)}</TableCell>
                         </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {invoice.items.map((item, idx) => (
-                            <TableRow key={idx} className="h-10 border-slate-50">
-                                <TableCell className="text-[10px] font-black text-slate-700 uppercase px-4">{item.name}</TableCell>
-                                <TableCell className="text-[11px] font-black text-center">{item.quantity}</TableCell>
-                                <TableCell className="text-[11px] font-black text-right px-4 text-primary">{formatCurrency(item.subtotal)}</TableCell>
-                            </TableRow>
-                        ))}
-                    </TableBody>
-                </Table>
-             </div>
+                    ))}
+                </TableBody>
+            </Table>
           </div>
 
           {/* Bloque Financiero Oscuro */}
           <div className="bg-slate-900 rounded-[2.5rem] p-8 text-white space-y-4 shadow-2xl relative overflow-hidden">
-             <div className="absolute top-0 right-0 p-4 opacity-5">
-                <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1-2-1Z"/><path d="M16 8h-8"/><path d="M16 12h-8"/><path d="M16 16h-8"/></svg>
-             </div>
-             
              <div className="space-y-2 relative z-10">
                 <div className="flex justify-between items-center text-[10px] font-bold text-slate-400 uppercase tracking-widest">
                     <span>Subtotal Neto</span>
@@ -176,43 +192,41 @@ export function InvoiceDetailModal({ invoice, isOpen, onClose, mode = 'view', bu
                         <span>-{formatCurrency(invoice.discount)}</span>
                     </div>
                 )}
-                {invoice.tip > 0 && (
-                    <div className="flex justify-between items-center text-[10px] font-bold text-blue-400 uppercase tracking-widest">
-                        <span>Propina Sugerida</span>
-                        <span>{formatCurrency(invoice.tip)}</span>
-                    </div>
-                )}
              </div>
 
              <Separator className="bg-slate-800" />
              
              <div className="flex justify-between items-center relative z-10 pt-1">
-                <span className="text-xs font-black uppercase tracking-tighter text-slate-300">Total Final</span>
+                <span className="text-xs font-black uppercase tracking-tighter text-slate-300">Total a Pagar</span>
                 <span className="text-3xl font-black text-[#FF6B6B] tracking-tighter drop-shadow-sm">
                     {formatCurrency(invoice.total)}
                 </span>
              </div>
           </div>
-
-          {/* Bloque de Caja */}
-          <div className="grid grid-cols-2 gap-4">
-             <div className="p-5 bg-slate-50 rounded-[1.5rem] border-2 border-dashed border-slate-100 flex flex-col items-center justify-center">
-                <span className="text-[9px] font-black uppercase text-slate-400 tracking-tighter mb-1">Recibido</span>
-                <span className="text-md font-bold text-slate-600">{formatCurrency(invoice.cashReceived)}</span>
-             </div>
-             <div className="p-5 bg-green-50 rounded-[1.5rem] border-2 border-green-100 flex flex-col items-center justify-center">
-                <span className="text-[9px] font-black uppercase text-green-700 tracking-tighter mb-1">Cambio</span>
-                <span className="text-lg font-black text-green-600">{formatCurrency(invoice.changeAmount)}</span>
-             </div>
-          </div>
         </div>
 
-        <div className="p-8 pt-2">
+        {/* Acciones de Salida Digital/Física */}
+        <div className="p-6 pt-2 grid grid-cols-3 gap-3 bg-slate-50 border-t">
+          <Button variant="outline" className="flex flex-col h-16 gap-1 rounded-2xl bg-white border-2" onClick={handlePrint}>
+            <Printer size={18} />
+            <span className="text-[9px] font-black uppercase">Ticket</span>
+          </Button>
+          <Button variant="outline" className="flex flex-col h-16 gap-1 rounded-2xl bg-white border-2" onClick={handleDownloadPDF}>
+            <FileText size={18} />
+            <span className="text-[9px] font-black uppercase">PDF</span>
+          </Button>
+          <Button variant="outline" className="flex flex-col h-16 gap-1 rounded-2xl bg-white border-2 text-green-600 hover:text-green-700" onClick={handleWhatsApp}>
+            <MessageCircle size={18} />
+            <span className="text-[9px] font-black uppercase">WhatsApp</span>
+          </Button>
+        </div>
+
+        <div className="p-6 pt-2">
           <Button 
-            className="w-full h-14 rounded-2xl font-black uppercase tracking-[0.2em] shadow-xl bg-slate-900 hover:bg-black text-white transition-all active:scale-95"
+            className="w-full h-14 rounded-2xl font-black uppercase tracking-[0.2em] shadow-xl bg-slate-900 hover:bg-black text-white"
             onClick={onClose}
           >
-            Cerrar Detalle
+            Cerrar Ventana
           </Button>
         </div>
       </DialogContent>
