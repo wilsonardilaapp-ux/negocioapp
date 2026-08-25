@@ -27,9 +27,9 @@ interface InvoiceCartProps {
   onRemoveItem: (productId: string) => void;
   businessType: VerticalType;
   customerName: string;
-  setCustomerName: (val: string) => void;
+  onCustomerNameChange?: (val: string) => void;
   customerPhone: string;
-  setCustomerPhone: (val: string) => void;
+  onCustomerPhoneChange?: (val: string) => void;
   
   // Financial Control
   discountType: DiscountType;
@@ -61,9 +61,9 @@ export default function InvoiceCart({
   onRemoveItem, 
   businessType,
   customerName,
-  setCustomerName,
+  onCustomerNameChange,
   customerPhone,
-  setCustomerPhone,
+  onCustomerPhoneChange,
   discountType,
   setDiscountType,
   discountValue,
@@ -101,7 +101,7 @@ export default function InvoiceCart({
               <Input 
                 placeholder="Nombre o documento..." 
                 value={customerName}
-                onChange={(e) => setCustomerName(e.target.value)}
+                onChange={(e) => onCustomerNameChange?.(e.target.value)}
                 className="h-8 font-bold bg-muted/30 border-none text-xs"
                 disabled={isProcessing}
               />
@@ -113,7 +113,7 @@ export default function InvoiceCart({
               <Input 
                 placeholder="Ej: 3001234567" 
                 value={customerPhone}
-                onChange={(e) => setCustomerPhone(e.target.value)}
+                onChange={(e) => onCustomerPhoneChange?.(e.target.value)}
                 className="h-8 font-bold bg-muted/30 border-none text-xs"
                 disabled={isProcessing}
               />
