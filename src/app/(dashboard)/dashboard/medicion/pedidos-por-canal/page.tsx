@@ -1,13 +1,13 @@
 'use client';
 
-import { useMemo, useState, useRef } from 'react';
+import { useMemo, useState, useRef, useEffect } from 'react';
 import { useMetricAnalysis } from '../hooks/useMetricAnalysis';
 import { MetricsService } from '../services/metrics.service';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart';
-import { PieChart, Pie, Cell, Legend } from 'recharts';
-import { ShoppingBag, Loader2, Info, Copy, Check, Download, QrCode, Smartphone, Globe, Share2, MessageCircle, MapPin } from 'lucide-react';
-import { useUser } from '@/firebase';
+import { PieChart, Pie, Cell, Legend, ResponsiveContainer } from 'recharts';
+import { ShoppingBag, Loader2, Info, Copy, Check, Download, QrCode, Smartphone, Globe, Share2, MessageCircle, MapPin, Receipt, BarChart3 } from 'lucide-react';
+import { useUser, useFirestore } from '@/firebase';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
@@ -16,8 +16,10 @@ import { useToast } from '@/hooks/use-toast';
 import QRCode from "react-qr-code";
 import html2canvas from "html2canvas";
 import { cn } from '@/lib/utils';
+import { trackingQueryService, type ChannelShare } from '@/services/billing/tracking-query-service';
+import { subDays, startOfDay } from 'date-fns';
 
-const COLORS = ['#16a34a', '#3b82f6', '#f59e0b', '#8b5cf6', '#ef4444'];
+const COLORS = ['#16a34a', '#3b82f6', '#f59e0b', '#8b5cf6', '#ef4444', '#0f172a'];
 
 const chartConfig = {
   value: {
@@ -25,19 +27,55 @@ const chartConfig = {
   },
 } satisfies ChartConfig;
 
+const trackingChartConfig = {
+  totalAmount: {
+    label: "Recaudación ($)",
+    color: "hsl(var(--primary))",
+  },
+} satisfies ChartConfig;
+
 /**
- * @fileOverview Vista de análisis de pedidos segmentados por canal de entrada
- * y generador de enlaces de difusión con tracking y códigos QR descargables.
+ * @fileOverview Vista de análisis de pedidos segmentados por canal de entrada.
+ * FASE 4: Integra análisis de trazabilidad total (Facturación POS + Ventas Online).
  */
 export default function PedidosPorCanalPage() {
   const { user } = useUser();
   const { toast } = useToast();
   const { orders, isLoading } = useMetricAnalysis();
+  
+  // --- ESTADOS FASE 4 (RASTREO INTELIGENTE) ---
+  const [channelShares, setChannelShares] = useState<ChannelShare[]>([]);
+  const [isLoadingShares, setIsLoadingShares] = useState(false);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [mesaNumber, setMesaNumber] = useState('1');
   const qrRef = useRef<HTMLDivElement>(null);
 
-  // --- LÓGICA ANALÍTICA ---
+  // --- LÓGICA ANALÍTICA FASE 4 ---
+  useEffect(() => {
+    if (!user?.uid) return;
+
+    const fetchChannelShares = async () => {
+      setIsLoadingShares(true);
+      try {
+        const endDate = new Date();
+        const startDate = startOfDay(subDays(endDate, 30));
+        const shares = await trackingQueryService.getChannelShare(user.uid, startDate, endDate);
+        setChannelShares(shares);
+      } catch (e) {
+        console.error("[Fase 4] Error fetching channel shares:", e);
+      } finally {
+        setIsLoadingShares(false);
+      }
+    };
+
+    fetchChannelShares();
+  }, [user?.uid]);
+
+  const totalTrackedRevenue = useMemo(() => 
+    channelShares.reduce((sum, item) => sum + item.totalAmount, 0)
+  , [channelShares]);
+
+  // --- LÓGICA ANALÍTICA EXISTENTE ---
   const channelData = useMemo(() => {
     if (isLoading || !orders) return [];
     return MetricsService.analyzeOrdersByChannel(orders);
@@ -47,7 +85,7 @@ export default function PedidosPorCanalPage() {
     channelData.reduce((sum, item) => sum + item.value, 0)
   , [channelData]);
 
-  // --- LÓGICA DE GENERACIÓN DE ENLACES ---
+  // --- LÓGICA DE GENERACIÓN DE ENLACES (PRESERVADA) ---
   const baseUrl = useMemo(() => {
     if (typeof window === 'undefined' || !user?.uid) return '';
     return `${window.location.origin}/catalog/${user.uid}`;
@@ -68,9 +106,6 @@ export default function PedidosPorCanalPage() {
     setTimeout(() => setCopiedKey(null), 2000);
   };
 
-  /**
-   * Función universal para descargar códigos QR capturando el elemento por ID.
-   */
   const handleDownloadSpecificQR = async (containerId: string, label: string) => {
     const element = document.getElementById(containerId);
     if (!element) return;
@@ -78,7 +113,7 @@ export default function PedidosPorCanalPage() {
     try {
       const canvas = await html2canvas(element, { 
         backgroundColor: '#ffffff', 
-        scale: 3, // Mayor resolución para impresión
+        scale: 3, 
         logging: false,
         useCORS: true 
       });
@@ -106,6 +141,9 @@ export default function PedidosPorCanalPage() {
     }
   };
 
+  const formatCurrency = (val: number) => 
+    new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(val);
+
   if (isLoading) {
     return (
       <div className="flex h-64 items-center justify-center">
@@ -121,11 +159,126 @@ export default function PedidosPorCanalPage() {
         <p className="text-muted-foreground">Analiza y genera herramientas de difusión con rastreo inteligente.</p>
       </header>
 
-      {/* --- SECCIÓN 1: ANALÍTICA --- */}
+      {/* --- NUEVA SECCIÓN FASE 4: TRAZABILIDAD TOTAL --- */}
+      <section className="space-y-6 animate-in slide-in-from-top-4 duration-700">
+        <div className="flex items-center gap-3">
+          <div className="h-1 bg-primary w-12 rounded-full"></div>
+          <h2 className="text-xl font-black text-gray-800 uppercase tracking-tighter">Análisis de Trazabilidad Total (POS + Online)</h2>
+        </div>
+
+        <div className="grid gap-6 lg:grid-cols-3">
+           <Card className="lg:col-span-2 border-2 border-primary/10 shadow-lg">
+             <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Cuota de Mercado Real</CardTitle>
+                    <CardDescription>Distribución de ingresos por canal de venta facturado (Últimos 30 días).</CardDescription>
+                  </div>
+                  <div className="p-2 bg-primary/10 rounded-xl text-primary">
+                    <BarChart3 size={24} />
+                  </div>
+                </div>
+             </CardHeader>
+             <CardContent className="h-[350px]">
+                {isLoadingShares ? (
+                  <div className="h-full flex flex-col items-center justify-center gap-2">
+                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                    <span className="text-xs font-bold uppercase text-muted-foreground">Analizando facturación...</span>
+                  </div>
+                ) : channelShares.length > 0 ? (
+                  <ChartContainer config={trackingChartConfig} className="h-full w-full">
+                    <PieChart>
+                      <Pie
+                        data={channelShares}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={80}
+                        outerRadius={120}
+                        paddingAngle={5}
+                        dataKey="totalAmount"
+                        nameKey="name"
+                      >
+                        {channelShares.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} stroke="transparent" />
+                        ))}
+                      </Pie>
+                      <ChartTooltip content={<ChartTooltipContent nameKey="name" />} />
+                      <Legend verticalAlign="bottom" align="center" iconType="circle" />
+                    </PieChart>
+                  </ChartContainer>
+                ) : (
+                  <div className="h-full flex flex-col items-center justify-center text-muted-foreground gap-2">
+                    <Receipt className="h-10 w-10 opacity-20" />
+                    <p className="text-sm font-medium">Sin datos de facturación rastreada.</p>
+                  </div>
+                )}
+             </CardContent>
+           </Card>
+
+           <Card className="h-full border-2 border-slate-100 shadow-md overflow-hidden">
+             <CardHeader className="bg-slate-50/50 border-b">
+               <CardTitle className="text-base uppercase font-black tracking-widest text-slate-600">Desglose de Facturación</CardTitle>
+             </CardHeader>
+             <CardContent className="p-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-slate-50">
+                      <TableHead className="text-[10px] font-black uppercase">Canal</TableHead>
+                      <TableHead className="text-[10px] font-black uppercase text-center">Ventas</TableHead>
+                      <TableHead className="text-[10px] font-black uppercase text-right pr-6">Recaudado</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {channelShares.map((share, i) => (
+                      <TableRow key={share.name} className="h-12 border-slate-50">
+                        <TableCell className="pl-6">
+                           <div className="flex items-center gap-2">
+                              <div className="h-2 w-2 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
+                              <span className="text-[11px] font-bold text-slate-700 uppercase">{share.name}</span>
+                           </div>
+                        </TableCell>
+                        <TableCell className="text-center font-black text-xs">{share.count}</TableCell>
+                        <TableCell className="text-right pr-6">
+                           <div className="flex flex-col">
+                              <span className="text-xs font-black text-primary">{formatCurrency(share.totalAmount)}</span>
+                              <span className="text-[9px] font-bold text-muted-foreground">{share.percentage.toFixed(1)}% de cuota</span>
+                           </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {channelShares.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={3} className="h-32 text-center text-muted-foreground italic text-xs">
+                          No hay transacciones POS registradas recientemente.
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                  {channelShares.length > 0 && (
+                    <TableFooter className="bg-slate-900 text-white">
+                       <TableRow>
+                          <TableCell className="font-black text-[10px] uppercase pl-6">Total General</TableCell>
+                          <TableCell className="text-center font-black">{channelShares.reduce((s, item) => s + item.count, 0)}</TableCell>
+                          <TableCell className="text-right pr-6 font-black">{formatCurrency(totalTrackedRevenue)}</TableCell>
+                       </TableRow>
+                    </TableFooter>
+                  )}
+                </Table>
+             </CardContent>
+           </Card>
+        </div>
+      </section>
+
+      {/* --- SECCIÓN 2: ANALÍTICA DE PEDIDOS (EXISTENTE) --- */}
+      <div className="flex items-center gap-3">
+        <div className="h-1 bg-slate-300 w-12 rounded-full"></div>
+        <h2 className="text-xl font-black text-gray-400 uppercase tracking-tighter">Métricas de Marketing (Pedidos)</h2>
+      </div>
+
       <div className="grid gap-6 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <CardHeader>
-            <CardTitle>Cuota de Mercado por Canal</CardTitle>
+            <CardTitle>Pedidos por Canal (Marketing)</CardTitle>
             <CardDescription>Distribución porcentual de los pedidos en los últimos 30 días.</CardDescription>
           </CardHeader>
           <CardContent className="h-[400px]">
@@ -190,7 +343,7 @@ export default function PedidosPorCanalPage() {
         </Card>
       </div>
 
-      {/* --- SECCIÓN 2: GENERADOR DE ENLACES --- */}
+      {/* --- SECCIÓN 3: GENERADOR DE ENLACES (EXISTENTE) --- */}
       <Card className="border-2 border-primary/10 shadow-lg overflow-hidden">
         <CardHeader className="bg-primary/5 border-b">
           <div className="flex items-center gap-3">
@@ -222,7 +375,6 @@ export default function PedidosPorCanalPage() {
                                 <Badge variant="outline" className="text-[10px] font-black uppercase tracking-tighter bg-primary/5">?ref={channel.ref}</Badge>
                             </div>
 
-                            {/* Área del Código QR (Visualizador) */}
                             <div className="flex-1 flex flex-col items-center justify-center py-4 space-y-4">
                                 <div 
                                     id={qrContainerId}
@@ -270,7 +422,7 @@ export default function PedidosPorCanalPage() {
         </CardContent>
       </Card>
 
-      {/* --- SECCIÓN 3: GENERADOR QR PARA MESAS --- */}
+      {/* --- SECCIÓN 4: QR PARA MESAS (EXISTENTE) --- */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <Card className="border-2 border-primary/10 shadow-lg">
               <CardHeader>
@@ -357,4 +509,32 @@ export default function PedidosPorCanalPage() {
       </div>
     </div>
   );
+}
+
+function Table({ children, className }: { children: React.ReactNode, className?: string }) {
+    return <table className={cn("w-full text-sm", className)}>{children}</table>;
+}
+
+function TableHeader({ children, className }: { children: React.ReactNode, className?: string }) {
+    return <thead className={cn("border-b", className)}>{children}</thead>;
+}
+
+function TableRow({ children, className }: { children: React.ReactNode, className?: string }) {
+    return <tr className={cn("border-b transition-colors hover:bg-muted/50", className)}>{children}</tr>;
+}
+
+function TableHead({ children, className }: { children: React.ReactNode, className?: string }) {
+    return <th className={cn("h-10 px-2 text-left align-middle font-medium text-muted-foreground", className)}>{children}</th>;
+}
+
+function TableBody({ children, className }: { children: React.ReactNode, className?: string }) {
+    return <tbody className={cn("[&_tr:last-child]:border-0", className)}>{children}</tbody>;
+}
+
+function TableCell({ children, className }: { children: React.ReactNode, className?: string }) {
+    return <td className={cn("p-2 align-middle", className)}>{children}</td>;
+}
+
+function TableFooter({ children, className }: { children: React.ReactNode, className?: string }) {
+    return <tfoot className={cn("border-t bg-muted/50 font-medium [&>tr]:last:border-b-0", className)}>{children}</tfoot>;
 }
