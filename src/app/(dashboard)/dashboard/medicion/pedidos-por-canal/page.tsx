@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useMemo, useState, useRef, useEffect } from 'react';
@@ -6,18 +7,53 @@ import { MetricsService } from '../services/metrics.service';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart';
 import { PieChart, Pie, Cell, Legend, ResponsiveContainer } from 'recharts';
-import { ShoppingBag, Loader2, Info, Copy, Check, Download, QrCode, Smartphone, Globe, Share2, MessageCircle, MapPin, Receipt, BarChart3 } from 'lucide-react';
-import { useUser, useFirestore } from '@/firebase';
+import { 
+    ShoppingBag, 
+    Loader2, 
+    Info, 
+    Copy, 
+    Check, 
+    Download, 
+    QrCode, 
+    Smartphone, 
+    Globe, 
+    Share2, 
+    MessageCircle, 
+    MapPin, 
+    Receipt, 
+    BarChart3, 
+    History,
+    Search,
+    UserCheck,
+    Eye,
+    Calendar as CalendarIcon,
+    ArrowRight
+} from 'lucide-react';
+import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { 
+    Select, 
+    SelectContent, 
+    SelectItem, 
+    SelectTrigger, 
+    SelectValue 
+} from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import QRCode from "react-qr-code";
 import html2canvas from "html2canvas";
 import { cn } from '@/lib/utils';
 import { trackingQueryService, type ChannelShare } from '@/services/billing/tracking-query-service';
 import { subDays, startOfDay } from 'date-fns';
+import { es } from 'date-fns/locale';
+import { format } from 'date-fns';
+import { doc, getDoc } from 'firebase/firestore';
+import type { TrackingEvent } from '@/types/tracking';
+import type { Invoice, VerticalType } from '@/types/billing';
+import type { Business } from '@/models/business';
+import { InvoiceDetailModal } from '@/components/billing/InvoiceDetailModal';
 
 const COLORS = ['#16a34a', '#3b82f6', '#f59e0b', '#8b5cf6', '#ef4444', '#0f172a'];
 
@@ -36,12 +72,13 @@ const trackingChartConfig = {
 
 /**
  * @fileOverview Vista de análisis de pedidos segmentados por canal de entrada.
- * FASE 4: Integra análisis de trazabilidad total (Facturación POS + Ventas Online).
+ * FASE 5: Bitácora Detallada de Trazabilidad con integración de InvoiceDetailModal.
  */
 export default function PedidosPorCanalPage() {
   const { user } = useUser();
+  const firestore = useFirestore();
   const { toast } = useToast();
-  const { orders, isLoading } = useMetricAnalysis();
+  const { orders, isLoading: isLoadingOrders } = useMetricAnalysis();
   
   // --- ESTADOS FASE 4 (RASTREO INTELIGENTE) ---
   const [channelShares, setChannelShares] = useState<ChannelShare[]>([]);
@@ -49,6 +86,24 @@ export default function PedidosPorCanalPage() {
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [mesaNumber, setMesaNumber] = useState('1');
   const qrRef = useRef<HTMLDivElement>(null);
+
+  // --- ESTADOS FASE 5 (BITÁCORA) ---
+  const [logEvents, setLogEvents] = useState<TrackingEvent[]>([]);
+  const [isLogsLoading, setIsLogsLoading] = useState(false);
+  const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
+  const [isDetailOpen, setIsDetailOpen] = useState(false);
+  
+  // Filtros de Bitácora
+  const [filterChannel, setFilterChannel] = useState('all');
+  const [searchClient, setSearchClient] = useState('');
+
+  // Obtener negocio para determinar VerticalType (para el modal)
+  const businessRef = useMemoFirebase(() => 
+    (firestore && user?.uid ? doc(firestore, 'businesses', user.uid) : null),
+    [user?.uid, firestore]
+  );
+  const { data: business } = useDoc<Business>(businessRef);
+  const businessType = (business?.category || 'Retail') as VerticalType;
 
   // --- LÓGICA ANALÍTICA FASE 4 ---
   useEffect(() => {
@@ -71,21 +126,71 @@ export default function PedidosPorCanalPage() {
     fetchChannelShares();
   }, [user?.uid]);
 
+  // --- LÓGICA ANALÍTICA FASE 5 (BITÁCORA) ---
+  useEffect(() => {
+    if (!user?.uid) return;
+
+    const fetchLogs = async () => {
+      setIsLogsLoading(true);
+      try {
+        const filters = {
+          channel: filterChannel === 'all' ? undefined : filterChannel,
+          // La búsqueda por cliente se realiza en memoria sobre los resultados recientes
+          limit: 100
+        };
+        const { events } = await trackingQueryService.getTrackingEvents(user.uid, filters);
+        setLogEvents(events);
+      } catch (e) {
+        console.error("[Fase 5] Error fetching logs:", e);
+      } finally {
+        setIsLogsLoading(false);
+      }
+    };
+
+    fetchLogs();
+  }, [user?.uid, filterChannel]);
+
+  const filteredLogs = useMemo(() => {
+    if (!searchClient) return logEvents;
+    const term = searchClient.toLowerCase();
+    return logEvents.filter(e => 
+      e.customerName?.toLowerCase().includes(term) || 
+      e.customerWhatsapp?.includes(term) ||
+      e.sellerName?.toLowerCase().includes(term)
+    );
+  }, [logEvents, searchClient]);
+
+  const handleOpenDetail = async (invoiceId: string | null) => {
+    if (!invoiceId || !user?.uid || !firestore) return;
+    
+    try {
+      const docRef = doc(firestore, `businesses/${user.uid}/invoices`, invoiceId);
+      const snap = await getDoc(docRef);
+      if (snap.exists()) {
+        setSelectedInvoice({ id: snap.id, ...snap.data() } as Invoice);
+        setIsDetailOpen(true);
+      } else {
+        toast({ variant: 'destructive', title: 'Error', description: 'No se encontró el detalle de esta venta.' });
+      }
+    } catch (e) {
+      toast({ variant: 'destructive', title: 'Error técnico', description: 'Fallo al recuperar la factura.' });
+    }
+  };
+
   const totalTrackedRevenue = useMemo(() => 
     channelShares.reduce((sum, item) => sum + item.totalAmount, 0)
   , [channelShares]);
 
   // --- LÓGICA ANALÍTICA EXISTENTE ---
   const channelData = useMemo(() => {
-    if (isLoading || !orders) return [];
+    if (isLoadingOrders || !orders) return [];
     return MetricsService.analyzeOrdersByChannel(orders);
-  }, [orders, isLoading]);
+  }, [orders, isLoadingOrders]);
 
   const totalOrders = useMemo(() => 
     channelData.reduce((sum, item) => sum + item.value, 0)
   , [channelData]);
 
-  // --- LÓGICA DE GENERACIÓN DE ENLACES (PRESERVADA) ---
   const baseUrl = useMemo(() => {
     if (typeof window === 'undefined' || !user?.uid) return '';
     return `${window.location.origin}/catalog/${user.uid}`;
@@ -144,7 +249,7 @@ export default function PedidosPorCanalPage() {
   const formatCurrency = (val: number) => 
     new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(val);
 
-  if (isLoading) {
+  if (isLoadingOrders) {
     return (
       <div className="flex h-64 items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -159,7 +264,7 @@ export default function PedidosPorCanalPage() {
         <p className="text-muted-foreground">Analiza y genera herramientas de difusión con rastreo inteligente.</p>
       </header>
 
-      {/* --- NUEVA SECCIÓN FASE 4: TRAZABILIDAD TOTAL --- */}
+      {/* --- SECCIÓN 1: TRAZABILIDAD TOTAL --- */}
       <section className="space-y-6 animate-in slide-in-from-top-4 duration-700">
         <div className="flex items-center gap-3">
           <div className="h-1 bg-primary w-12 rounded-full"></div>
@@ -269,10 +374,10 @@ export default function PedidosPorCanalPage() {
         </div>
       </section>
 
-      {/* --- SECCIÓN 2: ANALÍTICA DE PEDIDOS (EXISTENTE) --- */}
-      <div className="flex items-center gap-3">
+      {/* --- SECCIÓN 2: ANALÍTICA DE PEDIDOS (MARKETING) --- */}
+      <div className="flex items-center gap-3 pt-6">
         <div className="h-1 bg-slate-300 w-12 rounded-full"></div>
-        <h2 className="text-xl font-black text-gray-400 uppercase tracking-tighter">Métricas de Marketing (Pedidos)</h2>
+        <h2 className="text-xl font-black text-gray-400 uppercase tracking-tighter">Métricas de Marketing (Pedidos Iniciados)</h2>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
@@ -343,7 +448,7 @@ export default function PedidosPorCanalPage() {
         </Card>
       </div>
 
-      {/* --- SECCIÓN 3: GENERADOR DE ENLACES (EXISTENTE) --- */}
+      {/* --- SECCIÓN 3: GENERADOR DE ENLACES (INTACTO) --- */}
       <Card className="border-2 border-primary/10 shadow-lg overflow-hidden">
         <CardHeader className="bg-primary/5 border-b">
           <div className="flex items-center gap-3">
@@ -422,7 +527,7 @@ export default function PedidosPorCanalPage() {
         </CardContent>
       </Card>
 
-      {/* --- SECCIÓN 4: QR PARA MESAS (EXISTENTE) --- */}
+      {/* --- SECCIÓN 4: QR PARA MESAS (INTACTO) --- */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <Card className="border-2 border-primary/10 shadow-lg">
               <CardHeader>
@@ -507,6 +612,145 @@ export default function PedidosPorCanalPage() {
               </div>
           </Card>
       </div>
+
+      {/* --- NUEVA SECCIÓN FASE 5: BITÁCORA DETALLADA --- */}
+      <Card className="rounded-[2rem] border-2 border-slate-100 shadow-xl overflow-hidden bg-white">
+        <CardHeader className="bg-slate-50/50 border-b p-6">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-primary/10 rounded-xl text-primary">
+                <History size={24} />
+              </div>
+              <div>
+                <CardTitle className="text-xl font-black uppercase tracking-tight">Bitácora de Eventos de Rastreo</CardTitle>
+                <CardDescription className="text-xs font-bold text-primary/70 uppercase tracking-widest">Auditoría de Ventas por Punto de Origen</CardDescription>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+              <div className="relative flex-1 md:w-64">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input 
+                    placeholder="Buscar cliente, vendedor o WhatsApp..." 
+                    className="pl-10 h-10 bg-white border-2 rounded-xl focus-visible:ring-primary/20"
+                    value={searchClient}
+                    onChange={(e) => setSearchClient(e.target.value)}
+                  />
+              </div>
+              
+              <Select value={filterChannel} onValueChange={setFilterChannel}>
+                <SelectTrigger className="h-10 w-40 bg-white border-2 rounded-xl font-bold text-xs">
+                    <SelectValue placeholder="Filtrar Canal" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos los Canales</SelectItem>
+                  <SelectItem value="presencial">Presencial (POS)</SelectItem>
+                  <SelectItem value="online">Online (Catálogo)</SelectItem>
+                  <SelectItem value="directo">Link Directo</SelectItem>
+                  <SelectItem value="redes_sociales">Redes Sociales</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </CardHeader>
+
+        <CardContent className="p-0">
+          <div className="overflow-x-auto">
+             <Table>
+               <TableHeader className="bg-slate-50">
+                 <TableRow>
+                   <TableHead className="text-[10px] font-black uppercase tracking-widest pl-6">Venta / Folio</TableHead>
+                   <TableHead className="text-[10px] font-black uppercase tracking-widest">Canal de Origen</TableHead>
+                   <TableHead className="text-[10px] font-black uppercase tracking-widest">Vendedor</TableHead>
+                   <TableHead className="text-[10px] font-black uppercase tracking-widest">Cliente</TableHead>
+                   <TableHead className="text-[10px] font-black uppercase tracking-widest text-right pr-6">Total</TableHead>
+                   <TableHead className="text-[10px] font-black uppercase tracking-widest text-center">Fecha</TableHead>
+                   <TableHead className="w-[100px] pr-6"></TableHead>
+                 </TableRow>
+               </TableHeader>
+               <TableBody>
+                 {isLogsLoading ? (
+                   <TableRow>
+                     <TableCell colSpan={7} className="h-48 text-center">
+                        <div className="flex flex-col items-center justify-center gap-2 opacity-50">
+                            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                            <span className="text-[10px] font-black uppercase">Recuperando registros...</span>
+                        </div>
+                     </TableCell>
+                   </TableRow>
+                 ) : filteredLogs.length > 0 ? (
+                   filteredLogs.map(event => (
+                     <TableRow key={event.trackingId} className="hover:bg-slate-50/50 transition-colors">
+                        <TableCell className="pl-6 font-mono text-[11px] font-bold text-primary">
+                          {event.invoiceId?.slice(-8).toUpperCase() || '---'}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-col">
+                             <Badge variant="secondary" className="w-fit text-[9px] font-black uppercase py-0 px-2 mb-0.5">
+                                {event.channel}
+                             </Badge>
+                             <span className="text-[9px] text-muted-foreground font-bold uppercase tracking-tighter">
+                               {event.source.replace('_', ' ')}
+                             </span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-xs font-bold text-slate-600">
+                           {event.sellerName || 'Auto-venta'}
+                        </TableCell>
+                        <TableCell>
+                           <div className="flex flex-col">
+                              <span className="text-[11px] font-black text-slate-800 uppercase">{event.customerName}</span>
+                              <span className="text-[9px] font-bold text-muted-foreground flex items-center gap-1">
+                                <Smartphone size={10} className="text-green-500" />
+                                {event.customerWhatsapp || 'N/A'}
+                              </span>
+                           </div>
+                        </TableCell>
+                        <TableCell className="text-right pr-6 font-black text-slate-900 text-xs">
+                          {formatCurrency(event.total)}
+                        </TableCell>
+                        <TableCell className="text-center">
+                           <div className="flex flex-col">
+                              <span className="text-[10px] font-bold text-slate-500">
+                                {event.createdAt?.toDate ? format(event.createdAt.toDate(), "dd/MM/yyyy") : '---'}
+                              </span>
+                              <span className="text-[9px] text-muted-foreground">
+                                {event.createdAt?.toDate ? format(event.createdAt.toDate(), "hh:mm a") : '---'}
+                              </span>
+                           </div>
+                        </TableCell>
+                        <TableCell className="pr-6 text-right">
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="h-8 rounded-xl font-bold gap-2 text-primary hover:bg-primary/5"
+                            onClick={() => handleOpenDetail(event.invoiceId)}
+                          >
+                            <Eye size={14} /> Detalle
+                          </Button>
+                        </TableCell>
+                     </TableRow>
+                   ))
+                 ) : (
+                   <TableRow>
+                     <TableCell colSpan={7} className="h-48 text-center text-muted-foreground">
+                       <p className="text-xs font-bold uppercase tracking-widest opacity-20">No se encontraron eventos rastreados.</p>
+                     </TableCell>
+                   </TableRow>
+                 )}
+               </TableBody>
+             </Table>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Modal de Detalle Compartido */}
+      <InvoiceDetailModal 
+        invoice={selectedInvoice}
+        isOpen={isDetailOpen}
+        onClose={() => setIsDetailOpen(false)}
+        businessType={businessType}
+      />
     </div>
   );
 }
