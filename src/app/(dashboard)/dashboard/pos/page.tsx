@@ -14,6 +14,7 @@ import { Loader2, Calculator, CreditCard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { processSale } from '@/services/billing/billing-service';
+import { registerPOSTracking } from '@/services/billing/tracking-service';
 import { useSearchParams } from 'next/navigation';
 
 /**
@@ -21,7 +22,7 @@ import { useSearchParams } from 'next/navigation';
  * Orquestador central del módulo POS con flujo operativo optimizado y blindaje de errores de runtime.
  */
 export default function POSPage() {
-  const { user } = useUser();
+  const { user, profile } = useUser();
   const firestore = useFirestore();
   const { toast } = useToast();
   const searchParams = useSearchParams();
@@ -71,7 +72,7 @@ export default function POSPage() {
 
   const businessType = (business?.category || 'Retail') as VerticalType;
 
-  // --- LÓGICA DE MESA (EXTRACCIÓN BLINDADA CONTRA NULL MATCH) ---
+  // --- LÓGICA DE MESA (EXTRACCIÓN BLINDADA CON VALIDACIÓN DE LONGITUD) ---
   const orderOrigin = searchParams?.get('ref') || 'web';
   const mesaNumber = useMemo(() => {
     const match = orderOrigin?.match(/mesa-(.+)/);
@@ -82,23 +83,18 @@ export default function POSPage() {
   const financialSummary = useMemo(() => {
     const subtotal = cart.reduce((sum, item) => sum + item.subtotal, 0);
     
-    // A. Calcular Descuento (Paso 1)
     const calculatedDiscount = discountType === 'percent' 
       ? (subtotal * (discountValue / 100)) 
       : discountValue;
 
-    // B. Establecer Base Gravable (Pivote central post-descuento)
     const baseTaxable = Math.max(0, subtotal - calculatedDiscount);
 
-    // C. Calcular IVA sobre la Base
     const calculatedTax = baseTaxable * (taxRate / 100);
     
-    // D. Calcular Propina sobre la Base
     const calculatedTip = tipType === 'percent'
       ? (baseTaxable * (tipValue / 100))
       : tipValue;
 
-    // E. Total Final Consolidado
     const totalFinal = baseTaxable + calculatedTax + calculatedTip;
     const change = Math.max(0, cashReceived - totalFinal);
 
@@ -164,7 +160,7 @@ export default function POSPage() {
 
     setIsProcessing(true);
     try {
-        await processSale(
+        const result = await processSale(
             firestore,
             user.uid,
             user.uid,
@@ -189,9 +185,31 @@ export default function POSPage() {
             businessType
         );
 
+        // FASE 1: REGISTRO DE RASTREO INTELIGENTE (Asíncrono y No Bloqueante)
+        const synthesizedInvoice: Invoice = {
+            id: result.invoiceId,
+            consecutiveNumber: result.consecutiveStr,
+            businessId: user.uid,
+            vendedorId: user.uid,
+            customer: { name: customerName, phone: customerPhone },
+            items: cart,
+            subtotal: financialSummary.subtotal,
+            tax: financialSummary.tax,
+            discount: financialSummary.discount,
+            tip: financialSummary.tip,
+            total: financialSummary.total,
+            paymentMethod: paymentMethod as any,
+            cashReceived,
+            changeAmount: financialSummary.change,
+            createdAt: new Date().toISOString(),
+            status: 'completada'
+        };
+
+        registerPOSTracking(firestore, user.uid, synthesizedInvoice, profile?.name || null);
+
         toast({
             title: "✅ Venta exitosa",
-            description: `Factura registrada correctamente. Stock actualizado.`,
+            description: `Factura ${result.consecutiveStr} registrada correctamente.`,
         });
 
         // Limpiar estados
@@ -239,7 +257,6 @@ export default function POSPage() {
 
   return (
     <div className="flex flex-col gap-8 h-full min-h-screen pb-20 animate-in fade-in duration-500">
-      {/* Header POS */}
       <header className="flex items-center justify-between bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100 shrink-0">
          <div className="flex items-center gap-4">
             <div className="p-3 bg-primary/10 rounded-2xl text-primary shadow-inner">
@@ -253,12 +270,11 @@ export default function POSPage() {
          <div className="hidden md:flex gap-4">
             <div className="bg-slate-50 px-4 py-2 rounded-xl border">
                 <p className="text-[10px] font-black uppercase text-slate-400 leading-none mb-1">Vendedor</p>
-                <p className="text-xs font-bold text-slate-700">{user?.email}</p>
+                <p className="text-xs font-bold text-slate-700">{profile?.name || user?.email}</p>
             </div>
          </div>
       </header>
 
-      {/* Main POS Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-auto">
         <div className="lg:col-span-7 xl:col-span-8 overflow-hidden">
           <ProductCatalog 
