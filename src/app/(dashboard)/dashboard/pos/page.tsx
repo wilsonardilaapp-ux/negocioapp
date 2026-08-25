@@ -35,7 +35,7 @@ export default function POSPage() {
     () => (user?.uid ? collection(firestore, `businesses/${user.uid}/products`) : null),
     [user, firestore]
   );
-  const { data: products, isLoading: loadingProducts } = useCollection<Product>(productsQuery);
+  const { data: products, isLoading: loadingProducts } = loadingBusiness ? { data: null, isLoading: true } : useCollection<Product>(productsQuery);
 
   // 2. Suscripción al Historial de Facturas
   const invoicesQuery = useMemoFirebase(
@@ -47,6 +47,7 @@ export default function POSPage() {
   // 3. Estado local del carrito y financiera
   const [cart, setCart] = useState<POSItem[]>([]);
   const [customerName, setCustomerName] = useState('Cliente General');
+  const [customerPhone, setCustomerPhone] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   
   // Variables Financieras
@@ -66,29 +67,29 @@ export default function POSPage() {
     
     // A. Calcular Descuento
     const discountAmount = discountType === 'percent' 
-      ? (subtotal * discountValue / 100) 
+      ? (subtotal * (discountValue / 100)) 
       : discountValue;
 
     // B. Establecer Base Gravable (Pivote central)
     const baseTaxable = Math.max(0, subtotal - discountAmount);
 
     // C. Calcular IVA sobre la Base
-    const taxAmount = baseTaxable * (taxRate / 100);
+    const calculatedTax = baseTaxable * (taxRate / 100);
     
-    // D. Calcular Propina sobre la Base (No sobre el subtotal bruto)
-    const tipAmount = tipType === 'percent'
-      ? (baseTaxable * tipValue / 100)
+    // D. Calcular Propina sobre la Base
+    const calculatedTip = tipType === 'percent'
+      ? (baseTaxable * (tipValue / 100))
       : tipValue;
 
     // E. Total Final Consolidado
-    const totalFinal = baseTaxable + taxAmount + tipAmount;
+    const totalFinal = baseTaxable + calculatedTax + calculatedTip;
     const change = Math.max(0, cashReceived - totalFinal);
 
     return {
       subtotal,
       discount: Math.round(discountAmount),
-      tax: Math.round(taxAmount),
-      tip: Math.round(tipAmount),
+      tax: Math.round(calculatedTax),
+      tip: Math.round(calculatedTip),
       total: Math.round(totalFinal),
       change
     };
@@ -146,14 +147,17 @@ export default function POSPage() {
 
     setIsProcessing(true);
     try {
-        const result = await processSale(
+        await processSale(
             firestore,
             user.uid,
             user.uid,
             {
                 businessId: user.uid,
                 vendedorId: user.uid,
-                customer: { name: customerName },
+                customer: { 
+                  name: customerName,
+                  phone: customerPhone 
+                },
                 items: cart,
                 subtotal: financialSummary.subtotal,
                 tax: financialSummary.tax,
@@ -169,12 +173,13 @@ export default function POSPage() {
 
         toast({
             title: "✅ Venta exitosa",
-            description: `Factura ${result.consecutiveStr} registrada. Stock actualizado.`,
+            description: `Factura registrada correctamente. Stock actualizado.`,
         });
 
         // Limpiar estados
         setCart([]);
         setCustomerName('Cliente General');
+        setCustomerPhone('');
         setCashReceived(0);
         setDiscountValue(0);
         setTipValue(0);
@@ -221,9 +226,8 @@ export default function POSPage() {
          </div>
       </header>
 
-      {/* Main POS Grid (Doble Columna) */}
+      {/* Main POS Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-auto">
-        {/* Lado Izquierdo: Catálogo */}
         <div className="lg:col-span-7 xl:col-span-8 overflow-hidden">
           <ProductCatalog 
             products={products || []} 
@@ -232,9 +236,7 @@ export default function POSPage() {
           />
         </div>
 
-        {/* Lado Derecho: Flujo de Facturación */}
         <div className="lg:col-span-5 xl:col-span-4 flex flex-col gap-6 overflow-hidden">
-          {/* 1. Factura Actual y Resumen Financiero */}
           <div className="overflow-hidden">
             <InvoiceCart 
               items={cart}
@@ -243,6 +245,8 @@ export default function POSPage() {
               businessType={businessType}
               customerName={customerName}
               setCustomerName={setCustomerName}
+              customerPhone={customerPhone}
+              setCustomerPhone={setCustomerPhone}
               
               // Financial Props
               discountType={discountType}
@@ -263,7 +267,6 @@ export default function POSPage() {
             />
           </div>
           
-          {/* 2. Control de Efectivo */}
           <div className="shrink-0">
              <CashControl 
                total={financialSummary.total} 
@@ -272,7 +275,6 @@ export default function POSPage() {
              />
           </div>
 
-          {/* 3. Acción Maestra (Registrar) */}
           <Button 
             className="w-full h-14 rounded-2xl text-lg font-black uppercase tracking-widest shadow-xl bg-primary hover:bg-primary/90 transition-all active:scale-95 disabled:opacity-30"
             disabled={cart.length === 0 || isProcessing}
@@ -287,7 +289,6 @@ export default function POSPage() {
         </div>
       </div>
 
-      {/* SECCIÓN 3: HISTORIAL DE VENTAS */}
       <section className="mt-4">
          <InvoiceHistoryTable 
            invoices={invoices || []} 

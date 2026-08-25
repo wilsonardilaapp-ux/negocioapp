@@ -192,6 +192,12 @@ export function InvoiceDetailModal({ invoice, isOpen, onClose, mode = 'view', bu
                         <span>-{formatCurrency(invoice.discount)}</span>
                     </div>
                 )}
+                {invoice.tip > 0 && (
+                    <div className="flex justify-between items-center text-[10px] font-bold text-blue-400 uppercase tracking-widest">
+                        <span>Propina / Servicio</span>
+                        <span>{formatCurrency(invoice.tip)}</span>
+                    </div>
+                )}
              </div>
 
              <Separator className="bg-slate-800" />

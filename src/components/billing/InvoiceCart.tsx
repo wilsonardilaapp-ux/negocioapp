@@ -15,6 +15,7 @@ import {
   Receipt, 
   DollarSign, 
   Percent,
+  Smartphone
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { POSItem, VerticalType, DiscountType } from '@/types/billing';
@@ -27,6 +28,8 @@ interface InvoiceCartProps {
   businessType: VerticalType;
   customerName: string;
   setCustomerName: (val: string) => void;
+  customerPhone: string;
+  setCustomerPhone: (val: string) => void;
   
   // Financial Control
   discountType: DiscountType;
@@ -59,6 +62,8 @@ export default function InvoiceCart({
   businessType,
   customerName,
   setCustomerName,
+  customerPhone,
+  setCustomerPhone,
   discountType,
   setDiscountType,
   discountValue,
@@ -88,17 +93,31 @@ export default function InvoiceCart({
 
       <CardContent className="flex-1 flex flex-col p-4 gap-3 overflow-hidden">
         <div className="space-y-3">
-          <div className="space-y-1">
-            <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest flex items-center gap-1">
-              <User size={10} /> Cliente
-            </Label>
-            <Input 
-              placeholder="Nombre o documento..." 
-              value={customerName}
-              onChange={(e) => setCustomerName(e.target.value)}
-              className="h-8 font-bold bg-muted/30 border-none text-xs"
-              disabled={isProcessing}
-            />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest flex items-center gap-1">
+                <User size={10} /> Cliente
+              </Label>
+              <Input 
+                placeholder="Nombre o documento..." 
+                value={customerName}
+                onChange={(e) => setCustomerName(e.target.value)}
+                className="h-8 font-bold bg-muted/30 border-none text-xs"
+                disabled={isProcessing}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest flex items-center gap-1">
+                <Smartphone size={10} /> WhatsApp del Cliente
+              </Label>
+              <Input 
+                placeholder="Ej: 3001234567" 
+                value={customerPhone}
+                onChange={(e) => setCustomerPhone(e.target.value)}
+                className="h-8 font-bold bg-muted/30 border-none text-xs"
+                disabled={isProcessing}
+              />
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -204,9 +223,9 @@ export default function InvoiceCart({
                     </div>
                     <div className="relative">
                         {discountType === 'percent' ? (
-                          <Percent size={10} className="absolute left-2 top-1/2 -translate-y-1/2 text-primary font-bold" />
+                          <Percent size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-primary font-bold" />
                         ) : (
-                          <DollarSign size={10} className="absolute left-2 top-1/2 -translate-y-1/2 text-primary font-bold" />
+                          <DollarSign size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-primary font-bold" />
                         )}
                         <Input 
                             type="number"
@@ -249,9 +268,9 @@ export default function InvoiceCart({
                     <div className="flex items-center gap-1">
                         <div className="relative flex-1">
                             {tipType === 'percent' ? (
-                              <Percent size={10} className="absolute left-2 top-1/2 -translate-y-1/2 text-primary font-bold" />
+                              <Percent size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-primary font-bold" />
                             ) : (
-                              <DollarSign size={10} className="absolute left-2 top-1/2 -translate-y-1/2 text-primary font-bold" />
+                              <DollarSign size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-primary font-bold" />
                             )}
                             <Input 
                                 type="number"
@@ -305,7 +324,7 @@ export default function InvoiceCart({
           </div>
           {summary.discount > 0 && (
             <div className="flex justify-between text-[11px] font-bold text-red-400 uppercase tracking-tighter animate-in fade-in slide-in-from-left-1">
-                <span>{`Descuento ${discountType === 'percent' ? `(${discountValue}%)` : ''}`}</span>
+                <span>Descuento {discountType === 'percent' ? `(${discountValue}%)` : ''}</span>
                 <span>-{formatCurrency(summary.discount)}</span>
             </div>
           )}
@@ -315,7 +334,7 @@ export default function InvoiceCart({
           </div>
           {summary.tip > 0 && (
             <div className="flex justify-between text-[11px] font-bold text-blue-400 uppercase tracking-tighter animate-in fade-in slide-in-from-left-1">
-              <span>{`Propina / Servicio ${tipType === 'percent' ? `(${tipAmount}%)` : ''}`}</span>
+              <span>Propina / Servicio {tipType === 'percent' ? `(${tipAmount}%)` : ''}</span>
               <span>{formatCurrency(summary.tip)}</span>
             </div>
           )}
