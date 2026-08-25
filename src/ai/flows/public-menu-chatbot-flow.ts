@@ -3,10 +3,11 @@
 /**
  * @fileOverview Flujo de Genkit para el chatbot del menú público.
  * 
- * FASE 5 (Seguridad Multi-inquilino):
- * - Se elimina 'businessId' del esquema de la IA para evitar alucinaciones.
- * - La herramienta de agendamiento captura el ID directamente del contexto del servidor (closure).
- * - Se implementa normalización estricta de formatos para la Agenda.
+ * RE-ARQUITECTURA (Estabilización Operativa):
+ * - Se mueve 'bookAppointmentTool' al nivel superior para evitar errores de registro duplicado en Genkit.
+ * - Se incluye 'businessId' en el esquema de la herramienta para soporte multi-inquilino.
+ * - Se implementa normalización estricta de formatos (YYYY-MM-DD y HH:mm 24h).
+ * - Se garantiza la persistencia en Firestore mediante Firebase Admin SDK.
  */
 
 import { ai } from '@/ai/genkit';
@@ -16,8 +17,6 @@ import {
   PublicMenuChatbotInputSchema, 
   PublicMenuChatbotOutputSchema, 
   PublicMenuChatbotOutput,
-  DEFAULT_CHATBOT_CONFIG,
-  PublicMenuChatbotConfig
 } from '@/models/public-menu-chatbot';
 import { getAIConfig } from './chat-flow';
 import { calculateEndTime } from '@/lib/booking-engine';
@@ -51,6 +50,85 @@ function normalizeTime(timeStr: string): string {
   return `${String(hours).padStart(2, '0')}:${minutes}`;
 }
 
+/**
+ * HERRAMIENTA EJECUTIVA: bookAppointmentTool
+ * Se define fuera del flujo para evitar el error "Action already registered".
+ */
+export const bookAppointmentTool = ai.defineTool(
+  {
+    name: 'bookAppointmentTool',
+    description: 'Registra una reserva en el sistema de citas de Firestore.',
+    inputSchema: z.object({
+      businessId: z.string().describe('ID único del negocio (inquilino)'),
+      customerName: z.string().describe('Nombre del cliente'),
+      customerPhone: z.string().describe('WhatsApp del cliente'),
+      serviceName: z.string().describe('Nombre del servicio solicitado'),
+      date: z.string().describe('Fecha de la cita en formato YYYY-MM-DD'),
+      startTime: z.string().describe('Hora de inicio en formato HH:mm (24h)'),
+    }),
+  },
+  async (toolInput) => {
+    console.log(`[bookAppointmentTool] Ejecutando guardado para: ${toolInput.customerName} en ${toolInput.businessId}`);
+    
+    try {
+      const db = await getAdminFirestore();
+      const normalizedDate = normalizeDate(toolInput.date);
+      const normalizedStartTime = normalizeTime(toolInput.startTime);
+      
+      // Búsqueda de servicio para obtener metadatos (duración/precio)
+      const servicesSnap = await db.collection(`businesses/${toolInput.businessId}/bookingServices`).get();
+      const service = servicesSnap.docs.map(d => ({id: d.id, ...d.data()} as any))
+        .find(s => s.name.toLowerCase().includes(toolInput.serviceName.toLowerCase()));
+
+      const reservationId = db.collection('placeholder').doc().id;
+      const duration = service?.durationMinutes || 45;
+      const price = service?.price || 0;
+
+      const reservationData = {
+        id: reservationId,
+        businessId: toolInput.businessId,
+        customerName: toolInput.customerName.trim(),
+        customerPhone: toolInput.customerPhone.trim(),
+        serviceId: service?.id || 'chatbot_generic',
+        serviceName: service?.name || toolInput.serviceName,
+        staffId: null,
+        staffName: "Pendiente de asignación",
+        date: normalizedDate,
+        startTime: normalizedStartTime,
+        endTime: calculateEndTime(normalizedStartTime, duration),
+        price: price,
+        durationMinutes: duration,
+        status: 'pending',
+        source: 'chatbot',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      // Sanitización atómica para evitar errores de campos undefined en Firestore
+      const cleanData = JSON.parse(JSON.stringify(reservationData));
+
+      await db.collection(`businesses/${toolInput.businessId}/reservations`).doc(reservationId).set(cleanData);
+      
+      console.log(`[bookAppointmentTool] ÉXITO: Cita guardada en ID REAL: businesses/${toolInput.businessId}/reservations/${reservationId}`);
+
+      return { 
+        success: true, 
+        reservationId: reservationId.slice(-6).toUpperCase(),
+        date: normalizedDate,
+        startTime: normalizedStartTime,
+        customerName: toolInput.customerName,
+        serviceName: service?.name || toolInput.serviceName
+      };
+    } catch (error: any) {
+      console.error("[bookAppointmentTool] Error crítico:", error.message);
+      return { 
+        success: false, 
+        error: "No se pudo conectar con la base de datos de reservas." 
+      };
+    }
+  }
+);
+
 export const publicMenuChatbotFlow = ai.defineFlow(
   {
     name: 'publicMenuChatbotFlow',
@@ -66,8 +144,8 @@ export const publicMenuChatbotFlow = ai.defineFlow(
     const appointmentIntents = ['cita', 'agendar', 'reserva', 'turno', 'reservar'];
     const isAppointmentIntent = appointmentIntents.some(intent => lowQuestion.includes(intent));
 
+    // Si NO es una intención de agendamiento, procesamos respuestas rápidas de contacto/ubicación
     if (!isAppointmentIntent) {
-        // Respuestas personalizadas e información del negocio (solo si no es cita)
         try {
           const responsesSnap = await db.collection(`businesses/${businessId}/publicMenuChatbot/main/responses`)
             .where('isActive', '==', true).get();
@@ -88,68 +166,7 @@ export const publicMenuChatbotFlow = ai.defineFlow(
         }
     }
 
-    // --- PASO 2: DEFINICIÓN DE HERRAMIENTA CONTEXTUAL (SaaS Multi-tenant Safe) ---
-    // Definimos la herramienta con un ID único para evitar el error "Action already registered"
-    const toolName = `bookAppointment_${businessId.replace(/[^a-zA-Z0-9]/g, '_')}`;
-    
-    const bookAppointmentTool = ai.defineTool(
-      {
-        name: toolName,
-        description: 'Registra una reserva. NO requiere businessId, se inyecta automáticamente.',
-        inputSchema: z.object({
-          customerName: z.string().describe('Nombre del cliente'),
-          customerPhone: z.string().describe('WhatsApp del cliente'),
-          serviceName: z.string().describe('Servicio solicitado'),
-          date: z.string().describe('Fecha YYYY-MM-DD'),
-          startTime: z.string().describe('Hora HH:mm'),
-        }),
-      },
-      async (toolInput) => {
-        try {
-          const normalizedDate = normalizeDate(toolInput.date);
-          const normalizedStartTime = normalizeTime(toolInput.startTime);
-          
-          // Búsqueda de servicio para obtener metadatos (duración/precio)
-          const servicesSnap = await db.collection(`businesses/${businessId}/bookingServices`).get();
-          const service = servicesSnap.docs.map(d => ({id: d.id, ...d.data()} as any))
-            .find(s => s.name.toLowerCase().includes(toolInput.serviceName.toLowerCase()));
-
-          const reservationId = db.collection('placeholder').doc().id;
-          const reservationData = {
-            id: reservationId,
-            businessId: businessId, // <--- INYECCIÓN SEGURA DESDE EL CLOSURE
-            customerName: toolInput.customerName.trim(),
-            customerPhone: toolInput.customerPhone.trim(),
-            serviceId: service?.id || 'chatbot_generic',
-            serviceName: service?.name || toolInput.serviceName,
-            date: normalizedDate,
-            startTime: normalizedStartTime,
-            endTime: calculateEndTime(normalizedStartTime, service?.durationMinutes || 45),
-            price: service?.price || 0,
-            status: 'pending',
-            source: 'chatbot',
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-          };
-
-          await db.collection(`businesses/${businessId}/reservations`).doc(reservationId).set(reservationData);
-          
-          console.log(`[Chatbot Success] Cita guardada en ID REAL: businesses/${businessId}/reservations/${reservationId}`);
-
-          return { 
-            success: true, 
-            reservationId: reservationId.slice(-6).toUpperCase(),
-            date: normalizedDate,
-            startTime: normalizedStartTime
-          };
-        } catch (error: any) {
-          console.error("[bookAppointmentTool] Error:", error.message);
-          return { success: false };
-        }
-      }
-    );
-
-    // --- PASO 3: EJECUCIÓN DEL MOTOR DE IA ---
+    // --- PASO 2: EJECUCIÓN DEL MOTOR DE IA ---
     try {
       const catalogSnap = await db.collection(`businesses/${businessId}/publicData`).doc('catalog').get();
       const products = catalogSnap.data()?.products || [];
@@ -157,15 +174,17 @@ export const publicMenuChatbotFlow = ai.defineFlow(
 
       const aiConfig = await getAIConfig(businessId);
       
-      const systemPrompt = `Eres el asistente virtual de ${businessId}.
-      CATÁLOGO ACTUAL:
+      const systemPrompt = `Eres el asistente virtual oficial del negocio.
+      CATÁLOGO DE SERVICIOS/PRODUCTOS:
       ${formattedCatalog}
       
-      REGLAS:
+      REGLAS CRÍTICAS:
       1. Si el cliente quiere agendar, solicita: Nombre, WhatsApp, Servicio y Fecha/Hora.
-      2. Cuando tengas los datos, usa la herramienta '${toolName}'.
-      3. IMPORTANTE: El ID de negocio se inyecta automáticamente, no lo preguntes ni lo inventes.
-      4. SOLO confirma la cita cuando la herramienta devuelva éxito.`;
+      2. Cuando tengas los datos, usa obligatoriamente la herramienta 'bookAppointmentTool'.
+      3. IMPORTANTE: Para la herramienta, utiliza siempre businessId: '${businessId}'. No lo inventes.
+      4. SOLO confirma la cita cuando la herramienta devuelva éxito.
+      5. NO redactes confirmaciones falsas. Si la herramienta no se ejecuta, dile al cliente que estás procesando sus datos.
+      6. Formato de respuesta tras éxito: Muestra el ID de reserva, servicio, fecha y hora de forma estructurada.`;
 
       const response = await ai.generate({
         model: 'googleai/gemini-1.5-flash',
@@ -179,13 +198,16 @@ export const publicMenuChatbotFlow = ai.defineFlow(
       });
       
       return { 
-        answer: response.text || "Solicitud procesada.", 
+        answer: response.text || "Tu solicitud ha sido procesada.", 
         source: 'ai_generated' 
       };
 
     } catch (error: any) {
       console.error("[REAL_CHATBOT_ERROR]:", error);
-      return { answer: "Hubo un inconveniente técnico. Por favor, intenta de nuevo.", source: 'fallback' };
+      return { 
+        answer: "Lo siento, tuve un inconveniente al procesar tu consulta. Por favor intenta de nuevo o contacta al negocio.", 
+        source: 'fallback' 
+      };
     }
   }
 );
