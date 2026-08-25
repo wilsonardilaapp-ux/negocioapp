@@ -31,19 +31,19 @@ interface InvoiceCartProps {
   customerPhone: string;
   onCustomerPhoneChange?: (val: string) => void;
   
-  // Financial Control
+  // Financial Control - Aligned names with page.tsx
   discountType: DiscountType;
-  setDiscountType: (type: DiscountType) => void;
+  onDiscountTypeChange?: (type: DiscountType) => void;
   discountValue: number;
-  setDiscountValue: (val: number) => void;
+  onDiscountValueChange?: (val: number) => void;
   taxRate: number;
-  setTaxRate: (val: number) => void;
+  onTaxRateChange?: (rate: number) => void;
   tipAmount: number;
-  setTipAmount: (val: number) => void;
-  tipType: DiscountType;
-  setTipType: (type: DiscountType) => void;
+  onTipAmountChange?: (val: number) => void;
+  tipType: 'amount' | 'percent';
+  onTipTypeChange?: (type: 'amount' | 'percent') => void;
   paymentMethod: string;
-  setPaymentMethod: (val: string) => void;
+  onPaymentMethodChange?: (method: string) => void;
   
   summary: {
       subtotal: number;
@@ -65,16 +65,17 @@ export default function InvoiceCart({
   customerPhone,
   onCustomerPhoneChange,
   discountType,
-  setDiscountType,
+  onDiscountTypeChange,
   discountValue,
-  setDiscountValue,
+  onDiscountValueChange,
   taxRate,
+  onTaxRateChange,
   tipAmount,
-  setTipAmount,
+  onTipAmountChange,
   tipType,
-  setTipType,
+  onTipTypeChange,
   paymentMethod,
-  setPaymentMethod,
+  onPaymentMethodChange,
   summary,
   isProcessing
 }: InvoiceCartProps) {
@@ -199,7 +200,7 @@ export default function InvoiceCart({
                         <div className="flex bg-muted p-0.5 rounded-lg border">
                           <button 
                             type="button"
-                            onClick={() => setDiscountType('amount')}
+                            onClick={() => onDiscountTypeChange?.('amount')}
                             className={cn(
                               "px-2 py-0.5 rounded text-[9px] font-black transition-all",
                               discountType === 'amount' ? "bg-white shadow-sm text-primary" : "text-muted-foreground"
@@ -210,7 +211,7 @@ export default function InvoiceCart({
                           </button>
                           <button 
                             type="button"
-                            onClick={() => setDiscountType('percent')}
+                            onClick={() => onDiscountTypeChange?.('percent')}
                             className={cn(
                               "px-2 py-0.5 rounded text-[9px] font-black transition-all",
                               discountType === 'percent' ? "bg-white shadow-sm text-primary" : "text-muted-foreground"
@@ -230,7 +231,7 @@ export default function InvoiceCart({
                         <Input 
                             type="number"
                             value={discountValue || ''}
-                            onChange={(e) => setDiscountValue(Number(e.target.value))}
+                            onChange={(e) => onDiscountValueChange?.(Number(e.target.value))}
                             className="h-7 pl-6 text-xs font-bold bg-white focus-visible:ring-primary/20"
                             disabled={isProcessing}
                         />
@@ -243,7 +244,7 @@ export default function InvoiceCart({
                         <div className="flex bg-muted p-0.5 rounded-lg border">
                           <button 
                             type="button"
-                            onClick={() => setTipType('amount')}
+                            onClick={() => onTipTypeChange?.('amount')}
                             className={cn(
                               "px-2 py-0.5 rounded text-[9px] font-black transition-all",
                               tipType === 'amount' ? "bg-white shadow-sm text-primary" : "text-muted-foreground"
@@ -254,7 +255,7 @@ export default function InvoiceCart({
                           </button>
                           <button 
                             type="button"
-                            onClick={() => setTipType('percent')}
+                            onClick={() => onTipTypeChange?.('percent')}
                             className={cn(
                               "px-2 py-0.5 rounded text-[9px] font-black transition-all",
                               tipType === 'percent' ? "bg-white shadow-sm text-primary" : "text-muted-foreground"
@@ -275,7 +276,7 @@ export default function InvoiceCart({
                             <Input 
                                 type="number"
                                 value={tipAmount || ''}
-                                onChange={(e) => setTipAmount(Number(e.target.value))}
+                                onChange={(e) => onTipAmountChange?.(Number(e.target.value))}
                                 className="h-7 pl-6 text-xs font-bold bg-white focus-visible:ring-primary/20"
                                 disabled={isProcessing}
                             />
@@ -285,7 +286,7 @@ export default function InvoiceCart({
                             variant="outline" 
                             size="icon" 
                             className="h-7 w-7 rounded-lg shrink-0 border-primary/20 text-primary hover:bg-primary/5"
-                            onClick={() => { setTipType('percent'); setTipAmount(10); }}
+                            onClick={() => { onTipTypeChange?.('percent'); onTipAmountChange?.(10); }}
                             disabled={isProcessing}
                         >
                             <span className="text-[8px] font-black">10%</span>
@@ -301,7 +302,7 @@ export default function InvoiceCart({
                         <button
                             key={method}
                             type="button"
-                            onClick={() => setPaymentMethod(method)}
+                            onClick={() => onPaymentMethodChange?.(method)}
                             disabled={isProcessing}
                             className={cn(
                                 "flex-1 py-1 rounded-lg text-[9px] font-black uppercase border transition-all",
