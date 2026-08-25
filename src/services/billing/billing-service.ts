@@ -5,8 +5,16 @@ import type { Product } from '@/models/product';
 /**
  * @fileOverview Servicio de persistencia para la Terminal POS.
  * Ejecuta transacciones atómicas para garantizar la integridad del stock y consecutivos.
- * Reestructurado para cumplir la regla "Read before Write" de Firestore.
+ * Implementa sanitización recursiva para evitar errores de campos 'undefined' en Firestore.
  */
+
+/**
+ * Elimina valores 'undefined' de un objeto de forma recursiva, convirtiéndolos en 'null'.
+ * Requisito crítico para la estabilidad de transacciones en Firestore.
+ */
+const sanitizePayload = (obj: any): any => {
+  return JSON.parse(JSON.stringify(obj, (key, value) => (value === undefined ? null : value)));
+};
 
 export async function processSale(
   db: Firestore,
@@ -16,7 +24,7 @@ export async function processSale(
   businessType: VerticalType
 ) {
   return await runTransaction(db, async (transaction) => {
-    // --- FASE 1: TODAS LAS LECTURAS Y VALIDACIONES PRIMERO ---
+    // --- FASE 1: TODAS LAS LECTURAS Y VALIDACIONES PRIMERO (READ BEFORE WRITE) ---
     
     // 1. Preparar referencias y recolectar promesas de lectura para productos
     const itemRefs = invoiceData.items.map(item => ({
@@ -77,16 +85,18 @@ export async function processSale(
     // 2. Actualizar Consecutivo Atómico
     transaction.set(counterRef, { current: nextNumber }, { merge: true });
 
-    // 3. Registrar Factura Oficial
+    // 3. Registrar Factura Oficial (CON SANITIZACIÓN)
     const invoiceRef = doc(db, `businesses/${businessId}/invoices`, invoiceId);
-    const finalInvoice: Invoice = {
+    const rawInvoice: Invoice = {
       ...invoiceData,
       id: invoiceId,
       consecutiveNumber: consecutiveStr,
       createdAt: now,
       status: 'completada'
     };
-    transaction.set(invoiceRef, finalInvoice);
+    
+    // Blindaje contra valores 'undefined'
+    transaction.set(invoiceRef, sanitizePayload(rawInvoice));
 
     // 4. Registro de Trazabilidad en Kardex (stock_movements)
     for (const item of invoiceData.items) {
@@ -106,7 +116,7 @@ export async function processSale(
     // 5. Espejo en Órdenes (Comanda para cocina/barra si es Restaurante)
     if (businessType === 'Restaurante') {
         const orderRef = doc(db, `businesses/${businessId}/orders`, invoiceId);
-        transaction.set(orderRef, {
+        const rawOrder = {
             id: invoiceId,
             businessId,
             customerName: invoiceData.customer.name,
@@ -125,10 +135,13 @@ export async function processSale(
             orderDate: now,
             orderStatus: 'Pendiente',
             paymentMethod: invoiceData.paymentMethod,
-            paymentStatus: 'paid', // En POS la venta se asume cobrada
+            paymentStatus: 'paid',
             origin: `pos-${invoiceData.mesa || 'barra'}`,
             tipoEntrega: invoiceData.tipoConsumo === 'domicilio' ? 'domicilio' : 'recoger_en_tienda'
-        });
+        };
+        
+        // Blindaje contra valores 'undefined' en la orden espejo
+        transaction.set(orderRef, sanitizePayload(rawOrder));
     }
 
     return { invoiceId, consecutiveStr };
