@@ -10,16 +10,18 @@ import ProductCatalog from '@/components/billing/ProductCatalog';
 import InvoiceCart from '@/components/billing/InvoiceCart';
 import CashControl from '@/components/billing/CashControl';
 import InvoiceHistoryTable from '@/components/billing/InvoiceHistoryTable';
+import { TrackingConfirmationCard } from '@/components/billing/TrackingConfirmationCard';
 import { Loader2, Calculator, CreditCard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { processSale } from '@/services/billing/billing-service';
 import { registerPOSTracking } from '@/services/billing/tracking-service';
 import { useSearchParams } from 'next/navigation';
+import { AnimatePresence } from 'framer-motion';
 
 /**
  * @fileOverview Página principal de la Terminal de Facturación (POS).
- * Orquestador central del módulo POS con flujo operativo optimizado y blindaje de errores de runtime.
+ * Orquestador central del módulo POS con flujo operativo optimizado y rastreo inteligente.
  */
 export default function POSPage() {
   const { user, profile } = useUser();
@@ -27,30 +29,21 @@ export default function POSPage() {
   const { toast } = useToast();
   const searchParams = useSearchParams();
 
-  // 1. Obtener contexto del negocio y productos con guardias estrictas (Anti TypeError reading '1')
+  // 1. Obtener contexto del negocio y productos con guardias estrictas
   const businessRef = useMemoFirebase(
-    () => {
-      if (!firestore || !user?.uid) return null;
-      return doc(firestore, 'businesses', user.uid);
-    },
+    () => (firestore && user?.uid ? doc(firestore, 'businesses', user.uid) : null),
     [user?.uid, firestore]
   );
   const { data: business, isLoading: loadingBusiness } = useDoc<Business>(businessRef);
 
   const productsQuery = useMemoFirebase(
-    () => {
-      if (!firestore || !user?.uid) return null;
-      return collection(firestore, `businesses/${user.uid}/products`);
-    },
+    () => (firestore && user?.uid ? collection(firestore, `businesses/${user.uid}/products`) : null),
     [user?.uid, firestore]
   );
   const { data: products, isLoading: loadingProducts } = useCollection<Product>(productsQuery);
 
   const invoicesQuery = useMemoFirebase(
-    () => {
-      if (!firestore || !user?.uid) return null;
-      return collection(firestore, `businesses/${user.uid}/invoices`);
-    },
+    () => (firestore && user?.uid ? collection(firestore, `businesses/${user.uid}/invoices`) : null),
     [user?.uid, firestore]
   );
   const { data: invoices, isLoading: loadingInvoices } = useCollection<Invoice>(invoicesQuery);
@@ -60,6 +53,7 @@ export default function POSPage() {
   const [customerName, setCustomerName] = useState('Cliente General');
   const [customerPhone, setCustomerPhone] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [lastSaleEvent, setLastSaleEvent] = useState<Invoice | null>(null);
   
   // Variables Financieras
   const [discountType, setDiscountType] = useState<DiscountType>('amount');
@@ -72,23 +66,22 @@ export default function POSPage() {
 
   const businessType = (business?.category || 'Retail') as VerticalType;
 
-  // --- LÓGICA DE MESA (EXTRACCIÓN BLINDADA CON VALIDACIÓN DE LONGITUD) ---
+  // --- LÓGICA DE MESA (EXTRACCIÓN BLINDADA) ---
   const orderOrigin = searchParams?.get('ref') || 'web';
   const mesaNumber = useMemo(() => {
     const match = orderOrigin?.match(/mesa-(.+)/);
     return (match && match.length > 1) ? match[1] : null;
   }, [orderOrigin]);
 
-  // 3. Motor de Cálculos Reactivos (Fórmulas Blindadas de Base Gravable Única)
+  // 3. Motor de Cálculos Reactivos
   const financialSummary = useMemo(() => {
-    const subtotal = cart.reduce((sum, item) => sum + item.subtotal, 0);
+    const subtotal = (cart || []).reduce((sum, item) => sum + (item.subtotal || 0), 0);
     
     const calculatedDiscount = discountType === 'percent' 
       ? (subtotal * (discountValue / 100)) 
       : discountValue;
 
     const baseTaxable = Math.max(0, subtotal - calculatedDiscount);
-
     const calculatedTax = baseTaxable * (taxRate / 100);
     
     const calculatedTip = tipType === 'percent'
@@ -111,6 +104,7 @@ export default function POSPage() {
   // 4. Handlers de Carrito
   const handleAddToCart = (product: Product) => {
     if (isProcessing) return;
+    setLastSaleEvent(null); // Ocultar confirmación previa al iniciar nueva venta
     setCart(prev => {
       const existing = prev.find(item => item.productId === product.id);
       if (existing) {
@@ -185,7 +179,6 @@ export default function POSPage() {
             businessType
         );
 
-        // FASE 1: REGISTRO DE RASTREO INTELIGENTE (Asíncrono y No Bloqueante)
         const synthesizedInvoice: Invoice = {
             id: result.invoiceId,
             consecutiveNumber: result.consecutiveStr,
@@ -205,14 +198,18 @@ export default function POSPage() {
             status: 'completada'
         };
 
+        // REGISTRO DE RASTREO INTELIGENTE
         registerPOSTracking(firestore, user.uid, synthesizedInvoice, profile?.name || null);
+
+        // FASE 2: ALMACENAR EVENTO PARA FEEDBACK VISUAL
+        setLastSaleEvent(synthesizedInvoice);
 
         toast({
             title: "✅ Venta exitosa",
             description: `Factura ${result.consecutiveStr} registrada correctamente.`,
         });
 
-        // Limpiar estados
+        // Limpiar estados de venta
         setCart([]);
         setCustomerName('Cliente General');
         setCustomerPhone('');
@@ -232,7 +229,6 @@ export default function POSPage() {
     }
   };
 
-  // Atajo de teclado F8
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
         if (e.key === 'F8') {
@@ -292,48 +288,57 @@ export default function POSPage() {
               onRemoveItem={handleRemoveItem}
               businessType={businessType}
               customerName={customerName}
-              setCustomerName={setCustomerName}
+              onCustomerNameChange={setCustomerName}
               customerPhone={customerPhone}
-              setCustomerPhone={setCustomerPhone}
+              onCustomerPhoneChange={setCustomerPhone}
               
-              // Financial Control
               discountType={discountType}
-              setDiscountType={setDiscountType}
+              onDiscountTypeChange={setDiscountType}
               discountValue={discountValue}
-              setDiscountValue={setDiscountValue}
+              onDiscountValueChange={setDiscountValue}
               taxRate={taxRate}
-              setTaxRate={setTaxRate}
+              onTaxRateChange={setTaxRate}
               tipAmount={tipValue}
-              setTipAmount={setTipValue}
+              onTipAmountChange={setTipValue}
               tipType={tipType}
-              setTipType={setTipType}
+              onTipTypeChange={setTipType}
               paymentMethod={paymentMethod}
-              setPaymentMethod={setPaymentMethod}
+              onPaymentMethodChange={setPaymentMethod}
               
               summary={financialSummary}
               isProcessing={isProcessing}
             />
           </div>
           
-          <div className="shrink-0">
+          <div className="shrink-0 space-y-6">
              <CashControl 
                total={financialSummary.total} 
                cashReceived={cashReceived}
                onCashChange={setCashReceived}
              />
-          </div>
 
-          <Button 
-            className="w-full h-14 rounded-2xl text-lg font-black uppercase tracking-widest shadow-xl bg-primary hover:bg-primary/90 transition-all active:scale-95 disabled:opacity-30"
-            disabled={cart.length === 0 || isProcessing}
-            onClick={handleProcessSale}
-          >
-            {isProcessing ? (
-                <><Loader2 size={24} className="mr-2 animate-spin" /> Procesando...</>
-            ) : (
-                <><CreditCard size={24} className="mr-2" /> Registrar Venta (F8)</>
-            )}
-          </Button>
+             <AnimatePresence>
+               {lastSaleEvent ? (
+                 <TrackingConfirmationCard 
+                   invoice={lastSaleEvent} 
+                   sellerName={profile?.name || null} 
+                   onClose={() => setLastSaleEvent(null)}
+                 />
+               ) : (
+                 <Button 
+                   className="w-full h-14 rounded-2xl text-lg font-black uppercase tracking-widest shadow-xl bg-primary hover:bg-primary/90 transition-all active:scale-95 disabled:opacity-30"
+                   disabled={cart.length === 0 || isProcessing}
+                   onClick={handleProcessSale}
+                 >
+                   {isProcessing ? (
+                       <><Loader2 size={24} className="mr-2 animate-spin" /> Procesando...</>
+                   ) : (
+                       <><CreditCard size={24} className="mr-2" /> Registrar Venta (F8)</>
+                   )}
+                 </Button>
+               )}
+             </AnimatePresence>
+          </div>
         </div>
       </div>
 
@@ -347,3 +352,4 @@ export default function POSPage() {
     </div>
   );
 }
+
