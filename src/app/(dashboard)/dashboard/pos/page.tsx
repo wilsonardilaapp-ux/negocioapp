@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useMemo } from 'react';
@@ -61,7 +60,7 @@ export default function POSPage() {
 
   const businessType = (business?.category || 'Retail') as VerticalType;
 
-  // 4. Motor de Cálculos Reactivos (Corregido para manejar porcentajes correctamente)
+  // 4. Motor de Cálculos Reactivos (Optimizado y Corregido)
   const financialSummary = useMemo(() => {
     const subtotal = cart.reduce((sum, item) => sum + item.subtotal, 0);
     
@@ -85,7 +84,7 @@ export default function POSPage() {
       subtotal,
       discount: calculatedDiscount,
       tax: calculatedTax,
-      tip: calculatedTip,
+      tip: calculatedTip, // CORRECCIÓN: Retornar el monto calculado en pesos
       total: totalFinal,
       change
     };

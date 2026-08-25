@@ -1,4 +1,3 @@
-
 'use client';
 
 import React from 'react';
@@ -15,6 +14,7 @@ import {
   Plus, 
   Receipt, 
   DollarSign, 
+  Percent,
   HandHeart,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -195,7 +195,11 @@ export default function InvoiceCart({
                         </button>
                     </div>
                     <div className="relative">
-                        <DollarSign size={10} className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                        {discountType === 'percent' ? (
+                          <Percent size={10} className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                        ) : (
+                          <DollarSign size={10} className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                        )}
                         <Input 
                             type="number"
                             value={discountValue || ''}
@@ -223,7 +227,11 @@ export default function InvoiceCart({
                     </div>
                     <div className="relative flex items-center gap-1">
                         <div className="relative flex-1">
-                            <HandHeart size={10} className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                            {tipType === 'percent' ? (
+                              <Percent size={10} className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                            ) : (
+                              <DollarSign size={10} className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                            )}
                             <Input 
                                 type="number"
                                 value={tipAmount || ''}
@@ -277,7 +285,7 @@ export default function InvoiceCart({
           </div>
           {summary.discount > 0 && (
             <div className="flex justify-between text-[11px] font-bold text-red-400">
-                <span>Descuento {discountType === 'percent' ? `(${discountValue}%)` : ''}</span>
+                <span>{`Descuento ${discountType === 'percent' ? `(${discountValue}%)` : ''}`}</span>
                 <span>-{formatCurrency(summary.discount)}</span>
             </div>
           )}
@@ -287,7 +295,7 @@ export default function InvoiceCart({
           </div>
           {summary.tip > 0 && (
             <div className="flex justify-between text-[11px] font-bold text-slate-400">
-              <span>Propina / Servicio {tipType === 'percent' ? `(${tipAmount}%)` : ''}</span>
+              <span>{`Propina / Servicio ${tipType === 'percent' ? `(${tipAmount}%)` : ''}`}</span>
               <span>{formatCurrency(summary.tip)}</span>
             </div>
           )}
