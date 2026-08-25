@@ -63,6 +63,113 @@ function normalizeTimeTo24h(timeStr: string): string {
   return `${String(hours).padStart(2, '0')}:${minutes}`;
 }
 
+/**
+ * HERRAMIENTA EJECUTIVA: Definida a nivel de módulo para evitar registros duplicados.
+ */
+const bookAppointmentTool = ai.defineTool(
+  {
+    name: 'bookAppointmentTool',
+    description: 'Registra una nueva cita o reserva en la base de datos.',
+    inputSchema: z.object({
+      businessId: z.string().describe('ID único del negocio proporcionado en el prompt'),
+      customerName: z.string().describe('Nombre completo del cliente'),
+      customerPhone: z.string().describe('Número de WhatsApp del cliente'),
+      serviceName: z.string().describe('Nombre del servicio solicitado'),
+      date: z.string().describe('Fecha de la cita (cualquier formato)'),
+      startTime: z.string().describe('Hora de inicio de la cita'),
+    }),
+    outputSchema: z.object({
+      success: z.boolean(),
+      reservationId: z.string(),
+      customerName: z.string(),
+      serviceName: z.string(),
+      date: z.string(),
+      startTime: z.string(),
+    }),
+  },
+  async (toolInput) => {
+    try {
+        const { businessId, customerName, customerPhone, serviceName, date, startTime } = toolInput;
+        const db = await getAdminFirestore();
+        
+        const normalizedDate = normalizeDateToISO(date);
+        const normalizedTime = normalizeTimeTo24h(startTime);
+
+        // 1. Buscar servicio con lógica flexible (Fuzzy Match)
+        let matchedService = null;
+        try {
+          const servicesSnap = await db.collection(`businesses/${businessId}/bookingServices`)
+            .where('isActive', '==', true)
+            .get();
+          
+          const allServices = servicesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
+          matchedService = allServices.find((s: any) => 
+            s.name.toLowerCase().includes(serviceName.toLowerCase()) || 
+            serviceName.toLowerCase().includes(s.name.toLowerCase())
+          );
+        } catch (e) {
+          console.warn("[bookAppointmentTool] No se pudo consultar catálogo, usando genérico.");
+        }
+
+        // 2. Definir valores de respaldo seguros (Safe Defaults)
+        const duration = matchedService?.durationMinutes || 45;
+        const price = matchedService?.price || 0;
+        const serviceId = matchedService?.id || 'chatbot_generic';
+        const finalServiceName = matchedService?.name || serviceName;
+        const endTime = calculateEndTime(normalizedTime, duration);
+
+        const reservationRef = db.collection(`businesses/${businessId}/reservations`).doc();
+        const reservationId = reservationRef.id;
+        const now = new Date().toISOString();
+
+        // 3. Construcción y Sanitización del Documento
+        const reservationData = {
+          id: reservationId,
+          businessId,
+          customerName: customerName.trim(),
+          customerPhone: customerPhone.trim(),
+          serviceId,
+          serviceName: finalServiceName,
+          staffId: null,
+          staffName: 'Pendiente de asignación',
+          date: normalizedDate,
+          startTime: normalizedTime,
+          endTime,
+          status: 'pending' as const,
+          price,
+          durationMinutes: duration,
+          source: 'chatbot' as const,
+          createdAt: now,
+          updatedAt: now,
+        };
+
+        // Blindaje total contra campos undefined (Firestore Exception Prevention)
+        const cleanPayload = JSON.parse(JSON.stringify(reservationData));
+        await reservationRef.set(cleanPayload);
+
+        return { 
+          success: true, 
+          reservationId: reservationId.slice(-6).toUpperCase(),
+          customerName,
+          serviceName: finalServiceName,
+          date: normalizedDate,
+          startTime: normalizedTime
+        };
+    } catch (error: any) {
+        console.error("[bookAppointmentTool] Error controlado en el servidor:", error.message);
+        // NO lanzamos error para no romper la IA; devolvemos fracaso controlado
+        return { 
+          success: false, 
+          reservationId: 'ERROR', 
+          customerName: '', 
+          serviceName: '', 
+          date: '', 
+          startTime: '' 
+        };
+    }
+  }
+);
+
 export const publicMenuChatbotFlow = ai.defineFlow(
   {
     name: 'publicMenuChatbotFlow',
@@ -77,96 +184,6 @@ export const publicMenuChatbotFlow = ai.defineFlow(
     // --- PASO 0: DETECCIÓN DE INTENCIÓN DE AGENDAMIENTO (Bypass prioritario) ---
     const appointmentIntents = ['cita', 'agendar', 'reserva', 'turno', 'reservar'];
     const isAppointmentIntent = appointmentIntents.some(intent => lowQuestion.includes(intent));
-
-    // --- HERRAMIENTA EJECUTIVA (DEFINIDA DENTRO DEL FLOW PARA CAPTURAR EL businessId) ---
-    const bookAppointmentTool = ai.defineTool(
-      {
-        name: 'bookAppointmentTool',
-        description: 'Registra una nueva cita o reserva en la base de datos. Utilízala SOLAMENTE cuando tengas el nombre del cliente, su WhatsApp, el servicio, la fecha y la hora.',
-        inputSchema: z.object({
-          customerName: z.string().describe('Nombre completo del cliente'),
-          customerPhone: z.string().describe('Número de WhatsApp del cliente'),
-          serviceName: z.string().describe('Nombre del servicio'),
-          date: z.string().describe('Fecha de la cita en formato YYYY-MM-DD'),
-          startTime: z.string().describe('Hora de inicio en formato HH:mm (24h)'),
-        }),
-        outputSchema: z.object({
-          success: z.boolean(),
-          reservationId: z.string(),
-          customerName: z.string(),
-          serviceName: z.string(),
-          date: z.string(),
-          startTime: z.string(),
-        }),
-      },
-      async (toolInput) => {
-        try {
-            const { customerName, customerPhone, serviceName, date, startTime } = toolInput;
-            const normalizedDate = normalizeDateToISO(date);
-            const normalizedTime = normalizeTimeTo24h(startTime);
-
-            // 1. Buscar servicio con lógica flexible
-            const servicesSnap = await db.collection(`businesses/${businessId}/bookingServices`)
-              .where('isActive', '==', true)
-              .get();
-            
-            const allServices = servicesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
-            const matchedService = allServices.find((s: any) => 
-              s.name.toLowerCase().includes(serviceName.toLowerCase()) || 
-              serviceName.toLowerCase().includes(s.name.toLowerCase())
-            );
-
-            // 2. Definir valores de respaldo seguros (Safe Defaults)
-            const duration = matchedService?.durationMinutes || 45;
-            const price = matchedService?.price || 0;
-            const serviceId = matchedService?.id || 'chatbot_generic';
-            const finalServiceName = matchedService?.name || serviceName;
-            const endTime = calculateEndTime(normalizedTime, duration);
-
-            const reservationRef = db.collection(`businesses/${businessId}/reservations`).doc();
-            const reservationId = reservationRef.id;
-            const now = new Date().toISOString();
-
-            // 3. Construcción y Sanitización del Documento
-            const reservationData = {
-              id: reservationId,
-              businessId,
-              customerName: customerName.trim(),
-              customerPhone: customerPhone.trim(),
-              serviceId,
-              serviceName: finalServiceName,
-              staffId: null,
-              staffName: 'Pendiente de asignación',
-              date: normalizedDate,
-              startTime: normalizedTime,
-              endTime,
-              status: 'pending' as const,
-              price,
-              durationMinutes: duration,
-              source: 'chatbot' as const,
-              createdAt: now,
-              updatedAt: now,
-            };
-
-            // Blindaje total contra campos undefined (Firestore Exception Prevention)
-            const cleanPayload = JSON.parse(JSON.stringify(reservationData));
-
-            await reservationRef.set(cleanPayload);
-
-            return { 
-              success: true, 
-              reservationId: reservationId.slice(-6).toUpperCase(),
-              customerName,
-              serviceName: finalServiceName,
-              date: normalizedDate,
-              startTime: normalizedTime
-            };
-        } catch (error: any) {
-            console.error("[bookAppointmentTool] Error en el servidor:", error.message);
-            throw error; 
-        }
-      }
-    );
 
     // Si NO es una intención de agendar, procesamos las respuestas fijas normalmente
     if (!isAppointmentIntent) {
@@ -235,9 +252,9 @@ export const publicMenuChatbotFlow = ai.defineFlow(
       INSTRUCCIONES DE AGENDAMIENTO:
       1. Si el cliente quiere una cita/reserva, DEBES pedir: nombre, WhatsApp, servicio y fecha/hora.
       2. No inventes que la cita está guardada ni confirmes sin haber ejecutado la acción técnica. 
-      3. Ejecuta obligatoriamente la herramienta 'bookAppointmentTool' para persistir la reserva en el sistema.
-      4. SOLO después de recibir éxito de la herramienta, confirma al cliente con los detalles estructurados y el ID de reserva.
-      5. Formato de fecha para la herramienta: YYYY-MM-DD.`;
+      3. Ejecuta obligatoriamente la herramienta 'bookAppointmentTool' para persistir la reserva.
+      4. Para agendar con bookAppointmentTool, utiliza obligatoriamente businessId: '${businessId}'.
+      5. SOLO después de recibir éxito de la herramienta, confirma al cliente con los detalles estructurados y el ID de reserva.`;
 
       const formattedHistory = history.map(h => ({
         role: h.role === 'model' ? 'model' as const : 'user' as const,
@@ -264,7 +281,7 @@ export const publicMenuChatbotFlow = ai.defineFlow(
     } catch (error: any) {
       console.error("[Chatbot Pipeline Error]:", error.message);
       return { 
-        answer: "Lo siento, tuve un inconveniente al procesar tu reserva. Por favor intenta de nuevo o contacta al negocio.", 
+        answer: "Lo siento, tuve un inconveniente al procesar tu consulta. Por favor intenta de nuevo o contacta al negocio.", 
         source: 'fallback' 
       };
     }
