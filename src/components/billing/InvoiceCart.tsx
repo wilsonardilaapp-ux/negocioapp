@@ -14,10 +14,7 @@ import {
   Plus, 
   Receipt, 
   DollarSign, 
-  CreditCard,
-  Percent,
   HandHeart,
-  Loader2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { POSItem, VerticalType, DiscountType } from '@/types/billing';
@@ -47,9 +44,9 @@ interface InvoiceCartProps {
       subtotal: number;
       discount: number;
       tax: number;
+      tip: number; // Propina incluida en el objeto de resumen
       total: number;
   };
-  onProcessSale: () => Promise<void>;
   isProcessing: boolean;
 }
 
@@ -65,13 +62,11 @@ export default function InvoiceCart({
   discountValue,
   setDiscountValue,
   taxRate,
-  setTaxRate,
   tipAmount,
   setTipAmount,
   paymentMethod,
   setPaymentMethod,
   summary,
-  onProcessSale,
   isProcessing
 }: InvoiceCartProps) {
   const labels = VERTICAL_LABELS[businessType] || VERTICAL_LABELS.Retail;
@@ -188,7 +183,7 @@ export default function InvoiceCart({
                         </button>
                     </div>
                     <div className="relative">
-                        {discountType === 'percent' ? <Percent size={10} className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" /> : <DollarSign size={10} className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />}
+                        <DollarSign size={10} className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
                         <Input 
                             type="number"
                             value={discountValue || ''}
@@ -244,8 +239,8 @@ export default function InvoiceCart({
         </div>
       </CardContent>
 
-      {/* Footer con Totales */}
-      <CardFooter className="flex flex-col gap-3 p-4 bg-slate-900 border-t text-white rounded-t-3xl shadow-2xl">
+      {/* Footer con Totales - RESUMEN FINANCIERO OSCURO */}
+      <CardFooter className="flex flex-col gap-1 p-4 bg-slate-900 text-white rounded-t-3xl shadow-2xl">
         <div className="w-full space-y-1.5">
           <div className="flex justify-between text-[11px] font-bold text-slate-400">
             <span>Subtotal</span>
@@ -261,23 +256,17 @@ export default function InvoiceCart({
             <span>IVA ({taxRate}%)</span>
             <span>{formatCurrency(summary.tax)}</span>
           </div>
+          {summary.tip > 0 && (
+            <div className="flex justify-between text-[11px] font-bold text-slate-400">
+              <span>Propina / Servicio</span>
+              <span>{formatCurrency(summary.tip)}</span>
+            </div>
+          )}
           <div className="flex justify-between items-center pt-2 border-t border-slate-800">
             <span className="text-xs font-black uppercase tracking-widest text-slate-300">Total a Cobrar</span>
             <span className="text-3xl font-black text-white tracking-tighter">{formatCurrency(summary.total)}</span>
           </div>
         </div>
-
-        <Button 
-          className="w-full h-12 rounded-2xl text-md font-black uppercase tracking-widest shadow-lg bg-primary hover:bg-primary/90 transition-transform active:scale-95 disabled:opacity-30"
-          disabled={items.length === 0 || isProcessing}
-          onClick={onProcessSale}
-        >
-          {isProcessing ? (
-              <><Loader2 size={18} className="mr-2 animate-spin" /> Procesando...</>
-          ) : (
-              <><CreditCard size={18} className="mr-2" /> Registrar Venta (F8)</>
-          )}
-        </Button>
       </CardFooter>
     </Card>
   );

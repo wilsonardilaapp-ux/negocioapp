@@ -10,13 +10,14 @@ import ProductCatalog from '@/components/billing/ProductCatalog';
 import InvoiceCart from '@/components/billing/InvoiceCart';
 import CashControl from '@/components/billing/CashControl';
 import InvoiceHistoryTable from '@/components/billing/InvoiceHistoryTable';
-import { Loader2, Calculator } from 'lucide-react';
+import { Loader2, Calculator, CreditCard } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { processSale } from '@/services/billing/billing-service';
 
 /**
  * @fileOverview Página principal de la Terminal de Facturación (POS).
- * Orquestador central del módulo POS.
+ * Orquestador central del módulo POS con flujo operativo optimizado.
  */
 export default function POSPage() {
   const { user } = useUser();
@@ -36,7 +37,7 @@ export default function POSPage() {
   );
   const { data: products, isLoading: loadingProducts } = useCollection<Product>(productsQuery);
 
-  // 2. Suscripción al Historial de Facturas (Fase 4)
+  // 2. Suscripción al Historial de Facturas
   const invoicesQuery = useMemoFirebase(
     () => (user?.uid ? collection(firestore, `businesses/${user.uid}/invoices`) : null),
     [user, firestore]
@@ -76,6 +77,7 @@ export default function POSPage() {
       subtotal,
       discount: calculatedDiscount,
       tax: calculatedTax,
+      tip: tipAmount, // Pasar propina al resumen para InvoiceCart
       total: totalFinal,
       change
     };
@@ -218,8 +220,9 @@ export default function POSPage() {
           />
         </div>
 
-        {/* Lado Derecho: Carrito y Efectivo */}
+        {/* Lado Derecho: Flujo de Facturación */}
         <div className="lg:col-span-5 xl:col-span-4 flex flex-col gap-6 overflow-hidden">
+          {/* 1. Factura Actual y Resumen Financiero */}
           <div className="overflow-hidden">
             <InvoiceCart 
               items={cart}
@@ -242,11 +245,11 @@ export default function POSPage() {
               setPaymentMethod={setPaymentMethod}
               
               summary={financialSummary}
-              onProcessSale={handleProcessSale}
               isProcessing={isProcessing}
             />
           </div>
           
+          {/* 2. Control de Efectivo */}
           <div className="shrink-0">
              <CashControl 
                total={financialSummary.total} 
@@ -254,10 +257,23 @@ export default function POSPage() {
                onCashChange={setCashReceived}
              />
           </div>
+
+          {/* 3. Acción Maestra (Registrar) */}
+          <Button 
+            className="w-full h-14 rounded-2xl text-lg font-black uppercase tracking-widest shadow-xl bg-primary hover:bg-primary/90 transition-all active:scale-95 disabled:opacity-30"
+            disabled={cart.length === 0 || isProcessing}
+            onClick={handleProcessSale}
+          >
+            {isProcessing ? (
+                <><Loader2 size={24} className="mr-2 animate-spin" /> Procesando...</>
+            ) : (
+                <><CreditCard size={24} className="mr-2" /> Registrar Venta (F8)</>
+            )}
+          </Button>
         </div>
       </div>
 
-      {/* SECCIÓN 3: HISTORIAL DE VENTAS (Fase 4) */}
+      {/* SECCIÓN 3: HISTORIAL DE VENTAS */}
       <section className="mt-4">
          <InvoiceHistoryTable 
            invoices={invoices || []} 
