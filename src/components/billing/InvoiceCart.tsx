@@ -127,6 +127,7 @@ export default function InvoiceCart({
                     <div className="flex justify-between items-start gap-2">
                       <span className="text-[11px] font-black text-slate-700 leading-tight flex-1 uppercase truncate">{item.name}</span>
                       <button 
+                        type="button"
                         onClick={() => onRemoveItem(item.productId)} 
                         disabled={isProcessing}
                         className="text-slate-400 hover:text-red-500 transition-colors disabled:opacity-30"
@@ -137,6 +138,7 @@ export default function InvoiceCart({
                     <div className="flex justify-between items-center">
                       <div className="flex items-center gap-2">
                         <Button 
+                          type="button"
                           variant="outline" 
                           size="icon" 
                           className="h-6 w-6 rounded-full bg-white shadow-sm" 
@@ -147,6 +149,7 @@ export default function InvoiceCart({
                         </Button>
                         <span className="text-xs font-black w-4 text-center">{item.quantity}</span>
                         <Button 
+                          type="button"
                           variant="outline" 
                           size="icon" 
                           className="h-6 w-6 rounded-full bg-white shadow-sm" 
@@ -180,8 +183,12 @@ export default function InvoiceCart({
                     <div className="flex justify-between items-center">
                         <Label className="text-[9px] font-black uppercase text-muted-foreground">Descuento</Label>
                         <button 
+                            type="button"
                             onClick={() => setDiscountType(discountType === 'amount' ? 'percent' : 'amount')}
-                            className="text-[9px] font-black text-primary uppercase"
+                            className={cn(
+                                "text-[10px] font-black uppercase transition-all px-1.5 rounded",
+                                discountType === 'percent' ? "bg-primary text-white" : "text-primary"
+                            )}
                             disabled={isProcessing}
                         >
                             {discountType === 'amount' ? '$' : '%'}
@@ -203,8 +210,12 @@ export default function InvoiceCart({
                     <div className="flex justify-between items-center">
                         <Label className="text-[9px] font-black uppercase text-muted-foreground">Propina Sug.</Label>
                         <button 
+                            type="button"
                             onClick={() => setTipType(tipType === 'amount' ? 'percent' : 'amount')}
-                            className="text-[9px] font-black text-primary uppercase"
+                            className={cn(
+                                "text-[10px] font-black uppercase transition-all px-1.5 rounded",
+                                tipType === 'percent' ? "bg-primary text-white" : "text-primary"
+                            )}
                             disabled={isProcessing}
                         >
                             {tipType === 'amount' ? '$' : '%'}
@@ -222,9 +233,10 @@ export default function InvoiceCart({
                             />
                         </div>
                         <Button 
+                            type="button" 
                             variant="outline" 
                             size="icon" 
-                            className="h-7 w-7 rounded-lg"
+                            className="h-7 w-7 rounded-lg shrink-0"
                             onClick={() => { setTipType('percent'); setTipAmount(10); }}
                             disabled={isProcessing}
                         >
@@ -240,6 +252,7 @@ export default function InvoiceCart({
                     {['efectivo', 'nequi', 'tarjeta'].map(method => (
                         <button
                             key={method}
+                            type="button"
                             onClick={() => setPaymentMethod(method)}
                             disabled={isProcessing}
                             className={cn(
