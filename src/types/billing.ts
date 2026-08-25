@@ -45,6 +45,9 @@ export interface Invoice {
   pax?: number;
   atendidoPor?: string; // Mesero / Estilista
   tipoConsumo?: 'local' | 'llevar' | 'domicilio';
+  
+  // Rastreo Inteligente
+  trackingId?: string; // Vínculo con el evento de rastreo
 }
 
 export const VERTICAL_LABELS: Record<VerticalType, { staff: string; location: string }> = {

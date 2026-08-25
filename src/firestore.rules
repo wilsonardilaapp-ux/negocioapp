@@ -168,6 +168,11 @@ service cloud.firestore {
         allow read, update, delete: if isSuperAdmin() || isBusinessMember(businessId);
         allow create: if isSuperAdmin() || isBusinessMember(businessId);
       }
+      
+      // Bloque aditivo para rastreo de eventos
+      match /tracking_events/{eventId} {
+        allow read, write: if isSuperAdmin() || isBusinessMember(businessId);
+      }
 
       // --- MÓDULO DE RESEÑAS Y FIDELIZACIÓN ---
 
