@@ -1,3 +1,4 @@
+
 'use client';
 
 import React from 'react';
@@ -37,6 +38,8 @@ interface InvoiceCartProps {
   setTaxRate: (val: number) => void;
   tipAmount: number;
   setTipAmount: (val: number) => void;
+  tipType: DiscountType;
+  setTipType: (type: DiscountType) => void;
   paymentMethod: string;
   setPaymentMethod: (val: string) => void;
   
@@ -44,7 +47,7 @@ interface InvoiceCartProps {
       subtotal: number;
       discount: number;
       tax: number;
-      tip: number; // Propina incluida en el objeto de resumen
+      tip: number;
       total: number;
   };
   isProcessing: boolean;
@@ -64,6 +67,8 @@ export default function InvoiceCart({
   taxRate,
   tipAmount,
   setTipAmount,
+  tipType,
+  setTipType,
   paymentMethod,
   setPaymentMethod,
   summary,
@@ -198,22 +203,33 @@ export default function InvoiceCart({
                     <div className="flex justify-between items-center">
                         <Label className="text-[9px] font-black uppercase text-muted-foreground">Propina Sug.</Label>
                         <button 
-                            onClick={() => setTipAmount(Math.round(summary.subtotal * 0.1))}
+                            onClick={() => setTipType(tipType === 'amount' ? 'percent' : 'amount')}
                             className="text-[9px] font-black text-primary uppercase"
                             disabled={isProcessing}
                         >
-                            10%
+                            {tipType === 'amount' ? '$' : '%'}
                         </button>
                     </div>
-                    <div className="relative">
-                        <HandHeart size={10} className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                        <Input 
-                            type="number"
-                            value={tipAmount || ''}
-                            onChange={(e) => setTipAmount(Number(e.target.value))}
-                            className="h-7 pl-6 text-xs font-bold bg-white"
+                    <div className="relative flex items-center gap-1">
+                        <div className="relative flex-1">
+                            <HandHeart size={10} className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                            <Input 
+                                type="number"
+                                value={tipAmount || ''}
+                                onChange={(e) => setTipAmount(Number(e.target.value))}
+                                className="h-7 pl-6 text-xs font-bold bg-white"
+                                disabled={isProcessing}
+                            />
+                        </div>
+                        <Button 
+                            variant="outline" 
+                            size="icon" 
+                            className="h-7 w-7 rounded-lg"
+                            onClick={() => { setTipType('percent'); setTipAmount(10); }}
                             disabled={isProcessing}
-                        />
+                        >
+                            <span className="text-[8px] font-black">10%</span>
+                        </Button>
                     </div>
                 </div>
             </div>
@@ -248,7 +264,7 @@ export default function InvoiceCart({
           </div>
           {summary.discount > 0 && (
             <div className="flex justify-between text-[11px] font-bold text-red-400">
-                <span>Descuento</span>
+                <span>Descuento {discountType === 'percent' ? `(${discountValue}%)` : ''}</span>
                 <span>-{formatCurrency(summary.discount)}</span>
             </div>
           )}
@@ -258,7 +274,7 @@ export default function InvoiceCart({
           </div>
           {summary.tip > 0 && (
             <div className="flex justify-between text-[11px] font-bold text-slate-400">
-              <span>Propina / Servicio</span>
+              <span>Propina / Servicio {tipType === 'percent' ? `(${tipAmount}%)` : ''}</span>
               <span>{formatCurrency(summary.tip)}</span>
             </div>
           )}

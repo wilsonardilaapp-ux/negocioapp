@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useMemo } from 'react';
@@ -53,13 +54,14 @@ export default function POSPage() {
   const [discountType, setDiscountType] = useState<DiscountType>('amount');
   const [discountValue, setDiscountValue] = useState(0);
   const [taxRate, setTaxRate] = useState(19); // Default IVA
-  const [tipAmount, setTipAmount] = useState(0);
+  const [tipValue, setTipValue] = useState(0);
+  const [tipType, setTipType] = useState<DiscountType>('amount');
   const [paymentMethod, setPaymentMethod] = useState<string>('efectivo');
   const [cashReceived, setCashReceived] = useState(0);
 
   const businessType = (business?.category || 'Retail') as VerticalType;
 
-  // 4. Motor de Cálculos Reactivos
+  // 4. Motor de Cálculos Reactivos (Corregido para manejar porcentajes correctamente)
   const financialSummary = useMemo(() => {
     const subtotal = cart.reduce((sum, item) => sum + item.subtotal, 0);
     
@@ -70,18 +72,24 @@ export default function POSPage() {
 
     const baseTaxable = Math.max(0, subtotal - calculatedDiscount);
     const calculatedTax = baseTaxable * (taxRate / 100);
-    const totalFinal = baseTaxable + calculatedTax + tipAmount;
+    
+    // Cálculo de propina (sobre base imponible para mayor precisión comercial)
+    const calculatedTip = tipType === 'percent'
+      ? (baseTaxable * tipValue / 100)
+      : tipValue;
+
+    const totalFinal = baseTaxable + calculatedTax + calculatedTip;
     const change = Math.max(0, cashReceived - totalFinal);
 
     return {
       subtotal,
       discount: calculatedDiscount,
       tax: calculatedTax,
-      tip: tipAmount, // Pasar propina al resumen para InvoiceCart
+      tip: calculatedTip,
       total: totalFinal,
       change
     };
-  }, [cart, discountType, discountValue, taxRate, tipAmount, cashReceived]);
+  }, [cart, discountType, discountValue, taxRate, tipValue, tipType, cashReceived]);
 
   // 5. Handlers de Carrito
   const handleAddToCart = (product: Product) => {
@@ -147,7 +155,7 @@ export default function POSPage() {
                 subtotal: financialSummary.subtotal,
                 tax: financialSummary.tax,
                 discount: financialSummary.discount,
-                tip: tipAmount,
+                tip: financialSummary.tip,
                 total: financialSummary.total,
                 paymentMethod: paymentMethod as any,
                 cashReceived,
@@ -166,7 +174,8 @@ export default function POSPage() {
         setCustomerName('Cliente General');
         setCashReceived(0);
         setDiscountValue(0);
-        setTipAmount(0);
+        setTipValue(0);
+        setTipType('amount');
 
     } catch (error: any) {
         toast({
@@ -239,8 +248,10 @@ export default function POSPage() {
               setDiscountValue={setDiscountValue}
               taxRate={taxRate}
               setTaxRate={setTaxRate}
-              tipAmount={tipAmount}
-              setTipAmount={setTipAmount}
+              tipAmount={tipValue}
+              setTipAmount={setTipValue}
+              tipType={tipType}
+              setTipType={setTipType}
               paymentMethod={paymentMethod}
               setPaymentMethod={setPaymentMethod}
               
