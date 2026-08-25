@@ -36,6 +36,8 @@ function getOrCreateBookAppointmentTool(businessId: string) {
     return toolCache.get(businessId);
   }
 
+  console.log(`[DEBUG] Registrando herramienta Genkit: ${toolName}`);
+
   const tool = ai.defineTool(
     {
       name: toolName,
@@ -120,12 +122,24 @@ export const publicMenuChatbotFlow = ai.defineFlow(
     outputSchema: PublicMenuChatbotOutputSchema,
   },
   async (input): Promise<PublicMenuChatbotOutput> => {
-    const db = await getAdminFirestore();
     const { businessId, question, history = [] } = input;
     const lowQuestion = question.toLowerCase().trim();
 
-    // Recuperamos la herramienta blindada para este inquilino específico
-    const appointmentTool = getOrCreateBookAppointmentTool(businessId);
+    console.log(`[FLOW_ENTRY] Recibido mensaje para businessId: ${businessId}`);
+
+    // --- PASO 0: CREACIÓN CONTEXTUAL DE HERRAMIENTA ---
+    let appointmentTool;
+    try {
+      appointmentTool = getOrCreateBookAppointmentTool(businessId);
+    } catch (toolError: any) {
+      console.error("[TOOL_CREATION_ERROR]:", toolError.message, toolError.stack);
+      return { 
+        answer: "Lo siento, el sistema de agendamiento inteligente no pudo inicializarse correctamente. Por favor contacta al negocio directamente.", 
+        source: 'fallback' 
+      };
+    }
+
+    const db = await getAdminFirestore();
 
     // --- PASO 1: GUARDIA DE PRIORIDAD PARA AGENDAMIENTO ---
     const appointmentIntents = ['cita', 'agendar', 'reserva', 'turno', 'reservar'];
@@ -171,6 +185,8 @@ export const publicMenuChatbotFlow = ai.defineFlow(
       4. NO menciones identificadores técnicos ni IDs de negocio al cliente.
       5. Formato de respuesta tras éxito: Muestra el ID de reserva, servicio, fecha y hora de forma estructurada.`;
 
+      console.log(`[AI_GENERATE_START] Consultando Gemini para ${businessId}`);
+
       const response = await ai.generate({
         model: 'googleai/gemini-1.5-flash',
         tools: [appointmentTool],
@@ -188,7 +204,7 @@ export const publicMenuChatbotFlow = ai.defineFlow(
       };
 
     } catch (error: any) {
-      console.error("[REAL_CHATBOT_ERROR]:", error);
+      console.error("[REAL_CHATBOT_ERROR]:", error.message, error.stack);
       return { 
         answer: "Lo siento, tuve un inconveniente al procesar tu consulta. Por favor intenta de nuevo o contacta al negocio.", 
         source: 'fallback' 
