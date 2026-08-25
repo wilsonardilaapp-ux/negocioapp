@@ -65,6 +65,19 @@ export function InvoiceDetailModal({ invoice, isOpen, onClose, mode = 'view', bu
   const formattedDate = format(new Date(invoice.createdAt), "dd 'DE' MMMM 'DE' yyyy 'A LAS' HH:mm", { locale: es }).toUpperCase();
   const taxLabel = businessType === 'Restaurante' ? 'Impoconsumo' : 'IVA';
 
+  // --- LÓGICA DE DERIVACIÓN DE PORCENTAJES ---
+  const baseTaxable = invoice.subtotal - invoice.discount;
+  
+  // Calcular % de descuento basado en el subtotal original
+  const discPct = invoice.discount > 0 && invoice.subtotal > 0 
+    ? Math.round((invoice.discount / invoice.subtotal) * 100) 
+    : null;
+
+  // Calcular % de propina basado en la base gravable (Subtotal - Descuento)
+  const tipPct = invoice.tip > 0 && baseTaxable > 0 
+    ? Math.round((invoice.tip / baseTaxable) * 100) 
+    : null;
+
   // --- HANDLERS DE SALIDA ---
   const handlePrint = () => {
     window.open(`/dashboard/pos/print/${invoice.id}`, '_blank', 'width=400,height=600');
@@ -175,7 +188,7 @@ export function InvoiceDetailModal({ invoice, isOpen, onClose, mode = 'view', bu
             </Table>
           </div>
 
-          {/* Bloque Financiero Oscuro */}
+          {/* Bloque Financiero Oscuro - ETIQUETAS DINÁMICAS ACTUALIZADAS */}
           <div className="bg-slate-900 rounded-[2.5rem] p-8 text-white space-y-4 shadow-2xl relative overflow-hidden">
              <div className="space-y-2 relative z-10">
                 <div className="flex justify-between items-center text-[10px] font-bold text-slate-400 uppercase tracking-widest">
@@ -183,18 +196,18 @@ export function InvoiceDetailModal({ invoice, isOpen, onClose, mode = 'view', bu
                     <span>{formatCurrency(invoice.subtotal)}</span>
                 </div>
                 <div className="flex justify-between items-center text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                    <span>{taxLabel}</span>
+                    <span>{taxLabel} (19%)</span>
                     <span>{formatCurrency(invoice.tax)}</span>
                 </div>
                 {invoice.discount > 0 && (
                     <div className="flex justify-between items-center text-[10px] font-bold text-red-400 uppercase tracking-widest">
-                        <span>Descuento</span>
+                        <span>DESCUENTO {discPct ? `(${discPct}%)` : ''}</span>
                         <span>-{formatCurrency(invoice.discount)}</span>
                     </div>
                 )}
                 {invoice.tip > 0 && (
                     <div className="flex justify-between items-center text-[10px] font-bold text-blue-400 uppercase tracking-widest">
-                        <span>Propina / Servicio</span>
+                        <span>PROPINA / SERVICIO {tipPct ? `(${tipPct}%)` : ''}</span>
                         <span>{formatCurrency(invoice.tip)}</span>
                     </div>
                 )}
