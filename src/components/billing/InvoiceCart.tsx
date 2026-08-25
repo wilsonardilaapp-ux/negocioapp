@@ -15,7 +15,6 @@ import {
   Receipt, 
   DollarSign, 
   Percent,
-  HandHeart,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { POSItem, VerticalType, DiscountType } from '@/types/billing';
@@ -88,7 +87,6 @@ export default function InvoiceCart({
       </CardHeader>
 
       <CardContent className="flex-1 flex flex-col p-4 gap-3 overflow-hidden">
-        {/* Info del Cliente y Vertical */}
         <div className="space-y-3">
           <div className="space-y-1">
             <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest flex items-center gap-1">
@@ -117,7 +115,6 @@ export default function InvoiceCart({
 
         <Separator />
 
-        {/* Listado de Productos */}
         <div className="flex-1 min-h-0">
           <ScrollArea className="h-full pr-3">
             {items.length > 0 ? (
@@ -175,10 +172,8 @@ export default function InvoiceCart({
 
         <Separator />
 
-        {/* Ajustes Financieros */}
         <div className="space-y-3 bg-slate-50/50 p-3 rounded-2xl border">
             <div className="grid grid-cols-2 gap-4">
-                {/* Descuento */}
                 <div className="space-y-1.5">
                     <div className="flex justify-between items-center">
                         <Label className="text-[9px] font-black uppercase text-muted-foreground">Descuento</Label>
@@ -187,7 +182,7 @@ export default function InvoiceCart({
                             onClick={() => setDiscountType(discountType === 'amount' ? 'percent' : 'amount')}
                             className={cn(
                                 "text-[10px] font-black uppercase transition-all px-1.5 rounded",
-                                discountType === 'percent' ? "bg-primary text-white" : "text-primary"
+                                discountType === 'percent' ? "bg-primary text-white shadow-sm" : "text-primary hover:bg-primary/5"
                             )}
                             disabled={isProcessing}
                         >
@@ -196,47 +191,47 @@ export default function InvoiceCart({
                     </div>
                     <div className="relative">
                         {discountType === 'percent' ? (
-                          <Percent size={10} className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                          <Percent size={10} className="absolute left-2 top-1/2 -translate-y-1/2 text-primary font-bold" />
                         ) : (
-                          <DollarSign size={10} className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                          <DollarSign size={10} className="absolute left-2 top-1/2 -translate-y-1/2 text-primary font-bold" />
                         )}
                         <Input 
                             type="number"
                             value={discountValue || ''}
                             onChange={(e) => setDiscountValue(Number(e.target.value))}
-                            className="h-7 pl-6 text-xs font-bold bg-white"
+                            className="h-7 pl-6 text-xs font-bold bg-white focus-visible:ring-primary/20"
                             disabled={isProcessing}
                         />
                     </div>
                 </div>
-                {/* Propina */}
+
                 <div className="space-y-1.5">
                     <div className="flex justify-between items-center">
-                        <Label className="text-[9px] font-black uppercase text-muted-foreground">Propina Sug.</Label>
+                        <Label className="text-[9px] font-black uppercase text-muted-foreground">Propina</Label>
                         <button 
                             type="button"
                             onClick={() => setTipType(tipType === 'amount' ? 'percent' : 'amount')}
                             className={cn(
                                 "text-[10px] font-black uppercase transition-all px-1.5 rounded",
-                                tipType === 'percent' ? "bg-primary text-white" : "text-primary"
+                                tipType === 'percent' ? "bg-primary text-white shadow-sm" : "text-primary hover:bg-primary/5"
                             )}
                             disabled={isProcessing}
                         >
                             {tipType === 'amount' ? '$' : '%'}
                         </button>
                     </div>
-                    <div className="relative flex items-center gap-1">
+                    <div className="flex items-center gap-1">
                         <div className="relative flex-1">
                             {tipType === 'percent' ? (
-                              <Percent size={10} className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                              <Percent size={10} className="absolute left-2 top-1/2 -translate-y-1/2 text-primary font-bold" />
                             ) : (
-                              <DollarSign size={10} className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                              <DollarSign size={10} className="absolute left-2 top-1/2 -translate-y-1/2 text-primary font-bold" />
                             )}
                             <Input 
                                 type="number"
                                 value={tipAmount || ''}
                                 onChange={(e) => setTipAmount(Number(e.target.value))}
-                                className="h-7 pl-6 text-xs font-bold bg-white"
+                                className="h-7 pl-6 text-xs font-bold bg-white focus-visible:ring-primary/20"
                                 disabled={isProcessing}
                             />
                         </div>
@@ -244,7 +239,7 @@ export default function InvoiceCart({
                             type="button" 
                             variant="outline" 
                             size="icon" 
-                            className="h-7 w-7 rounded-lg shrink-0"
+                            className="h-7 w-7 rounded-lg shrink-0 border-primary/20 text-primary hover:bg-primary/5"
                             onClick={() => { setTipType('percent'); setTipAmount(10); }}
                             disabled={isProcessing}
                         >
@@ -276,30 +271,29 @@ export default function InvoiceCart({
         </div>
       </CardContent>
 
-      {/* Footer con Totales - RESUMEN FINANCIERO OSCURO */}
       <CardFooter className="flex flex-col gap-1 p-4 bg-slate-900 text-white rounded-t-3xl shadow-2xl">
         <div className="w-full space-y-1.5">
-          <div className="flex justify-between text-[11px] font-bold text-slate-400">
-            <span>Subtotal</span>
+          <div className="flex justify-between text-[11px] font-bold text-slate-400 uppercase tracking-tighter">
+            <span>Subtotal Neto</span>
             <span>{formatCurrency(summary.subtotal)}</span>
           </div>
           {summary.discount > 0 && (
-            <div className="flex justify-between text-[11px] font-bold text-red-400">
+            <div className="flex justify-between text-[11px] font-bold text-red-400 uppercase tracking-tighter animate-in fade-in slide-in-from-left-1">
                 <span>{`Descuento ${discountType === 'percent' ? `(${discountValue}%)` : ''}`}</span>
                 <span>-{formatCurrency(summary.discount)}</span>
             </div>
           )}
-          <div className="flex justify-between text-[11px] font-bold text-slate-400">
+          <div className="flex justify-between text-[11px] font-bold text-slate-400 uppercase tracking-tighter">
             <span>IVA ({taxRate}%)</span>
             <span>{formatCurrency(summary.tax)}</span>
           </div>
           {summary.tip > 0 && (
-            <div className="flex justify-between text-[11px] font-bold text-slate-400">
+            <div className="flex justify-between text-[11px] font-bold text-blue-400 uppercase tracking-tighter animate-in fade-in slide-in-from-left-1">
               <span>{`Propina / Servicio ${tipType === 'percent' ? `(${tipAmount}%)` : ''}`}</span>
               <span>{formatCurrency(summary.tip)}</span>
             </div>
           )}
-          <div className="flex justify-between items-center pt-2 border-t border-slate-800">
+          <div className="flex justify-between items-center pt-2 border-t border-slate-800 mt-1">
             <span className="text-xs font-black uppercase tracking-widest text-slate-300">Total a Cobrar</span>
             <span className="text-3xl font-black text-white tracking-tighter">{formatCurrency(summary.total)}</span>
           </div>

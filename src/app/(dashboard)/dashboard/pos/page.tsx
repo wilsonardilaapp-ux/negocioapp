@@ -60,32 +60,36 @@ export default function POSPage() {
 
   const businessType = (business?.category || 'Retail') as VerticalType;
 
-  // 4. Motor de Cálculos Reactivos (Optimizado y Corregido)
+  // 4. Motor de Cálculos Reactivos (Fórmulas Blindadas)
   const financialSummary = useMemo(() => {
     const subtotal = cart.reduce((sum, item) => sum + item.subtotal, 0);
     
-    // Cálculo de descuento
-    const calculatedDiscount = discountType === 'percent' 
+    // A. Calcular Descuento
+    const discountAmount = discountType === 'percent' 
       ? (subtotal * discountValue / 100) 
       : discountValue;
 
-    const baseTaxable = Math.max(0, subtotal - calculatedDiscount);
-    const calculatedTax = baseTaxable * (taxRate / 100);
+    // B. Establecer Base Gravable (Pivote central)
+    const baseTaxable = Math.max(0, subtotal - discountAmount);
+
+    // C. Calcular IVA sobre la Base
+    const taxAmount = baseTaxable * (taxRate / 100);
     
-    // Cálculo de propina (sobre base imponible para mayor precisión comercial)
-    const calculatedTip = tipType === 'percent'
+    // D. Calcular Propina sobre la Base (No sobre el subtotal bruto)
+    const tipAmount = tipType === 'percent'
       ? (baseTaxable * tipValue / 100)
       : tipValue;
 
-    const totalFinal = baseTaxable + calculatedTax + calculatedTip;
+    // E. Total Final Consolidado
+    const totalFinal = baseTaxable + taxAmount + tipAmount;
     const change = Math.max(0, cashReceived - totalFinal);
 
     return {
       subtotal,
-      discount: calculatedDiscount,
-      tax: calculatedTax,
-      tip: calculatedTip, // CORRECCIÓN: Retornar el monto calculado en pesos
-      total: totalFinal,
+      discount: Math.round(discountAmount),
+      tax: Math.round(taxAmount),
+      tip: Math.round(tipAmount),
+      total: Math.round(totalFinal),
       change
     };
   }, [cart, discountType, discountValue, taxRate, tipValue, tipType, cashReceived]);
