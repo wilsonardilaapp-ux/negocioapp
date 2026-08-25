@@ -177,17 +177,30 @@ export default function InvoiceCart({
                 <div className="space-y-1.5">
                     <div className="flex justify-between items-center">
                         <Label className="text-[9px] font-black uppercase text-muted-foreground">Descuento</Label>
-                        <button 
+                        <div className="flex bg-muted p-0.5 rounded-lg border">
+                          <button 
                             type="button"
-                            onClick={() => setDiscountType(discountType === 'amount' ? 'percent' : 'amount')}
+                            onClick={() => setDiscountType('amount')}
                             className={cn(
-                                "text-[10px] font-black uppercase transition-all px-1.5 rounded",
-                                discountType === 'percent' ? "bg-primary text-white shadow-sm" : "text-primary hover:bg-primary/5"
+                              "px-2 py-0.5 rounded text-[9px] font-black transition-all",
+                              discountType === 'amount' ? "bg-white shadow-sm text-primary" : "text-muted-foreground"
                             )}
                             disabled={isProcessing}
-                        >
-                            {discountType === 'amount' ? '$' : '%'}
-                        </button>
+                          >
+                            $
+                          </button>
+                          <button 
+                            type="button"
+                            onClick={() => setDiscountType('percent')}
+                            className={cn(
+                              "px-2 py-0.5 rounded text-[9px] font-black transition-all",
+                              discountType === 'percent' ? "bg-white shadow-sm text-primary" : "text-muted-foreground"
+                            )}
+                            disabled={isProcessing}
+                          >
+                            %
+                          </button>
+                        </div>
                     </div>
                     <div className="relative">
                         {discountType === 'percent' ? (
@@ -208,17 +221,30 @@ export default function InvoiceCart({
                 <div className="space-y-1.5">
                     <div className="flex justify-between items-center">
                         <Label className="text-[9px] font-black uppercase text-muted-foreground">Propina</Label>
-                        <button 
+                        <div className="flex bg-muted p-0.5 rounded-lg border">
+                          <button 
                             type="button"
-                            onClick={() => setTipType(tipType === 'amount' ? 'percent' : 'amount')}
+                            onClick={() => setTipType('amount')}
                             className={cn(
-                                "text-[10px] font-black uppercase transition-all px-1.5 rounded",
-                                tipType === 'percent' ? "bg-primary text-white shadow-sm" : "text-primary hover:bg-primary/5"
+                              "px-2 py-0.5 rounded text-[9px] font-black transition-all",
+                              tipType === 'amount' ? "bg-white shadow-sm text-primary" : "text-muted-foreground"
                             )}
                             disabled={isProcessing}
-                        >
-                            {tipType === 'amount' ? '$' : '%'}
-                        </button>
+                          >
+                            $
+                          </button>
+                          <button 
+                            type="button"
+                            onClick={() => setTipType('percent')}
+                            className={cn(
+                              "px-2 py-0.5 rounded text-[9px] font-black transition-all",
+                              tipType === 'percent' ? "bg-white shadow-sm text-primary" : "text-muted-foreground"
+                            )}
+                            disabled={isProcessing}
+                          >
+                            %
+                          </button>
+                        </div>
                     </div>
                     <div className="flex items-center gap-1">
                         <div className="relative flex-1">
