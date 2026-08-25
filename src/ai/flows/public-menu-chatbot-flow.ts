@@ -44,6 +44,25 @@ function normalizeDateToISO(dateStr: string): string {
   return dateStr;
 }
 
+/**
+ * Normaliza una hora recibida (ej. "3:00 PM", "15:00", "3 pm") al formato 24h HH:mm.
+ */
+function normalizeTimeTo24h(timeStr: string): string {
+  const clean = timeStr.toLowerCase().trim();
+  const timeMatch = clean.match(/(\d{1,2}):(\d{2})\s*(pm|am|p\.m\.|a\.m\.)?/);
+  
+  if (!timeMatch) return timeStr; 
+
+  let hours = parseInt(timeMatch[1], 10);
+  const minutes = timeMatch[2];
+  const ampm = timeMatch[3];
+
+  if (ampm && (ampm.includes('p')) && hours < 12) hours += 12;
+  if (ampm && (ampm.includes('a')) && hours === 12) hours = 0;
+
+  return `${String(hours).padStart(2, '0')}:${minutes}`;
+}
+
 export const publicMenuChatbotFlow = ai.defineFlow(
   {
     name: 'publicMenuChatbotFlow',
@@ -81,59 +100,71 @@ export const publicMenuChatbotFlow = ai.defineFlow(
         }),
       },
       async (toolInput) => {
-        // Captura directa de businessId desde el closure del flow
-        const { customerName, customerPhone, serviceName, date, startTime } = toolInput;
-        const normalizedDate = normalizeDateToISO(date);
+        try {
+            const { customerName, customerPhone, serviceName, date, startTime } = toolInput;
+            const normalizedDate = normalizeDateToISO(date);
+            const normalizedTime = normalizeTimeTo24h(startTime);
 
-        const servicesSnap = await db.collection(`businesses/${businessId}/bookingServices`)
-          .where('isActive', '==', true)
-          .get();
-        
-        const allServices = servicesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
-        const matchedService = allServices.find((s: any) => 
-          s.name.toLowerCase().includes(serviceName.toLowerCase()) || 
-          serviceName.toLowerCase().includes(s.name.toLowerCase())
-        );
+            // 1. Buscar servicio con lógica flexible
+            const servicesSnap = await db.collection(`businesses/${businessId}/bookingServices`)
+              .where('isActive', '==', true)
+              .get();
+            
+            const allServices = servicesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
+            const matchedService = allServices.find((s: any) => 
+              s.name.toLowerCase().includes(serviceName.toLowerCase()) || 
+              serviceName.toLowerCase().includes(s.name.toLowerCase())
+            );
 
-        const duration = matchedService?.durationMinutes || 30;
-        const price = matchedService?.price || 0;
-        const serviceId = matchedService?.id || 'bot_auto';
-        const endTime = calculateEndTime(startTime, duration);
+            // 2. Definir valores de respaldo seguros (Safe Defaults)
+            const duration = matchedService?.durationMinutes || 45;
+            const price = matchedService?.price || 0;
+            const serviceId = matchedService?.id || 'chatbot_generic';
+            const finalServiceName = matchedService?.name || serviceName;
+            const endTime = calculateEndTime(normalizedTime, duration);
 
-        const reservationRef = db.collection(`businesses/${businessId}/reservations`).doc();
-        const reservationId = reservationRef.id;
-        const now = new Date().toISOString();
+            const reservationRef = db.collection(`businesses/${businessId}/reservations`).doc();
+            const reservationId = reservationRef.id;
+            const now = new Date().toISOString();
 
-        const reservationData = {
-          id: reservationId,
-          businessId,
-          customerName: customerName.trim(),
-          customerPhone: customerPhone.trim(),
-          serviceId,
-          serviceName: matchedService?.name || serviceName,
-          staffId: null,
-          staffName: 'Pendiente de asignación',
-          date: normalizedDate,
-          startTime,
-          endTime,
-          status: 'pending' as const,
-          price,
-          durationMinutes: duration,
-          source: 'web' as const,
-          createdAt: now,
-          updatedAt: now,
-        };
+            // 3. Construcción y Sanitización del Documento
+            const reservationData = {
+              id: reservationId,
+              businessId,
+              customerName: customerName.trim(),
+              customerPhone: customerPhone.trim(),
+              serviceId,
+              serviceName: finalServiceName,
+              staffId: null,
+              staffName: 'Pendiente de asignación',
+              date: normalizedDate,
+              startTime: normalizedTime,
+              endTime,
+              status: 'pending' as const,
+              price,
+              durationMinutes: duration,
+              source: 'chatbot' as const,
+              createdAt: now,
+              updatedAt: now,
+            };
 
-        await reservationRef.set(reservationData);
+            // Blindaje total contra campos undefined (Firestore Exception Prevention)
+            const cleanPayload = JSON.parse(JSON.stringify(reservationData));
 
-        return { 
-          success: true, 
-          reservationId: reservationId.slice(-6).toUpperCase(),
-          customerName,
-          serviceName: reservationData.serviceName,
-          date: normalizedDate,
-          startTime 
-        };
+            await reservationRef.set(cleanPayload);
+
+            return { 
+              success: true, 
+              reservationId: reservationId.slice(-6).toUpperCase(),
+              customerName,
+              serviceName: finalServiceName,
+              date: normalizedDate,
+              startTime: normalizedTime
+            };
+        } catch (error: any) {
+            console.error("[bookAppointmentTool] Error en el servidor:", error.message);
+            throw error; 
+        }
       }
     );
 
@@ -203,9 +234,9 @@ export const publicMenuChatbotFlow = ai.defineFlow(
       
       INSTRUCCIONES DE AGENDAMIENTO:
       1. Si el cliente quiere una cita/reserva, DEBES pedir: nombre, WhatsApp, servicio y fecha/hora.
-      2. No inventes que la cita está guardada. 
-      3. Ejecuta 'bookAppointmentTool' para persistir la reserva en el sistema.
-      4. Solo después de recibir éxito de la herramienta, confirma al cliente con los detalles y el ID de reserva.
+      2. No inventes que la cita está guardada ni confirmes sin haber ejecutado la acción técnica. 
+      3. Ejecuta obligatoriamente la herramienta 'bookAppointmentTool' para persistir la reserva en el sistema.
+      4. SOLO después de recibir éxito de la herramienta, confirma al cliente con los detalles estructurados y el ID de reserva.
       5. Formato de fecha para la herramienta: YYYY-MM-DD.`;
 
       const formattedHistory = history.map(h => ({
