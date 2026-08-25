@@ -72,9 +72,9 @@ export default function InvoiceHistoryTable({ invoices, isLoading, businessType 
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // Lógica de Filtrado en Memoria
+  // Lógica de Filtrado en Memoria con Guardia de Array Seguro (Anti runtime crash)
   const filteredInvoices = useMemo(() => {
-    return invoices.filter(inv => {
+    return (invoices || []).filter(inv => {
       const matchesSearch = inv.consecutiveNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
                             inv.customer.name.toLowerCase().includes(searchTerm.toLowerCase());
       

@@ -18,7 +18,7 @@ import { useSearchParams } from 'next/navigation';
 
 /**
  * @fileOverview Página principal de la Terminal de Facturación (POS).
- * Orquestador central del módulo POS con flujo operativo optimizado y blindaje de errores.
+ * Orquestador central del módulo POS con flujo operativo optimizado y blindaje de errores de runtime.
  */
 export default function POSPage() {
   const { user } = useUser();
@@ -26,27 +26,35 @@ export default function POSPage() {
   const { toast } = useToast();
   const searchParams = useSearchParams();
 
-  // 1. Obtener contexto del negocio y productos con guardias defensivas (Anti TypeError reading '1')
+  // 1. Obtener contexto del negocio y productos con guardias estrictas (Anti TypeError reading '1')
   const businessRef = useMemoFirebase(
-    () => (user?.uid ? doc(firestore, 'businesses', user.uid) : null),
+    () => {
+      if (!firestore || !user?.uid) return null;
+      return doc(firestore, 'businesses', user.uid);
+    },
     [user?.uid, firestore]
   );
   const { data: business, isLoading: loadingBusiness } = useDoc<Business>(businessRef);
 
   const productsQuery = useMemoFirebase(
-    () => (user?.uid ? collection(firestore, `businesses/${user.uid}/products`) : null),
+    () => {
+      if (!firestore || !user?.uid) return null;
+      return collection(firestore, `businesses/${user.uid}/products`);
+    },
     [user?.uid, firestore]
   );
-  const { data: products, isLoading: loadingProducts } = loadingBusiness ? { data: null, isLoading: true } : useCollection<Product>(productsQuery);
+  const { data: products, isLoading: loadingProducts } = useCollection<Product>(productsQuery);
 
-  // 2. Suscripción al Historial de Facturas
   const invoicesQuery = useMemoFirebase(
-    () => (user?.uid ? collection(firestore, `businesses/${user.uid}/invoices`) : null),
+    () => {
+      if (!firestore || !user?.uid) return null;
+      return collection(firestore, `businesses/${user.uid}/invoices`);
+    },
     [user?.uid, firestore]
   );
   const { data: invoices, isLoading: loadingInvoices } = useCollection<Invoice>(invoicesQuery);
 
-  // 3. Estado local del carrito y financiera
+  // 2. Estado local del carrito y datos de cliente
   const [cart, setCart] = useState<POSItem[]>([]);
   const [customerName, setCustomerName] = useState('Cliente General');
   const [customerPhone, setCustomerPhone] = useState('');
@@ -55,7 +63,7 @@ export default function POSPage() {
   // Variables Financieras
   const [discountType, setDiscountType] = useState<DiscountType>('amount');
   const [discountValue, setDiscountValue] = useState(0);
-  const [taxRate, setTaxRate] = useState(19); // Default IVA
+  const [taxRate, setTaxRate] = useState(19); 
   const [tipValue, setTipValue] = useState(0);
   const [tipType, setTipType] = useState<DiscountType>('amount');
   const [paymentMethod, setPaymentMethod] = useState<string>('efectivo');
@@ -65,9 +73,12 @@ export default function POSPage() {
 
   // --- LÓGICA DE MESA (EXTRACCIÓN BLINDADA CONTRA NULL MATCH) ---
   const orderOrigin = searchParams?.get('ref') || 'web';
-  const mesaNumber = orderOrigin?.match(/mesa-(.+)/)?.[1] ?? null;
+  const mesaNumber = useMemo(() => {
+    const match = orderOrigin?.match(/mesa-(.+)/);
+    return (match && match.length > 1) ? match[1] : null;
+  }, [orderOrigin]);
 
-  // 4. Motor de Cálculos Reactivos (Fórmulas Blindadas de Base Gravable Única)
+  // 3. Motor de Cálculos Reactivos (Fórmulas Blindadas de Base Gravable Única)
   const financialSummary = useMemo(() => {
     const subtotal = cart.reduce((sum, item) => sum + item.subtotal, 0);
     
@@ -101,7 +112,7 @@ export default function POSPage() {
     };
   }, [cart, discountType, discountValue, taxRate, tipValue, tipType, cashReceived]);
 
-  // 5. Handlers de Carrito
+  // 4. Handlers de Carrito
   const handleAddToCart = (product: Product) => {
     if (isProcessing) return;
     setCart(prev => {
