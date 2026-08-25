@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useUser, useFirestore, useCollection, useDoc, useMemoFirebase } from '@/firebase';
 import { collection, doc } from 'firebase/firestore';
 import type { Business } from '@/models/business';
@@ -14,33 +14,35 @@ import { Loader2, Calculator, CreditCard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { processSale } from '@/services/billing/billing-service';
+import { useSearchParams } from 'next/navigation';
 
 /**
  * @fileOverview Página principal de la Terminal de Facturación (POS).
- * Orquestador central del módulo POS con flujo operativo optimizado.
+ * Orquestador central del módulo POS con flujo operativo optimizado y blindaje de errores.
  */
 export default function POSPage() {
   const { user } = useUser();
   const firestore = useFirestore();
   const { toast } = useToast();
+  const searchParams = useSearchParams();
 
-  // 1. Obtener contexto del negocio y productos
+  // 1. Obtener contexto del negocio y productos con guardias defensivas (Anti TypeError reading '1')
   const businessRef = useMemoFirebase(
     () => (user?.uid ? doc(firestore, 'businesses', user.uid) : null),
-    [user, firestore]
+    [user?.uid, firestore]
   );
   const { data: business, isLoading: loadingBusiness } = useDoc<Business>(businessRef);
 
   const productsQuery = useMemoFirebase(
     () => (user?.uid ? collection(firestore, `businesses/${user.uid}/products`) : null),
-    [user, firestore]
+    [user?.uid, firestore]
   );
   const { data: products, isLoading: loadingProducts } = loadingBusiness ? { data: null, isLoading: true } : useCollection<Product>(productsQuery);
 
   // 2. Suscripción al Historial de Facturas
   const invoicesQuery = useMemoFirebase(
     () => (user?.uid ? collection(firestore, `businesses/${user.uid}/invoices`) : null),
-    [user, firestore]
+    [user?.uid, firestore]
   );
   const { data: invoices, isLoading: loadingInvoices } = useCollection<Invoice>(invoicesQuery);
 
@@ -61,17 +63,21 @@ export default function POSPage() {
 
   const businessType = (business?.category || 'Retail') as VerticalType;
 
-  // 4. Motor de Cálculos Reactivos (Fórmulas Blindadas)
+  // --- LÓGICA DE MESA (EXTRACCIÓN BLINDADA CONTRA NULL MATCH) ---
+  const orderOrigin = searchParams?.get('ref') || 'web';
+  const mesaNumber = orderOrigin?.match(/mesa-(.+)/)?.[1] ?? null;
+
+  // 4. Motor de Cálculos Reactivos (Fórmulas Blindadas de Base Gravable Única)
   const financialSummary = useMemo(() => {
     const subtotal = cart.reduce((sum, item) => sum + item.subtotal, 0);
     
-    // A. Calcular Descuento
-    const discountAmount = discountType === 'percent' 
+    // A. Calcular Descuento (Paso 1)
+    const calculatedDiscount = discountType === 'percent' 
       ? (subtotal * (discountValue / 100)) 
       : discountValue;
 
-    // B. Establecer Base Gravable (Pivote central)
-    const baseTaxable = Math.max(0, subtotal - discountAmount);
+    // B. Establecer Base Gravable (Pivote central post-descuento)
+    const baseTaxable = Math.max(0, subtotal - calculatedDiscount);
 
     // C. Calcular IVA sobre la Base
     const calculatedTax = baseTaxable * (taxRate / 100);
@@ -87,7 +93,7 @@ export default function POSPage() {
 
     return {
       subtotal,
-      discount: Math.round(discountAmount),
+      discount: Math.round(calculatedDiscount),
       tax: Math.round(calculatedTax),
       tip: Math.round(calculatedTip),
       total: Math.round(totalFinal),
@@ -166,7 +172,8 @@ export default function POSPage() {
                 total: financialSummary.total,
                 paymentMethod: paymentMethod as any,
                 cashReceived,
-                changeAmount: financialSummary.change
+                changeAmount: financialSummary.change,
+                mesa: mesaNumber || undefined,
             },
             businessType
         );
@@ -195,6 +202,20 @@ export default function POSPage() {
         setIsProcessing(false);
     }
   };
+
+  // Atajo de teclado F8
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+        if (e.key === 'F8') {
+            e.preventDefault();
+            if (cart.length > 0 && !isProcessing) {
+                handleProcessSale();
+            }
+        }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [cart, isProcessing, handleProcessSale]);
 
   if (loadingBusiness && !business) {
     return (
@@ -248,7 +269,7 @@ export default function POSPage() {
               customerPhone={customerPhone}
               setCustomerPhone={setCustomerPhone}
               
-              // Financial Props
+              // Financial Control
               discountType={discountType}
               setDiscountType={setDiscountType}
               discountValue={discountValue}

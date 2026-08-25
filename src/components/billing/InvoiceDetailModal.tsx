@@ -54,7 +54,7 @@ export function InvoiceDetailModal({ invoice, isOpen, onClose, mode = 'view', bu
   const firestore = useFirestore();
   const { toast } = useToast();
 
-  const businessRef = useMemoFirebase(() => user ? doc(firestore, 'businesses', user.uid) : null, [user, firestore]);
+  const businessRef = useMemoFirebase(() => user?.uid ? doc(firestore, 'businesses', user.uid) : null, [user?.uid, firestore]);
   const { data: business } = useDoc<Business>(businessRef);
 
   if (!invoice) return null;

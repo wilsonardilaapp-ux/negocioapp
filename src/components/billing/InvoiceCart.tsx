@@ -239,7 +239,7 @@ export default function InvoiceCart({
 
                 <div className="space-y-1.5">
                     <div className="flex justify-between items-center">
-                        <Label className="text-[9px] font-black uppercase text-muted-foreground">Propina</Label>
+                        <Label className="text-[9px] font-black uppercase text-muted-foreground">Propina Sug.</Label>
                         <div className="flex bg-muted p-0.5 rounded-lg border">
                           <button 
                             type="button"
