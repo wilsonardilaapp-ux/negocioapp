@@ -28,6 +28,7 @@ export interface Invoice {
     document?: string;
     email?: string;
     phone?: string;
+    address?: string;
   };
   items: POSItem[];
   subtotal: number;

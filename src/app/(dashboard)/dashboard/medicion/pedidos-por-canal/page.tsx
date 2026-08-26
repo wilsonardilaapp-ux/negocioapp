@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useMemo, useState, useRef, useEffect } from 'react';
@@ -767,7 +766,7 @@ function TableRow({ children, className }: { children: React.ReactNode, classNam
     return <tr className={cn("border-b transition-colors hover:bg-muted/50", className)}>{children}</tr>;
 }
 
-function TableHead({ children, className }: { children: React.ReactNode, className?: string }) {
+function TableHead({ children, className }: { children?: React.ReactNode, className?: string }) {
     return <th className={cn("h-10 px-2 text-left align-middle font-medium text-muted-foreground", className)}>{children}</th>;
 }
 
@@ -775,8 +774,8 @@ function TableBody({ children, className }: { children: React.ReactNode, classNa
     return <tbody className={cn("[&_tr:last-child]:border-0", className)}>{children}</tbody>;
 }
 
-function TableCell({ children, className }: { children: React.ReactNode, className?: string }) {
-    return <td className={cn("p-2 align-middle", className)}>{children}</td>;
+function TableCell({ children, className, colSpan }: { children: React.ReactNode, className?: string, colSpan?: number }) {
+    return <td colSpan={colSpan} className={cn("p-2 align-middle", className)}>{children}</td>;
 }
 
 function TableFooter({ children, className }: { children: React.ReactNode, className?: string }) {

@@ -19,6 +19,7 @@ import {
   PublicMenuChatbotOutput,
 } from '@/models/public-menu-chatbot';
 import { getAIConfig } from './chat-flow';
+import type { BookingService, BookingStaff } from '@/models/booking';
 
 /**
  * Calcula la hora de fin sumando la duración a la hora de inicio.
@@ -77,10 +78,10 @@ export const publicMenuChatbotFlow = ai.defineFlow(
 
       const bData = businessSnap.data();
       const products = catalogSnap.data()?.products || [];
-      const services = servicesSnap.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+      const services = servicesSnap.docs.map(doc => ({ ...doc.data(), id: doc.id } as BookingService));
 
       const formattedCatalog = products.map((p: any) => `- ${p.name}: $${p.price}`).join('\n');
-      const formattedServices = services.map((s: any) => `- ${s.name}: $${s.price} (${s.durationMinutes} min)`).join('\n');
+      const formattedServices = services.map((s: BookingService) => `- ${s.name}: $${s.price} (${s.durationMinutes} min)`).join('\n');
 
       // --- CAPA 3: CONFIGURACIÓN IA Y CADENA DE FALLBACK ---
       const todayISO = new Date().toISOString().split('T')[0];
