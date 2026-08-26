@@ -129,6 +129,7 @@ export async function getAIConfig(businessId?: string): Promise<{ provider: stri
     console.error("[AI-CONFIG] [ERROR]:", e.message);
   }
 
+  // Fallback seguro: siempre devuelve un objeto con el contrato esperado
   return { provider: 'googleai', apiKey: '', model: 'gemini-3.6-flash' };
 }
 
