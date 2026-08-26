@@ -82,18 +82,10 @@ export const publicMenuChatbotFlow = ai.defineFlow(
     const formattedServices = services.map((s: any) => `- ${s.name}: $${s.price} (${s.durationMinutes} min)`).join('\n');
 
     // --- CAPA 3: CONFIGURACIÓN IA Y CADENA DE FALLBACK ---
-    const integrationSnap = await db.doc('integrations/chatbot-integrado-con-whatsapp-para-soporte-y-ventas').get();
-    let fields: any = {};
-    if (integrationSnap.exists) {
-        try {
-            fields = typeof integrationSnap.data()?.fields === 'string' 
-                ? JSON.parse(integrationSnap.data()?.fields) 
-                : (integrationSnap.data()?.fields || {});
-        } catch (e) {}
-    }
-
-    const googleApiKey = fields.google?.apiKey || process.env.GEMINI_API_KEY || '';
-    const deepseekApiKey = fields.deepseek?.apiKey || process.env.DEEPSEEK_API_KEY || '';
+    const aiConfig = await getAIConfig(businessId);
+    
+    const googleApiKey = (aiConfig?.apiKey?.startsWith('AIza') ? aiConfig.apiKey : null) || process.env.GEMINI_API_KEY || '';
+    const deepseekApiKey = process.env.DEEPSEEK_API_KEY || '';
 
     const providerChain = [
       { name: 'google', model: 'googleai/gemini-3.6-flash', apiKey: googleApiKey.trim() },
@@ -149,10 +141,14 @@ REGLAS DE AGENDAMIENTO:
           }
         } catch (err: any) {
           lastError = err;
-          const status = err.status || err.code || (err.message?.includes('429') ? 429 : 500);
-          const isRetryable = [401, 403, 404, 429].includes(status);
           
-          console.warn(`[AI Fallback] Error en ${provider.name} (${status}):`, err.message);
+          // Detección de error reintentable (Fix Problema 1)
+          const numericCode = err.code ?? (err.message?.includes('429') ? 429 : null);
+          const retryableCodes = [401, 403, 404, 429, 500];
+          const retryableStatusStrings = ['RESOURCE_EXHAUSTED', 'UNAUTHENTICATED', 'PERMISSION_DENIED', 'NOT_FOUND', 'UNKNOWN', 'INVALID_ARGUMENT'];
+          const isRetryable = retryableCodes.includes(numericCode) || retryableStatusStrings.includes(err.status);
+          
+          console.warn(`[AI Fallback] Error en ${provider.name} (${err.status || numericCode}):`, err.message);
           
           if (!isRetryable) {
             throw err; // Error de validación o petición mal formada, no reintentar
