@@ -1,8 +1,10 @@
-
 'use server';
 
 /**
- * @fileOverview Flujo de Genkit para el chatbot del menú público con resolución defensiva de identidad (Tenant Resolution).
+ * @fileOverview Flujo de Genkit para el chatbot del menú público con ejecución determinista de agendamiento.
+ * 
+ * - Elimina Tool Calling para evitar errores de registro duplicado.
+ * - Implementa extracción estructurada de datos y guardado directo vía Firebase Admin SDK.
  */
 
 import { ai } from '@/ai/genkit';
@@ -16,91 +18,21 @@ import {
 import { getAIConfig } from './chat-flow';
 import { calculateEndTime } from '@/lib/booking-engine';
 
-// Registro global de herramientas para evitar colisiones en Genkit v1.x
-const toolsCache = new Map<string, any>();
-
 /**
- * Resuelve o registra la herramienta de agendamiento para un negocio específico.
+ * Esquema interno para la extracción de datos de reserva por parte de la IA.
  */
-function getOrCreateBookAppointmentTool(businessId: string) {
-  const safeId = businessId.toLowerCase().replace(/[^a-z0-9-]/g, '-');
-  const toolName = `bookAppointment_${safeId}`;
-
-  if (toolsCache.has(businessId)) {
-    return toolsCache.get(businessId);
-  }
-
-  const tool = ai.defineTool(
-    {
-      name: toolName,
-      description: 'Registra una cita o reserva en la agenda del negocio.',
-      inputSchema: z.object({
-        customerName: z.string().describe('Nombre completo del cliente'),
-        customerPhone: z.string().describe('WhatsApp de contacto'),
-        serviceName: z.string().describe('Nombre del servicio solicitado'),
-        date: z.string().describe('Fecha en formato YYYY-MM-DD'),
-        startTime: z.string().describe('Hora en formato 24h (HH:mm)'),
-      }),
-    },
-    async (toolInput) => {
-      try {
-        console.log(">>> [DEBUG 4 - TOOL EXECUTION START]", toolInput);
-
-        const db = await getAdminFirestore();
-        
-        const servicesSnap = await db.collection(`businesses/${businessId}/bookingServices`).get();
-        const matchedService = servicesSnap.docs
-          .map(d => ({ id: d.id, ...d.data() } as any))
-          .find(s => s.name.toLowerCase().includes(toolInput.serviceName.toLowerCase()));
-
-        const reservationId = db.collection('placeholder').doc().id;
-        const duration = matchedService?.durationMinutes || 45;
-        const price = matchedService?.price || 0;
-
-        const reservationData = {
-          id: reservationId,
-          businessId: businessId,
-          customerName: toolInput.customerName.trim(),
-          customerPhone: toolInput.customerPhone.trim(),
-          serviceId: matchedService?.id || 'chatbot_generic',
-          serviceName: matchedService?.name || toolInput.serviceName,
-          staffId: null,
-          staffName: "Pendiente de asignación",
-          date: toolInput.date,
-          startTime: toolInput.startTime,
-          endTime: calculateEndTime(toolInput.startTime, duration),
-          price: price,
-          durationMinutes: duration,
-          status: 'pending',
-          source: 'chatbot',
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        };
-
-        const cleanData = JSON.parse(JSON.stringify(reservationData));
-
-        await db.collection(`businesses/${businessId}/reservations`).doc(reservationId).set(cleanData);
-        
-        console.log(">>> [DEBUG 5 - FIRESTORE WRITE SUCCESS]", { path: `businesses/${businessId}/reservations/${reservationId}` });
-
-        return { 
-          success: true, 
-          reservationId: reservationId.slice(-6).toUpperCase(),
-          customerName: toolInput.customerName,
-          serviceName: matchedService?.name || toolInput.serviceName,
-          date: toolInput.date,
-          startTime: toolInput.startTime
-        };
-      } catch (error: any) {
-        console.error(">>> [DEBUG 6 - TOOL ERROR CATCH]:", error.message, error.stack);
-        return { success: false, error: "Servicio de agenda temporalmente fuera de línea." };
-      }
-    }
-  );
-
-  toolsCache.set(businessId, tool);
-  return tool;
-}
+const BookingExtractionSchema = z.object({
+  answer: z.string().describe('Respuesta textual para el cliente'),
+  intent: z.enum(['chat', 'booking']).describe('Intención detectada: charla general o reserva'),
+  extractedData: z.object({
+    customerName: z.string().optional(),
+    customerPhone: z.string().optional(),
+    serviceName: z.string().optional(),
+    date: z.string().optional().describe('Formato YYYY-MM-DD'),
+    startTime: z.string().optional().describe('Formato HH:mm (24h)'),
+    isComplete: z.boolean().describe('Verdadero solo si nombre, teléfono, fecha y hora están presentes'),
+  }).optional(),
+});
 
 export const publicMenuChatbotFlow = ai.defineFlow(
   {
@@ -116,11 +48,9 @@ export const publicMenuChatbotFlow = ai.defineFlow(
 
     const db = await getAdminFirestore();
 
-    // --- CAPA 0: RESOLUCIÓN DEFENSIVA DE TENANT (SLUG -> UID) ---
-    // Si el documento directo no existe, buscamos por el campo slug
+    // --- CAPA 0: RESOLUCIÓN DE IDENTIDAD (SLUG -> UID) ---
     const directSnap = await db.collection('businesses').doc(businessId).get();
     if (!directSnap.exists) {
-        console.log(`>>> [TENANT RESOLUTION] Buscando ID canónico para slug: ${businessId}`);
         const slugQuery = await db.collection('businesses')
             .where('slug', '==', businessId)
             .limit(1)
@@ -128,25 +58,10 @@ export const publicMenuChatbotFlow = ai.defineFlow(
         
         if (!slugQuery.empty) {
             businessId = slugQuery.docs[0].id;
-            console.log(`>>> [TENANT RESOLUTION] ID resuelto: ${businessId}`);
-        } else {
-            // Intento secundario: buscar en shareConfig si se pasó el slug dinámico
-            const shareQuery = await db.collectionGroup('shareConfig')
-                .where('slug', '==', businessId)
-                .limit(1)
-                .get();
-            
-            if (!shareQuery.empty) {
-                const parentId = shareQuery.docs[0].ref.parent.parent?.id;
-                if (parentId) {
-                    businessId = parentId;
-                    console.log(`>>> [TENANT RESOLUTION] ID resuelto vía shareConfig: ${businessId}`);
-                }
-            }
         }
     }
     
-    // CAPA 1: RESPUESTAS PREDETERMINADAS
+    // CAPA 1: RESPUESTAS PREDETERMINADAS (CACHE LOCAL)
     try {
       const responsesSnap = await db.collection(`businesses/${businessId}/publicMenuChatbot/main/responses`)
         .where('isActive', '==', true).get();
@@ -154,62 +69,90 @@ export const publicMenuChatbotFlow = ai.defineFlow(
       if (matchedCustom) return { answer: matchedCustom.data().answer, source: 'custom_response' };
     } catch (e) {}
 
-    // CAPA 2: CATÁLOGO
+    // CAPA 2: CONOCIMIENTO DEL CATÁLOGO
     const businessSnap = await db.collection('businesses').doc(businessId).get();
+    const bData = businessSnap.data();
     const catalogSnap = await db.collection(`businesses/${businessId}/publicData`).doc('catalog').get();
     const products = catalogSnap.data()?.products || [];
     const formattedCatalog = products.map((p: any) => `- ${p.name}: $${p.price}`).join('\n');
 
-    // CAPA 3 Y 4: RAZONAMIENTO Y AGENDAMIENTO
+    // CAPA 3: PROCESAMIENTO CON IA (MOTOR MAESTRO)
     try {
       const aiConfig = await getAIConfig(businessId);
-      
-      // RESOLUCIÓN DEFENSIVA DE API KEY
       let resolvedApiKey = (aiConfig.apiKey || '').trim();
-      const isConfigKeyValid = resolvedApiKey.startsWith('AIza');
-      
-      if (!isConfigKeyValid) {
+      if (!resolvedApiKey.startsWith('AIza')) {
         resolvedApiKey = (process.env.GEMINI_API_KEY || process.env.GOOGLE_GENAI_API_KEY || '').trim();
       }
 
-      const appointmentTool = getOrCreateBookAppointmentTool(businessId);
-
-      const systemPrompt = `Eres el asistente virtual oficial del negocio.
+      const systemPrompt = `Eres el asistente virtual de "${bData?.name || 'Nuestro Negocio'}".
+      Ubicación: ${bData?.address || 'Consultar en catálogo'}
       
-      CONTEXTO DEL NEGOCIO:
-      Nombre: ${businessSnap.data()?.name || 'Nuestro Negocio'}
-      Ubicación: ${businessSnap.data()?.address || 'Ver en catálogo'}
-      
-      CATÁLOGO DE SERVICIOS/PRODUCTOS:
+      CATÁLOGO DE SERVICIOS:
       ${formattedCatalog}
       
       REGLAS DE AGENDAMIENTO:
-      1. Si el cliente desea una cita, solicita: Nombre, WhatsApp, Servicio y Fecha/Hora.
-      2. Una vez tengas los datos, utiliza la herramienta '${appointmentTool.name}'.
-      3. SOLO confirma la reserva cuando la herramienta devuelva éxito.
-      4. Muestra siempre el ID de reserva recibido para que el cliente lo guarde.`;
+      1. Si el cliente quiere una cita, debes capturar: Nombre, WhatsApp, Servicio y Fecha/Hora.
+      2. Si falta información, pídela amablemente en el campo 'answer'.
+      3. Si tienes los 4 datos (Nombre, WhatsApp, Fecha y Hora), marca 'isComplete: true' en el objeto JSON.
+      4. Fecha debe ser YYYY-MM-DD. Hora debe ser HH:mm (24h).
+      
+      INSTRUCCIÓN TÉCNICA: Responde SIEMPRE siguiendo estrictamente el esquema JSON proporcionado.`;
 
       const response = await ai.generate({
         model: 'googleai/gemini-1.5-flash',
-        tools: [appointmentTool],
+        output: { schema: BookingExtractionSchema },
         messages: [
           { role: 'system', content: [{ text: systemPrompt }] },
           ...history.map(h => ({ role: h.role as any, content: [{ text: h.content }] })),
           { role: 'user', content: [{ text: question }] }
         ],
-        config: { 
-          temperature: 0.1, 
-          apiKey: resolvedApiKey 
-        }
+        config: { temperature: 0.1, apiKey: resolvedApiKey }
       });
-      
+
+      const extracted = response.output;
+
+      // --- CAPA 4: EJECUCIÓN DETERMINISTA (TS BACKEND) ---
+      if (extracted?.intent === 'booking' && extracted.extractedData?.isComplete) {
+        const data = extracted.extractedData;
+        const reservationId = db.collection('placeholder').doc().id;
+
+        const reservationPayload = {
+          id: reservationId,
+          businessId: businessId,
+          customerName: (data.customerName || 'Cliente').trim(),
+          customerPhone: (data.customerPhone || '').trim(),
+          serviceId: 'chatbot_extracted',
+          serviceName: data.serviceName || 'Servicio solicitado',
+          staffId: null,
+          staffName: "Pendiente de asignación",
+          date: data.date,
+          startTime: data.startTime,
+          endTime: calculateEndTime(data.startTime || '00:00', 45),
+          price: 0,
+          durationMinutes: 45,
+          status: 'pending',
+          source: 'chatbot',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+
+        // Escritura directa en Firestore (Firebase Admin)
+        await db.collection(`businesses/${businessId}/reservations`).doc(reservationId).set(reservationPayload);
+        
+        console.log(">>> [DEBUG 5 - DETERMINISTIC WRITE SUCCESS]", { path: `businesses/${businessId}/reservations/${reservationId}` });
+
+        const confirmMsg = `¡Listo, ${data.customerName}! ✅ He agendado tu cita para ${data.serviceName} el día ${data.date} a las ${data.startTime}. Tu ID de reserva es: ${reservationId.slice(-6).toUpperCase()}. ¡Te esperamos!`;
+        
+        return { answer: confirmMsg, source: 'ai_generated' };
+      }
+
       return { 
-        answer: response.text || "He recibido tu solicitud, ¿en qué más puedo ayudarte?", 
+        answer: extracted?.answer || "Entendido. ¿En qué más puedo ayudarte?", 
         source: 'ai_generated' 
       };
 
     } catch (error: any) {
-      console.error(">>> [DEBUG 7 - GLOBAL FLOW CATCH]:", error.message, error.stack, error);
+      console.error(">>> [DEBUG 7 - GLOBAL FLOW CATCH]:", error.message, error.stack);
       return { 
         answer: "Lo siento, tuve un inconveniente al procesar tu consulta. Por favor intenta de nuevo o contacta al negocio directamente.", 
         source: 'fallback' 
