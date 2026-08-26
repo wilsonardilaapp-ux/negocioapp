@@ -26,6 +26,12 @@ import { es } from 'date-fns/locale';
 import { cn, normalizePhoneNumber } from '@/lib/utils';
 import { ReservationModal } from './ReservationModal';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 
 const formatCurrency = (value: number) => {
   return new Intl.NumberFormat('es-CO', {
@@ -80,10 +86,31 @@ export function AgendaGrid() {
         <div className="flex items-center gap-4">
             <div className="flex items-center border rounded-xl overflow-hidden bg-muted/20">
                 <Button variant="ghost" size="icon" onClick={() => navigateDay('prev')} className="h-10 w-10 hover:bg-white"><ChevronLeft className="h-4 w-4" /></Button>
-                <div className="px-4 font-black text-sm border-x flex items-center gap-2 bg-white min-w-[200px] justify-center">
-                    <CalendarIcon className="h-4 w-4 text-primary" />
-                    {format(new Date(selectedDate + 'T00:00:00'), "EEEE, d 'de' MMMM", { locale: es })}
-                </div>
+                
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <button 
+                      type="button"
+                      className="px-4 font-black text-sm border-x flex items-center gap-2 bg-white min-w-[200px] justify-center hover:bg-muted/30 transition-colors focus:outline-none"
+                    >
+                        <CalendarIcon className="h-4 w-4 text-primary" />
+                        {format(new Date(selectedDate + 'T00:00:00'), "EEEE, d 'de' MMMM", { locale: es })}
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="center">
+                    <Calendar
+                      mode="single"
+                      selected={new Date(selectedDate + 'T00:00:00')}
+                      onSelect={(date) => {
+                        if (date) {
+                          setSelectedDate(format(date, 'yyyy-MM-dd'));
+                        }
+                      }}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+
                 <Button variant="ghost" size="icon" onClick={() => navigateDay('next')} className="h-10 w-10 hover:bg-white"><ChevronRight className="h-4 w-4" /></Button>
             </div>
             <Button variant="outline" size="sm" onClick={() => setSelectedDate(new Date().toISOString().split('T')[0])} className="font-bold text-[10px] uppercase">Hoy</Button>
