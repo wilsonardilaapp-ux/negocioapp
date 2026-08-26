@@ -84,7 +84,7 @@ export const publicMenuChatbotFlow = ai.defineFlow(
 
       // --- CAPA 3: CONFIGURACIÓN IA Y CADENA DE FALLBACK ---
       const aiConfig = await getAIConfig(businessId);
-      const googleApiKey = aiConfig.apiKey || process.env.GEMINI_API_KEY || '';
+      const googleApiKey = (aiConfig?.apiKey?.startsWith('AIza') ? aiConfig.apiKey : null) || process.env.GEMINI_API_KEY || '';
       
       const integrationDoc = await db.collection('integrations').doc('chatbot-integrado-con-whatsapp-para-soporte-y-ventas').get();
       let deepseekApiKey = process.env.DEEPSEEK_API_KEY || '';
