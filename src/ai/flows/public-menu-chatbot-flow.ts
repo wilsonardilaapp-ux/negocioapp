@@ -84,7 +84,11 @@ export const publicMenuChatbotFlow = ai.defineFlow(
     // --- CAPA 3: CONFIGURACIÓN IA Y CADENA DE FALLBACK ---
     const aiConfig = await getAIConfig(businessId);
     
-    const googleApiKey = (aiConfig?.apiKey?.startsWith('AIza') ? aiConfig.apiKey : null) || process.env.GEMINI_API_KEY || '';
+    // Acceso blindado a la API Key para evitar excepciones por nulos
+    const googleApiKey = (aiConfig?.apiKey && typeof aiConfig.apiKey === 'string' && aiConfig.apiKey.startsWith('AIza')) 
+      ? aiConfig.apiKey 
+      : (process.env.GEMINI_API_KEY || '');
+    
     const deepseekApiKey = process.env.DEEPSEEK_API_KEY || '';
 
     const providerChain = [
@@ -142,6 +146,7 @@ REGLAS DE AGENDAMIENTO:
         } catch (err: any) {
           lastError = err;
           
+          // Corregir detección de error reintentable comparando strings y códigos numéricos
           const numericCode = err.code ?? (err.message?.includes('429') ? 429 : null);
           const retryableCodes = [401, 403, 404, 429, 500];
           const retryableStatusStrings = ['RESOURCE_EXHAUSTED', 'UNAUTHENTICATED', 'PERMISSION_DENIED', 'NOT_FOUND', 'UNKNOWN', 'INVALID_ARGUMENT'];
