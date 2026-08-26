@@ -1,7 +1,7 @@
 'use server';
 
 /**
- * @fileOverview Flujo de Genkit para el chatbot del menú público con telemetría forense.
+ * @fileOverview Flujo de Genkit para el chatbot del menú público con telemetría forense y resolución defensiva de llaves.
  */
 
 import { ai } from '@/ai/genkit';
@@ -25,9 +25,6 @@ function getOrCreateBookAppointmentTool(businessId: string) {
   const safeId = businessId.toLowerCase().replace(/[^a-z0-9-]/g, '-');
   const toolName = `bookAppointment_${safeId}`;
 
-  // >>> [DEBUG 3 - TOOL REGISTRATION]
-  console.log(">>> [DEBUG 3 - TOOL REGISTRATION]", { toolName, inCache: toolsCache.has(businessId) });
-
   if (toolsCache.has(businessId)) {
     return toolsCache.get(businessId);
   }
@@ -46,7 +43,6 @@ function getOrCreateBookAppointmentTool(businessId: string) {
     },
     async (toolInput) => {
       try {
-        // >>> [DEBUG 4 - TOOL EXECUTION START]
         console.log(">>> [DEBUG 4 - TOOL EXECUTION START]", toolInput);
 
         const db = await getAdminFirestore();
@@ -84,7 +80,6 @@ function getOrCreateBookAppointmentTool(businessId: string) {
 
         await db.collection(`businesses/${businessId}/reservations`).doc(reservationId).set(cleanData);
         
-        // >>> [DEBUG 5 - FIRESTORE WRITE SUCCESS]
         console.log(">>> [DEBUG 5 - FIRESTORE WRITE SUCCESS]", { path: `businesses/${businessId}/reservations/${reservationId}` });
 
         return { 
@@ -96,7 +91,6 @@ function getOrCreateBookAppointmentTool(businessId: string) {
           startTime: toolInput.startTime
         };
       } catch (error: any) {
-        // >>> [DEBUG 6 - TOOL ERROR CATCH]
         console.error(">>> [DEBUG 6 - TOOL ERROR CATCH]:", error.message, error.stack);
         return { success: false, error: "Servicio de agenda temporalmente fuera de línea." };
       }
@@ -118,7 +112,6 @@ export const publicMenuChatbotFlow = ai.defineFlow(
     const lowQuestion = question.toLowerCase().trim();
     const isAppointmentIntent = lowQuestion.includes('agendar') || lowQuestion.includes('cita') || lowQuestion.includes('reserva');
 
-    // >>> [PUNTO 1 - ENTRADA]
     console.log(">>> [DEBUG 1 - FLOW ENTRY]", { businessId, question, isAppointmentIntent });
 
     const db = await getAdminFirestore();
@@ -141,10 +134,24 @@ export const publicMenuChatbotFlow = ai.defineFlow(
     try {
       const aiConfig = await getAIConfig(businessId);
       
-      // >>> [PUNTO 2 - CONFIGURACIÓN IA]
-      console.log(">>> [DEBUG 2 - AI CONFIG]", { provider: aiConfig?.provider, model: aiConfig?.model, hasKey: !!aiConfig?.apiKey });
+      // RESOLUCIÓN DEFENSIVA DE API KEY
+      let resolvedApiKey = (aiConfig.apiKey || '').trim();
+      const isConfigKeyValid = resolvedApiKey.startsWith('AIza');
+      
+      if (!isConfigKeyValid) {
+        // Fallback real a variables de entorno si la del Super Admin es inválida o no es de Google
+        resolvedApiKey = (process.env.GEMINI_API_KEY || process.env.GOOGLE_GENAI_API_KEY || '').trim();
+      }
+
+      console.log(">>> [DEBUG 2 - AI CONFIG]", { 
+        provider: aiConfig?.provider, 
+        model: aiConfig?.model, 
+        hasKey: !!aiConfig?.apiKey,
+        keySource: isConfigKeyValid ? 'SuperAdmin Config' : 'Environment Fallback'
+      });
 
       const appointmentTool = getOrCreateBookAppointmentTool(businessId);
+      console.log(">>> [DEBUG 3 - TOOL REGISTRATION]", { toolName: appointmentTool.name, inCache: toolsCache.has(businessId) });
 
       const systemPrompt = `Eres el asistente virtual oficial del negocio.
       
@@ -171,7 +178,7 @@ export const publicMenuChatbotFlow = ai.defineFlow(
         ],
         config: { 
           temperature: 0.1, 
-          apiKey: aiConfig.apiKey 
+          apiKey: resolvedApiKey 
         }
       });
       
@@ -181,7 +188,6 @@ export const publicMenuChatbotFlow = ai.defineFlow(
       };
 
     } catch (error: any) {
-      // >>> [PUNTO 7 - CATCH GLOBAL DEL PIPELINE]
       console.error(">>> [DEBUG 7 - GLOBAL FLOW CATCH]:", error.message, error.stack, error);
       return { 
         answer: "Lo siento, tuve un inconveniente al procesar tu consulta. Por favor intenta de nuevo o contacta al negocio directamente.", 
