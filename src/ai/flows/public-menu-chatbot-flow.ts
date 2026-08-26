@@ -1,4 +1,3 @@
-
 'use server';
 
 /**
@@ -84,17 +83,20 @@ export const publicMenuChatbotFlow = ai.defineFlow(
       const formattedServices = services.map((s: any) => `- ${s.name}: $${s.price} (${s.durationMinutes} min)`).join('\n');
 
       // --- CAPA 3: CONFIGURACIÓN IA Y CADENA DE FALLBACK ---
+      const aiConfig = await getAIConfig(businessId);
+      const googleApiKey = aiConfig.apiKey || process.env.GEMINI_API_KEY || '';
+      
       const integrationDoc = await db.collection('integrations').doc('chatbot-integrado-con-whatsapp-para-soporte-y-ventas').get();
-      let fields: any = {};
+      let deepseekApiKey = process.env.DEEPSEEK_API_KEY || '';
       if (integrationDoc.exists) {
           try {
               const data = integrationDoc.data();
-              fields = typeof data?.fields === 'string' ? JSON.parse(data.fields) : (data?.fields || {});
+              const fields = typeof data?.fields === 'string' ? JSON.parse(data.fields) : (data?.fields || {});
+              if (fields.deepseek?.apiKey) {
+                  deepseekApiKey = fields.deepseek.apiKey;
+              }
           } catch (e) {}
       }
-      
-      const googleApiKey = fields.google?.apiKey || process.env.GEMINI_API_KEY || '';
-      const deepseekApiKey = fields.deepseek?.apiKey || process.env.DEEPSEEK_API_KEY || '';
 
       const providerChain = [
         { name: 'google', model: 'googleai/gemini-3.6-flash', apiKey: googleApiKey.trim() },
