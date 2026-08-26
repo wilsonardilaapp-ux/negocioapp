@@ -76,6 +76,12 @@ service cloud.firestore {
       allow delete: if isSuperAdmin() || isOwner(request.resource.data.businessId);
     }
 
+    // Regla para configuración de cookies
+    match /cookies_settings/config {
+      allow read: if true;
+      allow write: if isSuperAdmin();
+    }
+
     // --- PROGRAMA DE SOCIOS (REFERIDOS) ---
 
     match /referrals/{id} {
@@ -155,10 +161,23 @@ service cloud.firestore {
       match /invoices/{invoiceId} {
         allow read, write: if isSuperAdmin() || isBusinessMember(businessId);
       }
+      
+      match /stock_movements/{movId} {
+        allow read, write: if isSuperAdmin() || isBusinessMember(businessId);
+      }
+      
+      match /counters/{counterId} {
+        allow read, write: if isSuperAdmin() || isBusinessMember(businessId);
+      }
 
       match /notifications/{notificationId} {
         allow read, update, delete: if isSuperAdmin() || isBusinessMember(businessId);
         allow create: if isSuperAdmin() || isBusinessMember(businessId);
+      }
+      
+      // Bloque aditivo para rastreo de eventos
+      match /tracking_events/{eventId} {
+        allow read, write: if isSuperAdmin() || isBusinessMember(businessId);
       }
 
       // --- MÓDULO DE RESEÑAS Y FIDELIZACIÓN ---
