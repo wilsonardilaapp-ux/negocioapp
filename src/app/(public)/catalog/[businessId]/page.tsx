@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, useMemo, useCallback, Suspense } from 'react';
@@ -104,12 +105,18 @@ function CatalogPageContent({ params }: CatalogPageProps) {
             setIsLoading(true);
             setError(null);
             try {
+                // 1. RESOLUCIÓN DE IDENTIDAD (SLUG -> UID)
+                let businessId = slug;
                 const shareConfigQuery = query(collectionGroup(firestore, 'shareConfig'), where('slug', '==', slug), limit(1));
                 const querySnapshot = await getDocs(shareConfigQuery);
-                const customSlugDoc = querySnapshot.docs.find(doc => doc.data().useCustomSlug === true);
                 
-                const businessId = customSlugDoc ? (customSlugDoc.ref.parent.parent?.id ?? slug) : slug;
+                if (!querySnapshot.empty) {
+                    const foundDoc = querySnapshot.docs[0];
+                    const parentId = foundDoc.ref.parent.parent?.id;
+                    if (parentId) businessId = parentId;
+                }
 
+                // 2. OBTENER DATOS CON EL ID CANÓNICO
                 const publicCatalogRef = doc(firestore, 'businesses', businessId, 'publicData', 'catalog');
                 const paymentSettingsRef = doc(firestore, 'paymentSettings', businessId);
                 const couponsQuery = query(

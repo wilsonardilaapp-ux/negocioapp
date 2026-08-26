@@ -1,7 +1,8 @@
+
 'use server';
 
 /**
- * @fileOverview Flujo de Genkit para el chatbot del menú público con telemetría forense y resolución defensiva de llaves.
+ * @fileOverview Flujo de Genkit para el chatbot del menú público con resolución defensiva de identidad (Tenant Resolution).
  */
 
 import { ai } from '@/ai/genkit';
@@ -108,13 +109,42 @@ export const publicMenuChatbotFlow = ai.defineFlow(
     outputSchema: PublicMenuChatbotOutputSchema,
   },
   async (input): Promise<PublicMenuChatbotOutput> => {
-    const { businessId, question, history = [] } = input;
+    let { businessId, question, history = [] } = input;
     const lowQuestion = question.toLowerCase().trim();
-    const isAppointmentIntent = lowQuestion.includes('agendar') || lowQuestion.includes('cita') || lowQuestion.includes('reserva');
-
-    console.log(">>> [DEBUG 1 - FLOW ENTRY]", { businessId, question, isAppointmentIntent });
+    
+    console.log(">>> [DEBUG 1 - FLOW ENTRY]", { businessId, question });
 
     const db = await getAdminFirestore();
+
+    // --- CAPA 0: RESOLUCIÓN DEFENSIVA DE TENANT (SLUG -> UID) ---
+    // Si el documento directo no existe, buscamos por el campo slug
+    const directSnap = await db.collection('businesses').doc(businessId).get();
+    if (!directSnap.exists) {
+        console.log(`>>> [TENANT RESOLUTION] Buscando ID canónico para slug: ${businessId}`);
+        const slugQuery = await db.collection('businesses')
+            .where('slug', '==', businessId)
+            .limit(1)
+            .get();
+        
+        if (!slugQuery.empty) {
+            businessId = slugQuery.docs[0].id;
+            console.log(`>>> [TENANT RESOLUTION] ID resuelto: ${businessId}`);
+        } else {
+            // Intento secundario: buscar en shareConfig si se pasó el slug dinámico
+            const shareQuery = await db.collectionGroup('shareConfig')
+                .where('slug', '==', businessId)
+                .limit(1)
+                .get();
+            
+            if (!shareQuery.empty) {
+                const parentId = shareQuery.docs[0].ref.parent.parent?.id;
+                if (parentId) {
+                    businessId = parentId;
+                    console.log(`>>> [TENANT RESOLUTION] ID resuelto vía shareConfig: ${businessId}`);
+                }
+            }
+        }
+    }
     
     // CAPA 1: RESPUESTAS PREDETERMINADAS
     try {
@@ -139,19 +169,10 @@ export const publicMenuChatbotFlow = ai.defineFlow(
       const isConfigKeyValid = resolvedApiKey.startsWith('AIza');
       
       if (!isConfigKeyValid) {
-        // Fallback real a variables de entorno si la del Super Admin es inválida o no es de Google
         resolvedApiKey = (process.env.GEMINI_API_KEY || process.env.GOOGLE_GENAI_API_KEY || '').trim();
       }
 
-      console.log(">>> [DEBUG 2 - AI CONFIG]", { 
-        provider: aiConfig?.provider, 
-        model: aiConfig?.model, 
-        hasKey: !!aiConfig?.apiKey,
-        keySource: isConfigKeyValid ? 'SuperAdmin Config' : 'Environment Fallback'
-      });
-
       const appointmentTool = getOrCreateBookAppointmentTool(businessId);
-      console.log(">>> [DEBUG 3 - TOOL REGISTRATION]", { toolName: appointmentTool.name, inCache: toolsCache.has(businessId) });
 
       const systemPrompt = `Eres el asistente virtual oficial del negocio.
       
