@@ -3,11 +3,9 @@
 /**
  * @fileOverview Flujo de Genkit para el chatbot del menú público con ejecución determinista de agendamiento.
  * 
- * - Elimina la arquitectura de Tool Calling para evitar errores de registro duplicado.
- * - Implementa extracción estructurada de datos y guardado directo vía Firebase Admin SDK.
- * - Integra Capas 1, 2 y 3 (getAIConfig) para una gobernanza total.
- * - Implementa Tenant Resolver de 3 pasos para manejar Slugs con tildes y longitudes variables.
- * - Corrige Error 400 de Gemini pasando el system prompt como propiedad raíz.
+ * - Implementa extracción por etiquetas [BOOKING_DATA: ...] para máxima resiliencia.
+ * - Capa 0: Resolución de Tenant (Slug a UID) con normalización de tildes.
+ * - Capa 5: Extracción robusta con Regex multilínea y validación de campos obligatorios.
  * - Actualizado a gemini-3.6-flash.
  */
 
@@ -22,24 +20,8 @@ import {
 import { getAIConfig } from './chat-flow';
 
 /**
- * Esquema interno para la extracción de datos de reserva por parte de la IA.
- */
-const BookingExtractionSchema = z.object({
-  answer: z.string().describe('Respuesta textual para el cliente'),
-  intent: z.enum(['chat', 'booking']).describe('Intención detectada: charla general o reserva'),
-  extractedData: z.object({
-    customerName: z.string().optional(),
-    customerPhone: z.string().optional(),
-    serviceName: z.string().optional(),
-    date: z.string().optional().describe('Formato YYYY-MM-DD'),
-    startTime: z.string().optional().describe('Formato HH:mm (24h)'),
-    isComplete: z.boolean().describe('Verdadero solo si nombre, teléfono, servicio, fecha y hora están presentes'),
-  }).optional(),
-});
-
-/**
  * Calcula la hora de fin sumando la duración a la hora de inicio.
- * Helper interno para evitar dependencias circulares o externas en el servidor.
+ * Helper interno para evitar dependencias externas en el servidor.
  */
 function calculateEndTimeInternal(startTime: string, duration: number): string {
     const [h, m] = startTime.split(':').map(Number);
@@ -65,15 +47,11 @@ export const publicMenuChatbotFlow = ai.defineFlow(
     const directDoc = await db.collection('businesses').doc(businessId).get();
     
     if (!directDoc.exists && businessId !== 'platform-bot') {
-      // Intento 1: Búsqueda por slug exacto
       let slugQuery = await db.collection('businesses').where('slug', '==', businessId).limit(1).get();
-      
       if (slugQuery.empty) {
-        // Intento 2: Búsqueda por slug normalizado (sin tildes, lowercase)
         const cleanSlug = businessId.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
         slugQuery = await db.collection('businesses').where('slug', '==', cleanSlug).limit(1).get();
       }
-
       if (!slugQuery.empty) {
         canonicalBusinessId = slugQuery.docs[0].id;
       }
@@ -105,8 +83,6 @@ export const publicMenuChatbotFlow = ai.defineFlow(
     // --- CAPA 3: CONFIGURACIÓN IA (Motor Maestro del Super Admin) ---
     const aiConfig = await getAIConfig(businessId);
     let resolvedApiKey = (aiConfig.apiKey || '').trim();
-    
-    // Fallback de seguridad hacia variables de entorno
     if (!resolvedApiKey.startsWith('AIza')) {
       resolvedApiKey = (process.env.GEMINI_API_KEY || process.env.GOOGLE_GENAI_API_KEY || '').trim();
     }
@@ -120,17 +96,14 @@ CATÁLOGO DE PRODUCTOS:
 ${formattedCatalog}
 
 REGLAS DE AGENDAMIENTO:
-1. Si el cliente quiere una cita, debes capturar: Nombre, WhatsApp, Servicio, Fecha y Hora.
-2. Si falta información, pídela amablemente en el campo 'answer'.
-3. Si tienes los 5 datos, marca 'isComplete: true' en el objeto JSON.
-4. Fecha DEBE ser YYYY-MM-DD. Hora DEBE ser HH:mm (24h).
-
-INSTRUCCIÓN TÉCNICA: Responde SIEMPRE siguiendo estrictamente el esquema JSON proporcionado.`;
+1. Si el cliente confirma Nombre, WhatsApp, Servicio, Fecha y Hora, responde amablemente y agrega AL FINAL en una sola línea:
+[BOOKING_DATA: {"customerName":"...","customerPhone":"...","serviceName":"...","date":"YYYY-MM-DD","startTime":"HH:mm"}]
+2. Si faltan datos, pídelos amablemente y NO agregues el tag de reserva.`;
 
     try {
+      // --- CAPA 4: GENERACIÓN NATURAL (TEXTO) ---
       const response = await ai.generate({
         model: 'googleai/gemini-3.6-flash',
-        output: { schema: BookingExtractionSchema },
         system: systemPrompt,
         messages: [
           ...history.map(h => ({ 
@@ -142,49 +115,68 @@ INSTRUCCIÓN TÉCNICA: Responde SIEMPRE siguiendo estrictamente el esquema JSON 
         config: { temperature: 0.1, apiKey: resolvedApiKey }
       });
 
-      const extracted = response.output;
+      const rawAnswer = response.text;
 
-      // --- CAPA 4: EJECUCIÓN DETERMINISTA (TypeScript Server-side) ---
-      if (extracted?.intent === 'booking' && extracted.extractedData?.isComplete) {
-        const data = extracted.extractedData;
-        const reservationId = db.collection('placeholder').doc().id;
+      // --- CAPA 5: EXTRACCIÓN Y PERSISTENCIA NATIVA (FIXED) ---
+      const bookingRegex = /\[BOOKING_DATA:\s*({[\s\S]*?})\]/;
+      const bookingMatch = rawAnswer.match(bookingRegex);
+      
+      if (bookingMatch && bookingMatch[1]) {
+        try {
+          const data = JSON.parse(bookingMatch[1]);
+          const { customerName, customerPhone, serviceName, date, startTime } = data;
 
-        // Intentar matchear con servicio real para obtener duración y precio
-        const matchedService = services.find(s => 
-            s.name.toLowerCase().includes(data.serviceName?.toLowerCase() || '')
-        );
+          // Validación de integridad: los 5 campos deben ser strings no vacíos
+          if (
+            typeof customerName === 'string' && customerName.trim() &&
+            typeof customerPhone === 'string' && customerPhone.trim() &&
+            typeof serviceName === 'string' && serviceName.trim() &&
+            typeof date === 'string' && date.trim() &&
+            typeof startTime === 'string' && startTime.trim()
+          ) {
+            // Resolver servicio real para obtener metadata financiera y técnica
+            const matchedService = services.find(s => 
+                s.name.toLowerCase().includes(serviceName.toLowerCase())
+            );
 
-        const reservationPayload = {
-          businessId: businessId,
-          customerName: (data.customerName || 'Cliente').trim(),
-          customerPhone: (data.customerPhone || '').trim(),
-          serviceName: matchedService?.name || data.serviceName || 'Servicio solicitado',
-          serviceId: matchedService?.id || 'chatbot_extracted',
-          staffId: null,
-          staffName: "Pendiente de asignación",
-          date: data.date,
-          startTime: data.startTime,
-          endTime: calculateEndTimeInternal(data.startTime || '00:00', matchedService?.durationMinutes || 45),
-          price: matchedService?.price || 0,
-          durationMinutes: matchedService?.durationMinutes || 45,
-          status: 'pending',
-          source: 'chatbot',
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        };
+            const reservationId = db.collection(`businesses/${businessId}/reservations`).doc().id;
 
-        // Escritura física en Firestore (Admin SDK)
-        await db.collection(`businesses/${businessId}/reservations`).doc(reservationId).set(reservationPayload);
-        
-        const confirmMsg = `¡Listo, ${data.customerName}! ✅ He agendado tu cita para ${reservationPayload.serviceName} el día ${data.date} a las ${data.startTime}. Tu ID de reserva es: ${reservationId.slice(-6).toUpperCase()}. ¡Te esperamos!`;
-        
-        return { answer: confirmMsg, source: 'ai_generated' };
+            const reservationPayload = {
+              businessId: businessId,
+              customerName: customerName.trim(),
+              customerPhone: customerPhone.trim(),
+              serviceName: matchedService?.name || serviceName.trim(),
+              serviceId: matchedService?.id || 'chatbot_extracted',
+              staffId: null,
+              staffName: "Pendiente de asignación",
+              date: date.trim(),
+              startTime: startTime.trim(),
+              endTime: calculateEndTimeInternal(startTime.trim(), matchedService?.durationMinutes || 45),
+              price: matchedService?.price || 0,
+              durationMinutes: matchedService?.durationMinutes || 45,
+              status: 'pending',
+              source: 'chatbot',
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            };
+
+            await db.collection(`businesses/${businessId}/reservations`).doc(reservationId).set(reservationPayload);
+            
+            // Limpieza del tag para la respuesta al usuario
+            const cleanAnswer = rawAnswer.replace(bookingRegex, '').trim();
+            return { answer: cleanAnswer, source: 'ai_generated' };
+          } else {
+            throw new Error("Missing required booking fields");
+          }
+        } catch (e) {
+          console.warn("[Booking Parsing Error]:", e);
+          // Si falla el parseo o validación, limpiamos el tag y devolvemos la respuesta conversacional
+          const fallbackCleanAnswer = rawAnswer.replace(bookingRegex, '').trim();
+          return { answer: fallbackCleanAnswer, source: 'ai_generated' };
+        }
       }
 
-      return { 
-        answer: extracted?.answer || "Entendido. ¿En qué más puedo ayudarte?", 
-        source: 'ai_generated' 
-      };
+      return { answer: rawAnswer, source: 'ai_generated' };
 
     } catch (error: any) {
       console.error("[Chatbot Pipeline Error]:", error.message);
