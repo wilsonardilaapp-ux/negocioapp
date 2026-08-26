@@ -3,10 +3,10 @@
 /**
  * @fileOverview Flujo de Genkit para el chatbot del menú público.
  * 
- * RE-ARQUITECTURA DEFINITIVA (Tenant Isolation):
- * - Implementa un factory de herramientas para inyectar 'businessId' vía Closure.
- * - Elimina 'businessId' del esquema que ve la IA, garantizando que el guardado ocurra en el inquilino correcto.
- * - Utiliza un cache en memoria para evitar el error "Action already registered" de Genkit.
+ * RE-ARQUITECTURA DE ALTA DISPONIBILIDAD (Fase 3):
+ * - Implementa toolsCache (Map) para evitar el error "Action already registered".
+ * - Inyección de businessId vía Closure para garantizar aislamiento de inquilinos.
+ * - Normalización de datos (ISO Date / 24h Time) para compatibilidad con Agenda.
  */
 
 import { ai } from '@/ai/genkit';
@@ -20,59 +20,57 @@ import {
 import { getAIConfig } from './chat-flow';
 import { calculateEndTime } from '@/lib/booking-engine';
 
-// Cache para evitar registrar la misma herramienta múltiples veces en el registro global de Genkit
-const toolCache = new Map<string, any>();
+// Registro global de herramientas para evitar colisiones en Genkit v1.x
+const toolsCache = new Map<string, any>();
 
 /**
- * Genera o recupera una herramienta de agendamiento vinculada a un negocio específico.
- * Captura el businessId del contexto del servidor (Closure), impidiendo que el LLM lo alumine o use fallbacks.
+ * Resuelve o registra la herramienta de agendamiento para un negocio específico.
+ * Utiliza el businessId del servidor, impidiendo que el LLM lo manipule.
  */
 function getOrCreateBookAppointmentTool(businessId: string) {
-  // Normalizamos el nombre para cumplir con el estándar de Genkit ([a-z0-9-]+)
   const safeId = businessId.toLowerCase().replace(/[^a-z0-9-]/g, '-');
-  const toolName = `bookAppointment-${safeId}`;
+  const toolName = `bookAppointment_${safeId}`;
 
-  if (toolCache.has(businessId)) {
-    return toolCache.get(businessId);
+  if (toolsCache.has(businessId)) {
+    return toolsCache.get(businessId);
   }
 
-  console.log(`[DEBUG] Registrando herramienta Genkit: ${toolName}`);
+  console.log(`[Genkit-Registry] Registrando nueva tool: ${toolName}`);
 
   const tool = ai.defineTool(
     {
       name: toolName,
-      description: 'Registra una reserva en el sistema de citas de Firestore.',
+      description: 'Registra una cita o reserva en la agenda del negocio.',
       inputSchema: z.object({
-        customerName: z.string().describe('Nombre del cliente'),
-        customerPhone: z.string().describe('WhatsApp del cliente'),
+        customerName: z.string().describe('Nombre completo del cliente'),
+        customerPhone: z.string().describe('WhatsApp de contacto'),
         serviceName: z.string().describe('Nombre del servicio solicitado'),
-        date: z.string().describe('Fecha de la cita en formato YYYY-MM-DD'),
-        startTime: z.string().describe('Hora de inicio en formato HH:mm (24h)'),
+        date: z.string().describe('Fecha en formato YYYY-MM-DD'),
+        startTime: z.string().describe('Hora en formato 24h (HH:mm)'),
       }),
     },
     async (toolInput) => {
-      // LOG DE AUDITORÍA: Confirmamos que usamos el ID del cierre, no uno enviado por la IA
-      console.log(`[bookAppointmentTool] Ejecutando guardado para: ${toolInput.customerName} en el inquilino REAL: ${businessId}`);
-      
       try {
         const db = await getAdminFirestore();
         
-        // Búsqueda resiliente de metadatos del servicio para asegurar precio y duración correctos
+        // Búsqueda flexible de metadatos del servicio (precio/duración)
         const servicesSnap = await db.collection(`businesses/${businessId}/bookingServices`).get();
-        const service = servicesSnap.docs.map(d => ({id: d.id, ...d.data()} as any))
+        const matchedService = servicesSnap.docs
+          .map(d => ({ id: d.id, ...d.data() } as any))
           .find(s => s.name.toLowerCase().includes(toolInput.serviceName.toLowerCase()));
 
         const reservationId = db.collection('placeholder').doc().id;
-        const duration = service?.durationMinutes || 45;
-        const price = service?.price || 0;
+        const duration = matchedService?.durationMinutes || 45;
+        const price = matchedService?.price || 0;
 
+        // Construcción de Payload con Safe Defaults (Normalización 24h e ISO)
         const reservationData = {
           id: reservationId,
-          businessId: businessId, // ID GARANTIZADO POR EL SERVIDOR
+          businessId: businessId, // ID INYECTADO DESDE EL SERVIDOR (CLOSURE)
           customerName: toolInput.customerName.trim(),
           customerPhone: toolInput.customerPhone.trim(),
-          serviceId: service?.id || 'chatbot_generic',
-          serviceName: service?.name || toolInput.serviceName,
+          serviceId: matchedService?.id || 'chatbot_generic',
+          serviceName: matchedService?.name || toolInput.serviceName,
           staffId: null,
           staffName: "Pendiente de asignación",
           date: toolInput.date,
@@ -86,32 +84,30 @@ function getOrCreateBookAppointmentTool(businessId: string) {
           updatedAt: new Date().toISOString(),
         };
 
-        // Sanitización atómica del payload para evitar errores de campos undefined en Firestore Admin SDK
+        // Sanitización atómica para Firebase Admin SDK
         const cleanData = JSON.parse(JSON.stringify(reservationData));
 
         await db.collection(`businesses/${businessId}/reservations`).doc(reservationId).set(cleanData);
         
-        console.log(`[bookAppointmentTool] ÉXITO: Cita persistida en path: businesses/${businessId}/reservations/${reservationId}`);
+        console.log(`[Chatbot Success] Cita guardada en ID REAL: businesses/${businessId}/reservations/${reservationId}`);
 
         return { 
           success: true, 
           reservationId: reservationId.slice(-6).toUpperCase(),
-          date: toolInput.date,
-          startTime: toolInput.startTime,
           customerName: toolInput.customerName,
-          serviceName: service?.name || toolInput.serviceName
+          serviceName: matchedService?.name || toolInput.serviceName,
+          date: toolInput.date,
+          startTime: toolInput.startTime
         };
       } catch (error: any) {
-        console.error("[bookAppointmentTool] Error crítico de persistencia:", error.message);
-        return { 
-          success: false, 
-          error: "Error interno al conectar con la base de datos de reservas." 
-        };
+        console.error("[bookAppointmentTool-Internal-Error]:", error.message);
+        // Retornamos éxito falso para que la IA maneje el fallback sin romper el pipeline
+        return { success: false, error: "Servicio de agenda temporalmente fuera de línea." };
       }
     }
   );
 
-  toolCache.set(businessId, tool);
+  toolsCache.set(businessId, tool);
   return tool;
 }
 
@@ -125,67 +121,44 @@ export const publicMenuChatbotFlow = ai.defineFlow(
     const { businessId, question, history = [] } = input;
     const lowQuestion = question.toLowerCase().trim();
 
-    console.log(`[FLOW_ENTRY] Recibido mensaje para businessId: ${businessId}`);
+    console.log(`[FLOW_ENTRY] Procesando solicitud para el negocio: ${businessId}`);
 
-    // --- PASO 0: CREACIÓN CONTEXTUAL DE HERRAMIENTA ---
-    let appointmentTool;
-    try {
-      appointmentTool = getOrCreateBookAppointmentTool(businessId);
-    } catch (toolError: any) {
-      console.error("[TOOL_CREATION_ERROR]:", toolError.message, toolError.stack);
-      return { 
-        answer: "Lo siento, el sistema de agendamiento inteligente no pudo inicializarse correctamente. Por favor contacta al negocio directamente.", 
-        source: 'fallback' 
-      };
-    }
-
+    // --- CAPA 1: RESPUESTAS PREDETERMINADAS (CACHE LOCAL) ---
     const db = await getAdminFirestore();
-
-    // --- PASO 1: GUARDIA DE PRIORIDAD PARA AGENDAMIENTO ---
-    const appointmentIntents = ['cita', 'agendar', 'reserva', 'turno', 'reservar'];
-    const isAppointmentIntent = appointmentIntents.some(intent => lowQuestion.includes(intent));
-
-    if (!isAppointmentIntent) {
-        try {
-          const responsesSnap = await db.collection(`businesses/${businessId}/publicMenuChatbot/main/responses`)
-            .where('isActive', '==', true).get();
-          const matchedCustom = responsesSnap.docs.find(doc => lowQuestion.includes(doc.data().question?.toLowerCase().trim() || ''));
-          if (matchedCustom) return { answer: matchedCustom.data().answer, source: 'custom_response' };
-        } catch (e) {}
-
-        const businessSnap = await db.collection('businesses').doc(businessId).get();
-        if (businessSnap.exists) {
-            const bData = businessSnap.data();
-            const infoTriggers = ['donde queda', 'ubicación', 'direccion', 'teléfono', 'contacto', 'whatsapp'];
-            if (infoTriggers.some(t => lowQuestion.includes(t))) {
-              return { 
-                answer: `Estamos ubicados en ${bData?.address || 'nuestra sede'}. Tel: ${bData?.phone || 'N/A'}.`, 
-                source: 'business_info' 
-              };
-            }
-        }
-    }
-
-    // --- PASO 2: EJECUCIÓN DEL MOTOR DE IA ---
     try {
-      const catalogSnap = await db.collection(`businesses/${businessId}/publicData`).doc('catalog').get();
-      const products = catalogSnap.data()?.products || [];
-      const formattedCatalog = products.map((p: any) => `- ${p.name}: $${p.price}`).join('\n');
+      const responsesSnap = await db.collection(`businesses/${businessId}/publicMenuChatbot/main/responses`)
+        .where('isActive', '==', true).get();
+      const matchedCustom = responsesSnap.docs.find(doc => lowQuestion.includes(doc.data().question?.toLowerCase().trim() || ''));
+      if (matchedCustom) return { answer: matchedCustom.data().answer, source: 'custom_response' };
+    } catch (e) {}
 
+    // --- CAPA 2: INFORMACIÓN DE NEGOCIO Y CATÁLOGO ---
+    const businessSnap = await db.collection('businesses').doc(businessId).get();
+    const catalogSnap = await db.collection(`businesses/${businessId}/publicData`).doc('catalog').get();
+    const products = catalogSnap.data()?.products || [];
+    const formattedCatalog = products.map((p: any) => `- ${p.name}: $${p.price}`).join('\n');
+
+    // --- CAPA 3 Y 4: RAZONAMIENTO Y AGENDAMIENTO CON TOOLS ---
+    try {
       const aiConfig = await getAIConfig(businessId);
-      
+      const appointmentTool = getOrCreateBookAppointmentTool(businessId);
+
       const systemPrompt = `Eres el asistente virtual oficial del negocio.
+      
+      CONTEXTO DEL NEGOCIO:
+      Nombre: ${businessSnap.data()?.name || 'Nuestro Negocio'}
+      Ubicación: ${businessSnap.data()?.address || 'Ver en catálogo'}
+      
       CATÁLOGO DE SERVICIOS/PRODUCTOS:
       ${formattedCatalog}
       
-      REGLAS CRÍTICAS:
-      1. Si el cliente quiere agendar, solicita: Nombre, WhatsApp, Servicio y Fecha/Hora.
-      2. Cuando tengas los datos, usa la herramienta '${appointmentTool.name}'.
-      3. SOLO confirma la cita cuando la herramienta devuelva éxito.
-      4. NO menciones identificadores técnicos ni IDs de negocio al cliente.
-      5. Formato de respuesta tras éxito: Muestra el ID de reserva, servicio, fecha y hora de forma estructurada.`;
+      REGLAS DE AGENDAMIENTO:
+      1. Si el cliente desea una cita, solicita: Nombre, WhatsApp, Servicio y Fecha/Hora.
+      2. Una vez tengas los datos, utiliza la herramienta '${appointmentTool.name}'.
+      3. SOLO confirma la reserva cuando la herramienta devuelva éxito.
+      4. Muestra siempre el ID de reserva recibido para que el cliente lo guarde.`;
 
-      console.log(`[AI_GENERATE_START] Consultando Gemini para ${businessId}`);
+      console.log(`[AI_GENERATE_START] Ejecutando motor de razonamiento para ${businessId}`);
 
       const response = await ai.generate({
         model: 'googleai/gemini-1.5-flash',
@@ -195,18 +168,21 @@ export const publicMenuChatbotFlow = ai.defineFlow(
           ...history.map(h => ({ role: h.role as any, content: [{ text: h.content }] })),
           { role: 'user', content: [{ text: question }] }
         ],
-        config: { temperature: 0.1, apiKey: aiConfig.apiKey }
+        config: { 
+          temperature: 0.1, 
+          apiKey: aiConfig.apiKey // Inyección de llave del Super Admin
+        }
       });
       
       return { 
-        answer: response.text || "Tu solicitud ha sido procesada.", 
+        answer: response.text || "He recibido tu solicitud, ¿en qué más puedo ayudarte?", 
         source: 'ai_generated' 
       };
 
     } catch (error: any) {
-      console.error("[REAL_CHATBOT_ERROR]:", error.message, error.stack);
+      console.error("[Chatbot Pipeline Error]:", error.message);
       return { 
-        answer: "Lo siento, tuve un inconveniente al procesar tu consulta. Por favor intenta de nuevo o contacta al negocio.", 
+        answer: "Lo siento, tuve un inconveniente al procesar tu consulta. Por favor intenta de nuevo o contacta al negocio directamente.", 
         source: 'fallback' 
       };
     }
