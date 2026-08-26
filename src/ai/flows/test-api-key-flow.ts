@@ -31,10 +31,10 @@ const testApiKeyFlow = ai.defineFlow(
 
       if (provider === 'google' || provider === 'nanobanana') {
           providerName = provider === 'google' ? 'Google AI' : 'NanoBanana';
-          // Se fuerza el modelo gemini-1.5-flash para v1 estable para evitar el error 404 de beta
+          // Se fuerza el modelo gemini-2.0-flash para evitar el error 404 de modelos obsoletos
           const testAi = genkit({ plugins: [googleAI({ apiKey })] });
           const { text: googleText } = await testAi.generate({ 
-            model: 'googleai/gemini-1.5-flash', 
+            model: 'googleai/gemini-2.0-flash', 
             prompt: 'Hi', 
             config: { temperature: 0 } 
           });

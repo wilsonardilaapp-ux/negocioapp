@@ -102,7 +102,7 @@ export async function getAIConfig(businessId?: string): Promise<{ provider: stri
     const integrationSnap = await firestore.doc('integrations/chatbot-integrado-con-whatsapp-para-soporte-y-ventas').get();
 
     if (!integrationSnap.exists) {
-      return { provider: 'googleai', apiKey: '', model: 'gemini-1.5-flash' };
+      return { provider: 'googleai', apiKey: '', model: 'gemini-2.0-flash' };
     }
 
     const data = integrationSnap.data();
@@ -118,7 +118,7 @@ export async function getAIConfig(businessId?: string): Promise<{ provider: stri
     }
     
     if (fields.google?.apiKey) {
-      return { provider: 'googleai', apiKey: fields.google.apiKey, model: 'gemini-1.5-flash' };
+      return { provider: 'googleai', apiKey: fields.google.apiKey, model: 'gemini-2.0-flash' };
     }
     
     if (fields.openai?.apiKey) {
@@ -128,7 +128,7 @@ export async function getAIConfig(businessId?: string): Promise<{ provider: stri
     console.error("[AI-CONFIG] [ERROR]:", e.message);
   }
 
-  return { provider: 'googleai', apiKey: '', model: 'gemini-1.5-flash' };
+  return { provider: 'googleai', apiKey: '', model: 'gemini-2.0-flash' };
 }
 
 const chatFlow = ai.defineFlow(
