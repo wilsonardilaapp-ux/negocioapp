@@ -12,7 +12,7 @@ import ProductViewModal from '@/components/catalogo/product-view-modal';
 import { PurchaseModal } from '@/components/catalogo/purchase-modal';
 import { CartDrawer } from '@/components/catalogo/cart-drawer';
 import { SuggestionModal } from '@/components/suggestions/suggestion-modal';
-import { Frown, Loader2, PackageSearch, LayoutGrid, Star, Award, ChevronLeft, ChevronRight, Search, Ticket } from 'lucide-react';
+import { Frown, Loader2, PackageSearch, LayoutGrid, Star, Award, ChevronLeft, ChevronRight, Search, Ticket, Calendar, CheckCircle2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -45,6 +45,7 @@ import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious
 import Autoplay from "embla-carousel-autoplay";
 import Image from 'next/image';
 import { cn } from '@/lib/utils';
+import Link from 'next/link';
 
 interface CatalogPageProps {
     params: { businessId: string };
@@ -197,6 +198,7 @@ function CatalogPageContent({ params }: CatalogPageProps) {
 
     const isLoyaltyActive = useMemo(() => isModuleAuthorized('loyalty'), [isModuleAuthorized]);
     const isPromotionsActive = useMemo(() => isModuleAuthorized('promotions'), [isModuleAuthorized]);
+    const isReservasActive = useMemo(() => isModuleAuthorized('reservas-agendamiento'), [isModuleAuthorized]);
 
     const handleAddToCart = (product: Product, quantity: number) => {
         const discountInfo = promotionService.calculateDiscountedPrice(product, pageData.promotions || []);
@@ -393,6 +395,11 @@ function CatalogPageContent({ params }: CatalogPageProps) {
                                     <Ticket className="h-4 w-4" /> Cupones
                                 </TabsTrigger>
                             )}
+                            {isReservasActive && (
+                                <TabsTrigger value="reservas" className="rounded-full px-6 gap-2 font-bold data-[state=active]:bg-primary data-[state=active]:text-white">
+                                    <Calendar className="h-4 w-4" /> Reservar
+                                </TabsTrigger>
+                            )}
                             <TabsTrigger value="reviews" className="rounded-full px-6 gap-2 font-bold data-[state=active]:bg-primary data-[state=active]:text-white">
                                 <Star className="h-4 w-4" /> Reseñas
                             </TabsTrigger>
@@ -515,6 +522,45 @@ function CatalogPageContent({ params }: CatalogPageProps) {
                                     <p className="text-sm">Vuelve pronto para descubrir nuevas ofertas.</p>
                                 </div>
                             )}
+                        </TabsContent>
+                    )}
+
+                    {isReservasActive && (
+                        <TabsContent value="reservas" className="max-w-2xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-500 outline-none">
+                            <Card className="border-none shadow-xl bg-white rounded-[2.5rem] overflow-hidden">
+                                <CardHeader className="bg-primary/5 border-b p-8 text-center">
+                                    <div className="p-4 bg-white rounded-3xl shadow-sm border w-fit mx-auto mb-4">
+                                        <Calendar className="h-10 w-10 text-primary" />
+                                    </div>
+                                    <CardTitle className="text-2xl font-black text-gray-900">Agenda tu Cita</CardTitle>
+                                    <CardDescription className="text-gray-600 font-medium max-w-sm mx-auto">
+                                        Reserva tu espacio en segundos. Elige el servicio, el profesional y el horario que mejor te convenga.
+                                    </CardDescription>
+                                </CardHeader>
+                                <CardContent className="p-8 text-center space-y-6">
+                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                        <div className="flex flex-col items-center gap-2">
+                                            <div className="p-3 bg-muted rounded-2xl"><CheckCircle2 className="h-5 w-5 text-primary" /></div>
+                                            <span className="text-xs font-bold text-gray-600">Rápido y Fácil</span>
+                                        </div>
+                                        <div className="flex flex-col items-center gap-2">
+                                            <div className="p-3 bg-muted rounded-2xl"><CheckCircle2 className="h-5 w-5 text-primary" /></div>
+                                            <span className="text-xs font-bold text-gray-600">Sin Llamadas</span>
+                                        </div>
+                                        <div className="flex flex-col items-center gap-2">
+                                            <div className="p-3 bg-muted rounded-2xl"><CheckCircle2 className="h-5 w-5 text-primary" /></div>
+                                            <span className="text-xs font-bold text-gray-600">Confirmación</span>
+                                        </div>
+                                    </div>
+                                </CardContent>
+                                <CardFooter className="p-8 pt-0">
+                                    <Button asChild className="w-full h-16 rounded-2xl text-lg font-black uppercase tracking-widest shadow-xl">
+                                        <Link href={`/reservar/${pageData.resolvedBusinessId || slug}`} target="_blank">
+                                            Ir al Portal de Reservas
+                                        </Link>
+                                    </Button>
+                                </CardFooter>
+                            </Card>
                         </TabsContent>
                     )}
 
