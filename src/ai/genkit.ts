@@ -8,7 +8,7 @@ export const ai = genkit({
       apiVersion: 'v1',  // ← fuerza API estable, no preview
     }),
   ],
-  model: 'googleai/gemini-2.0-flash',  // ← modelo por defecto global
+  model: 'googleai/gemini-3.6-flash',  // ← modelo por defecto global actualizado
 });
 
 console.log('✅ Genkit inicializado con soporte para Google AI.');

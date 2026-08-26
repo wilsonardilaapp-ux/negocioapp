@@ -7,6 +7,7 @@
  * - Implementa extracción estructurada de datos y guardado directo vía Firebase Admin SDK.
  * - Integra Capas 1, 2 y 3 (getAIConfig) para una gobernanza total.
  * - Corrige Error 400 de Gemini pasando el system prompt como propiedad raíz.
+ * - Actualizado a gemini-3.6-flash.
  */
 
 import { ai } from '@/ai/genkit';
@@ -119,7 +120,7 @@ INSTRUCCIÓN TÉCNICA: Responde SIEMPRE siguiendo estrictamente el esquema JSON 
 
     try {
       const response = await ai.generate({
-        model: 'googleai/gemini-2.0-flash',
+        model: 'googleai/gemini-3.6-flash',
         output: { schema: BookingExtractionSchema },
         system: systemPrompt,
         messages: [
