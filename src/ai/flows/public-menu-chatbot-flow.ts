@@ -83,6 +83,7 @@ export const publicMenuChatbotFlow = ai.defineFlow(
       const formattedServices = services.map((s: any) => `- ${s.name}: $${s.price} (${s.durationMinutes} min)`).join('\n');
 
       // --- CAPA 3: CONFIGURACIÓN IA Y CADENA DE FALLBACK ---
+      const todayISO = new Date().toISOString().split('T')[0];
       const aiConfig = await getAIConfig(businessId);
       const googleApiKey = (aiConfig?.apiKey?.startsWith('AIza') ? aiConfig.apiKey : null) || process.env.GEMINI_API_KEY || '';
       
@@ -108,6 +109,8 @@ export const publicMenuChatbotFlow = ai.defineFlow(
       }
 
       const systemPrompt = `Eres el asistente virtual oficial de "${bData?.name || 'Nuestro Negocio'}".
+
+FECHA ACTUAL DEL SERVIDOR: ${todayISO}. Usa esta fecha base para calcular términos como 'hoy' o 'mañana' en formato YYYY-MM-DD.
 
 SERVICIOS DISPONIBLES PARA AGENDAR:
 ${formattedServices}
@@ -201,7 +204,7 @@ REGLAS DE AGENDAMIENTO:
       }
 
       // --- CAPA 5: EXTRACCIÓN Y PERSISTENCIA NATIVA ---
-      const bookingRegex = /\[BOOKING_DATA:\s*({[\s\S]*?})\]/;
+      const bookingRegex = /\[BOOKING_DATA:\s*(\{[\s\S]*?\})\s*\]/i;
       const bookingMatch = rawAnswer.match(bookingRegex);
       
       if (bookingMatch && bookingMatch[1]) {
@@ -213,9 +216,11 @@ REGLAS DE AGENDAMIENTO:
             typeof customerName === 'string' && customerName.trim() &&
             typeof customerPhone === 'string' && customerPhone.trim() &&
             typeof serviceName === 'string' && serviceName.trim() &&
-            typeof date === 'string' && date.trim() &&
             typeof startTime === 'string' && startTime.trim()
           ) {
+            const rawDate = String(date || '').trim().toLowerCase();
+            const finalDate = (rawDate === 'hoy' || !rawDate) ? todayISO : rawDate;
+
             const matchedService = services.find(s => 
                 s.name.toLowerCase().includes(serviceName.toLowerCase())
             );
@@ -230,7 +235,7 @@ REGLAS DE AGENDAMIENTO:
               serviceId: matchedService?.id || 'chatbot_extracted',
               staffId: null,
               staffName: "Pendiente de asignación",
-              date: date.trim(),
+              date: finalDate,
               startTime: startTime.trim(),
               endTime: calculateEndTimeInternal(startTime.trim(), matchedService?.durationMinutes || 45),
               price: matchedService?.price || 0,
