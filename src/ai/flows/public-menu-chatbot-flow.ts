@@ -85,7 +85,6 @@ export const publicMenuChatbotFlow = ai.defineFlow(
       // --- CAPA 3: CONFIGURACIÓN IA Y CADENA DE FALLBACK ---
       const aiConfig = await getAIConfig(businessId);
       
-      // Acceso blindado a la API Key para evitar excepciones por nulos
       const googleApiKey = (aiConfig?.apiKey && typeof aiConfig.apiKey === 'string' && aiConfig.apiKey.startsWith('AIza')) 
         ? aiConfig.apiKey 
         : (process.env.GEMINI_API_KEY || '');
@@ -146,16 +145,15 @@ REGLAS DE AGENDAMIENTO:
         } catch (err: any) {
           lastError = err;
           
-          // Corregir detección de error reintentable comparando strings y códigos numéricos
           const numericCode = err.code ?? (err.message?.includes('429') ? 429 : null);
           const retryableCodes = [401, 403, 404, 429, 500];
           const retryableStatusStrings = ['RESOURCE_EXHAUSTED', 'UNAUTHENTICATED', 'PERMISSION_DENIED', 'NOT_FOUND', 'UNKNOWN', 'INVALID_ARGUMENT'];
           const isRetryable = retryableCodes.includes(numericCode as any) || retryableStatusStrings.includes(err.status);
           
-          console.warn(`[AI Fallback] Error en ${provider.name} (${err.status || numericCode}):`, err.message);
+          console.warn(`[AI Fallback] Intento fallido en ${provider.name}. Detalle:`, err);
           
           if (!isRetryable) {
-            throw err; // Error de validación o petición mal formada, no reintentar
+            throw err; 
           }
         }
       }
@@ -221,7 +219,9 @@ REGLAS DE AGENDAMIENTO:
       return { answer: rawAnswer, source: 'ai_generated' };
 
     } catch (error: any) {
-      console.error("[Chatbot Pipeline Error]:", error.message);
+      // REGISTRO DE ERROR REAL PARA DIAGNÓSTICO EN TERMINAL
+      console.error("[Chatbot Pipeline Error Critical]:", error);
+      
       return { 
         answer: "Lo siento, tuve un inconveniente al procesar tu consulta. Por favor intenta de nuevo o contacta al negocio directamente.", 
         source: 'fallback' 
