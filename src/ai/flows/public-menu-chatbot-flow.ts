@@ -142,7 +142,6 @@ REGLAS DE AGENDAMIENTO:
         } catch (err: any) {
           lastError = err;
           
-          // Detección de error reintentable (Fix Problema 1)
           const numericCode = err.code ?? (err.message?.includes('429') ? 429 : null);
           const retryableCodes = [401, 403, 404, 429, 500];
           const retryableStatusStrings = ['RESOURCE_EXHAUSTED', 'UNAUTHENTICATED', 'PERMISSION_DENIED', 'NOT_FOUND', 'UNKNOWN', 'INVALID_ARGUMENT'];
