@@ -5,6 +5,7 @@
  * 
  * - Implementa extracción por etiquetas [BOOKING_DATA: ...] para máxima resiliencia.
  * - Capa 0: Resolución de Tenant (Slug a UID) con normalización de tildes.
+ * - Capa 3: Implementación de Fallback automático entre proveedores (Google -> DeepSeek).
  * - Capa 5: Extracción robusta con Regex multilínea y validación de campos obligatorios.
  * - Actualizado a gemini-3.6-flash.
  */
@@ -80,11 +81,27 @@ export const publicMenuChatbotFlow = ai.defineFlow(
     const formattedCatalog = products.map((p: any) => `- ${p.name}: $${p.price}`).join('\n');
     const formattedServices = services.map((s: any) => `- ${s.name}: $${s.price} (${s.durationMinutes} min)`).join('\n');
 
-    // --- CAPA 3: CONFIGURACIÓN IA (Motor Maestro del Super Admin) ---
-    const aiConfig = await getAIConfig(businessId);
-    let resolvedApiKey = (aiConfig.apiKey || '').trim();
-    if (!resolvedApiKey.startsWith('AIza')) {
-      resolvedApiKey = (process.env.GEMINI_API_KEY || process.env.GOOGLE_GENAI_API_KEY || '').trim();
+    // --- CAPA 3: CONFIGURACIÓN IA Y CADENA DE FALLBACK ---
+    const integrationSnap = await db.doc('integrations/chatbot-integrado-con-whatsapp-para-soporte-y-ventas').get();
+    let fields: any = {};
+    if (integrationSnap.exists) {
+        try {
+            fields = typeof integrationSnap.data()?.fields === 'string' 
+                ? JSON.parse(integrationSnap.data()?.fields) 
+                : (integrationSnap.data()?.fields || {});
+        } catch (e) {}
+    }
+
+    const googleApiKey = fields.google?.apiKey || process.env.GEMINI_API_KEY || '';
+    const deepseekApiKey = fields.deepseek?.apiKey || process.env.DEEPSEEK_API_KEY || '';
+
+    const providerChain = [
+      { name: 'google', model: 'googleai/gemini-3.6-flash', apiKey: googleApiKey.trim() },
+      { name: 'deepseek', model: 'openai/deepseek-chat', apiKey: deepseekApiKey.trim(), baseUrl: 'https://api.deepseek.com' },
+    ].filter(p => p.apiKey);
+
+    if (providerChain.length === 0) {
+      return { answer: "Lo siento, no tengo acceso a mi cerebro de IA. Contacta al administrador.", source: 'fallback' };
     }
 
     const systemPrompt = `Eres el asistente virtual oficial de "${bData?.name || 'Nuestro Negocio'}".
@@ -100,22 +117,53 @@ REGLAS DE AGENDAMIENTO:
 [BOOKING_DATA: {"customerName":"...","customerPhone":"...","serviceName":"...","date":"YYYY-MM-DD","startTime":"HH:mm"}]
 2. Si faltan datos, pídelos amablemente y NO agregues el tag de reserva.`;
 
-    try {
-      // --- CAPA 4: GENERACIÓN NATURAL (TEXTO) ---
-      const response = await ai.generate({
-        model: 'googleai/gemini-3.6-flash',
-        system: systemPrompt,
-        messages: [
-          ...history.map(h => ({ 
-            role: (h.role === 'model' || h.role === 'assistant') ? 'model' as const : 'user' as const,
-            content: [{ text: h.content }] 
-          })),
-          { role: 'user', content: [{ text: question }] }
-        ],
-        config: { temperature: 0.1, apiKey: resolvedApiKey }
-      });
+    let rawAnswer = '';
+    let lastError = null;
 
-      const rawAnswer = response.text;
+    try {
+      // --- CAPA 4: GENERACIÓN NATURAL CON FALLBACK AUTOMÁTICO ---
+      for (const provider of providerChain) {
+        try {
+          const response = await ai.generate({
+            model: provider.model as any,
+            system: systemPrompt,
+            messages: [
+              ...history.map(h => ({ 
+                role: (h.role === 'model' || h.role === 'assistant') ? 'model' as const : 'user' as const,
+                content: [{ text: h.content }] 
+              })),
+              { role: 'user', content: [{ text: question }] }
+            ],
+            config: { 
+              temperature: 0.1, 
+              apiKey: provider.apiKey,
+              ...(provider.baseUrl ? { baseUrl: provider.baseUrl } : {})
+            }
+          });
+
+          rawAnswer = response.text;
+          if (rawAnswer) {
+            console.log(`[AI Fallback] Respondió exitosamente: ${provider.name}`);
+            lastError = null;
+            break;
+          }
+        } catch (err: any) {
+          lastError = err;
+          const status = err.status || err.code || (err.message?.includes('429') ? 429 : 500);
+          const isRetryable = [401, 403, 404, 429].includes(status);
+          
+          console.warn(`[AI Fallback] Error en ${provider.name} (${status}):`, err.message);
+          
+          if (!isRetryable) {
+            throw err; // Error de validación o petición mal formada, no reintentar
+          }
+          // Si es reintentable (cuota, modelo no encontrado, auth), el bucle continúa al siguiente
+        }
+      }
+
+      if (lastError && !rawAnswer) {
+        throw lastError;
+      }
 
       // --- CAPA 5: EXTRACCIÓN Y PERSISTENCIA NATIVA ---
       const bookingRegex = /\[BOOKING_DATA:\s*({[\s\S]*?})\]/;
@@ -126,7 +174,6 @@ REGLAS DE AGENDAMIENTO:
           const data = JSON.parse(bookingMatch[1]);
           const { customerName, customerPhone, serviceName, date, startTime } = data;
 
-          // Validación de integridad: los 5 campos deben ser strings no vacíos
           if (
             typeof customerName === 'string' && customerName.trim() &&
             typeof customerPhone === 'string' && customerPhone.trim() &&
@@ -134,7 +181,6 @@ REGLAS DE AGENDAMIENTO:
             typeof date === 'string' && date.trim() &&
             typeof startTime === 'string' && startTime.trim()
           ) {
-            // Resolver servicio real para obtener metadata financiera y técnica
             const matchedService = services.find(s => 
                 s.name.toLowerCase().includes(serviceName.toLowerCase())
             );
@@ -162,15 +208,12 @@ REGLAS DE AGENDAMIENTO:
 
             await db.collection(`businesses/${businessId}/reservations`).doc(reservationId).set(reservationPayload);
             
-            // Limpieza del tag para la respuesta al usuario
             const cleanAnswer = rawAnswer.replace(bookingRegex, '').trim();
             return { answer: cleanAnswer, source: 'ai_generated' };
           } else {
             throw new Error("Missing required booking fields");
           }
         } catch (e) {
-          console.warn("[Booking Parsing Error]:", e);
-          // Si falla el parseo o validación, limpiamos el tag y devolvemos la respuesta conversacional
           const fallbackCleanAnswer = rawAnswer.replace(bookingRegex, '').trim();
           return { answer: fallbackCleanAnswer, source: 'ai_generated' };
         }
