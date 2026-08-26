@@ -38,69 +38,70 @@ export const publicMenuChatbotFlow = ai.defineFlow(
     outputSchema: PublicMenuChatbotOutputSchema,
   },
   async (input): Promise<PublicMenuChatbotOutput> => {
-    let { businessId, question, history = [] } = input;
-    const lowQuestion = question.toLowerCase().trim();
-    
-    const db = await getAdminFirestore();
-
-    // --- CAPA 0: RESOLUCIÓN DE TENANT (Tenant Resolver de 3 Pasos) ---
-    let canonicalBusinessId = businessId;
-    const directDoc = await db.collection('businesses').doc(businessId).get();
-    
-    if (!directDoc.exists && businessId !== 'platform-bot') {
-      let slugQuery = await db.collection('businesses').where('slug', '==', businessId).limit(1).get();
-      if (slugQuery.empty) {
-        const cleanSlug = businessId.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
-        slugQuery = await db.collection('businesses').where('slug', '==', cleanSlug).limit(1).get();
-      }
-      if (!slugQuery.empty) {
-        canonicalBusinessId = slugQuery.docs[0].id;
-      }
-    }
-    businessId = canonicalBusinessId;
-    
-    // --- CAPA 1: AUTOMATIZACIÓN LOCAL (Respuestas Predeterminadas) ---
     try {
-      const responsesSnap = await db.collection(`businesses/${businessId}/publicMenuChatbot/main/responses`)
-        .where('isActive', '==', true).get();
-      const matchedCustom = responsesSnap.docs.find(doc => lowQuestion.includes(doc.data().question?.toLowerCase().trim() || ''));
-      if (matchedCustom) return { answer: matchedCustom.data().answer, source: 'custom_response' };
-    } catch (e) {}
+      let { businessId, question, history = [] } = input;
+      const lowQuestion = question.toLowerCase().trim();
+      
+      const db = await getAdminFirestore();
 
-    // --- CAPA 2: CONOCIMIENTO DEL NEGOCIO (Catálogo y Servicios) ---
-    const [businessSnap, catalogSnap, servicesSnap] = await Promise.all([
-        db.collection('businesses').doc(businessId).get(),
-        db.collection(`businesses/${businessId}/publicData`).doc('catalog').get(),
-        db.collection(`businesses/${businessId}/bookingServices`).where('isActive', '==', true).get()
-    ]);
+      // --- CAPA 0: RESOLUCIÓN DE TENANT (Tenant Resolver de 3 Pasos) ---
+      let canonicalBusinessId = businessId;
+      const directDoc = await db.collection('businesses').doc(businessId).get();
+      
+      if (!directDoc.exists && businessId !== 'platform-bot') {
+        let slugQuery = await db.collection('businesses').where('slug', '==', businessId).limit(1).get();
+        if (slugQuery.empty) {
+          const cleanSlug = businessId.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+          slugQuery = await db.collection('businesses').where('slug', '==', cleanSlug).limit(1).get();
+        }
+        if (!slugQuery.empty) {
+          canonicalBusinessId = slugQuery.docs[0].id;
+        }
+      }
+      businessId = canonicalBusinessId;
+      
+      // --- CAPA 1: AUTOMATIZACIÓN LOCAL (Respuestas Predeterminadas) ---
+      try {
+        const responsesSnap = await db.collection(`businesses/${businessId}/publicMenuChatbot/main/responses`)
+          .where('isActive', '==', true).get();
+        const matchedCustom = responsesSnap.docs.find(doc => lowQuestion.includes(doc.data().question?.toLowerCase().trim() || ''));
+        if (matchedCustom) return { answer: matchedCustom.data().answer, source: 'custom_response' };
+      } catch (e) {}
 
-    const bData = businessSnap.data();
-    const products = catalogSnap.data()?.products || [];
-    const services = servicesSnap.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+      // --- CAPA 2: CONOCIMIENTO DEL NEGOCIO (Catálogo y Servicios) ---
+      const [businessSnap, catalogSnap, servicesSnap] = await Promise.all([
+          db.collection('businesses').doc(businessId).get(),
+          db.collection(`businesses/${businessId}/publicData`).doc('catalog').get(),
+          db.collection(`businesses/${businessId}/bookingServices`).where('isActive', '==', true).get()
+      ]);
 
-    const formattedCatalog = products.map((p: any) => `- ${p.name}: $${p.price}`).join('\n');
-    const formattedServices = services.map((s: any) => `- ${s.name}: $${s.price} (${s.durationMinutes} min)`).join('\n');
+      const bData = businessSnap.data();
+      const products = catalogSnap.data()?.products || [];
+      const services = servicesSnap.docs.map(doc => ({ ...doc.data(), id: doc.id }));
 
-    // --- CAPA 3: CONFIGURACIÓN IA Y CADENA DE FALLBACK ---
-    const aiConfig = await getAIConfig(businessId);
-    
-    // Acceso blindado a la API Key para evitar excepciones por nulos
-    const googleApiKey = (aiConfig?.apiKey && typeof aiConfig.apiKey === 'string' && aiConfig.apiKey.startsWith('AIza')) 
-      ? aiConfig.apiKey 
-      : (process.env.GEMINI_API_KEY || '');
-    
-    const deepseekApiKey = process.env.DEEPSEEK_API_KEY || '';
+      const formattedCatalog = products.map((p: any) => `- ${p.name}: $${p.price}`).join('\n');
+      const formattedServices = services.map((s: any) => `- ${s.name}: $${s.price} (${s.durationMinutes} min)`).join('\n');
 
-    const providerChain = [
-      { name: 'google', model: 'googleai/gemini-3.6-flash', apiKey: googleApiKey.trim() },
-      { name: 'deepseek', model: 'openai/deepseek-chat', apiKey: deepseekApiKey.trim(), baseUrl: 'https://api.deepseek.com' },
-    ].filter(p => p.apiKey);
+      // --- CAPA 3: CONFIGURACIÓN IA Y CADENA DE FALLBACK ---
+      const aiConfig = await getAIConfig(businessId);
+      
+      // Acceso blindado a la API Key para evitar excepciones por nulos
+      const googleApiKey = (aiConfig?.apiKey && typeof aiConfig.apiKey === 'string' && aiConfig.apiKey.startsWith('AIza')) 
+        ? aiConfig.apiKey 
+        : (process.env.GEMINI_API_KEY || '');
+      
+      const deepseekApiKey = process.env.DEEPSEEK_API_KEY || '';
 
-    if (providerChain.length === 0) {
-      return { answer: "Lo siento, no tengo acceso a mi cerebro de IA. Contacta al administrador.", source: 'fallback' };
-    }
+      const providerChain = [
+        { name: 'google', model: 'googleai/gemini-3.6-flash', apiKey: googleApiKey.trim() },
+        { name: 'deepseek', model: 'openai/deepseek-chat', apiKey: deepseekApiKey.trim(), baseUrl: 'https://api.deepseek.com' },
+      ].filter(p => p.apiKey);
 
-    const systemPrompt = `Eres el asistente virtual oficial de "${bData?.name || 'Nuestro Negocio'}".
+      if (providerChain.length === 0) {
+        return { answer: "Lo siento, no tengo acceso a mi cerebro de IA. Contacta al administrador.", source: 'fallback' };
+      }
+
+      const systemPrompt = `Eres el asistente virtual oficial de "${bData?.name || 'Nuestro Negocio'}".
 
 SERVICIOS DISPONIBLES PARA AGENDAR:
 ${formattedServices}
@@ -113,10 +114,9 @@ REGLAS DE AGENDAMIENTO:
 [BOOKING_DATA: {"customerName":"...","customerPhone":"...","serviceName":"...","date":"YYYY-MM-DD","startTime":"HH:mm"}]
 2. Si faltan datos, pídelos amablemente y NO agregues el tag de reserva.`;
 
-    let rawAnswer = '';
-    let lastError = null;
+      let rawAnswer = '';
+      let lastError = null;
 
-    try {
       // --- CAPA 4: GENERACIÓN NATURAL CON FALLBACK AUTOMÁTICO ---
       for (const provider of providerChain) {
         try {
@@ -150,7 +150,7 @@ REGLAS DE AGENDAMIENTO:
           const numericCode = err.code ?? (err.message?.includes('429') ? 429 : null);
           const retryableCodes = [401, 403, 404, 429, 500];
           const retryableStatusStrings = ['RESOURCE_EXHAUSTED', 'UNAUTHENTICATED', 'PERMISSION_DENIED', 'NOT_FOUND', 'UNKNOWN', 'INVALID_ARGUMENT'];
-          const isRetryable = retryableCodes.includes(numericCode) || retryableStatusStrings.includes(err.status);
+          const isRetryable = retryableCodes.includes(numericCode as any) || retryableStatusStrings.includes(err.status);
           
           console.warn(`[AI Fallback] Error en ${provider.name} (${err.status || numericCode}):`, err.message);
           
