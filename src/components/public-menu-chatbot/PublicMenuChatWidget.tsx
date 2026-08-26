@@ -146,7 +146,23 @@ export function PublicMenuChatWidget({ businessId, isPreview = false }: PublicMe
         </Card>
       )}
 
-      <Button size="lg" className="rounded-full h-16 w-16 shadow-xl hover:scale-105 transition-transform" style={{ backgroundColor: config.buttonColor }} onClick={() => setIsOpen(!isOpen)}>{isOpen ? <X className="h-8 w-8" /> : <MessageCircle className="h-8 w-8" />}</Button>
+      <Button 
+        size="lg" 
+        className={cn(
+          "rounded-full h-16 w-16 shadow-xl hover:scale-105 transition-transform overflow-hidden",
+          config.avatarUrl && !isOpen ? "p-0" : ""
+        )} 
+        style={{ backgroundColor: config.buttonColor }} 
+        onClick={() => setIsOpen(!isOpen)}
+      >
+        {isOpen ? (
+          <X className="h-8 w-8 text-white" />
+        ) : config.avatarUrl ? (
+          <img src={config.avatarUrl} alt={config.assistantName || "Avatar"} className="h-full w-full object-cover" />
+        ) : (
+          <MessageCircle className="h-8 w-8 text-white" />
+        )}
+      </Button>
     </div>
   );
 }
