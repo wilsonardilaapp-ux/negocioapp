@@ -6,6 +6,7 @@
  * - Elimina la arquitectura de Tool Calling para evitar errores de registro duplicado.
  * - Implementa extracción estructurada de datos y guardado directo vía Firebase Admin SDK.
  * - Integra Capas 1, 2 y 3 (getAIConfig) para una gobernanza total.
+ * - Corrige Error 400 de Gemini pasando el system prompt como propiedad raíz.
  */
 
 import { ai } from '@/ai/genkit';
@@ -17,7 +18,6 @@ import {
   PublicMenuChatbotOutput,
 } from '@/models/public-menu-chatbot';
 import { getAIConfig } from './chat-flow';
-import { calculateEndTime } from '@/lib/booking-engine';
 
 /**
  * Esquema interno para la extracción de datos de reserva por parte de la IA.
@@ -35,6 +35,17 @@ const BookingExtractionSchema = z.object({
   }).optional(),
 });
 
+/**
+ * Calcula la hora de fin sumando la duración a la hora de inicio.
+ * Helper interno para evitar dependencias circulares o externas en el servidor.
+ */
+function calculateEndTimeInternal(startTime: string, duration: number): string {
+    const [h, m] = startTime.split(':').map(Number);
+    const date = new Date();
+    date.setHours(h || 0, (m || 0) + duration, 0);
+    return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+}
+
 export const publicMenuChatbotFlow = ai.defineFlow(
   {
     name: 'publicMenuChatbotFlow',
@@ -48,7 +59,6 @@ export const publicMenuChatbotFlow = ai.defineFlow(
     const db = await getAdminFirestore();
 
     // --- CAPA 0: RESOLUCIÓN DE TENANT (Slug -> UID) ---
-    // Si el ID no parece un UID estándar (aprox 28 chars), buscamos coincidencia por slug
     if (businessId.length < 20 || businessId.includes('-')) {
         const slugQuery = await db.collection('businesses')
             .where('slug', '==', businessId)
@@ -86,7 +96,6 @@ export const publicMenuChatbotFlow = ai.defineFlow(
     const aiConfig = await getAIConfig(businessId);
     let resolvedApiKey = (aiConfig.apiKey || '').trim();
     
-    // Fail-Safe Auth: Validar prefijo oficial de Google AI con fallback a infraestructura
     if (!resolvedApiKey.startsWith('AIza')) {
       resolvedApiKey = (process.env.GEMINI_API_KEY || process.env.GOOGLE_GENAI_API_KEY || '').trim();
     }
@@ -112,9 +121,12 @@ INSTRUCCIÓN TÉCNICA: Responde SIEMPRE siguiendo estrictamente el esquema JSON 
       const response = await ai.generate({
         model: 'googleai/gemini-1.5-flash',
         output: { schema: BookingExtractionSchema },
+        system: systemPrompt,
         messages: [
-          { role: 'system', content: [{ text: systemPrompt }] },
-          ...history.map(h => ({ role: h.role as any, content: [{ text: h.content }] })),
+          ...history.map(h => ({ 
+            role: (h.role === 'model' || h.role === 'assistant') ? 'model' as const : 'user' as const,
+            content: [{ text: h.content }] 
+          })),
           { role: 'user', content: [{ text: question }] }
         ],
         config: { temperature: 0.1, apiKey: resolvedApiKey }
@@ -127,7 +139,6 @@ INSTRUCCIÓN TÉCNICA: Responde SIEMPRE siguiendo estrictamente el esquema JSON 
         const data = extracted.extractedData;
         const reservationId = db.collection('placeholder').doc().id;
 
-        // Intentar cruzar con datos reales del servicio para precio y duración
         const matchedService = services.find(s => 
             s.name.toLowerCase().includes(data.serviceName?.toLowerCase() || '')
         );
@@ -142,7 +153,7 @@ INSTRUCCIÓN TÉCNICA: Responde SIEMPRE siguiendo estrictamente el esquema JSON 
           staffName: "Pendiente de asignación",
           date: data.date,
           startTime: data.startTime,
-          endTime: calculateEndTime(data.startTime || '00:00', matchedService?.durationMinutes || 45),
+          endTime: calculateEndTimeInternal(data.startTime || '00:00', matchedService?.durationMinutes || 45),
           price: matchedService?.price || 0,
           durationMinutes: matchedService?.durationMinutes || 45,
           status: 'pending',
@@ -151,7 +162,6 @@ INSTRUCCIÓN TÉCNICA: Responde SIEMPRE siguiendo estrictamente el esquema JSON 
           updatedAt: new Date().toISOString(),
         };
 
-        // Escritura directa en Firestore (Firebase Admin SDK)
         await db.collection(`businesses/${businessId}/reservations`).doc(reservationId).set(reservationPayload);
         
         const confirmMsg = `¡Listo, ${data.customerName}! ✅ He agendado tu cita para ${reservationPayload.serviceName} el día ${data.date} a las ${data.startTime}. Tu ID de reserva es: ${reservationId.slice(-6).toUpperCase()}. ¡Te esperamos!`;
