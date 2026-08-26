@@ -117,7 +117,7 @@ REGLAS DE AGENDAMIENTO:
 
       const rawAnswer = response.text;
 
-      // --- CAPA 5: EXTRACCIÓN Y PERSISTENCIA NATIVA (FIXED) ---
+      // --- CAPA 5: EXTRACCIÓN Y PERSISTENCIA NATIVA ---
       const bookingRegex = /\[BOOKING_DATA:\s*({[\s\S]*?})\]/;
       const bookingMatch = rawAnswer.match(bookingRegex);
       
@@ -187,3 +187,15 @@ REGLAS DE AGENDAMIENTO:
     }
   }
 );
+
+/**
+ * Función de utilidad preservada para el mapeo de datos de aplicación a formularios.
+ * NO MODIFICAR para mantener compatibilidad con componentes externos.
+ */
+export async function mapAppToFormData(data: any) {
+  if (!data) return {};
+  return {
+    ...data,
+    mappedAt: new Date().toISOString()
+  };
+}
