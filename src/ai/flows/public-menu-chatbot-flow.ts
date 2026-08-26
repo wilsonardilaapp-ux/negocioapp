@@ -100,7 +100,7 @@ export const publicMenuChatbotFlow = ai.defineFlow(
 
       const providerChain = [
         { name: 'google', model: 'googleai/gemini-3.6-flash', apiKey: googleApiKey.trim() },
-        { name: 'deepseek', model: 'openai/deepseek-chat', apiKey: deepseekApiKey.trim(), baseUrl: 'https://api.deepseek.com' },
+        { name: 'deepseek', model: 'deepseek-chat', apiKey: deepseekApiKey.trim() },
       ].filter(p => p.apiKey);
 
       if (providerChain.length === 0) {
@@ -126,24 +126,55 @@ REGLAS DE AGENDAMIENTO:
       // --- CAPA 4: GENERACIÓN NATURAL CON FALLBACK AUTOMÁTICO ---
       for (const provider of providerChain) {
         try {
-          const response = await ai.generate({
-            model: provider.model as any,
-            system: systemPrompt,
-            messages: [
-              ...history.map(h => ({ 
-                role: (h.role === 'model' || h.role === 'assistant') ? 'model' as const : 'user' as const,
-                content: [{ text: h.content }] 
-              })),
-              { role: 'user', content: [{ text: question }] }
-            ],
-            config: { 
-              temperature: 0.1, 
-              apiKey: provider.apiKey,
-              ...(provider.baseUrl ? { baseUrl: provider.baseUrl } : {})
-            }
-          });
+          if (provider.name === 'google') {
+            const response = await ai.generate({
+              model: provider.model as any,
+              system: systemPrompt,
+              messages: [
+                ...history.map(h => ({ 
+                  role: (h.role === 'model' || h.role === 'assistant') ? 'model' as const : 'user' as const,
+                  content: [{ text: h.content }] 
+                })),
+                { role: 'user', content: [{ text: question }] }
+              ],
+              config: { 
+                temperature: 0.1, 
+                apiKey: provider.apiKey
+              }
+            });
+            rawAnswer = response.text;
+          } else if (provider.name === 'deepseek') {
+            const response = await fetch('https://api.deepseek.com/chat/completions', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${provider.apiKey}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                model: 'deepseek-chat',
+                messages: [
+                  { role: 'system', content: systemPrompt },
+                  ...history.map(h => ({ 
+                    role: (h.role === 'model' || h.role === 'assistant') ? 'assistant' : 'user', 
+                    content: h.content 
+                  })),
+                  { role: 'user', content: question }
+                ],
+                temperature: 0.1,
+              }),
+            });
 
-          rawAnswer = response.text;
+            if (!response.ok) {
+              const errorText = await response.text();
+              const error: any = new Error(`DeepSeek API Error: ${response.status} - ${errorText}`);
+              error.status = response.status;
+              throw error;
+            }
+
+            const data = await response.json();
+            rawAnswer = data.choices?.[0]?.message?.content || "";
+          }
+
           if (rawAnswer) {
             console.log(`[AI Fallback] Respondió exitosamente: ${provider.name}`);
             lastError = null;
