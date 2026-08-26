@@ -113,7 +113,7 @@ CATÁLOGO DE PRODUCTOS:
 ${formattedCatalog}
 
 REGLAS DE AGENDAMIENTO:
-1. Si el cliente confirma Nombre, WhatsApp, Servicio, Fecha y Hora, responde amablemente y agrega AL FINAL en una sola línea:
+1. Si el cliente confirma Nombre, WhatsApp, Servicio, Fecha y Hora, responde amablemente y agrega al final en una sola línea:
 [BOOKING_DATA: {"customerName":"...","customerPhone":"...","serviceName":"...","date":"YYYY-MM-DD","startTime":"HH:mm"}]
 2. Si faltan datos, pídelos amablemente y NO agregues el tag de reserva.`;
 
@@ -157,7 +157,6 @@ REGLAS DE AGENDAMIENTO:
           if (!isRetryable) {
             throw err; // Error de validación o petición mal formada, no reintentar
           }
-          // Si es reintentable (cuota, modelo no encontrado, auth), el bucle continúa al siguiente
         }
       }
 
