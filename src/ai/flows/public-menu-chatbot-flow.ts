@@ -59,17 +59,26 @@ export const publicMenuChatbotFlow = ai.defineFlow(
     
     const db = await getAdminFirestore();
 
-    // --- CAPA 0: RESOLUCIÓN DE TENANT (Slug -> UID) ---
-    if (businessId.length < 20 || businessId.includes('-')) {
-        const slugQuery = await db.collection('businesses')
-            .where('slug', '==', businessId)
-            .limit(1)
-            .get();
-        
-        if (!slugQuery.empty) {
-            businessId = slugQuery.docs[0].id;
-        }
+    // --- CAPA 0: RESOLUCIÓN DE TENANT (ID canónico vs Slug) ---
+    // 1. Verificar si existe como documento directo
+    const directDoc = await db.collection('businesses').doc(businessId).get();
+    let canonicalBusinessId = businessId;
+    
+    if (!directDoc.exists && businessId !== 'platform-bot') {
+      // Intentar búsqueda por slug exacto
+      let slugQuery = await db.collection('businesses').where('slug', '==', businessId).limit(1).get();
+      
+      if (slugQuery.empty) {
+        // Intentar búsqueda por slug normalizado (sin tildes ni caracteres especiales)
+        const cleanSlug = businessId.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+        slugQuery = await db.collection('businesses').where('slug', '==', cleanSlug).limit(1).get();
+      }
+
+      if (!slugQuery.empty) {
+        canonicalBusinessId = slugQuery.docs[0].id;
+      }
     }
+    businessId = canonicalBusinessId;
     
     // --- CAPA 1: AUTOMATIZACIÓN LOCAL (Respuestas Predeterminadas) ---
     try {
@@ -97,6 +106,7 @@ export const publicMenuChatbotFlow = ai.defineFlow(
     const aiConfig = await getAIConfig(businessId);
     let resolvedApiKey = (aiConfig.apiKey || '').trim();
     
+    // Fallback de seguridad si la llave del Super Admin no es de Google o es inválida
     if (!resolvedApiKey.startsWith('AIza')) {
       resolvedApiKey = (process.env.GEMINI_API_KEY || process.env.GOOGLE_GENAI_API_KEY || '').trim();
     }
