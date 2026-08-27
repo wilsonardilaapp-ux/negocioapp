@@ -1,9 +1,9 @@
 'use client';
 
-import { useMemo, useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { useMemo, useState, useEffect, useRef } from 'react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart';
-import { PieChart, Pie, Cell, Legend } from 'recharts';
+import { PieChart, Pie, Cell, Legend, ResponsiveContainer } from 'recharts';
 import { 
     Loader2, 
     Receipt, 
@@ -12,10 +12,24 @@ import {
     Search,
     Eye,
     FileSpreadsheet,
-    FileText
+    FileText,
+    Smartphone,
+    Globe,
+    Instagram,
+    Facebook,
+    QrCode,
+    HelpCircle,
+    Table as TableIcon,
+    Download,
+    Copy,
+    Check,
+    CheckCircle2,
+    Info,
+    MousePointer2,
+    Zap
 } from 'lucide-react';
-import { useUser, useFirestore, useMemoFirebase, useDoc } from '@/firebase';
-import { doc, getDoc } from 'firebase/firestore';
+import { useUser, useFirestore, useMemoFirebase, useDoc, useCollection } from '@/firebase';
+import { doc, getDoc, collection, query, orderBy } from 'firebase/firestore';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -40,19 +54,26 @@ import { subDays, startOfDay, format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import type { TrackingEvent } from '@/types/tracking';
 import type { Invoice, VerticalType } from '@/types/billing';
+import type { Order } from '@/models/order';
 import type { Business } from '@/models/business';
 import { InvoiceDetailModal } from '@/components/billing/InvoiceDetailModal';
 import * as XLSX from 'xlsx';
 import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
+import QRCode from "react-qr-code";
+import html2canvas from "html2canvas";
 
 const COLORS = ['#16a34a', '#3b82f6', '#f59e0b', '#8b5cf6', '#ef4444', '#0f172a'];
 
-const trackingChartConfig = {
+const chartConfig = {
   totalAmount: {
     label: "Recaudación ($)",
     color: "hsl(var(--primary))",
   },
+  count: {
+    label: "Pedidos",
+    color: "hsl(var(--chart-2))",
+  }
 } satisfies ChartConfig;
 
 export default function PedidosPorCanalPage() {
@@ -60,18 +81,22 @@ export default function PedidosPorCanalPage() {
   const firestore = useFirestore();
   const { toast } = useToast();
   
+  // Estados para Gráficas y Bitácora
   const [channelShares, setChannelShares] = useState<ChannelShare[]>([]);
   const [isLoadingShares, setIsLoadingShares] = useState(false);
   const [isExporting, setIsExporting] = useState<'excel' | 'pdf' | null>(null);
-
   const [logEvents, setLogEvents] = useState<TrackingEvent[]>([]);
   const [isLogsLoading, setIsLogsLoading] = useState(false);
+  
+  // Estados para UI y Modales
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
-  
   const [filterChannel, setFilterChannel] = useState('all');
   const [searchClient, setSearchClient] = useState('');
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [customTableNumber, setCustomTableNumber] = useState('');
 
+  // 1. Obtener Datos del Negocio
   const businessRef = useMemoFirebase(() => 
     (firestore && user?.uid ? doc(firestore, 'businesses', user.uid) : null),
     [user?.uid, firestore]
@@ -79,6 +104,13 @@ export default function PedidosPorCanalPage() {
   const { data: business } = useDoc<Business>(businessRef);
   const businessType = (business?.category || 'Retail') as VerticalType;
 
+  // 2. Obtener Pedidos Reales para Métricas de Marketing (Campo: origin)
+  const ordersQuery = useMemoFirebase(() => 
+    user ? collection(firestore, `businesses/${user.uid}/orders`) : null, 
+  [firestore, user]);
+  const { data: allOrders, isLoading: loadingOrders } = useCollection<Order>(ordersQuery);
+
+  // 3. Cargar Cuota de Mercado Real (tracking_events)
   useEffect(() => {
     if (!user?.uid) return;
 
@@ -99,6 +131,7 @@ export default function PedidosPorCanalPage() {
     fetchChannelShares();
   }, [user?.uid]);
 
+  // 4. Cargar Bitácora de Eventos
   useEffect(() => {
     if (!user?.uid) return;
 
@@ -121,101 +154,115 @@ export default function PedidosPorCanalPage() {
     fetchLogs();
   }, [user?.uid, filterChannel]);
 
+  // --- LÓGICA DE MARKETING (PEDIDOS INICIADOS) ---
+  const marketingStats = useMemo(() => {
+    if (!allOrders) return [];
+    const counts: Record<string, number> = {};
+    let total = 0;
+
+    allOrders.forEach(o => {
+        const origin = o.origin || 'web';
+        counts[origin] = (counts[origin] || 0) + 1;
+        total++;
+    });
+
+    return Object.entries(counts).map(([name, count]) => ({
+        name: name.toUpperCase().replace('_', ' '),
+        count,
+        percentage: total > 0 ? (count / total) * 100 : 0
+    })).sort((a, b) => b.count - a.count);
+  }, [allOrders]);
+
+  // --- HANDLERS DE UI ---
+  const handleCopyLink = (url: string, id: string) => {
+    navigator.clipboard.writeText(url);
+    setCopiedId(id);
+    toast({ title: "Enlace copiado", description: "El link con tracking está listo para usar." });
+    setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  const handleDownloadQR = async (elementId: string, filename: string) => {
+    const element = document.getElementById(elementId);
+    if (!element) return;
+    try {
+        const canvas = await html2canvas(element, { backgroundColor: '#ffffff', scale: 2 });
+        const link = document.createElement('a');
+        link.download = `${filename}.png`;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+    } catch (e) {
+        toast({ variant: 'destructive', title: "Error al generar QR" });
+    }
+  };
+
   const filteredLogs = useMemo(() => {
-    let result = logEvents;
-
-    if (filterChannel !== 'all') {
-      result = result.filter(e => e.channel === filterChannel);
-    }
-
-    if (searchClient) {
-      const term = searchClient.toLowerCase();
-      result = result.filter(e => 
-        e.customerName?.toLowerCase().includes(term) || 
-        e.customerWhatsapp?.includes(term) ||
-        e.invoiceId?.toLowerCase().includes(term) ||
-        e.orderId?.toLowerCase().includes(term)
-      );
-    }
-
-    return result;
-  }, [logEvents, searchClient, filterChannel]);
+    return logEvents.filter(e => {
+        const term = searchClient.toLowerCase();
+        return e.customerName?.toLowerCase().includes(term) || 
+               e.consecutiveNumber?.toLowerCase().includes(term) ||
+               e.invoiceId?.toLowerCase().includes(term);
+    });
+  }, [logEvents, searchClient]);
 
   const handleOpenDetail = async (invoiceId: string | null) => {
     if (!invoiceId || !user?.uid || !firestore) return;
-    
     try {
       const docRef = doc(firestore, `businesses/${user.uid}/invoices`, invoiceId);
       const snap = await getDoc(docRef);
       if (snap.exists()) {
         setSelectedInvoice({ id: snap.id, ...snap.data() } as Invoice);
         setIsDetailOpen(true);
-      } else {
-        toast({ variant: 'destructive', title: 'Error', description: 'No se encontró el registro.' });
       }
-    } catch (e) {
-      toast({ variant: 'destructive', title: 'Error técnico' });
-    }
+    } catch (e) { console.error(e); }
   };
 
   const formatCurrency = (val: number) => 
     new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(val);
 
+  // --- EXPORTACIÓN ---
   const handleExportExcel = () => {
     setIsExporting('excel');
     try {
       const wb = XLSX.utils.book_new();
-      const summaryData = channelShares.map(s => ({
+      const wsSummary = XLSX.utils.json_to_sheet(channelShares.map(s => ({
         'Canal': s.name,
         'Ventas': s.count,
-        'Monto ($)': s.totalAmount,
-        'Porcentaje (%)': `${s.percentage.toFixed(1)}%`
-      }));
-      const wsSummary = XLSX.utils.json_to_sheet(summaryData);
-      XLSX.utils.book_append_sheet(wb, wsSummary, "Cuota de Mercado");
-
-      const logData = filteredLogs.map(e => ({
-        'Fecha': e.createdAt?.toDate ? format(e.createdAt.toDate(), "dd/MM/yyyy HH:mm") : '---',
-        'Venta/Pedido': e.invoiceId || e.orderId || '---',
-        'Canal': e.channel,
-        'Cliente': e.customerName,
-        'Monto ($)': e.total
-      }));
-      const wsLogs = XLSX.utils.json_to_sheet(logData);
-      XLSX.utils.book_append_sheet(wb, wsLogs, "Bitácora");
-
+        'Monto': s.totalAmount,
+        'Cuota (%)': `${s.percentage.toFixed(1)}%`
+      })));
+      XLSX.utils.book_append_sheet(wb, wsSummary, "Ventas Reales");
+      const wsMarketing = XLSX.utils.json_to_sheet(marketingStats.map(s => ({
+        'Origen': s.name,
+        'Pedidos': s.count,
+        'Cuota (%)': `${s.percentage.toFixed(1)}%`
+      })));
+      XLSX.utils.book_append_sheet(wb, wsMarketing, "Métricas Marketing");
       XLSX.writeFile(wb, `Reporte_Canales_${new Date().toISOString().split('T')[0]}.xlsx`);
       toast({ title: "Excel generado" });
-    } catch (error) {
-      toast({ variant: 'destructive', title: 'Error al exportar' });
-    } finally {
-      setIsExporting(null);
-    }
+    } catch (e) { toast({ variant: 'destructive', title: "Error al exportar" }); }
+    finally { setIsExporting(null); }
   };
 
   const handleExportPDF = () => {
     setIsExporting('pdf');
     try {
       const doc = new jsPDF();
-      doc.text("Reporte de Origen de Pedidos", 14, 20);
-      
+      doc.text("Reporte de Origen de Pedidos - Markix", 14, 20);
       (doc as any).autoTable({
         startY: 30,
         head: [['Canal', 'Ventas', 'Total Recaudado', 'Cuota (%)']],
         body: channelShares.map(s => [s.name, s.count, formatCurrency(s.totalAmount), `${s.percentage.toFixed(1)}%`]),
       });
-
       doc.save(`Reporte_Canales_${new Date().toISOString().split('T')[0]}.pdf`);
-      toast({ title: "PDF generado" });
-    } catch (error) {
-      toast({ variant: 'destructive', title: 'Error al exportar' });
-    } finally {
-      setIsExporting(null);
-    }
+    } catch (e) { toast({ variant: 'destructive', title: "Error al exportar" }); }
+    finally { setIsExporting(null); }
   };
 
+  const baseUrl = typeof window !== 'undefined' ? `${window.location.origin}/catalog/${user?.uid}` : '';
+
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
+    <div className="space-y-8 animate-in fade-in duration-500 pb-20">
+      {/* HEADER */}
       <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-3xl font-black tracking-tight text-gray-900">Origen de los Pedidos</h1>
@@ -231,93 +278,192 @@ export default function PedidosPorCanalPage() {
         </div>
       </header>
 
-      <div className="grid gap-6 lg:grid-cols-3">
-           <Card className="lg:col-span-2">
+      {/* SECCIÓN SUPERIOR: COMPARATIVA REAL VS MARKETING */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+           {/* CUOTA REAL (FACTURADO) */}
+           <Card>
              <CardHeader>
                 <div className="flex items-center justify-between">
                   <div>
-                    <CardTitle>Cuota de Mercado</CardTitle>
-                    <CardDescription>Distribución de ingresos por canal (Últimos 30 días).</CardDescription>
+                    <CardTitle className="text-lg">Ventas Facturadas (Canal Real)</CardTitle>
+                    <CardDescription>Distribución de ingresos en los últimos 30 días.</CardDescription>
                   </div>
                   <BarChart3 className="text-primary h-6 w-6" />
                 </div>
              </CardHeader>
-             <CardContent className="h-[350px]">
-                {isLoadingShares ? (
-                  <div className="h-full flex items-center justify-center"><Loader2 className="animate-spin" /></div>
-                ) : channelShares.length > 0 ? (
-                  <ChartContainer config={trackingChartConfig} className="h-full w-full">
+             <CardContent className="h-[300px]">
+                {isLoadingShares ? <div className="h-full flex items-center justify-center"><Loader2 className="animate-spin" /></div> : channelShares.length > 0 ? (
+                  <ChartContainer config={chartConfig} className="h-full w-full">
                     <PieChart>
-                      <Pie
-                        data={channelShares}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={80}
-                        outerRadius={120}
-                        paddingAngle={5}
-                        dataKey="totalAmount"
-                        nameKey="name"
-                      >
-                        {channelShares.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                        ))}
+                      <Pie data={channelShares} cx="50%" cy="50%" innerRadius={60} outerRadius={100} paddingAngle={5} dataKey="totalAmount" nameKey="name">
+                        {channelShares.map((_, index) => <Cell key={index} fill={COLORS[index % COLORS.length]} />)}
                       </Pie>
                       <ChartTooltip content={<ChartTooltipContent nameKey="name" />} />
                       <Legend verticalAlign="bottom" align="center" />
                     </PieChart>
                   </ChartContainer>
-                ) : (
-                  <div className="h-full flex items-center justify-center text-muted-foreground opacity-50">
-                    <Receipt size={48} />
-                  </div>
-                )}
+                ) : <div className="h-full flex items-center justify-center text-muted-foreground opacity-20"><Receipt size={64} /></div>}
              </CardContent>
            </Card>
 
-           <Card>
-             <CardHeader><CardTitle>Desglose de Ventas</CardTitle></CardHeader>
-             <CardContent className="p-0">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Canal</TableHead>
-                      <TableHead className="text-center">Cant.</TableHead>
-                      <TableHead className="text-right">Total</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {channelShares.map((share, i) => (
-                      <TableRow key={share.name}>
-                        <TableCell className="pl-4 py-2 flex items-center gap-2">
-                           <div className="h-2 w-2 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
-                           <span className="text-xs font-bold uppercase">{share.name}</span>
-                        </TableCell>
-                        <TableCell className="text-center font-bold text-xs">{share.count}</TableCell>
-                        <TableCell className="text-right pr-4 text-xs font-black text-primary">{formatCurrency(share.totalAmount)}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+           {/* MÉTRICAS DE MARKETING (PEDIDOS INICIADOS) */}
+           <Card className="border-primary/10 bg-primary/5 shadow-inner border-2">
+             <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-lg">Pedidos por Canal (Marketing)</CardTitle>
+                    <CardDescription>Origen de todos los pedidos detectados por tracking.</CardDescription>
+                  </div>
+                  <Badge variant="outline" className="bg-white border-primary/20 text-primary font-bold">Leads de Ventas</Badge>
+                </div>
+             </CardHeader>
+             <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center h-[300px]">
+                <div className="h-full">
+                    {loadingOrders ? <Loader2 className="animate-spin mx-auto mt-20" /> : marketingStats.length > 0 ? (
+                        <ResponsiveContainer width="100%" height="100%">
+                            <PieChart>
+                                <Pie data={marketingStats} cx="50%" cy="50%" innerRadius={50} outerRadius={80} dataKey="count" nameKey="name">
+                                    {marketingStats.map((_, index) => <Cell key={index} fill={COLORS[index % COLORS.length]} />)}
+                                </Pie>
+                                <ChartTooltip />
+                            </PieChart>
+                        </ResponsiveContainer>
+                    ) : <div className="h-full flex items-center justify-center opacity-10"><Zap size={64} /></div>}
+                </div>
+                <div className="space-y-3">
+                    <div className="p-3 bg-white rounded-xl border border-primary/10 space-y-1">
+                        <p className="text-[10px] font-black uppercase text-muted-foreground">Tip Estratégico</p>
+                        <p className="text-[11px] text-primary leading-tight font-medium">Usa los enlaces de abajo para saber exactamente de dónde vienen tus clientes.</p>
+                    </div>
+                    <div className="space-y-2">
+                        {marketingStats.slice(0, 3).map((s, i) => (
+                            <div key={i} className="flex justify-between items-center text-xs">
+                                <span className="font-bold flex items-center gap-1.5">
+                                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
+                                    {s.name}
+                                </span>
+                                <span className="font-black text-slate-700">{s.count} ped.</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
              </CardContent>
            </Card>
       </div>
 
+      {/* SECCIÓN INTERMEDIA: GENERADOR DE ENLACES */}
+      <section className="space-y-6">
+        <div className="space-y-1">
+            <h2 className="text-xl font-black text-gray-900 flex items-center gap-2">
+                <QrCode className="text-primary" /> Generador de Enlaces con Tracking
+            </h2>
+            <p className="text-sm text-muted-foreground">Copia estos enlaces o descarga los códigos QR para tus campañas de marketing.</p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+            {[
+                { id: 'web', label: 'Catálogo Web', ref: 'web', icon: Globe, color: 'text-blue-600' },
+                { id: 'whatsapp', label: 'WhatsApp', ref: 'whatsapp', icon: Smartphone, color: 'text-green-600' },
+                { id: 'redes', label: 'Redes Sociales', ref: 'redes', icon: Instagram, color: 'text-pink-600' },
+                { id: 'landing', label: 'Landing Page', ref: 'landing', icon: Facebook, color: 'text-indigo-600' },
+                { id: 'qr', label: 'QR General', ref: 'qr', icon: QrCode, color: 'text-orange-600' },
+            ].map((chan) => {
+                const trackedUrl = `${baseUrl}?ref=${chan.ref}`;
+                return (
+                    <Card key={chan.id} className="overflow-hidden border-2 border-gray-100 hover:border-primary/20 transition-all group h-full flex flex-col">
+                        <CardHeader className="p-4 pb-2 border-b bg-muted/20">
+                            <CardTitle className="text-xs font-black uppercase tracking-widest flex items-center gap-2">
+                                <chan.icon className={cn("h-4 w-4", chan.color)} /> {chan.label}
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="p-4 space-y-4 flex-grow flex flex-col items-center justify-center">
+                            <div id={`qr-${chan.id}`} className="bg-white p-2 rounded-xl border-2 shadow-inner group-hover:scale-105 transition-transform duration-500">
+                                <QRCode value={trackedUrl} size={100} level="M" />
+                            </div>
+                            <Button variant="ghost" size="sm" className="h-7 text-[10px] font-black uppercase text-muted-foreground hover:text-primary" onClick={() => handleDownloadQR(`qr-${chan.id}`, `QR_${chan.id}`)}>
+                                <Download className="mr-1.5 h-3 w-3" /> Descargar PNG
+                            </Button>
+                        </CardContent>
+                        <CardFooter className="p-4 pt-0">
+                            <div className="relative w-full">
+                                <Input readOnly value={trackedUrl} className="h-8 text-[10px] pr-8 bg-muted/30 border-none font-mono" />
+                                <Button variant="ghost" size="icon" className="absolute right-0 top-0 h-8 w-8 text-primary" onClick={() => handleCopyLink(trackedUrl, chan.id)}>
+                                    {copiedId === chan.id ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
+                                </Button>
+                            </div>
+                        </CardFooter>
+                    </Card>
+                );
+            })}
+        </div>
+      </section>
+
+      {/* SECCIÓN DE MESAS Y AYUDA */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+           <Card className="lg:col-span-1 border-primary/20 shadow-lg shadow-primary/5">
+             <CardHeader className="pb-3 border-b bg-primary/5">
+                <CardTitle className="text-base flex items-center gap-2">
+                    <TableIcon className="h-5 w-5 text-primary" /> QR para Mesas Específicas
+                </CardTitle>
+             </CardHeader>
+             <CardContent className="p-6 space-y-6 text-center">
+                <div className="space-y-2">
+                    <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Número o Nombre de Mesa</Label>
+                    <div className="flex gap-2">
+                        <Input placeholder="Ej: Terraza 4" value={customTableNumber} onChange={e => setCustomTableNumber(e.target.value)} className="h-11 font-bold" />
+                    </div>
+                </div>
+                <div className="flex flex-col items-center gap-4 py-2">
+                    <div id="qr-custom-mesa" className="p-4 bg-white rounded-[2rem] shadow-2xl border-4 border-white ring-1 ring-gray-100">
+                        <QRCode value={`${baseUrl}?ref=mesa-${customTableNumber || 'general'}`} size={160} level="H" />
+                    </div>
+                    <Button className="w-full font-black h-12 shadow-xl shadow-primary/20" onClick={() => handleDownloadQR('qr-custom-mesa', `QR_Mesa_${customTableNumber || 'Local'}`)}>
+                        <Download className="mr-2 h-4 w-4" /> Descargar QR Mesa
+                    </Button>
+                </div>
+             </CardContent>
+           </Card>
+
+           <Card className="lg:col-span-2 rounded-[2rem] border-none bg-slate-900 text-white shadow-2xl overflow-hidden">
+             <CardHeader className="p-8 pb-4">
+                <div className="flex items-center gap-3">
+                    <div className="p-3 bg-white/10 rounded-2xl text-primary"><HelpCircle size={32} /></div>
+                    <div>
+                        <CardTitle className="text-2xl font-black tracking-tight">¿Cómo usar el Tracking?</CardTitle>
+                        <CardDescription className="text-white/40 uppercase font-bold text-[10px] tracking-widest">Domina tus métricas de marketing</CardDescription>
+                    </div>
+                </div>
+             </CardHeader>
+             <CardContent className="p-8 grid grid-cols-1 md:grid-cols-3 gap-6">
+                {[
+                    { step: 1, title: 'Difusión', text: 'Copia el enlace de WhatsApp y pégalo en tu botón de respuesta automática o bio.' },
+                    { step: 2, title: 'Operación Local', text: 'Imprime el QR General para tus mesas o vitrinas. Detectarás ventas presenciales.' },
+                    { step: 3, title: 'Redes Sociales', text: 'Usa el link de Redes para medir cuántas personas que ven tu perfil terminan comprando.' },
+                ].map(s => (
+                    <div key={s.step} className="space-y-2 group">
+                        <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center font-black text-primary border border-white/5 transition-all group-hover:bg-primary group-hover:text-white">
+                            {s.step}
+                        </div>
+                        <p className="font-bold text-sm">{s.title}</p>
+                        <p className="text-xs text-white/60 leading-relaxed">{s.text}</p>
+                    </div>
+                ))}
+             </CardContent>
+           </Card>
+      </div>
+
+      {/* BITÁCORA INFERIOR */}
       <Card>
-        <CardHeader>
+        <CardHeader className="border-b bg-muted/10">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div className="flex items-center gap-2">
               <History className="text-primary h-5 w-5" />
-              <CardTitle>Bitácora de Rastreo</CardTitle>
+              <CardTitle className="text-xl font-black uppercase tracking-tight">Bitácora de Rastreo</CardTitle>
             </div>
             <div className="flex gap-2 w-full md:w-auto">
               <div className="relative flex-1 md:w-64">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input 
-                    placeholder="Buscar cliente o pedido..." 
-                    className="pl-10 h-10"
-                    value={searchClient}
-                    onChange={(e) => setSearchClient(e.target.value)}
-                  />
+                  <Input placeholder="Buscar por factura o cliente..." className="pl-10 h-10" value={searchClient} onChange={(e) => setSearchClient(e.target.value)} />
               </div>
               <Select value={filterChannel} onValueChange={setFilterChannel}>
                 <SelectTrigger className="w-32"><SelectValue placeholder="Canal" /></SelectTrigger>
@@ -325,7 +471,6 @@ export default function PedidosPorCanalPage() {
                   <SelectItem value="all">Todos</SelectItem>
                   <SelectItem value="presencial">Presencial</SelectItem>
                   <SelectItem value="online">Online</SelectItem>
-                  <SelectItem value="redes_sociales">Redes</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -333,49 +478,35 @@ export default function PedidosPorCanalPage() {
         </CardHeader>
         <CardContent className="p-0">
              <Table>
-               <TableHeader>
+               <TableHeader className="bg-muted/50">
                  <TableRow>
-                   <TableHead className="pl-6">ID</TableHead>
-                   <TableHead>Canal</TableHead>
-                   <TableHead>Cliente</TableHead>
-                   <TableHead className="text-right">Total</TableHead>
-                   <TableHead className="text-center">Fecha</TableHead>
-                   <TableHead className="w-[100px]"></TableHead>
+                   <TableHead className="pl-6 text-[10px] font-black uppercase">Nro Factura</TableHead>
+                   <TableHead className="text-[10px] font-black uppercase">Canal</TableHead>
+                   <TableHead className="text-[10px] font-black uppercase">Cliente</TableHead>
+                   <TableHead className="text-right text-[10px] font-black uppercase">Monto</TableHead>
+                   <TableHead className="text-center text-[10px] font-black uppercase">Fecha</TableHead>
+                   <TableHead className="w-[80px]"></TableHead>
                  </TableRow>
                </TableHeader>
                <TableBody>
-                 {isLogsLoading ? (
-                   <TableRow><TableCell colSpan={6} className="h-32 text-center"><Loader2 className="animate-spin mx-auto" /></TableCell></TableRow>
-                 ) : filteredLogs.length > 0 ? ( 
+                 {isLogsLoading ? <TableRow><TableCell colSpan={6} className="h-32 text-center"><Loader2 className="animate-spin mx-auto" /></TableCell></TableRow> : filteredLogs.length > 0 ? ( 
                    filteredLogs.map(event => (
-                     <TableRow key={event.trackingId}>
-                        <TableCell className="pl-6 font-mono text-[10px]">{event.invoiceId?.slice(-8) || event.orderId?.slice(-8)}</TableCell>
+                     <TableRow key={event.trackingId} className="hover:bg-muted/30 transition-colors">
+                        <TableCell className="pl-6 font-mono text-xs font-bold text-primary">{event.consecutiveNumber || 'S/N'}</TableCell>
+                        <TableCell><Badge variant="secondary" className="text-[9px] uppercase font-black tracking-widest">{event.channel}</Badge></TableCell>
                         <TableCell>
-                          <Badge variant="secondary" className="text-[9px] uppercase">{event.channel}</Badge>
+                           <div className="flex flex-col"><span className="text-xs font-bold text-slate-800">{event.customerName}</span><span className="text-[9px] text-muted-foreground uppercase">{event.source}</span></div>
                         </TableCell>
-                        <TableCell>
-                           <div className="flex flex-col">
-                              <span className="text-xs font-bold">{event.customerName}</span>
-                              <span className="text-[10px] text-muted-foreground">{event.customerWhatsapp || 'N/A'}</span>
-                           </div>
-                        </TableCell>
-                        <TableCell className="text-right font-bold text-xs">{formatCurrency(event.total)}</TableCell>
-                        <TableCell className="text-center text-[10px]">
-                           {event.createdAt?.toDate ? format(event.createdAt.toDate(), "dd/MM/yyyy HH:mm") : '---'}
-                        </TableCell>
-                        <TableCell className="pr-6 text-right">
-                          <button 
-                            className="p-2 hover:bg-slate-100 rounded-lg text-slate-400 transition-colors"
-                            onClick={() => handleOpenDetail(event.invoiceId)}
-                          >
+                        <TableCell className="text-right font-black text-slate-900 text-xs">{formatCurrency(event.total)}</TableCell>
+                        <TableCell className="text-center text-[10px] font-medium text-slate-500">{event.createdAt?.toDate ? format(event.createdAt.toDate(), "dd/MM/yyyy HH:mm") : '---'}</TableCell>
+                        <TableCell className="pr-4 text-right">
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-primary" onClick={() => handleOpenDetail(event.invoiceId)}>
                             <Eye size={14} />
-                          </button>
+                          </Button>
                         </TableCell>
                      </TableRow>
                    ))
-                 ) : (
-                   <TableRow><TableCell colSpan={6} className="h-32 text-center text-muted-foreground opacity-50">Sin registros</TableCell></TableRow>
-                 )}
+                 ) : <TableRow><TableCell colSpan={6} className="h-32 text-center text-muted-foreground italic text-xs">Sin registros que coincidan con los filtros.</TableCell></TableRow>}
                </TableBody>
              </Table>
         </CardContent>
