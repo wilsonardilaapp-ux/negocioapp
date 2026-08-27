@@ -28,7 +28,8 @@ import {
   FileSpreadsheet, 
   Upload,
   LayoutGrid,
-  Table as TableIcon
+  Table as TableIcon,
+  Loader2
 } from 'lucide-react';
 import { DataTable } from './data-table';
 import { columns } from './columns';
@@ -64,6 +65,7 @@ export default function PedidosPage() {
   const [dateFrom, setDateFrom] = useState<string>('');
   const [dateTo, setDateTo] = useState<string>('');
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isExportingReal, setIsExportingReal] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   
   const [viewMode, setViewMode] = useState<'table' | 'kanban'>('table');
@@ -255,6 +257,62 @@ export default function PedidosPage() {
     doc.save('pedidos.pdf');
   };
 
+  const handleExportRealOrdersExcel = () => {
+    if (!filteredOrders || filteredOrders.length === 0) {
+      toast({ variant: 'destructive', title: 'Sin datos', description: 'No hay pedidos reales para exportar con los filtros actuales.' });
+      return;
+    }
+
+    setIsExportingReal(true);
+    try {
+        const dataToExport = filteredOrders.map(order => {
+            const isNewFormat = order.items && Array.isArray(order.items);
+            
+            // Unificar nombres de productos
+            const productsList = isNewFormat 
+                ? order.items.map(i => i.productName).join(', ')
+                : (order as any).productName || 'N/A';
+            
+            // Calcular cantidad total
+            const totalQty = isNewFormat
+                ? order.items.reduce((sum, item) => sum + item.quantity, 0)
+                : (order as any).quantity || 0;
+
+            return {
+                'Cliente': order.customerName,
+                'Pedido / Productos': productsList,
+                'Cantidad': totalQty,
+                'Total ($)': order.total || order.subtotal,
+                'Estado': order.orderStatus,
+                'Fecha': new Date(order.orderDate).toLocaleDateString('es-CO')
+            };
+        });
+
+        const ws = XLSX.utils.json_to_sheet(dataToExport);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Pedidos_Reales");
+        
+        // Ajustar anchos de columna automáticamente
+        const wscols = [
+            {wch: 25}, // Cliente
+            {wch: 40}, // Productos
+            {wch: 10}, // Cantidad
+            {wch: 15}, // Total
+            {wch: 15}, // Estado
+            {wch: 15}, // Fecha
+        ];
+        ws['!cols'] = wscols;
+
+        XLSX.writeFile(wb, `Reporte_Pedidos_${new Date().toISOString().split('T')[0]}.xlsx`);
+        toast({ title: "Reporte Generado", description: `Se han exportado ${dataToExport.length} pedidos correctamente.` });
+    } catch (error) {
+        console.error("Error exporting real orders:", error);
+        toast({ variant: 'destructive', title: "Error al exportar", description: "No se pudo generar el archivo de pedidos reales." });
+    } finally {
+        setIsExportingReal(false);
+    }
+  };
+
   const handleExportExcel = () => {
     /**
      * El botón "Plantilla" debe descargar SIEMPRE datos fijos de ejemplo
@@ -376,6 +434,10 @@ export default function PedidosPage() {
               </Button>
               <Button variant="outline" size="sm" onClick={() => setIsImportModalOpen(true)} className="font-bold border-primary text-primary hover:bg-primary/5">
                   <Upload className="mr-2 h-4 w-4" /> Importar
+              </Button>
+              <Button variant="outline" size="sm" onClick={handleExportRealOrdersExcel} disabled={isExportingReal} className="font-bold border-primary text-primary hover:bg-primary/5">
+                  {isExportingReal ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileSpreadsheet className="mr-2 h-4 w-4" />}
+                  Excel
               </Button>
               <Button variant="outline" size="sm" onClick={handlePrint}>
                 <Printer className="mr-2 h-4 w-4" />
