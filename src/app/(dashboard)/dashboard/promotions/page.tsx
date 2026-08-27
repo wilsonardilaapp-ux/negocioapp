@@ -27,7 +27,7 @@ import {
 } from '../../../../components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../../../components/ui/tabs';
 import { useToast } from '../../../../hooks/use-toast';
-import { PlusCircle, Edit, Trash2, Loader2, Tag, Frown, Info } from 'lucide-react';
+import { PlusCircle, Edit, Trash2, Loader2, Tag, Frown, Info, FileSpreadsheet, FileText, Download } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import type { Promotion } from '../../../../models/promotion';
@@ -39,15 +39,19 @@ import type { Product } from '../../../../models/product';
 import RichTextEditor from '../../../../components/editor/RichTextEditor';
 import { errorEmitter } from '../../../../firebase/error-emitter';
 import { FirestorePermissionError, type SecurityRuleContext } from '../../../../firebase/errors';
+import * as XLSX from 'xlsx';
+import { jsPDF } from 'jspdf';
+import 'jspdf-autotable';
 
 export default function PromotionsPage() {
-  const { user } = useUser();
+  const { user, profile } = useUser();
   const { promotions, isLoading: arePromosLoading } = usePromotions();
   const { toast } = useToast();
   const { limits, plan, promotionsCount, isModuleAuthorized, isLoading: isSubLoading } = useSubscription();
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingPromo, setEditingPromo] = useState<Promotion | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
 
   const isLoading = arePromosLoading || isSubLoading;
 
@@ -72,6 +76,98 @@ export default function PromotionsPage() {
       toast({ title: 'Promoción eliminada' });
     } catch (error) {
       toast({ variant: 'destructive', title: 'Error al eliminar' });
+    }
+  };
+
+  // --- HANDLERS DE EXPORTACIÓN ---
+
+  const handleExportExcel = () => {
+    setIsExporting(true);
+    try {
+        const dataToExport = promotions.map(p => ({
+            'Título': p.title,
+            'Tipo': p.type === 'percentage' ? 'Porcentaje' : p.type === 'fixed' ? 'Monto Fijo' : p.type.toUpperCase(),
+            'Valor': p.type === 'percentage' ? `${p.discountValue}%` : `$${p.discountValue}`,
+            'Aplica a': p.applicableTo.replace('_', ' ').toUpperCase(),
+            'Inicio Vigencia': format(new Date(p.validFrom), 'dd/MM/yyyy'),
+            'Fin Vigencia': format(new Date(p.validUntil), 'dd/MM/yyyy'),
+            'Estado': p.isActive ? 'Activa' : 'Inactiva',
+            'Usos': p.usageCount
+        }));
+
+        const ws = XLSX.utils.json_to_sheet(dataToExport);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Promociones");
+        XLSX.writeFile(wb, `Reporte_Promociones_${new Date().toISOString().split('T')[0]}.xlsx`);
+        
+        toast({ title: "Excel generado", description: "El listado de promociones se ha descargado correctamente." });
+    } catch (error) {
+        toast({ variant: 'destructive', title: "Error al exportar", description: "No se pudo generar el archivo Excel." });
+    } finally {
+        setIsExporting(false);
+    }
+  };
+
+  const handleExportPDF = () => {
+    setIsExporting(true);
+    try {
+        const docPdf = new jsPDF();
+        const businessName = profile?.name || 'Mi Negocio';
+        const now = format(new Date(), "dd 'de' MMMM 'de' yyyy, HH:mm", { locale: es });
+
+        // 1. Encabezado Corporativo
+        docPdf.setFontSize(20);
+        docPdf.setTextColor(40);
+        docPdf.text("REPORTE EJECUTIVO DE PROMOCIONES", 14, 22);
+        
+        docPdf.setFontSize(10);
+        docPdf.setTextColor(100);
+        docPdf.text(`Negocio: ${businessName.toUpperCase()}`, 14, 30);
+        docPdf.text(`Fecha de emisión: ${now}`, 14, 35);
+
+        // 2. Resumen de KPIs
+        const activeCount = promotions.filter(p => p.isActive && new Date(p.validUntil) >= new Date()).length;
+        const expiredCount = promotions.filter(p => new Date(p.validUntil) < new Date()).length;
+
+        (docPdf as any).autoTable({
+            startY: 45,
+            head: [['Métrica de Campaña', 'Valor']],
+            body: [
+                ['Total Promociones Registradas', promotions.length.toString()],
+                ['Promociones Activas y Vigentes', activeCount.toString()],
+                ['Promociones Vencidas', expiredCount.toString()],
+            ],
+            theme: 'striped',
+            headStyles: { fillColor: [74, 175, 80] },
+        });
+
+        // 3. Tabla Detallada
+        const nextY = (docPdf as any).lastAutoTable.finalY + 15;
+        docPdf.text("Detalle de Ofertas y Descuentos", 14, nextY);
+
+        const tableData = promotions.map(p => [
+            p.title,
+            p.type === 'percentage' ? `${p.discountValue}%` : `$${p.discountValue.toLocaleString()}`,
+            p.applicableTo.replace('_', ' ').toUpperCase(),
+            `${format(new Date(p.validFrom), 'dd/MM/yy')} - ${format(new Date(p.validUntil), 'dd/MM/yy')}`,
+            p.isActive ? 'ACTIVA' : 'INACTIVA'
+        ]);
+
+        (docPdf as any).autoTable({
+            startY: nextY + 5,
+            head: [['TÍTULO', 'VALOR', 'APLICA A', 'VIGENCIA', 'ESTADO']],
+            body: tableData,
+            theme: 'grid',
+            headStyles: { fillColor: [59, 130, 246] },
+            styles: { fontSize: 8 },
+        });
+
+        docPdf.save(`Reporte_Promociones_${new Date().toISOString().split('T')[0]}.pdf`);
+        toast({ title: "PDF generado", description: "El reporte ejecutivo está listo para descarga." });
+    } catch (error) {
+        toast({ variant: 'destructive', title: "Error al generar PDF" });
+    } finally {
+        setIsExporting(false);
     }
   };
 
@@ -123,14 +219,40 @@ export default function PromotionsPage() {
   return (
     <div className="flex flex-col gap-6">
       <Card>
-        <CardHeader className="flex flex-row justify-between items-center">
-          <div>
+        <CardHeader className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div className="space-y-1">
             <CardTitle>Promociones</CardTitle>
             <CardDescription>Crea y gestiona las promociones de tu negocio.</CardDescription>
           </div>
-          <Button onClick={() => { setEditingPromo(null); setIsDialogOpen(true); }} disabled={promoLimitReached}>
-            <PlusCircle className="mr-2 h-4 w-4" /> Nueva Promoción
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={handleExportExcel} 
+                disabled={isExporting || promotions.length === 0}
+                className="font-bold border-primary text-primary hover:bg-primary/5"
+            >
+                {isExporting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <FileSpreadsheet className="mr-2 h-4 w-4" />}
+                Excel
+            </Button>
+            <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={handleExportPDF} 
+                disabled={isExporting || promotions.length === 0}
+                className="font-bold border-primary text-primary hover:bg-primary/5"
+            >
+                {isExporting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <FileText className="mr-2 h-4 w-4" />}
+                PDF
+            </Button>
+            <Button 
+                onClick={() => { setEditingPromo(null); setIsDialogOpen(true); }} 
+                disabled={promoLimitReached || isExporting}
+                className="font-bold shadow-md"
+            >
+                <PlusCircle className="mr-2 h-4 w-4" /> Nueva Promoción
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
             <div className="flex items-center gap-2 rounded-lg border bg-secondary/50 p-3 text-sm">
