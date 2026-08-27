@@ -30,7 +30,8 @@ import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import * as XLSX from 'xlsx';
-import jsPDF from 'jspdf';
+import { jsPDF } from 'jspdf';
+import 'jspdf-autotable';
 import html2canvas from 'html2canvas';
 
 export default function DashboardPage() {
@@ -161,51 +162,94 @@ export default function DashboardPage() {
     const handleExportPDF = async () => {
         setIsExporting('pdf');
         const element = document.getElementById('analytics-section');
-        if (!element) {
-            setIsExporting(null);
-            return;
-        }
-
+        
         try {
-            const canvas = await html2canvas(element, { scale: 2, useCORS: true });
-            const imgData = canvas.toDataURL('image/png');
+            // Inicialización de jsPDF
             const pdf = new jsPDF('p', 'mm', 'a4');
             const pageWidth = pdf.internal.pageSize.getWidth();
             
-            // Header
-            pdf.setFontSize(20);
-            pdf.setTextColor(40);
-            pdf.text("Reporte Ejecutivo de Ventas", 14, 20);
+            // 1. Cabecera del Reporte
+            pdf.setFontSize(22);
+            pdf.setTextColor(40, 40, 40);
+            pdf.text("Reporte Ejecutivo de Ventas", 14, 22);
             
             pdf.setFontSize(10);
-            pdf.text(`Fecha de emisión: ${new Date().toLocaleString()}`, 14, 28);
-            pdf.text(`Generado para: ${user?.email}`, 14, 33);
+            pdf.setTextColor(100);
+            pdf.text(`Fecha de emisión: ${new Date().toLocaleString('es-CO')}`, 14, 30);
+            pdf.text(`Generado para: ${user?.email || 'Administrador Markix'}`, 14, 35);
             
-            // KPIs Table
+            // Línea de separación
+            pdf.setDrawColor(220);
+            pdf.line(14, 40, pageWidth - 14, 40);
+
+            // 2. Tabla de KPIs (Resumen Directo)
             const kpis = [
-                ["Pedidos Totales", orderCount.toString()],
-                ["Productos en Catálogo", productCount.toString()],
-                ["Mensajes Recibidos", messageCount.toString()]
+                ["Métrica del Negocio", "Valor Actual"],
+                ["Pedidos Totales Procesados", orderCount.toString()],
+                ["Productos Activos en Catálogo", productCount.toString()],
+                ["Mensajes de Clientes Recibidos", messageCount.toString()]
             ];
             
             (pdf as any).autoTable({
-                startY: 40,
-                head: [['Métrica', 'Valor']],
-                body: kpis,
+                startY: 45,
+                head: [kpis[0]],
+                body: kpis.slice(1),
                 theme: 'striped',
-                headStyles: { fillColor: [74, 175, 80] }
+                headStyles: { fillColor: [74, 175, 80], fontStyle: 'bold' },
+                styles: { fontSize: 10, cellPadding: 4 }
             });
 
-            // Analytics Capture
-            const imgWidth = pageWidth - 28;
-            const imgHeight = (canvas.height * imgWidth) / canvas.width;
-            pdf.addImage(imgData, 'PNG', 14, (pdf as any).lastAutoTable.finalY + 10, imgWidth, imgHeight);
+            const kpiTableEndY = (pdf as any).lastAutoTable.finalY || 65;
+
+            // 3. Captura Visual de Gráfica (Intento Resiliente)
+            if (element) {
+                try {
+                    const canvas = await html2canvas(element, { 
+                        scale: 2, 
+                        useCORS: true,
+                        logging: false,
+                        backgroundColor: '#ffffff'
+                    });
+                    const imgData = canvas.toDataURL('image/png');
+                    const imgWidth = pageWidth - 28;
+                    const imgHeight = (canvas.height * imgWidth) / canvas.width;
+                    
+                    // Solo añadir si cabe en la página
+                    if (kpiTableEndY + imgHeight + 20 < 280) {
+                        pdf.addImage(imgData, 'PNG', 14, kpiTableEndY + 10, imgWidth, imgHeight);
+                    } else {
+                        pdf.addPage();
+                        pdf.addImage(imgData, 'PNG', 14, 20, imgWidth, imgHeight);
+                    }
+                } catch (canvasErr) {
+                    console.warn("Fallo captura html2canvas, se omite imagen:", canvasErr);
+                }
+            }
+
+            // 4. Detalle de Ventas Mensuales (Nueva Página)
+            pdf.addPage();
+            pdf.setFontSize(14);
+            pdf.setTextColor(40);
+            pdf.text("Desglose Histórico de Ventas", 14, 20);
+            
+            (pdf as any).autoTable({
+                startY: 25,
+                head: [['Mes de Operación', 'Ventas Acumuladas ($)']],
+                body: monthlySales.map(d => [d.month, `$ ${d.total.toLocaleString('es-CO')}`]),
+                theme: 'grid',
+                headStyles: { fillColor: [59, 130, 246] },
+                styles: { fontSize: 9 }
+            });
 
             pdf.save(`Reporte_Ejecutivo_${new Date().toISOString().split('T')[0]}.pdf`);
-            toast({ title: "PDF generado", description: "El reporte ejecutivo está listo." });
+            toast({ title: "PDF generado", description: "El reporte ejecutivo está listo para descarga." });
         } catch (error) {
-            console.error(error);
-            toast({ variant: "destructive", title: "Error", description: "No se pudo generar el reporte PDF." });
+            console.error("PDF Export Error:", error);
+            toast({ 
+                variant: "destructive", 
+                title: "Error al generar PDF", 
+                description: "Ocurrió un fallo técnico en la generación del documento." 
+            });
         } finally {
             setIsExporting(null);
         }
@@ -289,7 +333,7 @@ export default function DashboardPage() {
                 </Card>
             </div>
 
-            <Card id="analytics-section">
+            <Card>
                 <CardHeader className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                     <div>
                         <CardTitle>Análisis de Ventas</CardTitle>
@@ -318,7 +362,7 @@ export default function DashboardPage() {
                         </Button>
                     </div>
                 </CardHeader>
-                <CardContent>
+                <CardContent id="analytics-section">
                     <Tabs defaultValue="line">
                         <TabsList className="grid w-full grid-cols-3">
                             <TabsTrigger value="line">Ventas por Mes</TabsTrigger>
@@ -361,3 +405,4 @@ export default function DashboardPage() {
         </div>
     );
 }
+
