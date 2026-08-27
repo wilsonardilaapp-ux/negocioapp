@@ -68,13 +68,25 @@ export default function DashboardPage() {
     // --- Chart Data Processing ---
     const monthlySales = useMemo(() => {
         if (!orders) return [];
-        const sales: { [key: string]: number } = {};
+        
+        const monthNames = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+        const sales = new Array(12).fill(0);
+        
         orders.forEach(order => {
-            const month = new Date(order.orderDate).toLocaleString('default', { month: 'short' });
-            sales[month] = (sales[month] || 0) + order.subtotal;
+            const date = new Date(order.orderDate);
+            if (!isNaN(date.getTime())) {
+                const monthIndex = date.getMonth();
+                // Suma resiliente de total o subtotal
+                const amount = Number(order.total || order.subtotal || 0);
+                sales[monthIndex] += amount;
+            }
         });
-        const monthOrder = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-        return monthOrder.map(month => ({ month, total: sales[month] || 0 })).filter(d => d.total > 0);
+
+        // Retornar solo los meses que tienen ventas para el gráfico de líneas
+        return monthNames.map((name, index) => ({
+            month: name,
+            total: sales[index]
+        })).filter(d => d.total > 0);
     }, [orders]);
 
     const salesByStatus = useMemo(() => {
