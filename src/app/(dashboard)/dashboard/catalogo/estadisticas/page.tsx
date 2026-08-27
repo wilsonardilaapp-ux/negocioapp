@@ -15,7 +15,9 @@ import {
     BarChart, 
     TriangleAlert,
     Clock,
-    Check
+    Check,
+    FileSpreadsheet,
+    Download
 } from 'lucide-react';
 import type { Product } from '@/models/product';
 import type { ProductAlert } from '@/models/product-alert';
@@ -26,12 +28,16 @@ import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
+import * as XLSX from 'xlsx';
+import { jsPDF } from 'jspdf';
+import 'jspdf-autotable';
 
 export default function ProductStatsPage() {
     const { user } = useUser();
     const firestore = useFirestore();
     const { toast } = useToast();
     const [isSyncing, setIsSyncing] = useState(false);
+    const [isExporting, setIsExporting] = useState<'excel' | 'pdf' | null>(null);
 
     // --- DATOS: PRODUCTOS ---
     const productsQuery = useMemoFirebase(() => 
@@ -148,6 +154,101 @@ export default function ProductStatsPage() {
         };
     }, [products]);
 
+    // --- HANDLERS DE EXPORTACIÓN ---
+    const handleExportExcel = () => {
+        if (!products || !stats) return;
+        setIsExporting('excel');
+        try {
+            const wb = XLSX.utils.book_new();
+
+            // Hoja 1: Resumen de KPIs
+            const summaryData = [
+                ["Métrica", "Valor"],
+                ["Total Productos", stats.total],
+                ["Productos Valorados", stats.ratedCount],
+                ["Sin Valoraciones", stats.unratedCount],
+                ["Promedio Catálogo", stats.avgRating.toFixed(1)]
+            ];
+            const wsSummary = XLSX.utils.aoa_to_sheet(summaryData);
+            XLSX.utils.book_append_sheet(wb, wsSummary, "Resumen General");
+
+            // Hoja 2: Detalle de Productos
+            const detailData = products.map(p => ({
+                "Producto": p.name,
+                "Categoría": p.category,
+                "Calificación": p.ratingCount > 0 ? p.rating.toFixed(1) : "N/A",
+                "Votos": p.ratingCount,
+                "Estado": p.ratingCount > 0 ? (p.rating < 3 ? "Atención" : "Normal") : "Sin votos"
+            }));
+            const wsDetail = XLSX.utils.json_to_sheet(detailData);
+            XLSX.utils.book_append_sheet(wb, wsDetail, "Listado de Productos");
+
+            XLSX.writeFile(wb, `Reporte_Catálogo_${new Date().toISOString().split('T')[0]}.xlsx`);
+            toast({ title: "Excel generado", description: "El reporte se ha descargado correctamente." });
+        } catch (error) {
+            toast({ variant: "destructive", title: "Error", description: "No se pudo generar el archivo Excel." });
+        } finally {
+            setIsExporting(null);
+        }
+    };
+
+    const handleExportPDF = () => {
+        if (!products || !stats) return;
+        setIsExporting('pdf');
+        try {
+            const doc = new jsPDF();
+            
+            // Cabecera
+            doc.setFontSize(20);
+            doc.setTextColor(40);
+            doc.text("Reporte de Rendimiento de Catálogo", 14, 22);
+            
+            doc.setFontSize(10);
+            doc.setTextColor(100);
+            doc.text(`Fecha de emisión: ${new Date().toLocaleString()}`, 14, 30);
+            doc.text(`Total de productos analizados: ${stats.total}`, 14, 35);
+
+            // Tabla KPIs
+            (doc as any).autoTable({
+                startY: 45,
+                head: [['Métrica de Satisfacción', 'Valor Actual']],
+                body: [
+                    ['Productos Valorados', stats.ratedCount.toString()],
+                    ['Productos Sin Votos', stats.unratedCount.toString()],
+                    ['Promedio General', stats.avgRating.toFixed(1)]
+                ],
+                theme: 'striped',
+                headStyles: { fillColor: [74, 175, 80] }
+            });
+
+            // Tabla Detalle de Productos
+            const nextY = (doc as any).lastAutoTable.finalY + 15;
+            doc.text("Ranking de Satisfacción de Productos", 14, nextY);
+
+            (doc as any).autoTable({
+                startY: nextY + 5,
+                head: [['Producto', 'Categoría', 'Rating', 'Votos']],
+                body: products
+                    .sort((a, b) => b.ratingCount - a.ratingCount)
+                    .map(p => [
+                        p.name,
+                        p.category,
+                        p.ratingCount > 0 ? p.rating.toFixed(1) : '-',
+                        p.ratingCount.toString()
+                    ]),
+                theme: 'grid',
+                headStyles: { fillColor: [59, 130, 246] }
+            });
+
+            doc.save(`Reporte_Catálogo_${new Date().toISOString().split('T')[0]}.pdf`);
+            toast({ title: "PDF generado", description: "El reporte ejecutivo está listo." });
+        } catch (error) {
+            toast({ variant: "destructive", title: "Error", description: "No se pudo generar el reporte PDF." });
+        } finally {
+            setIsExporting(null);
+        }
+    };
+
     const handleMarkAsReviewed = async (alertId: string) => {
         if (!user || !firestore) return;
         try {
@@ -191,12 +292,36 @@ export default function ProductStatsPage() {
     return (
         <div className="space-y-6">
             <Card className="border-none shadow-none bg-transparent">
-                <CardHeader className="px-0 pt-0">
-                    <CardTitle className="text-3xl font-black tracking-tight text-gray-900 flex items-center gap-2">
-                        <BarChart className="h-8 w-8 text-primary" />
-                        Análisis de Catálogo
-                    </CardTitle>
-                    <CardDescription className="text-lg">Monitorea la satisfacción de tus clientes y el rendimiento de tus productos.</CardDescription>
+                <CardHeader className="px-0 pt-0 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                    <div>
+                        <CardTitle className="text-3xl font-black tracking-tight text-gray-900 flex items-center gap-2">
+                            <BarChart className="h-8 w-8 text-primary" />
+                            Análisis de Catálogo
+                        </CardTitle>
+                        <CardDescription className="text-lg">Monitorea la satisfacción de tus clientes y el rendimiento de tus productos.</CardDescription>
+                    </div>
+                    <div className="flex gap-2 w-full md:w-auto">
+                        <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={handleExportExcel}
+                            disabled={isExporting !== null}
+                            className="flex-1 md:flex-none font-bold gap-2 border-primary/20 text-primary hover:bg-primary/5"
+                        >
+                            {isExporting === 'excel' ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSpreadsheet className="h-4 w-4 text-green-600" />}
+                            Excel
+                        </Button>
+                        <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={handleExportPDF}
+                            disabled={isExporting !== null}
+                            className="flex-1 md:flex-none font-bold gap-2 border-primary/20 text-primary hover:bg-primary/5"
+                        >
+                            {isExporting === 'pdf' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4 text-primary" />}
+                            PDF
+                        </Button>
+                    </div>
                 </CardHeader>
             </Card>
 
