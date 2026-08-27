@@ -26,10 +26,11 @@ import {
     CheckCircle2,
     Info,
     MousePointer2,
-    Zap
+    Zap,
+    ArrowLeft
 } from 'lucide-react';
 import { useUser, useFirestore, useMemoFirebase, useDoc, useCollection } from '@/firebase';
-import { doc, getDoc, collection, query, orderBy } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, limit, orderBy } from 'firebase/firestore';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -63,7 +64,7 @@ import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
 import QRCode from "react-qr-code";
 import html2canvas from "html2canvas";
-import { cn } from "@/lib/utils";
+import { cn, normalizePhoneNumber } from "@/lib/utils";
 
 // --- CONFIGURACIÓN DE GRÁFICAS (SHADCN CHARTS) ---
 const chartConfig = {
@@ -75,12 +76,6 @@ const chartConfig = {
   redes_sociales: { label: "Redes Sociales", color: "#ec4899" },
   import_manual: { label: "Importación", color: "#94a3b8" },
   web: { label: "Web", color: "#64748b" },
-  whatsapp: { label: "WhatsApp", color: "#22c55e" },
-  Presencial: { label: "Presencial", color: "#3b82f6" },
-  Online: { label: "Online", color: "#10b981" },
-  WEB: { label: "Web", color: "#64748b" },
-  WHATSAPP: { label: "WhatsApp", color: "#22c55e" },
-  QR: { label: "Código QR", color: "#f59e0b" },
 } satisfies ChartConfig;
 
 const COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#6366f1", "#ec4899", "#14b8a6", "#f43f5e"];
@@ -175,6 +170,16 @@ export default function PedidosPorCanalPage() {
     })).sort((a, b) => b.count - a.count);
   }, [allOrders]);
 
+  const filteredLogs = useMemo(() => {
+    return logEvents.filter(e => {
+        const term = searchClient.toLowerCase();
+        const clientNameMatch = e.customerName?.toLowerCase().includes(term);
+        const invoiceIdMatch = e.invoiceId?.toLowerCase().includes(term);
+        const channelMatch = filterChannel === 'all' || e.channel === filterChannel;
+        return (clientNameMatch || invoiceIdMatch) && channelMatch;
+    });
+  }, [logEvents, searchClient, filterChannel]);
+
   const handleCopyLink = (url: string, id: string) => {
     navigator.clipboard.writeText(url);
     setCopiedId(id);
@@ -196,16 +201,6 @@ export default function PedidosPorCanalPage() {
     }
   };
 
-  const filteredLogs = useMemo(() => {
-    return logEvents.filter(e => {
-        const term = searchClient.toLowerCase();
-        const clientNameMatch = e.customerName?.toLowerCase().includes(term);
-        const invoiceIdMatch = e.invoiceId?.toLowerCase().includes(term);
-        const channelMatch = filterChannel === 'all' || e.channel === filterChannel;
-        return (clientNameMatch || invoiceIdMatch) && channelMatch;
-    });
-  }, [logEvents, searchClient, filterChannel]);
-
   const handleOpenDetail = async (invoiceId: string | null) => {
     if (!invoiceId || !user?.uid || !firestore) return;
     try {
@@ -225,38 +220,120 @@ export default function PedidosPorCanalPage() {
     setIsExporting('excel');
     try {
       const wb = XLSX.utils.book_new();
-      const wsSummary = XLSX.utils.json_to_sheet(channelShares.map(s => ({
-        'Canal': s.name,
-        'Ventas': s.count,
-        'Monto': s.totalAmount,
-        'Cuota (%)': `${s.percentage.toFixed(1)}%`
+
+      // Hoja 1: Facturación Real (POS vs Online)
+      const wsShares = XLSX.utils.json_to_sheet(channelShares.map(s => ({
+        'Canal de Venta': s.name,
+        'Ventas Realizadas (#)': s.count,
+        'Monto Recaudado ($)': s.totalAmount,
+        'Cuota de Participación (%)': `${s.percentage.toFixed(1)}%`
       })));
-      XLSX.utils.book_append_sheet(wb, wsSummary, "Ventas Reales");
+      XLSX.utils.book_append_sheet(wb, wsShares, "Facturación Real");
+
+      // Hoja 2: Marketing y Tráfico (Leads)
       const wsMarketing = XLSX.utils.json_to_sheet(marketingStats.map(s => ({
-        'Origen': s.name,
-        'Pedidos': s.count,
-        'Cuota (%)': `${s.percentage.toFixed(1)}%`
+        'Origen de Tráfico': s.name,
+        'Pedidos Iniciados (#)': s.count,
+        'Cuota de Interés (%)': `${s.percentage.toFixed(1)}%`
       })));
-      XLSX.utils.book_append_sheet(wb, wsMarketing, "Métricas Marketing");
-      XLSX.writeFile(wb, `Reporte_Canales_${new Date().toISOString().split('T')[0]}.xlsx`);
-      toast({ title: "Excel generado" });
-    } catch (e) { toast({ variant: 'destructive', title: "Error al exportar" }); }
-    finally { setIsExporting(null); }
+      XLSX.utils.book_append_sheet(wb, wsMarketing, "Marketing y Leads");
+
+      // Hoja 3: Bitácora Detallada
+      const wsLogs = XLSX.utils.json_to_sheet(filteredLogs.map(log => ({
+        'Factura / Consecutivo': log.consecutiveNumber || 'N/A',
+        'Canal Operativo': log.channel?.toUpperCase(),
+        'Fuente de Tráfico': log.source?.toUpperCase(),
+        'Cliente': log.customerName,
+        'Monto Total ($)': log.total,
+        'Fecha y Hora': log.createdAt?.toDate ? format(log.createdAt.toDate(), "dd/MM/yyyy HH:mm") : 'N/A'
+      })));
+      XLSX.utils.book_append_sheet(wb, wsLogs, "Bitácora de Rastreo");
+
+      XLSX.writeFile(wb, `Reporte_Canales_Venta_${new Date().toISOString().split('T')[0]}.xlsx`);
+      toast({ title: "Excel generado", description: "El reporte multibook ha sido descargado." });
+    } catch (error) {
+      console.error(error);
+      toast({ variant: 'destructive', title: "Error al exportar", description: "No se pudo generar el archivo Excel." });
+    } finally {
+      setIsExporting(null);
+    }
   };
 
   const handleExportPDF = () => {
     setIsExporting('pdf');
     try {
       const doc = new jsPDF();
-      doc.text("Reporte de Origen de Pedidos - Markix", 14, 20);
+      const businessNameHeader = business?.name || 'Markix Business';
+      const userEmail = user?.email || 'N/A';
+      const now = format(new Date(), "dd 'de' MMMM 'de' yyyy, HH:mm", { locale: es });
+
+      // 1. Encabezado Corporativo
+      doc.setFontSize(20);
+      doc.setTextColor(40);
+      doc.text("REPORTE EJECUTIVO: ORIGEN DE PEDIDOS", 14, 22);
+      
+      doc.setFontSize(10);
+      doc.setTextColor(100);
+      doc.text(`Negocio: ${businessNameHeader.toUpperCase()}`, 14, 30);
+      doc.text(`Generado por: ${userEmail}`, 14, 35);
+      doc.text(`Fecha de emisión: ${now}`, 14, 40);
+
+      // 2. Bloque 1: Facturación Real
+      doc.setFontSize(14);
+      doc.setTextColor(40);
+      doc.text("1. Cuota de Facturación Real (POS vs Online)", 14, 52);
+      
       (doc as any).autoTable({
-        startY: 30,
-        head: [['Canal', 'Ventas', 'Total Recaudado', 'Cuota (%)']],
+        startY: 56,
+        head: [['Canal de Venta', 'Ventas (#)', 'Monto Recaudado', 'Cuota (%)']],
         body: channelShares.map(s => [s.name, s.count, formatCurrency(s.totalAmount), `${s.percentage.toFixed(1)}%`]),
+        theme: 'striped',
+        headStyles: { fillColor: [59, 130, 246] }, // Azul Markix
+        margin: { bottom: 20 }
       });
-      doc.save(`Reporte_Canales_${new Date().toISOString().split('T')[0]}.pdf`);
-    } catch (e) { toast({ variant: 'destructive', title: "Error al exportar" }); }
-    finally { setIsExporting(null); }
+
+      // 3. Bloque 2: Marketing y Leads
+      const marketingY = (doc as any).lastAutoTable.finalY + 15;
+      doc.text("2. Rendimiento de Canales de Marketing (Leads)", 14, marketingY);
+      
+      (doc as any).autoTable({
+        startY: marketingY + 4,
+        head: [['Origen del Tráfico', 'Pedidos Iniciados', 'Cuota de Interés (%)']],
+        body: marketingStats.map(s => [s.name, s.count, `${s.percentage.toFixed(1)}%`]),
+        theme: 'striped',
+        headStyles: { fillColor: [245, 158, 11] }, // Naranja/Ambar
+        margin: { bottom: 20 }
+      });
+
+      // 4. Bloque 3: Bitácora Detallada
+      const logsY = (doc as any).lastAutoTable.finalY + 15;
+      doc.text("3. Bitácora Detallada de Eventos de Rastreo", 14, logsY);
+      
+      (doc as any).autoTable({
+        startY: logsY + 4,
+        head: [['Factura', 'Canal', 'Origen', 'Cliente', 'Monto', 'Fecha']],
+        body: filteredLogs.map(log => [
+          log.consecutiveNumber || 'N/A',
+          log.channel?.toUpperCase(),
+          log.source?.toUpperCase(),
+          log.customerName,
+          formatCurrency(log.total),
+          log.createdAt?.toDate ? format(log.createdAt.toDate(), "dd/MM/yy HH:mm") : '---'
+        ]),
+        theme: 'grid',
+        headStyles: { fillColor: [71, 85, 105] }, // Slate 600
+        styles: { fontSize: 8 },
+        margin: { bottom: 15 }
+      });
+
+      doc.save(`Reporte_Origen_Pedidos_Markix_${new Date().toISOString().split('T')[0]}.pdf`);
+      toast({ title: "PDF generado", description: "El reporte ejecutivo está listo para descarga." });
+    } catch (error) {
+      console.error(error);
+      toast({ variant: 'destructive', title: "Error al exportar", description: "No se pudo generar el reporte PDF." });
+    } finally {
+      setIsExporting(null);
+    }
   };
 
   const baseUrl = typeof window !== 'undefined' ? `${window.location.origin}/catalog/${user?.uid}` : '';
@@ -270,10 +347,12 @@ export default function PedidosPorCanalPage() {
         </div>
         <div className="flex gap-2 w-full md:w-auto">
           <Button variant="outline" size="sm" onClick={handleExportExcel} disabled={isExporting !== null} className="gap-2 font-bold border-primary text-primary hover:bg-primary/5">
-            <FileSpreadsheet className="h-4 w-4 text-green-600" /> Excel
+            {isExporting === 'excel' ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSpreadsheet className="h-4 w-4 text-green-600" />}
+            Excel
           </Button>
           <Button variant="outline" size="sm" onClick={handleExportPDF} disabled={isExporting !== null} className="gap-2 font-bold border-primary text-primary hover:bg-primary/5">
-            <FileText className="h-4 w-4 text-primary" /> PDF
+            {isExporting === 'pdf' ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4 text-primary" />}
+            PDF
           </Button>
         </div>
       </header>
