@@ -62,6 +62,7 @@ import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
 import QRCode from "react-qr-code";
 import html2canvas from "html2canvas";
+import { cn } from "@/lib/utils";
 
 const COLORS = ['#16a34a', '#3b82f6', '#f59e0b', '#8b5cf6', '#ef4444', '#0f172a'];
 
@@ -77,18 +78,16 @@ const chartConfig = {
 } satisfies ChartConfig;
 
 export default function PedidosPorCanalPage() {
-  const { user } = useUser();
+  const { user, profile } = useUser();
   const firestore = useFirestore();
   const { toast } = useToast();
   
-  // Estados para Gráficas y Bitácora
   const [channelShares, setChannelShares] = useState<ChannelShare[]>([]);
   const [isLoadingShares, setIsLoadingShares] = useState(false);
   const [isExporting, setIsExporting] = useState<'excel' | 'pdf' | null>(null);
   const [logEvents, setLogEvents] = useState<TrackingEvent[]>([]);
   const [isLogsLoading, setIsLogsLoading] = useState(false);
   
-  // Estados para UI y Modales
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [filterChannel, setFilterChannel] = useState('all');
@@ -96,7 +95,6 @@ export default function PedidosPorCanalPage() {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [customTableNumber, setCustomTableNumber] = useState('');
 
-  // 1. Obtener Datos del Negocio
   const businessRef = useMemoFirebase(() => 
     (firestore && user?.uid ? doc(firestore, 'businesses', user.uid) : null),
     [user?.uid, firestore]
@@ -104,13 +102,11 @@ export default function PedidosPorCanalPage() {
   const { data: business } = useDoc<Business>(businessRef);
   const businessType = (business?.category || 'Retail') as VerticalType;
 
-  // 2. Obtener Pedidos Reales para Métricas de Marketing (Campo: origin)
   const ordersQuery = useMemoFirebase(() => 
     user ? collection(firestore, `businesses/${user.uid}/orders`) : null, 
   [firestore, user]);
   const { data: allOrders, isLoading: loadingOrders } = useCollection<Order>(ordersQuery);
 
-  // 3. Cargar Cuota de Mercado Real (tracking_events)
   useEffect(() => {
     if (!user?.uid) return;
 
@@ -131,7 +127,6 @@ export default function PedidosPorCanalPage() {
     fetchChannelShares();
   }, [user?.uid]);
 
-  // 4. Cargar Bitácora de Eventos
   useEffect(() => {
     if (!user?.uid) return;
 
@@ -154,7 +149,6 @@ export default function PedidosPorCanalPage() {
     fetchLogs();
   }, [user?.uid, filterChannel]);
 
-  // --- LÓGICA DE MARKETING (PEDIDOS INICIADOS) ---
   const marketingStats = useMemo(() => {
     if (!allOrders) return [];
     const counts: Record<string, number> = {};
@@ -173,7 +167,6 @@ export default function PedidosPorCanalPage() {
     })).sort((a, b) => b.count - a.count);
   }, [allOrders]);
 
-  // --- HANDLERS DE UI ---
   const handleCopyLink = (url: string, id: string) => {
     navigator.clipboard.writeText(url);
     setCopiedId(id);
@@ -198,11 +191,12 @@ export default function PedidosPorCanalPage() {
   const filteredLogs = useMemo(() => {
     return logEvents.filter(e => {
         const term = searchClient.toLowerCase();
-        return e.customerName?.toLowerCase().includes(term) || 
-               e.consecutiveNumber?.toLowerCase().includes(term) ||
-               e.invoiceId?.toLowerCase().includes(term);
+        const clientNameMatch = e.customerName?.toLowerCase().includes(term);
+        const invoiceIdMatch = e.invoiceId?.toLowerCase().includes(term);
+        const channelMatch = filterChannel === 'all' || e.channel === filterChannel;
+        return (clientNameMatch || invoiceIdMatch) && channelMatch;
     });
-  }, [logEvents, searchClient]);
+  }, [logEvents, searchClient, filterChannel]);
 
   const handleOpenDetail = async (invoiceId: string | null) => {
     if (!invoiceId || !user?.uid || !firestore) return;
@@ -219,7 +213,6 @@ export default function PedidosPorCanalPage() {
   const formatCurrency = (val: number) => 
     new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(val);
 
-  // --- EXPORTACIÓN ---
   const handleExportExcel = () => {
     setIsExporting('excel');
     try {
@@ -261,8 +254,7 @@ export default function PedidosPorCanalPage() {
   const baseUrl = typeof window !== 'undefined' ? `${window.location.origin}/catalog/${user?.uid}` : '';
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500 pb-20">
-      {/* HEADER */}
+    <div className="space-y-6 animate-in fade-in duration-500">
       <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-3xl font-black tracking-tight text-gray-900">Origen de los Pedidos</h1>
@@ -278,9 +270,7 @@ export default function PedidosPorCanalPage() {
         </div>
       </header>
 
-      {/* SECCIÓN SUPERIOR: COMPARATIVA REAL VS MARKETING */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-           {/* CUOTA REAL (FACTURADO) */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
            <Card>
              <CardHeader>
                 <div className="flex items-center justify-between">
@@ -306,15 +296,14 @@ export default function PedidosPorCanalPage() {
              </CardContent>
            </Card>
 
-           {/* MÉTRICAS DE MARKETING (PEDIDOS INICIADOS) */}
-           <Card className="border-primary/10 bg-primary/5 shadow-inner border-2">
+           <Card className="bg-primary/5 border-2">
              <CardHeader>
                 <div className="flex items-center justify-between">
                   <div>
                     <CardTitle className="text-lg">Pedidos por Canal (Marketing)</CardTitle>
                     <CardDescription>Origen de todos los pedidos detectados por tracking.</CardDescription>
                   </div>
-                  <Badge variant="outline" className="bg-white border-primary/20 text-primary font-bold">Leads de Ventas</Badge>
+                  <Badge variant="outline" className="bg-white text-primary font-bold">Leads de Ventas</Badge>
                 </div>
              </CardHeader>
              <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center h-[300px]">
@@ -351,8 +340,7 @@ export default function PedidosPorCanalPage() {
            </Card>
       </div>
 
-      {/* SECCIÓN INTERMEDIA: GENERADOR DE ENLACES */}
-      <section className="space-y-6">
+      <section className="space-y-4">
         <div className="space-y-1">
             <h2 className="text-xl font-black text-gray-900 flex items-center gap-2">
                 <QrCode className="text-primary" /> Generador de Enlaces con Tracking
@@ -370,14 +358,14 @@ export default function PedidosPorCanalPage() {
             ].map((chan) => {
                 const trackedUrl = `${baseUrl}?ref=${chan.ref}`;
                 return (
-                    <Card key={chan.id} className="overflow-hidden border-2 border-gray-100 hover:border-primary/20 transition-all group h-full flex flex-col">
+                    <Card key={chan.id} className="overflow-hidden border-gray-100 hover:border-primary/20 transition-all group flex flex-col">
                         <CardHeader className="p-4 pb-2 border-b bg-muted/20">
                             <CardTitle className="text-xs font-black uppercase tracking-widest flex items-center gap-2">
                                 <chan.icon className={cn("h-4 w-4", chan.color)} /> {chan.label}
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="p-4 space-y-4 flex-grow flex flex-col items-center justify-center">
-                            <div id={`qr-${chan.id}`} className="bg-white p-2 rounded-xl border-2 shadow-inner group-hover:scale-105 transition-transform duration-500">
+                            <div id={`qr-${chan.id}`} className="bg-white p-2 rounded-xl border group-hover:scale-105 transition-transform duration-500">
                                 <QRCode value={trackedUrl} size={100} level="M" />
                             </div>
                             <Button variant="ghost" size="sm" className="h-7 text-[10px] font-black uppercase text-muted-foreground hover:text-primary" onClick={() => handleDownloadQR(`qr-${chan.id}`, `QR_${chan.id}`)}>
@@ -398,38 +386,35 @@ export default function PedidosPorCanalPage() {
         </div>
       </section>
 
-      {/* SECCIÓN DE MESAS Y AYUDA */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-           <Card className="lg:col-span-1 border-primary/20 shadow-lg shadow-primary/5">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+           <Card className="lg:col-span-1">
              <CardHeader className="pb-3 border-b bg-primary/5">
                 <CardTitle className="text-base flex items-center gap-2">
                     <TableIcon className="h-5 w-5 text-primary" /> QR para Mesas Específicas
                 </CardTitle>
              </CardHeader>
              <CardContent className="p-6 space-y-6 text-center">
-                <div className="space-y-2">
+                <div className="space-y-2 text-left">
                     <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Número o Nombre de Mesa</Label>
-                    <div className="flex gap-2">
-                        <Input placeholder="Ej: Terraza 4" value={customTableNumber} onChange={e => setCustomTableNumber(e.target.value)} className="h-11 font-bold" />
-                    </div>
+                    <Input placeholder="Ej: Terraza 4" value={customTableNumber} onChange={e => setCustomTableNumber(e.target.value)} className="h-11 font-bold" />
                 </div>
                 <div className="flex flex-col items-center gap-4 py-2">
-                    <div id="qr-custom-mesa" className="p-4 bg-white rounded-[2rem] shadow-2xl border-4 border-white ring-1 ring-gray-100">
+                    <div id="qr-custom-mesa" className="p-4 bg-white rounded-xl shadow-inner border">
                         <QRCode value={`${baseUrl}?ref=mesa-${customTableNumber || 'general'}`} size={160} level="H" />
                     </div>
-                    <Button className="w-full font-black h-12 shadow-xl shadow-primary/20" onClick={() => handleDownloadQR('qr-custom-mesa', `QR_Mesa_${customTableNumber || 'Local'}`)}>
+                    <Button className="w-full font-black h-12" onClick={() => handleDownloadQR('qr-custom-mesa', `QR_Mesa_${customTableNumber || 'Local'}`)}>
                         <Download className="mr-2 h-4 w-4" /> Descargar QR Mesa
                     </Button>
                 </div>
              </CardContent>
            </Card>
 
-           <Card className="lg:col-span-2 rounded-[2rem] border-none bg-slate-900 text-white shadow-2xl overflow-hidden">
+           <Card className="lg:col-span-2 bg-slate-900 text-white overflow-hidden">
              <CardHeader className="p-8 pb-4">
                 <div className="flex items-center gap-3">
                     <div className="p-3 bg-white/10 rounded-2xl text-primary"><HelpCircle size={32} /></div>
                     <div>
-                        <CardTitle className="text-2xl font-black tracking-tight">¿Cómo usar el Tracking?</CardTitle>
+                        <CardTitle className="text-2xl font-black tracking-tight text-white">¿Cómo usar el Tracking?</CardTitle>
                         <CardDescription className="text-white/40 uppercase font-bold text-[10px] tracking-widest">Domina tus métricas de marketing</CardDescription>
                     </div>
                 </div>
@@ -452,7 +437,6 @@ export default function PedidosPorCanalPage() {
            </Card>
       </div>
 
-      {/* BITÁCORA INFERIOR */}
       <Card>
         <CardHeader className="border-b bg-muted/10">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
