@@ -3,10 +3,11 @@ import { collection, serverTimestamp } from 'firebase/firestore';
 import type { Firestore } from 'firebase/firestore';
 import type { Invoice } from '@/types/billing';
 import type { TrackingEvent } from '@/types/tracking';
+import type { Order } from '@/models/order';
 
 /**
- * @fileOverview Servicio de registro de eventos de rastreo para la Terminal POS.
- * Permite la trazabilidad de ventas presenciales para informes de origen de pedidos.
+ * @fileOverview Servicio de registro de eventos de rastreo para la Terminal POS y Pedidos Públicos.
+ * Permite la trazabilidad de ventas para informes de origen de pedidos.
  */
 
 /**
@@ -40,5 +41,63 @@ export function registerPOSTracking(
   };
 
   // Ejecución no bloqueante
+  return addDocumentNonBlocking(trackingColRef, eventData);
+}
+
+/**
+ * Registra un evento de rastreo para un pedido realizado desde el catálogo público.
+ * Mapea los parámetros de referencia (?ref=) a los canales de analíticas correspondientes.
+ */
+export function registerPublicOrderTracking(
+  db: Firestore,
+  businessId: string,
+  order: Order
+) {
+  if (!db || !businessId || !order) return;
+
+  const trackingColRef = collection(db, `businesses/${businessId}/tracking_events`);
+  
+  // Mapeo inteligente de orígenes (ref=...) a fuentes y canales oficiales
+  const origin = order.origin?.toLowerCase() || 'web';
+  
+  let source: TrackingEvent['source'] = 'catalogo_web';
+  let channel: TrackingEvent['channel'] = 'online';
+
+  if (origin === 'whatsapp') {
+    source = 'whatsapp_link';
+    channel = 'online';
+  } else if (origin === 'qr') {
+    source = 'qr';
+    channel = 'presencial';
+  } else if (origin === 'redes' || origin === 'redes_sociales') {
+    source = 'qr'; // Fallback a un tipo existente o podrías extender el tipo en tracking.ts
+    channel = 'redes_sociales';
+  } else if (origin === 'facebook') {
+    source = 'facebook';
+    channel = 'redes_sociales';
+  } else if (origin === 'instagram') {
+    source = 'instagram';
+    channel = 'redes_sociales';
+  } else if (origin === 'landing') {
+    source = 'catalogo_web';
+    channel = 'online';
+  }
+
+  const eventData: Omit<TrackingEvent, 'trackingId'> = {
+    businessId,
+    source,
+    channel,
+    invoiceId: null,
+    orderId: order.id,
+    sellerId: null,
+    sellerName: 'Cliente Online',
+    customerId: null,
+    customerName: order.customerName,
+    customerWhatsapp: order.customerPhone || null,
+    paymentMethod: order.paymentMethod as any,
+    total: order.total,
+    createdAt: serverTimestamp(),
+  };
+
   return addDocumentNonBlocking(trackingColRef, eventData);
 }

@@ -28,6 +28,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Image from 'next/image';
 import type { CartItem } from '@/models/cart';
 import { sendOrderConfirmation } from '@/actions/order-notifications';
+import { registerPublicOrderTracking } from '@/services/billing/tracking-service';
 
 const purchaseSchema = z.object({
   fullName: z.string().min(3, { message: 'El nombre es requerido.' }),
@@ -218,7 +219,6 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
 
         const ordersCollectionRef = collection(firestore, `businesses/${businessId}/orders`);
         
-        // REQUISITO 1: Pre-generar ID síncronamente para obtener orderId sin bloquear
         const newOrderRef = doc(ordersCollectionRef);
         const orderId = newOrderRef.id;
         const now = new Date().toISOString();
@@ -250,8 +250,8 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
             };
         });
 
-        const orderData = {
-            id: orderId, // Mantenemos ID consistente
+        const orderData: Order = {
+            id: orderId,
             businessId,
             customerName: data.fullName,
             customerEmail: data.email,
@@ -277,7 +277,10 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
         // Ejecutamos la escritura
         await setDocumentNonBlocking(newOrderRef, cleanOrderData);
 
-        // REQUISITO 5: Disparar notificación automática (Fire and forget)
+        // REGISTRO DE RASTREO (PUENTE DE ANALÍTICAS)
+        registerPublicOrderTracking(firestore, businessId, orderData);
+
+        // Disparar notificación automática (Fire and forget)
         sendOrderConfirmation({ businessId, orderId }).catch(e => console.error("[OrderNotification Trigger Failure]:", e.message));
 
         const paymentLabel = PAYMENT_METHOD_LABELS[selectedPaymentMethod] ?? selectedPaymentMethod;
