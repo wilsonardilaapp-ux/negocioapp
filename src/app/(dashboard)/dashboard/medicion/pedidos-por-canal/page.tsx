@@ -65,6 +65,26 @@ import QRCode from "react-qr-code";
 import html2canvas from "html2canvas";
 import { cn } from "@/lib/utils";
 
+// --- CONFIGURACIÓN DE GRÁFICAS (SHADCN CHARTS) ---
+const chartConfig = {
+  presencial: { label: "Presencial", color: "#3b82f6" },
+  online: { label: "Online", color: "#10b981" },
+  whatsapp_link: { label: "Link WhatsApp", color: "#22c55e" },
+  catalogo_web: { label: "Catálogo Web", color: "#6366f1" },
+  qr: { label: "Código QR", color: "#f59e0b" },
+  redes_sociales: { label: "Redes Sociales", color: "#ec4899" },
+  import_manual: { label: "Importación", color: "#94a3b8" },
+  web: { label: "Web", color: "#64748b" },
+  whatsapp: { label: "WhatsApp", color: "#22c55e" },
+  Presencial: { label: "Presencial", color: "#3b82f6" },
+  Online: { label: "Online", color: "#10b981" },
+  WEB: { label: "Web", color: "#64748b" },
+  WHATSAPP: { label: "WhatsApp", color: "#22c55e" },
+  QR: { label: "Código QR", color: "#f59e0b" },
+} satisfies ChartConfig;
+
+const COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#6366f1", "#ec4899", "#14b8a6", "#f43f5e"];
+
 export default function PedidosPorCanalPage() {
   const { user, profile } = useUser();
   const firestore = useFirestore();
