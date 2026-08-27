@@ -1,24 +1,107 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useMetricAnalysis } from '../hooks/useMetricAnalysis';
 import { MetricsService } from '../services/metrics.service';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from 'recharts';
-import { UserPlus, TrendingUp, TrendingDown, Loader2 } from 'lucide-react';
+import { UserPlus, TrendingUp, TrendingDown, Loader2, FileSpreadsheet, Download } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import * as XLSX from 'xlsx';
+import { jsPDF } from 'jspdf';
+import 'jspdf-autotable';
 
 /**
  * @fileOverview Vista de análisis para la adquisición de clientes nuevos.
  */
 export default function ClientesNuevosPage() {
   const { orders, isLoading } = useMetricAnalysis();
+  const { toast } = useToast();
+  const [isExporting, setIsExporting] = useState<'excel' | 'pdf' | null>(null);
 
   const analysis = useMemo(() => {
     if (isLoading || !orders) return null;
     return MetricsService.analyzeNewClients(orders);
   }, [orders, isLoading]);
+
+  const handleExportExcel = () => {
+    if (!analysis) return;
+    setIsExporting('excel');
+    try {
+      const data = analysis.history.map(item => ({
+        'Fecha': item.date,
+        'Cantidad de Clientes Nuevos': item.value
+      }));
+
+      const ws = XLSX.utils.json_to_sheet(data);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Reporte Adquisición");
+      XLSX.writeFile(wb, `Reporte_Clientes_Nuevos_${new Date().toISOString().split('T')[0]}.xlsx`);
+      
+      toast({ title: "Excel generado", description: "El reporte se ha descargado correctamente." });
+    } catch (error) {
+      toast({ variant: "destructive", title: "Error", description: "No se pudo generar el archivo Excel." });
+    } finally {
+      setIsExporting(null);
+    }
+  };
+
+  const handleExportPDF = () => {
+    if (!analysis) return;
+    setIsExporting('pdf');
+    try {
+      const doc = new jsPDF();
+      
+      // 1. Encabezado Corporativo
+      doc.setFontSize(20);
+      doc.setTextColor(40);
+      doc.text("Reporte de Adquisición de Clientes", 14, 22);
+      
+      doc.setFontSize(10);
+      doc.setTextColor(100);
+      doc.text(`Fecha de emisión: ${new Date().toLocaleString()}`, 14, 30);
+      doc.text(`Periodo analizado: Últimos 30 días`, 14, 35);
+
+      // 2. Resumen de KPIs
+      doc.setFontSize(12);
+      doc.setTextColor(40);
+      doc.text("Resumen Ejecutivo", 14, 48);
+      
+      (doc as any).autoTable({
+        startY: 52,
+        head: [['Métrica de Rendimiento', 'Valor']],
+        body: [
+          ['Total Clientes Nuevos (30 días)', analysis.currentValue.toString()],
+          ['Crecimiento vs Periodo Anterior', `${analysis.growth.toFixed(1)}%`],
+          ['Promedio Diario de Adquisición', (analysis.currentValue / 30).toFixed(1)]
+        ],
+        theme: 'striped',
+        headStyles: { fillColor: [74, 175, 80] }
+      });
+
+      // 3. Tabla de Desglose Diario
+      const nextY = (doc as any).lastAutoTable.finalY + 15;
+      doc.text("Desglose Diario de Adquisición", 14, nextY);
+
+      (doc as any).autoTable({
+        startY: nextY + 4,
+        head: [['Fecha', 'Cantidad de Clientes']],
+        body: analysis.history.map(item => [item.date, item.value]),
+        theme: 'grid',
+        headStyles: { fillColor: [59, 130, 246] }
+      });
+
+      doc.save(`Reporte_Clientes_Nuevos_${new Date().toISOString().split('T')[0]}.pdf`);
+      toast({ title: "PDF generado", description: "El reporte ejecutivo está listo." });
+    } catch (error) {
+      toast({ variant: "destructive", title: "Error", description: "No se pudo generar el reporte PDF." });
+    } finally {
+      setIsExporting(null);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -32,9 +115,33 @@ export default function ClientesNuevosPage() {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
-      <header>
-        <h1 className="text-3xl font-black tracking-tight text-gray-900">Clientes Nuevos</h1>
-        <p className="text-muted-foreground">Mide la efectividad de tu marketing y el crecimiento de tu base de datos.</p>
+      <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+          <h1 className="text-3xl font-black tracking-tight text-gray-900">Clientes Nuevos</h1>
+          <p className="text-muted-foreground">Mide la efectividad de tu marketing y el crecimiento de tu base de datos.</p>
+        </div>
+        <div className="flex gap-2 w-full md:w-auto">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={handleExportExcel}
+            disabled={isExporting !== null}
+            className="flex-1 md:flex-none font-bold gap-2 border-primary text-primary hover:bg-primary/5"
+          >
+            {isExporting === 'excel' ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSpreadsheet className="h-4 w-4 text-green-600" />}
+            Excel
+          </Button>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={handleExportPDF}
+            disabled={isExporting !== null}
+            className="flex-1 md:flex-none font-bold gap-2 border-primary text-primary hover:bg-primary/5"
+          >
+            {isExporting === 'pdf' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4 text-primary" />}
+            PDF
+          </Button>
+        </div>
       </header>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
