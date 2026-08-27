@@ -14,7 +14,7 @@ import {
     TabsTrigger,
 } from "@/components/ui/tabs"
 import { useUser, useCollection, useDoc, useFirestore, useMemoFirebase } from "@/firebase";
-import { FileText, ShoppingCart, MessageSquare, CheckCircle, XCircle, ShoppingBag } from "lucide-react";
+import { FileText, ShoppingCart, MessageSquare, CheckCircle, XCircle, ShoppingBag, FileSpreadsheet, Download, Loader2 } from "lucide-react";
 import { collection, doc } from "firebase/firestore";
 import type { Product } from "@/models/product";
 import type { ContactSubmission } from "@/models/contact-submission";
@@ -26,11 +26,18 @@ import {
   ChartTooltipContent,
 } from "@/components/ui/chart"
 import { Bar, BarChart, Line, LineChart, Pie, PieChart, CartesianGrid, XAxis, YAxis } from "recharts"
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
+import * as XLSX from 'xlsx';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 
 export default function DashboardPage() {
     const { user } = useUser();
     const firestore = useFirestore();
+    const { toast } = useToast();
+    const [isExporting, setIsExporting] = useState<'excel' | 'pdf' | null>(null);
 
     // Query for products
     const productsQuery = useMemoFirebase(() => {
@@ -76,13 +83,11 @@ export default function DashboardPage() {
             const date = new Date(order.orderDate);
             if (!isNaN(date.getTime())) {
                 const monthIndex = date.getMonth();
-                // Suma resiliente de total o subtotal
                 const amount = Number(order.total || order.subtotal || 0);
                 sales[monthIndex] += amount;
             }
         });
 
-        // Retornar solo los meses que tienen ventas para el gráfico de líneas
         return monthNames.map((name, index) => ({
             month: name,
             total: sales[index]
@@ -102,14 +107,12 @@ export default function DashboardPage() {
         if (!orders) return [];
         const productSales: { [key: string]: number } = {};
         orders.forEach(order => {
-            // Manejo dinámico para pedidos agrupados (nuevo formato) o individuales (legacy)
             if (order.items && Array.isArray(order.items)) {
                 order.items.forEach(item => {
                     const name = item.productName;
                     productSales[name] = (productSales[name] || 0) + item.quantity;
                 });
             } else {
-                // Fallback para pedidos con formato antiguo
                 const legacyOrder = order as any;
                 const name = legacyOrder.productName || 'N/A';
                 const quantity = legacyOrder.quantity || 0;
@@ -118,6 +121,95 @@ export default function DashboardPage() {
         });
         return Object.entries(productSales).map(([name, quantity]) => ({ name, quantity }));
     }, [orders]);
+
+    // --- Handlers de Exportación ---
+    const handleExportExcel = () => {
+        setIsExporting('excel');
+        try {
+            const wb = XLSX.utils.book_new();
+
+            // Hoja 1: Ventas por Mes
+            const wsSales = XLSX.utils.json_to_sheet(monthlySales.map(d => ({
+                'Mes': d.month,
+                'Total Ventas ($)': d.total
+            })));
+            XLSX.utils.book_append_sheet(wb, wsSales, "Ventas Mensuales");
+
+            // Hoja 2: Pedidos por Estado
+            const wsStatus = XLSX.utils.json_to_sheet(salesByStatus.map(d => ({
+                'Estado': d.status,
+                'Cantidad': d.count
+            })));
+            XLSX.utils.book_append_sheet(wb, wsStatus, "Estado de Pedidos");
+
+            // Hoja 3: Productos Vendidos
+            const wsProducts = XLSX.utils.json_to_sheet(salesByProduct.map(d => ({
+                'Producto': d.name,
+                'Unidades Vendidas': d.quantity
+            })));
+            XLSX.utils.book_append_sheet(wb, wsProducts, "Ranking Productos");
+
+            XLSX.writeFile(wb, `Reporte_Negocio_${new Date().toISOString().split('T')[0]}.xlsx`);
+            toast({ title: "Excel generado", description: "El reporte se ha descargado correctamente." });
+        } catch (error) {
+            toast({ variant: "destructive", title: "Error", description: "No se pudo generar el archivo Excel." });
+        } finally {
+            setIsExporting(null);
+        }
+    };
+
+    const handleExportPDF = async () => {
+        setIsExporting('pdf');
+        const element = document.getElementById('analytics-section');
+        if (!element) {
+            setIsExporting(null);
+            return;
+        }
+
+        try {
+            const canvas = await html2canvas(element, { scale: 2, useCORS: true });
+            const imgData = canvas.toDataURL('image/png');
+            const pdf = new jsPDF('p', 'mm', 'a4');
+            const pageWidth = pdf.internal.pageSize.getWidth();
+            
+            // Header
+            pdf.setFontSize(20);
+            pdf.setTextColor(40);
+            pdf.text("Reporte Ejecutivo de Ventas", 14, 20);
+            
+            pdf.setFontSize(10);
+            pdf.text(`Fecha de emisión: ${new Date().toLocaleString()}`, 14, 28);
+            pdf.text(`Generado para: ${user?.email}`, 14, 33);
+            
+            // KPIs Table
+            const kpis = [
+                ["Pedidos Totales", orderCount.toString()],
+                ["Productos en Catálogo", productCount.toString()],
+                ["Mensajes Recibidos", messageCount.toString()]
+            ];
+            
+            (pdf as any).autoTable({
+                startY: 40,
+                head: [['Métrica', 'Valor']],
+                body: kpis,
+                theme: 'striped',
+                headStyles: { fillColor: [74, 175, 80] }
+            });
+
+            // Analytics Capture
+            const imgWidth = pageWidth - 28;
+            const imgHeight = (canvas.height * imgWidth) / canvas.width;
+            pdf.addImage(imgData, 'PNG', 14, (pdf as any).lastAutoTable.finalY + 10, imgWidth, imgHeight);
+
+            pdf.save(`Reporte_Ejecutivo_${new Date().toISOString().split('T')[0]}.pdf`);
+            toast({ title: "PDF generado", description: "El reporte ejecutivo está listo." });
+        } catch (error) {
+            console.error(error);
+            toast({ variant: "destructive", title: "Error", description: "No se pudo generar el reporte PDF." });
+        } finally {
+            setIsExporting(null);
+        }
+    };
 
     const lineChartConfig = {
         total: { label: "Ventas", color: "hsl(var(--chart-1))" },
@@ -197,10 +289,34 @@ export default function DashboardPage() {
                 </Card>
             </div>
 
-            <Card>
-                <CardHeader>
-                    <CardTitle>Análisis de Ventas</CardTitle>
-                    <CardDescription>Visualiza el rendimiento de tu negocio.</CardDescription>
+            <Card id="analytics-section">
+                <CardHeader className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                    <div>
+                        <CardTitle>Análisis de Ventas</CardTitle>
+                        <CardDescription>Visualiza el rendimiento de tu negocio.</CardDescription>
+                    </div>
+                    <div className="flex gap-2 w-full md:w-auto">
+                        <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={handleExportExcel}
+                            disabled={isExporting !== null}
+                            className="flex-1 md:flex-none font-bold gap-2"
+                        >
+                            {isExporting === 'excel' ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSpreadsheet className="h-4 w-4 text-green-600" />}
+                            Exportar Excel
+                        </Button>
+                        <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={handleExportPDF}
+                            disabled={isExporting !== null}
+                            className="flex-1 md:flex-none font-bold gap-2"
+                        >
+                            {isExporting === 'pdf' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4 text-primary" />}
+                            Exportar PDF
+                        </Button>
+                    </div>
                 </CardHeader>
                 <CardContent>
                     <Tabs defaultValue="line">
