@@ -255,36 +255,6 @@ export default function PedidosPage() {
     doc.save('pedidos.pdf');
   };
 
-  const handleDownloadTemplate = () => {
-    const promptText = `Actúa como experto en ingesta de datos para la plataforma Markix.
-Tengo el siguiente archivo CSV que representa el Historial de Pedidos de un salón de belleza (hace 45 días) para importarlo masivamente. El objetivo es que la IA de Markix detecte automáticamente patrones de recompra y haga recuperación de clientes (churn).
-Tu tarea es devolver el contenido del archivo corregido y optimizado para importación masiva.
-Reglas de Oro (Crítico):
-Formato: Usa punto y coma (;) como separador.
-Codificación: El archivo de salida DEBE estar en formato UTF-8 para garantizar que los acentos (ej: "García", "Orgánica") no se rompan al importarse a la aplicación web. Si no usas UTF-8, la aplicación fallará.
-Datos: No alteres los valores de los datos, solo corrige el formato y la codificación para asegurar la integridad del sistema Markix.
-Aquí están los datos a corregir (asegura respetar el formato de Fecha DD/MM/AAAA y teléfonos internacionales):
-(Pega aquí tu contenido CSV actual, por ejemplo:
-FechaVenta;NombreCliente;Telefono;Producto;TotalPagado
-10/07/2024;Laura García;573101234567;Balayage Orgánico;180000
-... y el resto de tus 30 filas ... )
-Lo que hará la IA al recibir esto:
-Al usar este prompt, la IA te devolverá un bloque de texto con el contenido limpio y corregido. Solo tendrás que copiar ese texto, pegarlo en un bloc de notas, guardarlo como .csv e importarlo a Markix con éxito.`;
-
-    // Crear Blob con UTF-8 BOM (\uFEFF) para máxima compatibilidad con acentos en Windows/Web
-    const blob = new Blob(["\uFEFF" + promptText], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = 'Plantilla_IA_Markix.txt';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-    
-    toast({ title: "Plantilla descargada", description: "Copia el contenido del archivo y úsalo en tu IA favorita." });
-  };
-
   const handleExportExcel = () => {
     if (!filteredOrders || filteredOrders.length === 0) return;
 
@@ -367,14 +337,11 @@ Al usar este prompt, la IA te devolverá un bloque de texto con el contenido lim
               </CardDescription>
             </div>
             <div className="flex flex-wrap gap-2">
-              <Button variant="outline" size="sm" onClick={handleDownloadTemplate} className="font-bold border-primary text-primary hover:bg-primary/5">
+              <Button variant="outline" size="sm" onClick={handleExportExcel} className="font-bold border-primary text-primary hover:bg-primary/5">
                   <FileSpreadsheet className="mr-2 h-4 w-4" /> Plantilla
               </Button>
               <Button variant="outline" size="sm" onClick={() => setIsImportModalOpen(true)} className="font-bold border-primary text-primary hover:bg-primary/5">
                   <Upload className="mr-2 h-4 w-4" /> Importar
-              </Button>
-              <Button variant="outline" size="sm" onClick={handleExportExcel} className="font-bold border-primary text-primary hover:bg-primary/5">
-                  <FileSpreadsheet className="mr-2 h-4 w-4" /> Excel
               </Button>
               <Button variant="outline" size="sm" onClick={handlePrint}>
                 <Printer className="mr-2 h-4 w-4" />
