@@ -33,6 +33,7 @@ import { doc, getDoc, collection, query, orderBy } from 'firebase/firestore';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Label } from '@/components/ui/label';
 import { 
     Table, 
     TableBody, 
@@ -63,19 +64,6 @@ import 'jspdf-autotable';
 import QRCode from "react-qr-code";
 import html2canvas from "html2canvas";
 import { cn } from "@/lib/utils";
-
-const COLORS = ['#16a34a', '#3b82f6', '#f59e0b', '#8b5cf6', '#ef4444', '#0f172a'];
-
-const chartConfig = {
-  totalAmount: {
-    label: "Recaudación ($)",
-    color: "hsl(var(--primary))",
-  },
-  count: {
-    label: "Pedidos",
-    color: "hsl(var(--chart-2))",
-  }
-} satisfies ChartConfig;
 
 export default function PedidosPorCanalPage() {
   const { user, profile } = useUser();
