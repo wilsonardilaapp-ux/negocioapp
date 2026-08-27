@@ -256,65 +256,63 @@ export default function PedidosPage() {
   };
 
   const handleExportExcel = () => {
-    // Si no hay pedidos reales, usamos datos de ejemplo optimizados para el motor de IA de Markix
-    const sourceData = filteredOrders.length > 0 ? filteredOrders : [
-        {
-            customerName: "Laura García",
-            customerPhone: "573101234567",
-            items: [{ productName: "Balayage Orgánico", quantity: 1, unitPrice: 185000, subtotal: 185000 }],
-            total: 185000,
-            orderDate: new Date(Date.now() - 3888000000).toISOString(), // Hace 45 días
-            orderStatus: "Pagado" as OrderStatus
-        },
-        {
-            customerName: "Carlos Ruiz",
-            customerPhone: "573209876543",
-            items: [{ productName: "Corte de Cabello Caballero", quantity: 1, unitPrice: 35000, subtotal: 35000 }],
-            total: 35000,
-            orderDate: new Date(Date.now() - 3888000000).toISOString(),
-            orderStatus: "Pagado" as OrderStatus
-        },
-        {
-            customerName: "Ana Martínez",
-            customerPhone: "573155554433",
-            items: [{ productName: "Manicure Spa", quantity: 1, unitPrice: 45000, subtotal: 45000 }],
-            total: 45000,
-            orderDate: new Date(Date.now() - 3888000000).toISOString(),
-            orderStatus: "Pagado" as OrderStatus
-        }
+    /**
+     * El botón "Plantilla" debe descargar SIEMPRE datos fijos de ejemplo
+     * optimizados para el motor de IA de Markix, sin depender de los 
+     * pedidos reales de la base de datos.
+     */
+    const templateData = [
+      {
+        Cliente: "Laura García",
+        WhatsApp: "573101234567",
+        Producto: "Balayage Orgánico",
+        Precio_Unitario: 185000,
+        Total: 185000,
+        Fecha: "2024-07-10",
+        Estado: "Pagado"
+      },
+      {
+        Cliente: "Carlos Ruiz",
+        WhatsApp: "573209876543",
+        Producto: "Shampoo Natural de Romero",
+        Precio_Unitario: 45000,
+        Total: 45000,
+        Fecha: "2024-07-12",
+        Estado: "Pagado"
+      },
+      {
+        Cliente: "Ana Martínez",
+        WhatsApp: "573155554433",
+        Producto: "Acondicionador de Aloe Vera",
+        Precio_Unitario: 42000,
+        Total: 42000,
+        Fecha: "2024-07-15",
+        Estado: "Pagado"
+      },
+      {
+        Cliente: "Diana Pérez",
+        WhatsApp: "573112223344",
+        Producto: "Suero Facial Original",
+        Precio_Unitario: 95000,
+        Total: 95000,
+        Fecha: "2024-07-18",
+        Estado: "Pagado"
+      },
+      {
+        Cliente: "Luis Torres",
+        WhatsApp: "573009998877",
+        Producto: "Corte de Cabello Caballero",
+        Precio_Unitario: 35000,
+        Total: 35000,
+        Fecha: "2024-07-20",
+        Estado: "Pagado"
+      }
     ];
 
-    const dataToExport = sourceData.map((order) => {
-        const isNewFormat = order.items && Array.isArray(order.items);
-        const productName = isNewFormat ? order.items[0].productName : (order as any).productName;
-        const total = order.total || (order as any).subtotal || 0;
-        
-        // Garantizar que el precio unitario sea consistente con el total
-        let unitPrice = isNewFormat ? order.items[0].unitPrice : (order as any).unitPrice || 0;
-        if (unitPrice === 0 && total > 0) {
-            unitPrice = total;
-        }
-        
-        // Formato AAAA-MM-DD para el validador
-        const formattedDate = new Date(order.orderDate).toISOString().split('T')[0];
-
-        return {
-          "Cliente": order.customerName,
-          "WhatsApp": order.customerPhone || "",
-          "Producto": productName,
-          "Precio_Unitario": unitPrice,
-          "Total": total,
-          "Fecha": formattedDate,
-          "Estado": filteredOrders.length > 0 ? order.orderStatus : "Pagado"
-        };
-    });
-
-    const ws = XLSX.utils.json_to_sheet(dataToExport);
+    const ws = XLSX.utils.json_to_sheet(templateData);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Pedidos");
-    
-    const prefix = filteredOrders.length > 0 ? 'Reporte_Pedidos' : 'Plantilla_Markix_IA';
-    XLSX.writeFile(wb, `${prefix}_${new Date().toISOString().split('T')[0]}.xlsx`);
+    XLSX.utils.book_append_sheet(wb, ws, "Plantilla_Markix_IA");
+    XLSX.writeFile(wb, `Plantilla_Importacion_Markix_${new Date().toISOString().split('T')[0]}.xlsx`);
   };
 
   const isLoading = areOrdersLoading || isSubscriptionLoading;
