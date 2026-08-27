@@ -256,36 +256,30 @@ export default function PedidosPage() {
   };
 
   const handleExportExcel = () => {
-    // Si no hay pedidos, generamos datos de ejemplo reales para un salón de belleza
+    // Si no hay pedidos reales, usamos datos de ejemplo optimizados para el motor de IA de Markix
     const sourceData = filteredOrders.length > 0 ? filteredOrders : [
         {
             customerName: "Laura García",
-            customerEmail: "laura@ejemplo.com",
             customerPhone: "573101234567",
-            customerAddress: "Calle 123 #45-67",
             items: [{ productName: "Balayage Orgánico", quantity: 1, unitPrice: 185000, subtotal: 185000 }],
             total: 185000,
-            orderDate: new Date().toISOString(),
+            orderDate: new Date(Date.now() - 3888000000).toISOString(), // Hace 45 días
             orderStatus: "Pagado" as OrderStatus
         },
         {
             customerName: "Carlos Ruiz",
-            customerEmail: "carlos@ejemplo.com",
             customerPhone: "573209876543",
-            customerAddress: "Av Central 10-20",
             items: [{ productName: "Corte de Cabello Caballero", quantity: 1, unitPrice: 35000, subtotal: 35000 }],
             total: 35000,
-            orderDate: new Date().toISOString(),
+            orderDate: new Date(Date.now() - 3888000000).toISOString(),
             orderStatus: "Pagado" as OrderStatus
         },
         {
             customerName: "Ana Martínez",
-            customerEmail: "ana@ejemplo.com",
             customerPhone: "573155554433",
-            customerAddress: "Carrera 10 #5-15",
             items: [{ productName: "Manicure Spa", quantity: 1, unitPrice: 45000, subtotal: 45000 }],
             total: 45000,
-            orderDate: new Date().toISOString(),
+            orderDate: new Date(Date.now() - 3888000000).toISOString(),
             orderStatus: "Pagado" as OrderStatus
         }
     ];
@@ -295,19 +289,18 @@ export default function PedidosPage() {
         const productName = isNewFormat ? order.items[0].productName : (order as any).productName;
         const total = order.total || (order as any).subtotal || 0;
         
-        // Garantizar que el precio unitario sea consistente con el total si viene en 0
+        // Garantizar que el precio unitario sea consistente con el total
         let unitPrice = isNewFormat ? order.items[0].unitPrice : (order as any).unitPrice || 0;
         if (unitPrice === 0 && total > 0) {
             unitPrice = total;
         }
         
+        // Formato AAAA-MM-DD para el validador
         const formattedDate = new Date(order.orderDate).toISOString().split('T')[0];
 
         return {
           "Cliente": order.customerName,
-          "Email": order.customerEmail || "",
           "WhatsApp": order.customerPhone || "",
-          "Dirección": order.customerAddress || "Recogida en tienda",
           "Producto": productName,
           "Precio_Unitario": unitPrice,
           "Total": total,
@@ -320,7 +313,7 @@ export default function PedidosPage() {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Pedidos");
     
-    const prefix = filteredOrders.length > 0 ? 'Reporte_Pedidos' : 'Plantilla_Importacion';
+    const prefix = filteredOrders.length > 0 ? 'Reporte_Pedidos' : 'Plantilla_Markix_IA';
     XLSX.writeFile(wb, `${prefix}_${new Date().toISOString().split('T')[0]}.xlsx`);
   };
 
@@ -338,22 +331,24 @@ export default function PedidosPage() {
           </div>
           
           <div className="flex bg-muted p-1 rounded-xl border shadow-inner">
-            <Button 
-                variant={viewMode === 'table' ? 'default' : 'ghost'} 
-                size="sm" 
+            <button 
                 onClick={() => setViewMode('table')}
-                className={cn("h-8 px-4 font-bold rounded-lg", viewMode === 'table' && "shadow-md")}
+                className={cn(
+                    "flex items-center gap-2 px-4 py-1.5 text-xs font-bold rounded-lg transition-all",
+                    viewMode === 'table' ? "bg-white text-primary shadow-md" : "text-muted-foreground hover:bg-muted"
+                )}
             >
-                <TableIcon className="h-4 w-4 mr-2" /> Tabla
-            </Button>
-            <Button 
-                variant={viewMode === 'kanban' ? 'default' : 'ghost'} 
-                size="sm" 
+                <TableIcon className="h-4 w-4" /> Tabla
+            </button>
+            <button 
                 onClick={() => setViewMode('kanban')}
-                className={cn("h-8 px-4 font-bold rounded-lg", viewMode === 'kanban' && "shadow-md")}
+                className={cn(
+                    "flex items-center gap-2 px-4 py-1.5 text-xs font-bold rounded-lg transition-all",
+                    viewMode === 'kanban' ? "bg-white text-primary shadow-md" : "text-muted-foreground hover:bg-muted"
+                )}
             >
-                <LayoutGrid className="h-4 w-4 mr-2" /> Kanban
-            </Button>
+                <LayoutGrid className="h-4 w-4" /> Kanban
+            </button>
           </div>
         </CardHeader>
         <CardContent>
