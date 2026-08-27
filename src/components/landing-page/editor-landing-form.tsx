@@ -26,6 +26,24 @@ import { doc } from "firebase/firestore";
 import type { Business } from '@/models/business';
 import type { SubscriptionPlan } from "@/models/subscription-plan";
 
+// DND Kit Imports
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  useSortable,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 interface EditorLandingFormProps {
   data: LandingPageData;
@@ -92,14 +110,14 @@ const MediaUploader = ({
               ) : (
                 <video src={mediaUrl} controls className="w-full h-full rounded-md" />
               )}
-              <div className="absolute top-2 right-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+              <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                 <Button variant="outline" size="icon" className="h-7 w-7 bg-background" onClick={() => fileInputRef.current?.click()}><Pencil className="h-4 w-4" /></Button>
                 <Button variant="destructive" size="icon" className="h-7 w-7" onClick={onRemove}><Trash2 className="h-4 w-4" /></Button>
               </div>
             </>
           ) : (
              <div className="cursor-pointer">
-              <UploadCloud className="h-6 w-6 mx-auto text-muted-foreground" />
+              <UploadCloud className="h-6 h-6 mx-auto text-muted-foreground" />
               <p className="mt-1 text-xs font-semibold">Clic para subir imagen</p>
               {dimensions && <p className="text-xs text-muted-foreground mt-1">{dimensions}</p>}
               {description && <p className="text-xs text-muted-foreground">{description}</p>}
@@ -111,11 +129,150 @@ const MediaUploader = ({
     );
   };
 
+/**
+ * Componente para renderizar una sección de contenido con capacidad de ser arrastrada.
+ */
+function SortableSectionItem({ 
+    section, 
+    index, 
+    updateContentSection, 
+    removeContentSection, 
+    addSubSection, 
+    updateSubSection, 
+    removeSubSection,
+    handleSubSectionMediaUpload
+}: {
+    section: ContentSection;
+    index: number;
+    updateContentSection: (id: string, field: keyof ContentSection, value: any) => void;
+    removeContentSection: (id: string) => void;
+    addSubSection: (sectionId: string) => void;
+    updateSubSection: (sectionId: string, subSectionId: string, field: keyof Omit<SubSection, 'id'>, value: any) => void;
+    removeSubSection: (sectionId: string, subSectionId: string) => void;
+    handleSubSectionMediaUpload: (sectionId: string, subSectionId: string, file: File) => Promise<void>;
+}) {
+    const {
+        attributes,
+        listeners,
+        setNodeRef,
+        transform,
+        transition,
+        isDragging,
+    } = useSortable({ id: section.id });
+
+    const style = {
+        transform: CSS.Transform.toString(transform),
+        transition,
+        zIndex: isDragging ? 50 : 'auto',
+        opacity: isDragging ? 0.5 : 1,
+    };
+
+    return (
+        <div ref={setNodeRef} style={style}>
+            <AccordionItem value={section.id} className="border rounded-lg bg-background mb-4">
+                <AccordionTrigger className="p-4 text-base font-semibold hover:no-underline">
+                    <div className="flex items-center gap-2 flex-1 truncate">
+                        {/* Drag Handle exclusivo para el icono */}
+                        <div {...attributes} {...listeners} className="cursor-grab p-1 hover:bg-muted rounded text-muted-foreground transition-colors">
+                            <GripVertical className="h-5 w-5" />
+                        </div>
+                        <span className="truncate">{section.title}</span>
+                    </div>
+                </AccordionTrigger>
+                <AccordionContent className="p-4 pt-0 space-y-4">
+                    <div className="flex justify-end">
+                        <Button variant="destructive" size="sm" onClick={() => removeContentSection(section.id)}>
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Eliminar Sección
+                        </Button>
+                    </div>
+                    <div>
+                        <Label>Título</Label>
+                        <Input value={section.title} onChange={(e) => updateContentSection(section.id, 'title', e.target.value)} />
+                    </div>
+                    <div>
+                        <Label>Subtítulo</Label>
+                        <Input value={section.subtitle} onChange={(e) => updateContentSection(section.id, 'subtitle', e.target.value)} />
+                    </div>
+                    <div>
+                        <Label>Contenido</Label>
+                        <RichTextEditor value={section.content} onChange={(content) => updateContentSection(section.id, 'content', content)} />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <Label>Color de Fondo</Label>
+                            <Input type="color" value={section.backgroundColor} onChange={(e) => updateContentSection(section.id, 'backgroundColor', e.target.value)} className="p-1 h-10" />
+                        </div>
+                        <div>
+                            <Label>Color de Texto</Label>
+                            <Input type="color" value={section.textColor} onChange={(e) => updateContentSection(section.id, 'textColor', e.target.value)} className="p-1 h-10" />
+                        </div>
+                    </div>
+                    <div className="p-4 border rounded-md mt-4 space-y-4">
+                        <div className="flex justify-between items-center">
+                            <h4 className="font-medium">Subsecciones (Tarjetas/Columnas)</h4>
+                            <Button variant="outline" size="sm" onClick={() => addSubSection(section.id)}>
+                                <PlusCircle className="mr-2 h-4 w-4" />
+                                Añadir Tarjeta
+                            </Button>
+                        </div>
+                        {section.subsections.length > 0 ? (
+                            <div className="space-y-4">
+                                {section.subsections.map(sub => (
+                                    <div key={sub.id} className="p-3 border rounded-lg bg-muted/50 space-y-3">
+                                        <div className="flex justify-between items-center">
+                                            <p className="font-semibold text-sm">{sub.title}</p>
+                                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => removeSubSection(section.id, sub.id)}>
+                                                <Trash2 className="h-4 w-4 text-destructive" />
+                                            </Button>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <MediaUploader
+                                                mediaUrl={sub.imageUrl}
+                                                mediaType={sub.mediaType}
+                                                onUpload={(file) => handleSubSectionMediaUpload(section.id, sub.id, file)}
+                                                onRemove={() => updateSubSection(section.id, sub.id, 'imageUrl', null)}
+                                                aspectRatio="aspect-[4/3]"
+                                                dimensions="600x400px (4:3)"
+                                                description="Imagen para tarjeta"
+                                            />
+                                            <div>
+                                                <Label htmlFor={`sub-title-${sub.id}`}>Título Tarjeta</Label>
+                                                <Input id={`sub-title-${sub.id}`} value={sub.title} onChange={(e) => updateSubSection(section.id, sub.id, 'title', e.target.value)} />
+                                            </div>
+                                            <div>
+                                                <Label htmlFor={`sub-desc-${sub.id}`}>Descripción</Label>
+                                                <RichTextEditor 
+                                                    value={sub.description} 
+                                                    onChange={(content) => updateSubSection(section.id, sub.id, 'description', content)} 
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <p className="text-sm text-muted-foreground text-center py-4">No hay subsecciones todavía.</p>
+                        )}
+                    </div>
+                </AccordionContent>
+            </AccordionItem>
+        </div>
+    );
+}
+
 export default function EditorLandingForm({ data, setData, plans, loadingPlans }: EditorLandingFormProps) {
     const [newKeyword, setNewKeyword] = useState('');
     const { toast } = useToast();
     const { user } = useUser();
     const firestore = useFirestore();
+
+    const sensors = useSensors(
+        useSensor(PointerSensor),
+        useSensor(KeyboardSensor, {
+          coordinateGetter: sortableKeyboardCoordinates,
+        })
+    );
 
     const businessDocRef = useMemoFirebase(() => {
         if (!firestore || !user) return null;
@@ -416,6 +573,20 @@ export default function EditorLandingForm({ data, setData, plans, loadingPlans }
             const updatedFields = prev.form.fields.filter(f => f.id !== id);
             return { ...prev, form: { ...prev.form, fields: updatedFields }};
         });
+    }, [setData]);
+
+    const handleDragEnd = useCallback((event: DragEndEvent) => {
+        const { active, over } = event;
+        if (active.id !== over?.id) {
+            setData((prev) => {
+                const oldIndex = prev.sections.findIndex((s) => s.id === active.id);
+                const newIndex = prev.sections.findIndex((s) => s.id === over?.id);
+                return {
+                    ...prev,
+                    sections: arrayMove(prev.sections, oldIndex, newIndex),
+                };
+            });
+        }
     }, [setData]);
 
     // HANDLERS PARA CARGA DE MEDIOS
@@ -785,95 +956,32 @@ export default function EditorLandingForm({ data, setData, plans, loadingPlans }
                         </Button>
                     </div>
                     {data.sections.length > 0 ? (
-                        <Accordion type="multiple" className="w-full space-y-4">
-                            {data.sections.map((section, index) => (
-                                <AccordionItem key={section.id} value={`item-${index}`} className="border rounded-lg bg-background">
-                                    <AccordionTrigger className="p-4 text-base font-semibold hover:no-underline">
-                                        <div className="flex items-center gap-2 flex-1 truncate">
-                                            <GripVertical className="h-5 w-5 text-muted-foreground cursor-grab" />
-                                            <span className="truncate">{section.title}</span>
-                                        </div>
-                                    </AccordionTrigger>
-                                    <AccordionContent className="p-4 pt-0 space-y-4">
-                                        <div className="flex justify-end">
-                                            <Button variant="destructive" size="sm" onClick={() => removeContentSection(section.id)}>
-                                                <Trash2 className="mr-2 h-4 w-4" />
-                                                Eliminar Sección
-                                            </Button>
-                                        </div>
-                                        <div>
-                                            <Label>Título</Label>
-                                            <Input value={section.title} onChange={(e) => updateContentSection(section.id, 'title', e.target.value)} />
-                                        </div>
-                                        <div>
-                                            <Label>Subtítulo</Label>
-                                            <Input value={section.subtitle} onChange={(e) => updateContentSection(section.id, 'subtitle', e.target.value)} />
-                                        </div>
-                                        <div>
-                                            <Label>Contenido</Label>
-                                            <RichTextEditor value={section.content} onChange={(content) => updateContentSection(section.id, 'content', content)} />
-                                        </div>
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <div>
-                                                <Label>Color de Fondo</Label>
-                                                <Input type="color" value={section.backgroundColor} onChange={(e) => updateContentSection(section.id, 'backgroundColor', e.target.value)} className="p-1 h-10" />
-                                            </div>
-                                            <div>
-                                                <Label>Color de Texto</Label>
-                                                <Input type="color" value={section.textColor} onChange={(e) => updateContentSection(section.id, 'textColor', e.target.value)} className="p-1 h-10" />
-                                            </div>
-                                        </div>
-                                        <div className="p-4 border rounded-md mt-4 space-y-4">
-                                            <div className="flex justify-between items-center">
-                                                <h4 className="font-medium">Subsecciones (Tarjetas/Columnas)</h4>
-                                                <Button variant="outline" size="sm" onClick={() => addSubSection(section.id)}>
-                                                    <PlusCircle className="mr-2 h-4 w-4" />
-                                                    Añadir Tarjeta
-                                                </Button>
-                                            </div>
-                                            {section.subsections.length > 0 ? (
-                                                <div className="space-y-4">
-                                                    {section.subsections.map(sub => (
-                                                        <div key={sub.id} className="p-3 border rounded-lg bg-muted/50 space-y-3">
-                                                            <div className="flex justify-between items-center">
-                                                                <p className="font-semibold text-sm">{sub.title}</p>
-                                                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => removeSubSection(section.id, sub.id)}>
-                                                                    <Trash2 className="h-4 w-4 text-destructive" />
-                                                                </Button>
-                                                            </div>
-                                                            <div className="space-y-2">
-                                                                <MediaUploader
-                                                                    mediaUrl={sub.imageUrl}
-                                                                    mediaType={sub.mediaType}
-                                                                    onUpload={(file) => handleSubSectionMediaUpload(section.id, sub.id, file)}
-                                                                    onRemove={() => updateSubSection(section.id, sub.id, 'imageUrl', null)}
-                                                                    aspectRatio="aspect-[4/3]"
-                                                                    dimensions="600x400px (4:3)"
-                                                                    description="Imagen para tarjeta"
-                                                                />
-                                                                <div>
-                                                                    <Label htmlFor={`sub-title-${sub.id}`}>Título Tarjeta</Label>
-                                                                    <Input id={`sub-title-${sub.id}`} value={sub.title} onChange={(e) => updateSubSection(section.id, sub.id, 'title', e.target.value)} />
-                                                                </div>
-                                                                <div>
-                                                                    <Label htmlFor={`sub-desc-${sub.id}`}>Descripción</Label>
-                                                                    <RichTextEditor 
-                                                                        value={sub.description} 
-                                                                        onChange={(content) => updateSubSection(section.id, sub.id, 'description', content)} 
-                                                                    />
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            ) : (
-                                                <p className="text-sm text-muted-foreground text-center py-4">No hay subsecciones todavía.</p>
-                                            )}
-                                        </div>
-                                    </AccordionContent>
-                                </AccordionItem>
-                            ))}
-                        </Accordion>
+                        <DndContext 
+                            sensors={sensors} 
+                            collisionDetection={closestCenter} 
+                            onDragEnd={handleDragEnd}
+                        >
+                            <SortableContext 
+                                items={data.sections.map(s => s.id)} 
+                                strategy={verticalListSortingStrategy}
+                            >
+                                <Accordion type="multiple" className="w-full space-y-4">
+                                    {data.sections.map((section, index) => (
+                                        <SortableSectionItem 
+                                            key={section.id}
+                                            section={section}
+                                            index={index}
+                                            updateContentSection={updateContentSection}
+                                            removeContentSection={removeContentSection}
+                                            addSubSection={addSubSection}
+                                            updateSubSection={updateSubSection}
+                                            removeSubSection={removeSubSection}
+                                            handleSubSectionMediaUpload={handleSubSectionMediaUpload}
+                                        />
+                                    ))}
+                                </Accordion>
+                            </SortableContext>
+                        </DndContext>
                     ) : (
                         <div className="flex flex-col items-center justify-center text-center p-10 h-64 border rounded-md bg-muted/20">
                             <p className="text-muted-foreground">Aún no has agregado ninguna sección de contenido.</p>
