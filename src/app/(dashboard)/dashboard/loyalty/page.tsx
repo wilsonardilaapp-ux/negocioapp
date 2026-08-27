@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -19,12 +20,14 @@ import {
     Globe, 
     RefreshCw,
     CheckCircle2,
-    Database
+    Database,
+    FileSpreadsheet,
+    Download
 } from 'lucide-react';
 import type { Business } from '@/models/business';
 import { useToast } from '@/hooks/use-toast';
 import { updateBusinessLoyaltyConfig } from '@/actions/business';
-import { syncBusinessLoyaltyHistory } from '@/actions/loyalty';
+import { syncBusinessLoyaltyHistory, getVipRanking, getChurnStatistics, getRecoveryStats } from '@/actions/loyalty';
 
 import RecoveredRevenueCard from '@/components/admin/loyalty/RecoveredRevenueCard';
 import ChurnRiskCard from '@/components/admin/loyalty/ChurnRiskCard';
@@ -44,8 +47,12 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
+import * as XLSX from 'xlsx';
+import { jsPDF } from 'jspdf';
+import 'jspdf-autotable';
+
 export default function LoyaltyDashboardPage() {
-  const { user } = useUser();
+  const { user, profile } = useUser();
   const firestore = useFirestore();
   const { toast } = useToast();
 
@@ -56,7 +63,6 @@ export default function LoyaltyDashboardPage() {
   
   const { data: business, isLoading: loadingBusiness } = useDoc<Business>(businessRef);
 
-  // [NUEVA LÓGICA DE RESEÑAS - INYECTADA PARA REPARACIÓN]
   const reviewsQuery = useMemoFirebase(() => {
     if (!firestore || !user?.uid) return null;
     return query(
@@ -70,16 +76,25 @@ export default function LoyaltyDashboardPage() {
   const [googleLink, setGoogleLink] = useState('');
   const [isSavingLink, setIsSavingLink] = useState(false);
   
-  // Estados para Sincronización Histórica
   const [isSyncing, setIsSyncing] = useState(false);
   const [showSyncResult, setShowSyncResult] = useState(false);
   const [syncSummary, setSyncResult] = useState<any>(null);
+  
+  const [isExporting, setIsExporting] = useState(false);
 
   useEffect(() => {
     if (business?.googleReviewLink) {
       setGoogleLink(business.googleReviewLink);
     }
   }, [business?.googleReviewLink]);
+
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('es-CO', {
+      style: 'currency',
+      currency: 'COP',
+      minimumFractionDigits: 0,
+    }).format(value);
+  };
 
   const handleSaveLink = async () => {
     if (!user) return;
@@ -117,6 +132,121 @@ export default function LoyaltyDashboardPage() {
     }
   };
 
+  const handleExportExcel = async () => {
+    if (!user?.uid) return;
+    setIsExporting(true);
+    try {
+        const [ranking, churn, recovery] = await Promise.all([
+            getVipRanking(user.uid),
+            getChurnStatistics(user.uid),
+            getRecoveryStats(user.uid)
+        ]);
+
+        const wb = XLSX.utils.book_new();
+
+        // Hoja 1: Resumen
+        const summaryData = [
+            ["RESUMEN DE FIDELIZACIÓN E INTELIGENCIA"],
+            ["Fecha de generación:", new Date().toLocaleString()],
+            [],
+            ["Métrica", "Valor"],
+            ["Revenue Recuperado (IA)", formatCurrency(recovery.totalRevenue)],
+            ["Pedidos Rescatados", recovery.count],
+            ["Canal más Efectivo", recovery.topReason],
+            ["Reputación (Rating)", business?.rating || 5.0],
+            ["Total Reseñas", business?.reviewCount || 0],
+            ["Clientes en Riesgo (Churn)", churn.totalCount],
+            ["Umbral de Churn (días)", churn.threshold],
+            ["Valor de Puntos ($)", business?.loyaltyConfig?.amountThreshold || 1000]
+        ];
+        const wsSummary = XLSX.utils.aoa_to_sheet(summaryData);
+        XLSX.utils.book_append_sheet(wb, wsSummary, "Resumen General");
+
+        // Hoja 2: Ranking VIP
+        const rankingData = ranking.map((c, i) => ({
+            "Rango": i + 1,
+            "Nombre": c.name || "Cliente",
+            "WhatsApp": c.whatsapp,
+            "Visitas Totales": c.visitCount,
+            "Puntos Acumulados": c.points,
+            "Última Visita": c.lastVisitAt ? new Date(c.lastVisitAt).toLocaleDateString() : "---"
+        }));
+        const wsRanking = XLSX.utils.json_to_sheet(rankingData);
+        XLSX.utils.book_append_sheet(wb, wsRanking, "Ranking Clientes VIP");
+
+        XLSX.writeFile(wb, `Reporte_Fidelizacion_${new Date().toISOString().split('T')[0]}.xlsx`);
+        toast({ title: "Excel generado", description: "El reporte se ha descargado correctamente." });
+    } catch (e) {
+        toast({ variant: 'destructive', title: "Error al exportar", description: "No se pudieron obtener los datos para el archivo Excel." });
+    } finally {
+        setIsExporting(false);
+    }
+  };
+
+  const handleExportPDF = async () => {
+    if (!user?.uid) return;
+    setIsExporting(true);
+    try {
+        const [ranking, churn, recovery] = await Promise.all([
+            getVipRanking(user.uid),
+            getChurnStatistics(user.uid),
+            getRecoveryStats(user.uid)
+        ]);
+
+        const doc = new jsPDF();
+        const now = new Date().toLocaleString('es-CO');
+
+        // 1. Encabezado
+        doc.setFontSize(20);
+        doc.setTextColor(40);
+        doc.text("Reporte de Fidelización e Inteligencia", 14, 22);
+        
+        doc.setFontSize(10);
+        doc.setTextColor(100);
+        doc.text(`Negocio: ${business?.name?.toUpperCase() || 'MARKIX BUSINESS'}`, 14, 30);
+        doc.text(`Fecha de emisión: ${now}`, 14, 35);
+
+        // 2. Bloque KPIs
+        (doc as any).autoTable({
+            startY: 45,
+            head: [['Indicador Estratégico', 'Valor']],
+            body: [
+                ['Revenue Recuperado por IA', formatCurrency(recovery.totalRevenue)],
+                ['Reputación General', `${(business?.rating || 5.0).toFixed(1)} / 5.0 estrellas`],
+                ['Clientes en Riesgo Crítico', `${churn.totalCount} clientes`],
+                ['Valor por Punto', `$${(business?.loyaltyConfig?.amountThreshold || 1000).toLocaleString()}`]
+            ],
+            theme: 'striped',
+            headStyles: { fillColor: [59, 130, 246] }
+        });
+
+        // 3. Tabla Ranking VIP
+        const nextY = (doc as any).lastAutoTable.finalY + 15;
+        doc.text("Ranking de Clientes VIP", 14, nextY);
+
+        (doc as any).autoTable({
+            startY: nextY + 5,
+            head: [['Pos.', 'Cliente', 'WhatsApp', 'Visitas', 'Puntos']],
+            body: ranking.map((c, i) => [
+                (i + 1).toString(),
+                c.name || 'Cliente',
+                c.whatsapp,
+                c.visitCount.toString(),
+                c.points.toLocaleString()
+            ]),
+            theme: 'grid',
+            headStyles: { fillColor: [74, 175, 80] }
+        });
+
+        doc.save(`Reporte_Loyalty_${new Date().toISOString().split('T')[0]}.pdf`);
+        toast({ title: "PDF generado", description: "El reporte ejecutivo está listo." });
+    } catch (e) {
+        toast({ variant: 'destructive', title: "Error al generar PDF" });
+    } finally {
+        setIsExporting(false);
+    }
+  };
+
   if (loadingBusiness) {
     return (
       <div className="flex flex-col items-center justify-center h-[60vh] gap-4">
@@ -130,15 +260,39 @@ export default function LoyaltyDashboardPage() {
 
   return (
     <div className="container mx-auto space-y-8 animate-in fade-in duration-700 max-w-7xl">
-      <header className="space-y-1">
-        <div className="flex items-center gap-3">
-            <div className="p-2 bg-primary/10 rounded-xl">
-                <Sparkles className="h-8 w-8 text-primary" />
+      <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div className="space-y-1">
+            <div className="flex items-center gap-3">
+                <div className="p-2 bg-primary/10 rounded-xl">
+                    <Sparkles className="h-8 w-8 text-primary" />
+                </div>
+                <div>
+                    <h1 className="text-3xl font-black tracking-tight text-gray-900">Fidelización e Inteligencia</h1>
+                    <p className="text-muted-foreground font-medium">Gestiona tu reputación, premia a tus clientes VIP y recupera ventas con IA.</p>
+                </div>
             </div>
-            <div>
-                <h1 className="text-3xl font-black tracking-tight text-gray-900">Fidelización e Inteligencia</h1>
-                <p className="text-muted-foreground font-medium">Gestiona tu reputación, premia a tus clientes VIP y recupera ventas con IA.</p>
-            </div>
+        </div>
+        <div className="flex gap-2 w-full md:w-auto">
+            <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={handleExportExcel}
+                disabled={isExporting}
+                className="flex-1 md:flex-none font-bold gap-2 border-primary text-primary hover:bg-primary/5"
+            >
+                {isExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSpreadsheet className="h-4 w-4 text-green-600" />}
+                Excel
+            </Button>
+            <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={handleExportPDF}
+                disabled={isExporting}
+                className="flex-1 md:flex-none font-bold gap-2 border-primary text-primary hover:bg-primary/5"
+            >
+                {isExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4 text-primary" />}
+                PDF
+            </Button>
         </div>
       </header>
 
