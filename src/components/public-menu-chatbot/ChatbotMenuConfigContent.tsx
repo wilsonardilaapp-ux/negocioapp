@@ -68,7 +68,9 @@ import {
   Download,
   X,
   CheckCircle2,
-  MinusCircle
+  MinusCircle,
+  FileSpreadsheet,
+  FileText
 } from 'lucide-react';
 import { PublicMenuChatbotConfig, DEFAULT_CHATBOT_CONFIG, PublicMenuAutoResponse, PUBLIC_MENU_CHATBOT_MODULE_ID } from '@/models/public-menu-chatbot';
 import { PublicMenuChatWidget } from '@/components/public-menu-chatbot/PublicMenuChatWidget';
@@ -78,6 +80,8 @@ import type { Module } from '@/models/module';
 import { useSubscription } from '@/hooks/useSubscription';
 import Image from 'next/image';
 import * as XLSX from 'xlsx';
+import { jsPDF } from 'jspdf';
+import 'jspdf-autotable';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { setDocumentNonBlocking, addDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
@@ -110,6 +114,7 @@ export function ChatbotMenuConfigContent({ businessId: activeBusinessId }: Chatb
   const { toast } = useToast();
   const { isModuleAuthorized, isLoading: isSubLoading } = useSubscription();
   const [isSaving, setIsSaving] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -201,6 +206,112 @@ export function ChatbotMenuConfigContent({ businessId: activeBusinessId }: Chatb
         errorEmitter.emit('permission-error', permissionError);
       })
       .finally(() => setIsSaving(false));
+  };
+
+  const handleExportExcel = () => {
+    setIsExporting(true);
+    try {
+        const wb = XLSX.utils.book_new();
+
+        // Hoja 1: Identidad y Apariencia
+        const identityData = [
+            ["REPORTE DE CONFIGURACIÓN - ASISTENTE VIRTUAL"],
+            ["Fecha de exportación:", new Date().toLocaleString()],
+            ["Negocio:", business?.name || 'Markix'],
+            [],
+            ["PARÁMETRO", "VALOR CONFIGURADO"],
+            ["Nombre del Asistente", localConfig.assistantName],
+            ["Mensaje Inicial", localConfig.greetingMessage],
+            ["Color de Cabecera", localConfig.headerColor],
+            ["Color de Botones", localConfig.buttonColor],
+            ["Color de Fondo Chat", localConfig.secondaryColor],
+            ["Estado Activo", localConfig.isActive ? 'SÍ' : 'NO'],
+            ["Posición en Pantalla", localConfig.position],
+            ["Retraso de Auto-apertura", `${localConfig.autoOpenDelay} segundos`]
+        ];
+        const wsIdentity = XLSX.utils.aoa_to_sheet(identityData);
+        XLSX.utils.book_append_sheet(wb, wsIdentity, "Identidad y Apariencia");
+
+        // Hoja 2: Base de Conocimiento (FAQs)
+        const faqData = (rawResponses || []).map(r => ({
+            "Pregunta (Trigger)": r.question,
+            "Respuesta del Asistente": r.answer,
+            "Estado": r.isActive ? 'Activo' : 'Inactivo',
+            "Última Modificación": r.updatedAt ? new Date(r.updatedAt).toLocaleString() : '---'
+        }));
+        const wsFaqs = XLSX.utils.json_to_sheet(faqData);
+        XLSX.utils.book_append_sheet(wb, wsFaqs, "Base de Conocimiento");
+
+        XLSX.writeFile(wb, `Configuracion_Chatbot_${(business?.name || 'Markix').replace(/\s+/g, '_')}.xlsx`);
+        toast({ title: "Excel generado", description: "La configuración se ha descargado correctamente." });
+    } catch (error) {
+        toast({ variant: 'destructive', title: "Error al exportar Excel" });
+    } finally {
+        setIsExporting(false);
+    }
+  };
+
+  const handleExportPDF = () => {
+    setIsExporting(true);
+    try {
+        const docPdf = new jsPDF();
+        const bizName = business?.name || 'Markix Business';
+        const now = new Date().toLocaleString();
+
+        // 1. Encabezado Corporativo
+        docPdf.setFontSize(20);
+        docPdf.setTextColor(40);
+        docPdf.text("FICHA TÉCNICA: ASISTENTE VIRTUAL", 14, 22);
+        
+        docPdf.setFontSize(10);
+        docPdf.setTextColor(100);
+        docPdf.text(`Negocio: ${bizName.toUpperCase()}`, 14, 30);
+        docPdf.text(`Fecha de emisión: ${now}`, 14, 35);
+
+        // 2. Resumen de Identidad Visual
+        docPdf.setFontSize(14);
+        docPdf.setTextColor(40);
+        docPdf.text("1. Configuración de Identidad y Estilo", 14, 50);
+
+        (docPdf as any).autoTable({
+            startY: 55,
+            head: [['Atributo', 'Configuración']],
+            body: [
+                ['Nombre que ve el cliente', localConfig.assistantName],
+                ['Mensaje de Bienvenida', localConfig.greetingMessage],
+                ['Color de Cabecera (HEX)', localConfig.headerColor],
+                ['Color de Botones (HEX)', localConfig.buttonColor],
+                ['Visibilidad Pública', localConfig.isActive ? 'ACTIVO' : 'INACTIVO'],
+                ['Posición en la Web', localConfig.position]
+            ],
+            theme: 'striped',
+            headStyles: { fillColor: [74, 175, 80] }
+        });
+
+        // 3. Tabla de Respuestas Automáticas
+        const nextY = (docPdf as any).lastAutoTable.finalY + 15;
+        docPdf.text("2. Base de Conocimiento y Automatización", 14, nextY);
+
+        (docPdf as any).autoTable({
+            startY: nextY + 5,
+            head: [['Trigger (Pregunta)', 'Respuesta Configurada', 'Estado']],
+            body: (rawResponses || []).map(r => [
+                r.question,
+                r.answer,
+                r.isActive ? 'ACTIVO' : 'INACTIVO'
+            ]),
+            theme: 'grid',
+            headStyles: { fillColor: [59, 130, 246] },
+            styles: { fontSize: 8 }
+        });
+
+        docPdf.save(`Ficha_Chatbot_${bizName.replace(/\s+/g, '_')}.pdf`);
+        toast({ title: "PDF generado", description: "El reporte ejecutivo está listo para revisión." });
+    } catch (error) {
+        toast({ variant: 'destructive', title: "Error al exportar PDF" });
+    } finally {
+        setIsExporting(false);
+    }
   };
 
   const handleUploadImage = async (e: React.ChangeEvent<HTMLInputElement>, field: keyof PublicMenuChatbotConfig) => {
@@ -483,7 +594,15 @@ export function ChatbotMenuConfigContent({ businessId: activeBusinessId }: Chatb
           </h1>
           <p className="text-muted-foreground">Configura el comportamiento y diseño del chatbot del catálogo ({activeBusinessId}).</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+            <Button variant="outline" onClick={handleExportExcel} disabled={isExporting} className="font-bold border-primary text-primary hover:bg-primary/5">
+                {isExporting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <FileSpreadsheet className="mr-2 h-4 w-4" />}
+                Exportar Excel
+            </Button>
+            <Button variant="outline" onClick={handleExportPDF} disabled={isExporting} className="font-bold border-primary text-primary hover:bg-primary/5">
+                {isExporting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <FileText className="mr-2 h-4 w-4" />}
+                Exportar PDF
+            </Button>
             <Button onClick={handleSaveConfig} disabled={isSaving || !isGlobalActive} className="font-bold px-8 shadow-lg">
                 {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
                 Guardar Cambios
