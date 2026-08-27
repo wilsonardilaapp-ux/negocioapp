@@ -26,7 +26,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue 
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Edit, Trash2, Loader2, Ticket, Clock, AlertTriangle, Lock, Info, Frown } from 'lucide-react';
+import { PlusCircle, Edit, Trash2, Loader2, Ticket, Clock, AlertTriangle, Lock, Info, Frown, FileSpreadsheet, FileText } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import type { Coupon, CouponType, UsageLimitType } from '@/models/coupon';
@@ -36,19 +36,23 @@ import { LimitBanner } from '@/components/dashboard/LimitBanner';
 import { doc, collection, setDoc, addDoc, serverTimestamp } from 'firebase/firestore';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError, type SecurityRuleContext } from '@/firebase/errors';
+import * as XLSX from 'xlsx';
+import { jsPDF } from 'jspdf';
+import 'jspdf-autotable';
 
 const formatCurrency = (value: number) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(value);
 
 export default function CuponesPage() {
-  const { user, isUserLoading } = useUser();
+  const { user, profile } = useUser();
   const { coupons, isLoading: isCouponsLoading } = useCoupons();
   const { limits, plan, couponsCount, isModuleAuthorized, isLoading: isSubLoading } = useSubscription();
   const { toast } = useToast();
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingCoupon, setEditingCoupon] = useState<Coupon | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
 
-  const isLoading = isCouponsLoading || isSubLoading || isUserLoading;
+  const isLoading = isCouponsLoading || isSubLoading || !user;
 
   const handleToggleActive = async (id: string, current: boolean) => {
     try {
@@ -65,6 +69,101 @@ export default function CuponesPage() {
       toast({ title: 'Cupón eliminado' });
     } catch (error) {
       toast({ variant: 'destructive', title: 'Error al eliminar' });
+    }
+  };
+
+  const handleExportExcel = () => {
+    setIsExporting(true);
+    try {
+      const dataToExport = coupons.map(coupon => {
+        const isExpired = new Date(coupon.fechaVencimiento) < new Date();
+        const status = isExpired ? 'Expirado' : (coupon.activo ? 'Activo' : 'Inactivo');
+        
+        return {
+          'Código': coupon.codigo,
+          'Tipo': coupon.tipo === 'porcentaje' ? 'Porcentaje' : 'Valor Fijo',
+          'Valor Descuento': coupon.tipo === 'porcentaje' ? `${coupon.valor}%` : coupon.valor,
+          'Monto Mínimo': coupon.montoMinimo,
+          'Fecha Vencimiento': format(new Date(coupon.fechaVencimiento), 'dd/MM/yyyy'),
+          'Usos Realizados': coupon.usosActuales,
+          'Límite de Usos': coupon.limiteUsos === 0 ? 'Ilimitado' : coupon.limiteUsos,
+          'Estado': status
+        };
+      });
+
+      const ws = XLSX.utils.json_to_sheet(dataToExport);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Cupones");
+      XLSX.writeFile(wb, `Reporte_Cupones_${new Date().toISOString().split('T')[0]}.xlsx`);
+      
+      toast({ title: "Excel generado", description: "El listado de cupones se ha descargado." });
+    } catch (error) {
+      toast({ variant: 'destructive', title: "Error al exportar", description: "No se pudo generar el archivo Excel." });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleExportPDF = () => {
+    setIsExporting(true);
+    try {
+      const docPdf = new jsPDF();
+      const businessName = profile?.name || 'Mi Negocio';
+      const now = format(new Date(), "dd 'de' MMMM 'de' yyyy, HH:mm", { locale: es });
+
+      // 1. Encabezado Institucional
+      docPdf.setFontSize(20);
+      docPdf.setTextColor(40);
+      docPdf.text("REPORTE ESTRATÉGICO DE CUPONES", 14, 22);
+      
+      docPdf.setFontSize(10);
+      docPdf.setTextColor(100);
+      docPdf.text(`Negocio: ${businessName.toUpperCase()}`, 14, 30);
+      docPdf.text(`Fecha de emisión: ${now}`, 14, 35);
+
+      // 2. Resumen de KPIs
+      const activeCount = coupons.filter(c => c.activo && new Date(c.fechaVencimiento) >= new Date()).length;
+      const expiredCount = coupons.filter(c => new Date(c.fechaVencimiento) < new Date()).length;
+
+      (docPdf as any).autoTable({
+        startY: 45,
+        head: [['Métrica de Campaña', 'Valor']],
+        body: [
+          ['Total de Cupones Registrados', coupons.length.toString()],
+          ['Cupones Activos y Vigentes', activeCount.toString()],
+          ['Cupones Expirados', expiredCount.toString()],
+        ],
+        theme: 'striped',
+        headStyles: { fillColor: [74, 175, 80] },
+      });
+
+      // 3. Tabla Detallada
+      const nextY = (docPdf as any).lastAutoTable.finalY + 15;
+      docPdf.text("Detalle de Códigos Promocionales", 14, nextY);
+
+      const tableData = coupons.map(c => [
+        c.codigo,
+        c.tipo === 'porcentaje' ? `${c.valor}%` : formatCurrency(c.valor),
+        format(new Date(c.fechaVencimiento), 'dd/MM/yyyy'),
+        `${c.usosActuales} / ${c.limiteUsos === 0 ? '∞' : c.limiteUsos}`,
+        new Date(c.fechaVencimiento) < new Date() ? 'EXPIRADO' : (c.activo ? 'ACTIVO' : 'INACTIVO')
+      ]);
+
+      (docPdf as any).autoTable({
+        startY: nextY + 5,
+        head: [['CÓDIGO', 'DESCUENTO', 'VENCE', 'USOS', 'ESTADO']],
+        body: tableData,
+        theme: 'grid',
+        headStyles: { fillColor: [59, 130, 246] },
+        styles: { fontSize: 8 },
+      });
+
+      docPdf.save(`Reporte_Cupones_${new Date().toISOString().split('T')[0]}.pdf`);
+      toast({ title: "PDF generado", description: "El reporte ejecutivo está listo." });
+    } catch (error) {
+      toast({ variant: 'destructive', title: "Error al exportar PDF" });
+    } finally {
+      setIsExporting(false);
     }
   };
 
@@ -94,17 +193,40 @@ export default function CuponesPage() {
   return (
     <div className="flex flex-col gap-6">
       <Card>
-        <CardHeader className="flex flex-row justify-between items-center">
+        <CardHeader className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
             <CardTitle>Gestión de Cupones</CardTitle>
             <CardDescription>Crea códigos de descuento para fidelizar a tus clientes.</CardDescription>
           </div>
-          <Button 
-            onClick={() => { setEditingCoupon(null); setIsDialogOpen(true); }}
-            disabled={couponLimitReached}
-          >
-            <PlusCircle className="mr-2 h-4 w-4" /> Nuevo Cupón
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={handleExportExcel} 
+                disabled={isExporting || coupons.length === 0}
+                className="font-bold border-primary text-primary hover:bg-primary/5"
+            >
+                {isExporting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <FileSpreadsheet className="mr-2 h-4 w-4" />}
+                Excel
+            </Button>
+            <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={handleExportPDF} 
+                disabled={isExporting || coupons.length === 0}
+                className="font-bold border-primary text-primary hover:bg-primary/5"
+            >
+                {isExporting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <FileText className="mr-2 h-4 w-4" />}
+                PDF
+            </Button>
+            <Button 
+                onClick={() => { setEditingCoupon(null); setIsDialogOpen(true); }}
+                disabled={couponLimitReached || isExporting}
+                className="font-bold shadow-md"
+            >
+                <PlusCircle className="mr-2 h-4 w-4" /> Nuevo Cupón
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
             <div className="flex items-center gap-2 rounded-lg border bg-secondary/50 p-3 text-sm">
