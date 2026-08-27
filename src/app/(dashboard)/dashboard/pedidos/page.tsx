@@ -38,7 +38,7 @@ import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import { useToast } from '@/hooks/use-toast';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/ hisalert-dialog';
 import { useSubscription } from '@/hooks/useSubscription';
 import { LimitBanner } from '@/components/dashboard/LimitBanner';
 import { awardLoyaltyPoints } from '@/actions/loyalty';
@@ -257,15 +257,35 @@ export default function PedidosPage() {
   };
 
   const handleExportExcel = () => {
-    // Si no hay pedidos, generamos datos de ejemplo válidos para el importador
+    // Si no hay pedidos, generamos datos de ejemplo reales para un salón de belleza
     const sourceData = filteredOrders.length > 0 ? filteredOrders : [
         {
-            customerName: "Ejemplo Juan Pérez",
-            customerEmail: "juan@ejemplo.com",
-            customerPhone: "573001234567",
-            customerAddress: "Calle de Prueba 123",
-            items: [{ productName: "Producto de Ejemplo", quantity: 1, unitPrice: 25000, subtotal: 25000 }],
-            total: 25000,
+            customerName: "Laura García",
+            customerEmail: "laura@ejemplo.com",
+            customerPhone: "573101234567",
+            customerAddress: "Calle 123 #45-67",
+            items: [{ productName: "Balayage Orgánico", quantity: 1, unitPrice: 185000, subtotal: 185000 }],
+            total: 185000,
+            orderDate: new Date().toISOString(),
+            orderStatus: "Pagado" as OrderStatus
+        },
+        {
+            customerName: "Carlos Ruiz",
+            customerEmail: "carlos@ejemplo.com",
+            customerPhone: "573209876543",
+            customerAddress: "Av Central 10-20",
+            items: [{ productName: "Corte de Cabello Caballero", quantity: 1, unitPrice: 35000, subtotal: 35000 }],
+            total: 35000,
+            orderDate: new Date().toISOString(),
+            orderStatus: "Pagado" as OrderStatus
+        },
+        {
+            customerName: "Ana Martínez",
+            customerEmail: "ana@ejemplo.com",
+            customerPhone: "573155554433",
+            customerAddress: "Carrera 10 #5-15",
+            items: [{ productName: "Manicure Spa", quantity: 1, unitPrice: 45000, subtotal: 45000 }],
+            total: 45000,
             orderDate: new Date().toISOString(),
             orderStatus: "Pagado" as OrderStatus
         }
@@ -274,10 +294,14 @@ export default function PedidosPage() {
     const dataToExport = sourceData.map((order) => {
         const isNewFormat = order.items && Array.isArray(order.items);
         const productName = isNewFormat ? order.items[0].productName : (order as any).productName;
-        const unitPrice = isNewFormat ? order.items[0].unitPrice : (order as any).unitPrice || 0;
         const total = order.total || (order as any).subtotal || 0;
         
-        // El importador requiere formato AAAA-MM-DD
+        // Garantizar que el precio unitario sea consistente con el total si viene en 0
+        let unitPrice = isNewFormat ? order.items[0].unitPrice : (order as any).unitPrice || 0;
+        if (unitPrice === 0 && total > 0) {
+            unitPrice = total;
+        }
+        
         const formattedDate = new Date(order.orderDate).toISOString().split('T')[0];
 
         return {
