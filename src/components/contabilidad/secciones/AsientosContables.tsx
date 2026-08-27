@@ -1,24 +1,30 @@
 
 'use client';
 import { useState, useMemo, useEffect } from 'react';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { PlusCircle, MoreHorizontal, Trash2, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
-import { useAsientosContables } from '@/hooks/useAsientosContables';
-import { usePlanDeCuentas } from '@/hooks/usePlanDeCuentas';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "../../../components/ui/card";
+import { Button } from "../../../components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "../../../components/ui/dialog";
+import { Input } from "../../../components/ui/input";
+import { PlusCircle, MoreHorizontal, Trash2, Loader2, ChevronLeft, ChevronRight, FileSpreadsheet, FileText, Download } from 'lucide-react';
+import { useAsientosContables } from '../../../../hooks/useAsientosContables';
+import { usePlanDeCuentas } from '../../../../hooks/usePlanDeCuentas';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from "../../../components/ui/table";
+import { Badge } from "../../../components/ui/badge";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../../../components/ui/dropdown-menu";
 import { useForm, useFieldArray, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { cn } from '@/lib/utils';
-import type { Cuenta, AsientoContable, DetalleAsiento } from '@/types/contabilidad.types';
-import { useToast } from '@/hooks/use-toast';
+import { Label } from '../../../components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../components/ui/select';
+import { cn } from '../../../../lib/utils';
+import type { Cuenta, AsientoContable, DetalleAsiento } from '../../../../types/contabilidad.types';
+import { useToast } from '../../../../hooks/use-toast';
+import { useUser, useFirestore, useDoc, useMemoFirebase } from '../../../../firebase';
+import { doc } from 'firebase/firestore';
+import type { Business } from '../../../../models/business';
+import * as XLSX from 'xlsx';
+import { jsPDF } from 'jspdf';
+import 'jspdf-autotable';
 
 const detalleSchema = z.object({
   cuentaCodigo: z.string().min(1, 'Se requiere una cuenta.'),
@@ -157,7 +163,14 @@ export default function AsientosContables() {
     const { asientos, isLoading, registrarAsiento } = useAsientosContables();
     const { cuentas } = usePlanDeCuentas();
     const [isDialogOpen, setIsDialogOpen] = useState(false);
+    const [isExporting, setIsExporting] = useState(false);
     const { toast } = useToast();
+    const { user } = useUser();
+    const firestore = useFirestore();
+
+    // Obtener contexto del negocio para el reporte
+    const businessRef = useMemoFirebase(() => user ? doc(firestore, 'businesses', user.uid) : null, [user, firestore]);
+    const { data: business } = useDoc<Business>(businessRef);
     
     // --- LÓGICA DE PAGINACIÓN VISUAL ---
     const [currentPage, setCurrentPage] = useState(1);
@@ -174,7 +187,6 @@ export default function AsientosContables() {
         );
     }, [asientos, searchTerm]);
 
-    // Resetear a la primera página cuando cambia la búsqueda
     useEffect(() => {
         setCurrentPage(1);
     }, [searchTerm]);
@@ -187,81 +199,190 @@ export default function AsientosContables() {
 
     const formatCurrency = (value: number) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(value);
 
+    // --- HANDLERS DE EXPORTACIÓN ---
+    const handleExportExcel = () => {
+        setIsExporting(true);
+        try {
+            const dataToExport = filteredAsientos.map(asiento => ({
+                "Fecha": new Date(asiento.fecha).toLocaleDateString('es-CO'),
+                "Concepto": asiento.concepto,
+                "Referencia": asiento.documentoReferencia || 'N/A',
+                "Total Débitos": asiento.totalDebitos,
+                "Total Créditos": asiento.totalCreditos,
+                "Estado": asiento.estaCuadrado ? 'Cuadrado' : 'Descuadrado'
+            }));
+
+            const ws = XLSX.utils.json_to_sheet(dataToExport);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Libro Diario");
+            XLSX.writeFile(wb, `Libro_Diario_${new Date().toISOString().split('T')[0]}.xlsx`);
+            toast({ title: "Excel generado", description: "El reporte se ha descargado correctamente." });
+        } catch (error) {
+            toast({ variant: 'destructive', title: "Error al exportar Excel" });
+        } finally {
+            setIsExporting(false);
+        }
+    };
+
+    const handleExportPDF = () => {
+        setIsExporting(true);
+        try {
+            const docPdf = new jsPDF();
+            const businessName = business?.name || 'Markix Business';
+            const userEmail = user?.email || 'N/A';
+            const now = new Date().toLocaleString();
+
+            // 1. Encabezado Institucional
+            docPdf.setFontSize(18);
+            docPdf.setTextColor(40);
+            docPdf.text("REPORTE DE LIBRO DIARIO", 14, 22);
+            
+            docPdf.setFontSize(10);
+            docPdf.setTextColor(100);
+            docPdf.text(`Negocio: ${businessName.toUpperCase()}`, 14, 30);
+            docPdf.text(`Generado por: ${userEmail}`, 14, 35);
+            docPdf.text(`Fecha de emisión: ${now}`, 14, 40);
+
+            // 2. Resumen
+            docPdf.setFontSize(11);
+            docPdf.setTextColor(40);
+            docPdf.text(`Total registros exportados: ${filteredAsientos.length}`, 14, 52);
+
+            // 3. Tabla de Asientos
+            const tableData = filteredAsientos.map(a => [
+                new Date(a.fecha).toLocaleDateString('es-CO'),
+                a.concepto.toUpperCase(),
+                a.documentoReferencia || '---',
+                formatCurrency(a.totalDebitos),
+                a.estaCuadrado ? 'CUADRADO' : 'DESCUADRADO'
+            ]);
+
+            (docPdf as any).autoTable({
+                startY: 58,
+                head: [['FECHA', 'CONCEPTO', 'REF.', 'MONTO TOTAL', 'ESTADO']],
+                body: tableData,
+                theme: 'striped',
+                headStyles: { fillColor: [71, 85, 105], fontStyle: 'bold' },
+                styles: { fontSize: 8 },
+            });
+
+            docPdf.save(`Libro_Diario_${new Date().toISOString().split('T')[0]}.pdf`);
+            toast({ title: "PDF generado", description: "El reporte ejecutivo está listo." });
+        } catch (error) {
+            toast({ variant: 'destructive', title: "Error al exportar PDF" });
+        } finally {
+            setIsExporting(false);
+        }
+    };
+
     return (
-        <Card>
+        <Card className="animate-in fade-in duration-500">
             <CardHeader>
-                <div className="flex justify-between items-center">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                     <div>
                         <CardTitle>Libro Diario de Asientos Contables</CardTitle>
                         <CardDescription>Registra y consulta todas las transacciones contables de tu negocio.</CardDescription>
                     </div>
-                     <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                        <DialogTrigger asChild>
-                            <Button><PlusCircle className="mr-2 h-4 w-4" /> Nuevo Asiento</Button>
-                        </DialogTrigger>
-                        <DialogContent className="max-w-4xl">
-                            <DialogHeader>
-                                <DialogTitle>Crear Nuevo Asiento Contable</DialogTitle>
-                                <DialogDescription>Asegúrate de que la suma de los débitos sea igual a la de los créditos.</DialogDescription>
-                            </DialogHeader>
-                            <AsientoForm 
-                                cuentas={cuentas} 
-                                onSave={(data) => {
-                                    registrarAsiento(data);
-                                    toast({ title: "Asiento Registrado", description: "Tu asiento contable ha sido guardado." });
-                                    setIsDialogOpen(false);
-                                }} 
-                                onClose={() => setIsDialogOpen(false)} 
-                            />
-                        </DialogContent>
-                    </Dialog>
+                    <div className="flex flex-wrap items-center gap-2">
+                        <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={handleExportExcel} 
+                            disabled={isExporting || isLoading}
+                            className="font-bold border-primary/20 text-primary hover:bg-primary/5"
+                        >
+                            {isExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSpreadsheet className="mr-2 h-4 w-4" />}
+                            Excel
+                        </Button>
+                        <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={handleExportPDF} 
+                            disabled={isExporting || isLoading}
+                            className="font-bold border-primary/20 text-primary hover:bg-primary/5"
+                        >
+                            {isExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="mr-2 h-4 w-4" />}
+                            PDF
+                        </Button>
+                        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                            <DialogTrigger asChild>
+                                <Button className="font-bold shadow-md">
+                                    <PlusCircle className="mr-2 h-4 w-4" /> Nuevo Asiento
+                                </Button>
+                            </DialogTrigger>
+                            <DialogContent className="max-w-4xl">
+                                <DialogHeader>
+                                    <DialogTitle>Crear Nuevo Asiento Contable</DialogTitle>
+                                    <DialogDescription>Asegúrate de que la suma de los débitos sea igual a la de los créditos.</DialogDescription>
+                                </DialogHeader>
+                                <AsientoForm 
+                                    cuentas={cuentas} 
+                                    onSave={(data) => {
+                                        registrarAsiento(data);
+                                        toast({ title: "Asiento Registrado", description: "Tu asiento contable ha sido guardado." });
+                                        setIsDialogOpen(false);
+                                    }} 
+                                    onClose={() => setIsDialogOpen(false)} 
+                                />
+                            </DialogContent>
+                        </Dialog>
+                    </div>
                 </div>
             </CardHeader>
             <CardContent>
                 <div className="flex items-center gap-4 mb-4">
-                    <Input 
-                        placeholder="Buscar por concepto o referencia..." 
-                        className="max-w-sm" 
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                    />
+                    <div className="relative flex-1 max-w-sm">
+                        <Input 
+                            placeholder="Buscar por concepto o referencia..." 
+                            className="pl-10" 
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                        />
+                        <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                            <PlusCircle className="h-4 w-4 rotate-45" />
+                        </div>
+                    </div>
                 </div>
-                <div className="rounded-md border">
+                <div className="rounded-md border bg-white shadow-sm overflow-hidden">
                     <Table>
-                        <TableHeader>
+                        <TableHeader className="bg-muted/50">
                             <TableRow>
-                                <TableHead>Fecha</TableHead>
-                                <TableHead>Concepto</TableHead>
-                                <TableHead>Ref.</TableHead>
-                                <TableHead className="text-right">Total</TableHead>
-                                <TableHead>Estado</TableHead>
-                                <TableHead className="text-right">Acciones</TableHead>
+                                <TableHead className="font-bold uppercase text-[10px]">Fecha</TableHead>
+                                <TableHead className="font-bold uppercase text-[10px]">Concepto</TableHead>
+                                <TableHead className="font-bold uppercase text-[10px]">Ref.</TableHead>
+                                <TableHead className="text-right font-bold uppercase text-[10px]">Total</TableHead>
+                                <TableHead className="text-center font-bold uppercase text-[10px]">Estado</TableHead>
+                                <TableHead className="text-right font-bold uppercase text-[10px]">Acciones</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {isLoading ? (
                                 <TableRow>
                                     <TableCell colSpan={6} className="h-24 text-center">
-                                        <Loader2 className="mx-auto h-6 w-6 animate-spin" />
+                                        <div className="flex flex-col items-center gap-2">
+                                            <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                                            <span className="text-xs font-bold text-muted-foreground">Sincronizando Libro Diario...</span>
+                                        </div>
                                     </TableCell>
                                 </TableRow>
                             ) : paginatedAsientos.length > 0 ? (
                                 paginatedAsientos.map(asiento => (
-                                    <TableRow key={asiento.id}>
-                                        <TableCell>{new Date(asiento.fecha).toLocaleDateString()}</TableCell>
-                                        <TableCell className="font-medium">{asiento.concepto}</TableCell>
-                                        <TableCell>{asiento.documentoReferencia}</TableCell>
-                                        <TableCell className="text-right">{formatCurrency(asiento.totalDebitos)}</TableCell>
-                                        <TableCell>
-                                            <Badge variant={asiento.estaCuadrado ? 'default' : 'destructive'}>
+                                    <TableRow key={asiento.id} className="hover:bg-muted/30 transition-colors">
+                                        <TableCell className="text-xs">{new Date(asiento.fecha).toLocaleDateString()}</TableCell>
+                                        <TableCell className="font-bold text-xs uppercase text-slate-800">{asiento.concepto}</TableCell>
+                                        <TableCell className="text-xs text-muted-foreground font-mono">{asiento.documentoReferencia || '---'}</TableCell>
+                                        <TableCell className="text-right font-black text-xs text-primary">{formatCurrency(asiento.totalDebitos)}</TableCell>
+                                        <TableCell className="text-center">
+                                            <Badge variant={asiento.estaCuadrado ? 'default' : 'destructive'} className="text-[9px] font-black uppercase">
                                                 {asiento.estaCuadrado ? 'Cuadrado' : 'Descuadrado'}
                                             </Badge>
                                         </TableCell>
                                         <TableCell className="text-right">
                                             <DropdownMenu>
-                                                <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
-                                                <DropdownMenuContent>
-                                                    <DropdownMenuItem>Ver Detalles</DropdownMenuItem>
+                                                <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                                                <DropdownMenuContent align="end">
+                                                    <DropdownMenuItem className="font-bold text-xs">Ver Detalles</DropdownMenuItem>
+                                                    <DropdownMenuItem className="font-bold text-xs text-primary">Imprimir Comprobante</DropdownMenuItem>
                                                 </DropdownMenuContent>
                                             </DropdownMenu>
                                         </TableCell>
@@ -269,7 +390,9 @@ export default function AsientosContables() {
                                 ))
                             ) : (
                                 <TableRow>
-                                    <TableCell colSpan={6} className="h-24 text-center">No hay asientos registrados.</TableCell>
+                                    <TableCell colSpan={6} className="h-32 text-center text-muted-foreground italic">
+                                        No se encontraron registros contables.
+                                    </TableCell>
                                 </TableRow>
                             )}
                         </TableBody>
@@ -280,7 +403,7 @@ export default function AsientosContables() {
                 {totalPages > 1 && (
                     <div className="flex items-center justify-between py-4 border-t mt-4">
                         <div className="text-sm text-muted-foreground font-medium">
-                            Mostrando página {currentPage} de {totalPages} ({filteredAsientos.length} registros)
+                            Página {currentPage} de {totalPages} ({filteredAsientos.length} registros)
                         </div>
                         <div className="flex gap-2">
                             <Button 
@@ -288,7 +411,7 @@ export default function AsientosContables() {
                                 size="sm" 
                                 onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                                 disabled={currentPage === 1}
-                                className="font-bold"
+                                className="font-bold rounded-xl"
                             >
                                 <ChevronLeft className="mr-2 h-4 w-4" /> Anterior
                             </Button>
@@ -297,7 +420,7 @@ export default function AsientosContables() {
                                 size="sm" 
                                 onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
                                 disabled={currentPage >= totalPages}
-                                className="font-bold"
+                                className="font-bold rounded-xl"
                             >
                                 Siguiente <ChevronRight className="ml-2 h-4 w-4" />
                             </Button>
@@ -308,3 +431,4 @@ export default function AsientosContables() {
         </Card>
     );
 }
+
