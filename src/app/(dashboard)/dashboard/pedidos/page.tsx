@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useMemo, useState, useEffect } from 'react';
@@ -256,31 +257,48 @@ export default function PedidosPage() {
   };
 
   const handleExportExcel = () => {
-    if (!filteredOrders || filteredOrders.length === 0) return;
+    // Si no hay pedidos, generamos datos de ejemplo válidos para el importador
+    const sourceData = filteredOrders.length > 0 ? filteredOrders : [
+        {
+            customerName: "Ejemplo Juan Pérez",
+            customerEmail: "juan@ejemplo.com",
+            customerPhone: "573001234567",
+            customerAddress: "Calle de Prueba 123",
+            items: [{ productName: "Producto de Ejemplo", quantity: 1, unitPrice: 25000, subtotal: 25000 }],
+            total: 25000,
+            orderDate: new Date().toISOString(),
+            orderStatus: "Pagado" as OrderStatus
+        }
+    ];
 
-    const dataToExport = filteredOrders.map((order) => {
-        const isNew = order.items && Array.isArray(order.items);
-        const productText = isNew 
-          ? (order.items!.length > 1 ? `${order.items![0].productName} y ${order.items!.length - 1} más` : order.items![0].productName)
-          : (order as any).productName;
+    const dataToExport = sourceData.map((order) => {
+        const isNewFormat = order.items && Array.isArray(order.items);
+        const productName = isNewFormat ? order.items[0].productName : (order as any).productName;
+        const unitPrice = isNewFormat ? order.items[0].unitPrice : (order as any).unitPrice || 0;
+        const total = order.total || (order as any).subtotal || 0;
         
-        const qty = isNew ? order.items!.reduce((s, i) => s + i.quantity, 0) : (order as any).quantity;
-        const total = order.total || order.subtotal;
+        // El importador requiere formato AAAA-MM-DD
+        const formattedDate = new Date(order.orderDate).toISOString().split('T')[0];
 
         return {
           "Cliente": order.customerName,
-          "Pedido": productText,
-          "Cantidad": qty,
+          "Email": order.customerEmail || "",
+          "WhatsApp": order.customerPhone || "",
+          "Dirección": order.customerAddress || "Recogida en tienda",
+          "Producto": productName,
+          "Precio_Unitario": unitPrice,
           "Total": total,
-          "Estado": order.orderStatus,
-          "Fecha": new Date(order.orderDate).toLocaleDateString(),
+          "Fecha": formattedDate,
+          "Estado": filteredOrders.length > 0 ? order.orderStatus : "Pagado"
         };
     });
 
     const ws = XLSX.utils.json_to_sheet(dataToExport);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Pedidos");
-    XLSX.writeFile(wb, `Reporte_Pedidos_${new Date().toISOString().split('T')[0]}.xlsx`);
+    
+    const prefix = filteredOrders.length > 0 ? 'Reporte_Pedidos' : 'Plantilla_Importacion';
+    XLSX.writeFile(wb, `${prefix}_${new Date().toISOString().split('T')[0]}.xlsx`);
   };
 
   const isLoading = areOrdersLoading || isSubscriptionLoading;
