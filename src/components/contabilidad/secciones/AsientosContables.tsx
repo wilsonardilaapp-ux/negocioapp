@@ -1,27 +1,26 @@
-
 'use client';
 import { useState, useMemo, useEffect } from 'react';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "../../../components/ui/card";
-import { Button } from "../../../components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "../../../components/ui/dialog";
-import { Input } from "../../../components/ui/input";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { PlusCircle, MoreHorizontal, Trash2, Loader2, ChevronLeft, ChevronRight, FileSpreadsheet, FileText, Download } from 'lucide-react';
-import { useAsientosContables } from '../../../../hooks/useAsientosContables';
-import { usePlanDeCuentas } from '../../../../hooks/usePlanDeCuentas';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from "../../../components/ui/table";
-import { Badge } from "../../../components/ui/badge";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../../../components/ui/dropdown-menu";
+import { useAsientosContables } from '@/hooks/useAsientosContables';
+import { usePlanDeCuentas } from '@/hooks/usePlanDeCuentas';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useForm, useFieldArray, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Label } from '../../../components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../components/ui/select';
-import { cn } from '../../../../lib/utils';
-import type { Cuenta, AsientoContable, DetalleAsiento } from '../../../../types/contabilidad.types';
-import { useToast } from '../../../../hooks/use-toast';
-import { useUser, useFirestore, useDoc, useMemoFirebase } from '../../../../firebase';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { cn } from '@/lib/utils';
+import type { Cuenta, AsientoContable, DetalleAsiento } from '@/types/contabilidad.types';
+import { useToast } from '@/hooks/use-toast';
+import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { doc } from 'firebase/firestore';
-import type { Business } from '../../../../models/business';
+import type { Business } from '@/models/business';
 import * as XLSX from 'xlsx';
 import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
@@ -57,7 +56,7 @@ interface AsientoFormProps {
 
 const AsientoForm = ({ cuentas, onSave, onClose }: AsientoFormProps) => {
     const { toast } = useToast();
-    const { register, control, handleSubmit, watch, formState: { errors } } = useForm<AsientoFormData>({
+    const { register, handleSubmit, control, watch, formState: { errors } } = useForm<AsientoFormData>({
         resolver: zodResolver(asientoFormSchema),
         defaultValues: {
             fecha: new Date().toISOString().split('T')[0],
@@ -401,7 +400,7 @@ export default function AsientosContables() {
 
                 {/* CONTROLES DE PAGINACIÓN */}
                 {totalPages > 1 && (
-                    <div className="flex items-center justify-between py-4 border-t mt-4">
+                    <div className="flex items-center justify-between py-4 border-t mt-4 print:hidden">
                         <div className="text-sm text-muted-foreground font-medium">
                             Página {currentPage} de {totalPages} ({filteredAsientos.length} registros)
                         </div>
@@ -431,4 +430,3 @@ export default function AsientosContables() {
         </Card>
     );
 }
-
