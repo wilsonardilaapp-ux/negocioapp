@@ -8,6 +8,9 @@ type Props = {
 };
 
 async function getBusinessData(idOrSlug: string) {
+  // Guardia técnica: Ignorar peticiones de favicon para evitar colisiones de rutas dinámicas
+  if (!idOrSlug || idOrSlug === 'favicon.ico') return null;
+
   try {
     const db = await getAdminFirestore();
     const cleanSlug = decodeURIComponent(idOrSlug).toLowerCase().trim();
