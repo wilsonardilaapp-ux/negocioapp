@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { useUser, useFirestore, useCollection, useMemoFirebase, setDocumentNonBlocking } from '@/firebase';
-import { collection, query, where, orderBy, doc, limit, setDoc, Timestamp, getDocs } from 'firebase/firestore';
+import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import { collection, query, where, orderBy, doc, getDocs, setDoc } from 'firebase/firestore';
 import { useSubscription } from '@/hooks/useSubscription';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from '@/components/ui/button';
@@ -58,7 +58,8 @@ import {
     ArrowRight,
     Activity,
     Clock,
-    BrainCircuit
+    BrainCircuit,
+    Eye
 } from 'lucide-react';
 import { format, startOfMonth, isToday, differenceInDays } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -186,7 +187,7 @@ const PillarCard = ({
                 <BrainCircuit className="h-4 w-4 text-indigo-600 shrink-0 mt-0.5" />
                 <div className="space-y-0.5">
                     <span className="text-[9px] font-black uppercase text-indigo-700 tracking-widest">Ajuste por Aprendizaje</span>
-                    <p className="text-[11px] font-medium text-indigo-800 leading-tight italic">{data.learningNote}</p>
+                    <p className="text-11px font-medium text-indigo-800 leading-tight italic">{data.learningNote}</p>
                 </div>
             </div>
         )}
@@ -321,6 +322,7 @@ export default function DiagnosticoComercialPage() {
 
   const currentLimit = useMemo(() => {
     if (!plan) return 1;
+    // Normalización de tildes para comparación robusta de planes
     const normalizedPlan = plan.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
     if (normalizedPlan.includes('profesional')) return PLAN_GENERATION_LIMITS.profesional;
     if (normalizedPlan.includes('estandar')) return PLAN_GENERATION_LIMITS.estandar;
