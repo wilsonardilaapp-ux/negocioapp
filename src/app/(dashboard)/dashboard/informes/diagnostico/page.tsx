@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -37,13 +38,16 @@ import {
     Minus,
     CheckCircle2,
     Circle,
-    ArrowRight
+    ArrowRight,
+    Activity,
+    Clock
 } from 'lucide-react';
-import { format, startOfMonth, isToday, isWithinInterval } from 'date-fns';
+import { format, startOfMonth, isToday, differenceInDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
 import { extractDiagnosticData } from '@/services/diagnostic/data-extractor';
 import { analyzeDiagnosticWithAI, type PillarAnalysis } from '@/services/diagnostic/ai-analyzer';
+import { evaluateAppliedActionsImpact } from '@/services/diagnostic/impact-evaluator';
 import { cn } from '@/lib/utils';
 import { WhatsAppIcon } from '@/components/icons';
 import * as XLSX from 'xlsx';
@@ -66,7 +70,7 @@ const PILLAR_LABELS: Record<string, string> = {
 };
 
 /**
- * Componente para renderizar un pilar con seguimiento de acciones (Fase A).
+ * Componente para renderizar un pilar con seguimiento de acciones e impacto (Fase B).
  */
 const PillarCard = ({ 
     title, 
@@ -93,6 +97,44 @@ const PillarCard = ({
 
   const action = appliedActions.find(a => a.id === `${reportId}_${pilarKey}`);
   const isApplied = action?.status === 'applied';
+
+  // --- LÓGICA VISUAL DE IMPACTO (Fase B) ---
+  const renderImpactBadge = () => {
+      if (!action || !action.impactStatus) return null;
+
+      const formatCurrency = (val: number) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(val);
+      
+      const impactConfig: any = {
+          improved: { icon: TrendingUp, color: 'text-green-600 bg-green-50 border-green-200', label: 'Impacto Positivo' },
+          stable: { icon: Minus, color: 'text-slate-600 bg-slate-50 border-slate-200', label: 'Sin cambios' },
+          declined: { icon: TrendingDown, color: 'text-red-600 bg-red-50 border-red-200', label: 'Métrica en descenso' },
+          too_early: { icon: Clock, color: 'text-amber-600 bg-amber-50 border-amber-200', label: 'Medición en curso' }
+      };
+
+      const cfg = impactConfig[action.impactStatus];
+      const Icon = cfg.icon;
+
+      let deltaText = "";
+      if (action.impactStatus === 'improved' || action.impactStatus === 'declined') {
+          const delta = (action.resultValue || 0) - (action.baselineValue || 0);
+          const isCurrency = action.targetMetricKey === 'totalSales30d';
+          deltaText = ` (${delta >= 0 ? '+' : ''}${isCurrency ? formatCurrency(delta) : delta})`;
+      }
+
+      return (
+          <div className={cn("mt-4 p-3 rounded-2xl border-2 flex flex-col gap-1.5 animate-in fade-in duration-700", cfg.color)}>
+              <div className="flex items-center gap-2">
+                  <Icon className="h-4 w-4" />
+                  <span className="text-[10px] font-black uppercase tracking-widest">{cfg.label}</span>
+              </div>
+              <p className="text-xs font-medium leading-tight">
+                  {action.impactStatus === 'too_early' 
+                    ? `Aplicada hace ${differenceInDays(new Date(), new Date(action.appliedAt))} días. Necesitamos 7 días para validar el resultado.`
+                    : `Resultado medido: ${action.targetMetricKey === 'totalSales30d' ? formatCurrency(action.resultValue || 0) : (action.resultValue || 0)}${deltaText}.`}
+              </p>
+          </div>
+      );
+  };
 
   return (
     <Card className="rounded-[2rem] border-2 border-gray-100 shadow-sm hover:shadow-md transition-all overflow-hidden flex flex-col h-full">
@@ -128,13 +170,16 @@ const PillarCard = ({
           <div className="flex flex-col gap-3">
               <p className="text-sm font-bold text-slate-900">{data.recommendation}</p>
               
-              {/* ACCIÓN DE SEGUIMIENTO (Fase A) */}
+              {/* ACCIÓN DE SEGUIMIENTO (Fase A/B) */}
               <div className="pt-2">
                   {isApplied ? (
-                      <div className="flex items-center gap-2 text-[10px] font-black text-green-600 uppercase bg-green-50 p-2 rounded-xl border border-green-100 animate-in zoom-in duration-300">
-                          <CheckCircle2 className="h-4 w-4" />
-                          <span>Aplicada el {format(new Date(action.appliedAt), 'dd/MM/yyyy')}</span>
-                          <button onClick={() => onToggleAction(pilarKey, data.recommendation)} className="ml-auto text-muted-foreground hover:text-red-500 underline">Deshacer</button>
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-2 text-[10px] font-black text-green-600 uppercase bg-green-50 p-2 rounded-xl border border-green-100 animate-in zoom-in duration-300">
+                            <CheckCircle2 className="h-4 w-4" />
+                            <span>Aplicada el {format(new Date(action.appliedAt), 'dd/MM/yyyy')}</span>
+                            <button onClick={() => onToggleAction(pilarKey, data.recommendation)} className="ml-auto text-muted-foreground hover:text-red-500 underline">Deshacer</button>
+                        </div>
+                        {renderImpactBadge()}
                       </div>
                   ) : (
                       <Button 
@@ -199,7 +244,7 @@ export default function DiagnosticoComercialPage() {
   }, [businessId, firestore]);
   const { data: allReports, isLoading: loadingReports } = useCollection<any>(reportsQuery);
 
-  // 2. Cargar Acciones Aplicadas (Fase A)
+  // 2. Cargar Acciones Aplicadas (Fase A/B)
   const actionsQuery = useMemoFirebase(() => {
     if (!businessId || !firestore) return null;
     return collection(firestore, `businesses/${businessId}/diagnosticActions`);
@@ -270,7 +315,7 @@ export default function DiagnosticoComercialPage() {
   }, [allReports]);
 
   const handleRequestGeneration = async (bypassConfirm = false) => {
-    if (!businessId || usedCount >= currentLimit) return;
+    if (!businessId || usedCount >= currentLimit || isLoadingSub) return;
     if (!bypassConfirm && activeReport?.createdAt && isToday(new Date(activeReport.createdAt))) {
       setShowConfirmDialog(true);
       return;
@@ -279,10 +324,17 @@ export default function DiagnosticoComercialPage() {
     setIsGenerating(true);
     setShowConfirmDialog(false);
     try {
+      // 1. Extracción de 15 fuentes
       const extraction = await extractDiagnosticData(businessId);
+      
+      // 2. FASE B: Evaluación automática de impacto de acciones previas
+      await evaluateAppliedActionsImpact(businessId, extraction.data);
+
+      // 3. Generación de análisis IA
       const reportId = doc(collection(firestore, 'placeholder')).id;
       const analysis = await analyzeDiagnosticWithAI(extraction.data, extraction.sourcesReviewed, businessId, reportId);
 
+      // 4. Persistencia del nuevo informe
       const reportRef = doc(firestore, `businesses/${businessId}/diagnosticReports`, reportId);
       await setDoc(reportRef, {
         id: reportId,
@@ -292,7 +344,8 @@ export default function DiagnosticoComercialPage() {
         sourcesReviewed: extraction.sourcesReviewed,
         data: { executiveSummary: analysis.executiveSummary, raw: extraction.data, pillars: analysis.pillars }
       });
-      toast({ title: "¡Análisis Completado!" });
+      
+      toast({ title: "¡Análisis e Impacto Completado!" });
     } catch (error: any) {
       toast({ variant: "destructive", title: "Error", description: error.message });
     } finally {
@@ -313,7 +366,7 @@ export default function DiagnosticoComercialPage() {
             await setDoc(actionRef, { status: 'pending', updatedAt: new Date().toISOString() }, { merge: true });
             toast({ title: "Acción marcada como pendiente" });
         } else {
-            // Mapeo dinámico de métricas para baseline (simplificado para MVP)
+            // Mapeo dinámico de métricas para baseline (Fase A)
             const metricMap: Record<string, any> = {
                 ventaProactiva: { key: 'totalSales30d', val: activeReport.data.raw.ronda1_ventas.totalSales30d },
                 radarChurn: { key: 'churnRiskCount', val: activeReport.data.raw.ronda2_clientes.churnRiskCount },
@@ -330,7 +383,7 @@ export default function DiagnosticoComercialPage() {
                 description: recommendation,
                 status: 'applied',
                 appliedAt: new Date().toISOString(),
-                baselineValue: baseline?.val || 0,
+                baselineValue: typeof baseline?.val === 'number' ? baseline.val : 0,
                 targetMetricKey: baseline?.key || 'unknown',
                 resultValue: null,
                 impactStatus: null,
