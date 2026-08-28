@@ -30,17 +30,20 @@ import {
     Info,
     Search,
     Zap,
-    LayoutDashboard
+    AlertTriangle,
+    Target
 } from 'lucide-react';
 import { format, startOfMonth, isToday } from 'date-fns';
 import { es } from 'date-fns/locale';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
 import { extractDiagnosticData } from '@/services/diagnostic/data-extractor';
+import { analyzeDiagnosticWithAI, type PillarAnalysis } from '@/services/diagnostic/ai-analyzer';
+import { cn } from '@/lib/utils';
 
 /**
- * @fileOverview Fase 2 - Informe de Diagnóstico Comercial.
- * Implementa la extracción de datos reales de las 15 fuentes del corazón de Markix.
+ * @fileOverview Fase 3 - Informe de Diagnóstico Comercial.
+ * Implementa el análisis estratégico con IA basado en el Corazón de Markix.
  */
 
 const PLAN_GENERATION_LIMITS: Record<string, number> = {
@@ -49,6 +52,77 @@ const PLAN_GENERATION_LIMITS: Record<string, number> = {
     'basico': 4,
     'crecimiento': 1,
     'free': 1,
+};
+
+const PillarCard = ({ title, data }: { title: string, data: PillarAnalysis }) => {
+  const statusColors = {
+    green: 'bg-green-500',
+    yellow: 'bg-yellow-500',
+    red: 'bg-red-500',
+  };
+
+  const priorityVariants = {
+    High: 'destructive',
+    Medium: 'default',
+    Low: 'secondary',
+  } as const;
+
+  const priorityLabels = {
+    High: 'Prioridad Alta',
+    Medium: 'Prioridad Media',
+    Low: 'Prioridad Baja',
+  };
+
+  return (
+    <Card className="rounded-[2rem] border-2 border-gray-100 shadow-sm hover:shadow-md transition-shadow overflow-hidden flex flex-col h-full">
+      <CardHeader className="bg-muted/30 border-b pb-4">
+        <div className="flex justify-between items-center">
+          <div className="flex items-center gap-2">
+            <div className={cn("h-3 w-3 rounded-full shadow-sm", statusColors[data.status])} />
+            <CardTitle className="text-sm font-black uppercase tracking-tight">{title}</CardTitle>
+          </div>
+          <Badge variant={priorityVariants[data.priority]} className="text-[9px] font-black uppercase tracking-widest px-2 h-5">
+            {priorityLabels[data.priority]}
+          </Badge>
+        </div>
+      </CardHeader>
+      <CardContent className="p-6 space-y-4 flex-grow">
+        <div className="space-y-1">
+          <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Estado Real</p>
+          <p className="text-sm font-medium text-gray-700 leading-relaxed">{data.realState}</p>
+        </div>
+
+        {data.hasOpportunity && (
+          <div className="p-4 bg-primary/5 rounded-2xl border border-primary/10 space-y-2">
+            <div className="flex items-center gap-2 text-primary">
+              <Zap className="h-4 w-4 fill-primary" />
+              <span className="text-[10px] font-black uppercase tracking-widest">Oportunidad Detectada</span>
+            </div>
+            <p className="text-xs font-bold text-primary/80">{data.opportunityData}</p>
+          </div>
+        )}
+
+        <div className="space-y-1 pt-2">
+          <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Recomendación</p>
+          <p className="text-sm font-bold text-slate-900">{data.recommendation}</p>
+        </div>
+
+        {data.contradictions && data.contradictions.length > 0 && (
+          <div className="p-3 bg-red-50 rounded-xl border border-red-100 space-y-1">
+            <div className="flex items-center gap-2 text-red-600">
+              <AlertTriangle className="h-3 w-3" />
+              <span className="text-[9px] font-black uppercase tracking-widest">Alertas de Contradicción</span>
+            </div>
+            <ul className="list-disc list-inside space-y-0.5">
+              {data.contradictions.map((c, i) => (
+                <li key={i} className="text-[10px] text-red-700 font-medium">{c}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
 };
 
 export default function DiagnosticoComercialPage() {
@@ -106,9 +180,12 @@ export default function DiagnosticoComercialPage() {
     setShowConfirmDialog(false);
 
     try {
-      // --- FASE 2: EXTRACCIÓN DE DATOS REALES ---
+      // 1. Extracción de datos reales
       const extraction = await extractDiagnosticData(user.uid);
       
+      // 2. Análisis con IA Activa
+      const analysis = await analyzeDiagnosticWithAI(extraction.data, extraction.sourcesReviewed, user.uid);
+
       const reportId = doc(collection(firestore, 'placeholder')).id;
       const reportRef = doc(firestore, `businesses/${user.uid}/diagnosticReports`, reportId);
       
@@ -119,11 +196,9 @@ export default function DiagnosticoComercialPage() {
         status: 'completed',
         sourcesReviewed: extraction.sourcesReviewed,
         data: {
-          executiveSummary: extraction.sourcesReviewed > 7 
-            ? "Datos recolectados exitosamente. Listo para análisis de IA." 
-            : "Fuentes parciales detectadas. Se requiere más actividad en la plataforma para un diagnóstico profundo.",
+          executiveSummary: analysis.executiveSummary,
           raw: extraction.data,
-          pillars: {} // Fase 3
+          pillars: analysis.pillars
         }
       };
 
@@ -131,7 +206,7 @@ export default function DiagnosticoComercialPage() {
       
       toast({
         title: "¡Informe Generado!",
-        description: `Se han analizado ${extraction.sourcesReviewed} fuentes operativas.`,
+        description: `Se han analizado ${extraction.sourcesReviewed} fuentes. El diagnóstico de IA está listo.`,
       });
 
     } catch (error: any) {
@@ -139,7 +214,7 @@ export default function DiagnosticoComercialPage() {
       toast({
         variant: "destructive",
         title: "Error al generar",
-        description: error.message || "No se pudo procesar la solicitud."
+        description: error.message || "No se pudo procesar la solicitud de IA."
       });
     } finally {
       setIsGenerating(false);
@@ -176,7 +251,7 @@ export default function DiagnosticoComercialPage() {
                 className="h-12 px-8 rounded-xl font-black uppercase tracking-widest shadow-lg shadow-primary/20 w-full md:w-auto"
             >
                 {isGenerating ? (
-                    <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Analizando fuentes...</>
+                    <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Generando análisis...</>
                 ) : (
                     <><RefreshCw className="mr-2 h-5 w-5" /> Generar Informe Actualizado</>
                 )}
@@ -212,8 +287,8 @@ export default function DiagnosticoComercialPage() {
 
             <div className="flex flex-col md:items-end justify-center gap-1">
                 {!hasRemainingAttempts ? (
-                    <div className="flex flex-col items-end gap-2 animate-in slide-in-from-right-2">
-                        <p className="text-xs font-bold text-destructive text-right">Límite mensual alcanzado</p>
+                    <div className="flex flex-col items-end gap-2 animate-in slide-in-from-right-2 text-right">
+                        <p className="text-xs font-bold text-destructive">Límite mensual alcanzado</p>
                         <Button size="sm" variant="outline" asChild className="h-8 text-[10px] font-black border-primary text-primary hover:bg-primary/5">
                             <Link href="/dashboard/subscription">Mejorar Plan <ChevronRight className="ml-1 h-3 w-3" /></Link>
                         </Button>
@@ -236,53 +311,55 @@ export default function DiagnosticoComercialPage() {
             <p className="text-sm font-medium text-muted-foreground animate-pulse">Sincronizando con la nube...</p>
         </div>
       ) : lastReport ? (
-        <Card className="rounded-[2.5rem] border-2 border-gray-100 shadow-xl overflow-hidden animate-in slide-in-from-bottom-4 duration-700">
-            <CardHeader className="bg-muted/30 border-b p-8">
-                <div className="flex justify-between items-center">
-                    <div>
-                        <CardTitle className="text-2xl font-black tracking-tight text-gray-900">Resultados del Diagnóstico</CardTitle>
-                        <p className="text-sm font-medium text-muted-foreground flex items-center gap-2 mt-1">
-                            <Calendar className="h-4 w-4" />
-                            Generado el {format(new Date(lastReport.createdAt), "d 'de' MMMM 'de' yyyy 'a las' p", { locale: es })}
+        <div className="space-y-8 animate-in slide-in-from-bottom-4 duration-700">
+            <Card className="rounded-[2.5rem] border-2 border-gray-100 shadow-xl overflow-hidden">
+                <CardHeader className="bg-muted/30 border-b p-8">
+                    <div className="flex justify-between items-center">
+                        <div>
+                            <CardTitle className="text-2xl font-black tracking-tight text-gray-900">Resultados del Diagnóstico</CardTitle>
+                            <p className="text-sm font-medium text-muted-foreground flex items-center gap-2 mt-1">
+                                <Calendar className="h-4 w-4" />
+                                Generado el {format(new Date(lastReport.createdAt), "d 'de' MMMM 'de' yyyy 'a las' p", { locale: es })}
+                            </p>
+                        </div>
+                        <Badge className="bg-green-500 text-white font-black px-4 py-1 rounded-full text-[10px] uppercase tracking-widest border-none shadow-sm">
+                            Última Versión
+                        </Badge>
+                    </div>
+                </CardHeader>
+                <CardContent className="p-10">
+                    <div className="p-8 bg-primary/5 rounded-[2rem] border border-primary/10 relative overflow-hidden">
+                        <div className="absolute top-0 right-0 p-4 opacity-5"><FileBarChart size={80} /></div>
+                        <h3 className="text-xs font-black uppercase tracking-[0.2em] text-primary mb-4">Resumen Ejecutivo</h3>
+                        <p className="text-lg font-medium text-gray-700 leading-relaxed italic">
+                            &quot;{lastReport.data.executiveSummary}&quot;
                         </p>
                     </div>
-                    <Badge className="bg-green-500 text-white font-black px-4 py-1 rounded-full text-[10px] uppercase tracking-widest border-none shadow-sm">
-                        Última Versión
-                    </Badge>
-                </div>
-            </CardHeader>
-            <CardContent className="p-10 space-y-8">
-                <div className="p-8 bg-primary/5 rounded-[2rem] border border-primary/10 relative overflow-hidden">
-                    <div className="absolute top-0 right-0 p-4 opacity-5"><FileBarChart size={80} /></div>
-                    <h3 className="text-xs font-black uppercase tracking-[0.2em] text-primary mb-4">Resumen Ejecutivo</h3>
-                    <p className="text-lg font-medium text-gray-700 leading-relaxed italic">
-                        &quot;{lastReport.data.executiveSummary}&quot;
-                    </p>
-                </div>
+                </CardContent>
+            </Card>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center justify-center text-center py-10 opacity-40">
-                    <div className="p-10 border-2 border-dashed rounded-[2rem] space-y-4">
-                        <CheckCircle2 className="h-8 w-8 mx-auto text-green-500" />
-                        <div className="space-y-1">
-                            <p className="text-xs font-black uppercase tracking-widest">Extracción de datos completada</p>
-                            <p className="text-[10px] text-muted-foreground font-bold">Se revisaron {lastReport.sourcesReviewed} fuentes operativas.</p>
-                        </div>
-                    </div>
-                    <div className="p-10 border-2 border-dashed rounded-[2rem] space-y-4">
-                        <Search className="h-8 w-8 mx-auto text-muted-foreground" />
-                        <div className="space-y-1">
-                            <p className="text-xs font-black uppercase tracking-widest">Análisis del Corazón (Fase 3)</p>
-                            <p className="text-[10px] text-muted-foreground font-bold">Pendiente de autorización.</p>
-                        </div>
-                    </div>
+            {/* Renderizado de los 4 Pilares */}
+            {lastReport.data.pillars && (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <PillarCard title="Venta Proactiva y Autónoma" data={lastReport.data.pillars.ventaProactiva} />
+                <PillarCard title="Radar de Churn (Retención)" data={lastReport.data.pillars.radarChurn} />
+                <PillarCard title="Protección de Reputación" data={lastReport.data.pillars.reputacion} />
+                <PillarCard title="Operación Blindada" data={lastReport.data.pillars.operacionBlindada} />
+              </div>
+            )}
+
+            <Card className="bg-muted/20 border-dashed rounded-[2rem] border-2">
+              <CardHeader className="text-center p-8">
+                <div className="flex items-center justify-center gap-2 text-muted-foreground">
+                   <Target className="h-5 w-5" />
+                   <span className="text-[10px] font-black uppercase tracking-widest">Fuentes de Datos Analizadas</span>
                 </div>
-            </CardContent>
-            <CardFooter className="bg-muted/10 border-t p-6 text-center justify-center">
-                <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">
-                    Este informe no ha tenido costo adicional. Las generaciones posteriores consumen créditos de tu plan.
-                </p>
-            </CardFooter>
-        </Card>
+                <CardDescription className="text-xs font-medium">
+                  Este diagnóstico se construyó cruzando información de {lastReport.sourcesReviewed} módulos operativos.
+                </CardDescription>
+              </CardHeader>
+            </Card>
+        </div>
       ) : (
         <Card className="border-2 border-dashed bg-muted/20 py-24 rounded-[2rem]">
             <CardContent className="text-center space-y-6">
