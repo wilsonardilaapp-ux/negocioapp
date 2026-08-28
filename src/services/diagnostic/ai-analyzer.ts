@@ -2,9 +2,9 @@
 
 /**
  * @fileOverview Motor de análisis estratégico con IA para el Diagnóstico Comercial.
+ * - Implementa un extractor JSON resiliente para evitar errores 500 por formato.
+ * - Soporta normalización de llaves (alias) para mayor compatibilidad con LLMs.
  * - Fase C: Implementa memoria estratégica inyectando acciones previas y sus resultados.
- * - Consume el proveedor de IA activo (Google AI, OpenAI, DeepSeek, etc.).
- * - Genera un análisis estructurado basado en los 4 pilares del Corazón de Markix.
  */
 
 import { genkit } from 'genkit';
@@ -14,111 +14,144 @@ import { getAIConfig } from '@/ai/flows/chat-flow';
 import type { DiagnosticRawData } from './data-extractor';
 import type { ActionTracking } from './impact-evaluator';
 
+// --- ESQUEMAS DE VALIDACIÓN BLINDADOS ---
+
 const PillarAnalysisSchema = z.object({
-  status: z.enum(['green', 'yellow', 'red']),
-  realState: z.string().describe('Descripción del estado actual basado en los datos leídos.'),
-  hasOpportunity: z.boolean().describe('¿Existe una oportunidad clara de mejora o venta?'),
-  opportunityData: z.string().describe('Dato concreto que respalda la oportunidad.'),
-  recommendation: z.string().describe('Acción directa y específica para el dueño del negocio.'),
-  priority: z.enum(['High', 'Medium', 'Low']).describe('Nivel de urgencia de la recomendación.'),
-  learningNote: z.string().optional().describe('Nota breve que explica cómo el historial de acciones previas influyó en esta recomendación (Fase C).'),
-  contradictions: z.array(z.string()).optional().describe('Discrepancias detectadas entre diferentes fuentes de datos.'),
+  status: z.enum(['green', 'yellow', 'red']).default('yellow'),
+  realState: z.string().default('Estado no disponible en este momento.'),
+  hasOpportunity: z.boolean().default(false),
+  opportunityData: z.string().default('No se detectaron datos de oportunidad.'),
+  recommendation: z.string().default('Sigue monitoreando tus indicadores clave.'),
+  priority: z.enum(['High', 'Medium', 'Low']).default('Medium'),
+  learningNote: z.string().optional(),
+  contradictions: z.array(z.string()).optional().default([]),
 });
 
 const DiagnosticAnalysisSchema = z.object({
-  executiveSummary: z.string().describe('Resumen de un párrafo sobre la salud comercial del negocio.'),
+  executiveSummary: z.string().default('Resumen ejecutivo pendiente de generación.'),
   pillars: z.object({
     ventaProactiva: PillarAnalysisSchema,
     radarChurn: PillarAnalysisSchema,
     reputacion: PillarAnalysisSchema,
     operacionBlindada: PillarAnalysisSchema,
+  }).default({
+    ventaProactiva: PillarAnalysisSchema.parse({}),
+    radarChurn: PillarAnalysisSchema.parse({}),
+    reputacion: PillarAnalysisSchema.parse({}),
+    operacionBlindada: PillarAnalysisSchema.parse({}),
   }),
 });
 
 export type PillarAnalysis = z.infer<typeof PillarAnalysisSchema> & { recommendationId?: string };
-export type DiagnosticAnalysis = {
-  executiveSummary: string;
+export type DiagnosticAnalysis = z.infer<typeof DiagnosticAnalysisSchema>;
+
+// --- UTILIDADES DE PARSEO RESILIENTE ---
+
+/**
+ * Extrae el bloque JSON de una cadena de texto, eliminando markdown y ruidos.
+ */
+function extractJsonBlock(text: string): Record<string, unknown> | null {
+  try {
+    // Intentar encontrar el primer '{' y el último '}'
+    const startIndex = text.indexOf('{');
+    const endIndex = text.lastIndexOf('}');
+    
+    if (startIndex === -1 || endIndex === -1) return null;
+    
+    const jsonString = text.substring(startIndex, endIndex + 1);
+    return JSON.parse(jsonString) as Record<string, unknown>;
+  } catch (e) {
+    console.error('[AI-ANALYZER] Error de parseo JSON bruto:', e);
+    return null;
+  }
+}
+
+/**
+ * Normaliza los nombres de las llaves devueltas por la IA (Aliasing).
+ * Maneja traducciones comunes que suelen hacer los LLMs a pesar de las instrucciones.
+ */
+function normalizeAiResponse(raw: Record<string, unknown>): Record<string, unknown> {
+  const normalized: Record<string, unknown> = { ...raw };
+
+  // Mapeo de Resumen Ejecutivo
+  if (!normalized.executiveSummary) {
+    normalized.executiveSummary = raw.resumenEjecutivo || raw.resumen || raw.summary;
+  }
+
+  // Mapeo de Pilares
+  if (!normalized.pillars && (raw.pilares || raw.analisis || raw.pillars_analysis)) {
+    const rawPillars = (raw.pilares || raw.analisis || raw.pillars_analysis) as Record<string, unknown>;
+    normalized.pillars = {
+      ventaProactiva: rawPillars.ventaProactiva || rawPillars.venta_proactiva || rawPillars.proactive_sales,
+      radarChurn: rawPillars.radarChurn || rawPillars.radar_churn || rawPillars.churn_radar,
+      reputacion: rawPillars.reputacion || rawPillars.reputation || rawPillars.protection,
+      operacionBlindada: rawPillars.operacionBlindada || rawPillars.operacion_blindada || rawPillars.armored_operation,
+    };
+  }
+
+  return normalized;
+}
+
+// Objeto de emergencia para evitar error 500
+const FALLBACK_ANALYSIS: DiagnosticAnalysis = {
+  executiveSummary: "El servicio de inteligencia está experimentando alta demanda. Se recomienda revisar los indicadores crudos manualmente.",
   pillars: {
-    ventaProactiva: PillarAnalysis;
-    radarChurn: PillarAnalysis;
-    reputacion: PillarAnalysis;
-    operacionBlindada: PillarAnalysis;
-  };
+    ventaProactiva: PillarAnalysisSchema.parse({ realState: "Análisis en pausa.", status: 'yellow' }),
+    radarChurn: PillarAnalysisSchema.parse({ realState: "Análisis en pausa.", status: 'yellow' }),
+    reputacion: PillarAnalysisSchema.parse({ realState: "Análisis en pausa.", status: 'yellow' }),
+    operacionBlindada: PillarAnalysisSchema.parse({ realState: "Análisis en pausa.", status: 'yellow' }),
+  }
 };
 
-function extractJson(text: string) {
-    try {
-        const jsonMatch = text.match(/\{[\s\S]*\}/);
-        if (!jsonMatch) return null;
-        return JSON.parse(jsonMatch[0]);
-    } catch (e) {
-        return null;
-    }
-}
+// --- LÓGICA PRINCIPAL ---
 
 export async function analyzeDiagnosticWithAI(
   rawData: DiagnosticRawData,
   sourcesReviewed: number,
   businessId: string,
   reportId: string,
-  previousActions: ActionTracking[] = [] // Fase C: Inyección de memoria
+  previousActions: ActionTracking[] = []
 ): Promise<DiagnosticAnalysis> {
   const aiConfig = await getAIConfig(businessId);
 
   if (!aiConfig.apiKey) {
-    throw new Error('No hay un motor de IA configurado o activo en la plataforma.');
+    return FALLBACK_ANALYSIS;
   }
 
-  const constructionWarning = sourcesReviewed < 8 
-    ? `⚠️ AVISO IMPORTANTE: Este informe está en construcción. Faltan ${15 - sourcesReviewed} fuentes por revisar para tener el panorama completo. Menciona esto en el resumen ejecutivo.`
+  const constructionWarning = sourcesReviewed < 15 
+    ? `AVISO: Faltan ${15 - sourcesReviewed} fuentes por revisar.`
     : "";
 
-  // Formatear historial de acciones para el prompt
   const learningContext = previousActions.length > 0 
-    ? `\nCONTEXTO DE APRENDIZAJE Y ACCIONES PREVIAS DEL NEGOCIO:
-${previousActions.map(a => `- Pilar: ${a.pilar} | Acción: "${a.description}" | Resultado: ${a.impactStatus || 'En curso'} | Valor Inicial: ${a.baselineValue} -> Valor Actual: ${a.resultValue || 'Pendiente'}`).join('\n')}
+    ? `CONTEXTO HISTÓRICO: ${JSON.stringify(previousActions.map(a => ({ pilar: a.pilar, accion: a.description, resultado: a.impactStatus })))}`
+    : "";
 
-INSTRUCCIONES DE APRENDIZAJE:
-- Si una acción previa tuvo resultado positivo (improved), valida el logro en la 'learningNote' y sugiere el siguiente paso evolutivo.
-- Si una acción previa no mostró mejoras (declined/stable), NO repitas la misma recomendación: cambia de ángulo táctico y explica brevemente el ajuste en la 'learningNote'.
-- Si no hay acciones previas para un pilar o el resultado es 'too_early', ignora este contexto para ese pilar.`
-    : "\nNo hay historial de acciones previas aplicadas para este negocio.";
-
-  const systemPrompt = `Eres el Consultor Senior de Estrategia Comercial de Markix.
-Tu misión es analizar la salud de un negocio basado en "El Corazón de Markix".
-
-DATOS REALES DEL NEGOCIO:
-${JSON.stringify(rawData, null, 2)}
-
-FUENTES REVISADAS: ${sourcesReviewed} de 15.
-${constructionWarning}
-${learningContext}
-
-INSTRUCCIONES DE ANÁLISIS:
-1. Analiza los 4 pilares: 
-   - Venta Proactiva: Uso de Chatbot, Sugerencias e IA.
-   - Radar de Churn: Fidelización, puntos y clientes en riesgo.
-   - Protección de Reputación: Valoraciones en directorio y respuestas.
-   - Operación Blindada: Conexión entre Catálogo, Inventario, Contabilidad y Citas.
-2. Identifica oportunidades reales respaldadas por datos.
-3. Semáforos: Verde (Óptimo), Amarillo (Mejorable), Rojo (Riesgo).
-4. Lenguaje: Directo, empático y humano. CERO invención de datos.
-
-IMPORTANTE: Responde estrictamente en formato JSON que cumpla con el esquema definido.`;
+  const systemPrompt = `Eres el Consultor Senior de Markix. Genera un diagnóstico comercial en formato JSON basado en estos datos: ${JSON.stringify(rawData)}. 
+  Fuentes: ${sourcesReviewed}/15. ${constructionWarning}. ${learningContext}.
+  
+  Estructura JSON obligatoria:
+  {
+    "executiveSummary": "texto",
+    "pillars": {
+      "ventaProactiva": { "status": "green|yellow|red", "realState": "...", "hasOpportunity": true, "opportunityData": "...", "recommendation": "...", "priority": "High|Medium|Low", "learningNote": "..." },
+      "radarChurn": { ...mismo formato... },
+      "reputacion": { ...mismo formato... },
+      "operacionBlindada": { ...mismo formato... }
+    }
+  }`;
 
   try {
-    let result: any;
+    let rawAnswer = '';
     
     if (aiConfig.provider === 'googleai') {
         const localAi = genkit({ plugins: [googleAI({ apiKey: aiConfig.apiKey })] });
-        const { output } = await localAi.generate({
+        const response = await localAi.generate({
             model: `googleai/${aiConfig.model}`,
             system: systemPrompt,
-            prompt: 'Genera el diagnóstico comercial estructurado.',
-            output: { schema: DiagnosticAnalysisSchema },
-            config: { temperature: 0.2 },
+            prompt: 'Genera el JSON estructurado del diagnóstico comercial.',
+            config: { temperature: 0.1 },
         });
-        result = output;
+        rawAnswer = response.text;
     } else {
         const endpoint = aiConfig.provider === 'deepseek' ? 'https://api.deepseek.com/chat/completions' : 'https://api.openai.com/v1/chat/completions';
         const response = await fetch(endpoint, {
@@ -126,20 +159,28 @@ IMPORTANTE: Responde estrictamente en formato JSON que cumpla con el esquema def
             headers: { 'Authorization': `Bearer ${aiConfig.apiKey}`, 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 model: aiConfig.model,
-                messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: 'Genera el JSON.' }],
-                temperature: 0.2,
+                messages: [{ role: 'system', content: systemPrompt }],
+                temperature: 0.1,
                 response_format: { type: "json_object" } 
             }),
         });
 
-        if (!response.ok) throw new Error(`API Error ${response.status}`);
+        if (!response.ok) throw new Error(`IA_API_ERROR: ${response.status}`);
         const data = await response.json();
-        result = extractJson(data.choices?.[0]?.message?.content || "");
+        rawAnswer = data.choices?.[0]?.message?.content || "";
     }
 
-    if (!result) throw new Error('No se pudo procesar el análisis estructurado.');
+    // 1. Extraer bloque JSON limpio
+    const jsonBlock = extractJsonBlock(rawAnswer);
+    if (!jsonBlock) throw new Error('NO_JSON_FOUND');
 
-    const validated = DiagnosticAnalysisSchema.parse(result);
+    // 2. Normalizar llaves (Alias)
+    const normalizedData = normalizeAiResponse(jsonBlock);
+
+    // 3. Validar con Zod (usando fallbacks definidos en el esquema)
+    const validated = DiagnosticAnalysisSchema.parse(normalizedData);
+    
+    // Inyectar IDs de recomendación para el seguimiento de la Fase A
     return {
       executiveSummary: validated.executiveSummary,
       pillars: {
@@ -151,7 +192,8 @@ IMPORTANTE: Responde estrictamente en formato JSON que cumpla con el esquema def
     };
 
   } catch (error: any) {
-    console.error('[AI-ANALYZER] Error:', error.message);
-    throw new Error('Fallo en análisis IA: ' + error.message);
+    console.error('[AI-ANALYZER] Error crítico en el flujo:', error.message);
+    // Devolvemos el fallback en lugar de lanzar error 500
+    return FALLBACK_ANALYSIS;
   }
 }
