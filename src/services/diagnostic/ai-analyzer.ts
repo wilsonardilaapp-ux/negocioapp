@@ -2,9 +2,9 @@
 
 /**
  * @fileOverview Motor de análisis estratégico con IA para el Diagnóstico Comercial.
+ * - Fase C: Implementa memoria estratégica inyectando acciones previas y sus resultados.
  * - Consume el proveedor de IA activo (Google AI, OpenAI, DeepSeek, etc.).
  * - Genera un análisis estructurado basado en los 4 pilares del Corazón de Markix.
- * - FASE A: Inyecta identificadores únicos por recomendación para seguimiento.
  */
 
 import { genkit } from 'genkit';
@@ -12,6 +12,7 @@ import { googleAI } from '@genkit-ai/google-genai';
 import { z } from 'zod';
 import { getAIConfig } from '@/ai/flows/chat-flow';
 import type { DiagnosticRawData } from './data-extractor';
+import type { ActionTracking } from './impact-evaluator';
 
 const PillarAnalysisSchema = z.object({
   status: z.enum(['green', 'yellow', 'red']),
@@ -20,6 +21,7 @@ const PillarAnalysisSchema = z.object({
   opportunityData: z.string().describe('Dato concreto que respalda la oportunidad.'),
   recommendation: z.string().describe('Acción directa y específica para el dueño del negocio.'),
   priority: z.enum(['High', 'Medium', 'Low']).describe('Nivel de urgencia de la recomendación.'),
+  learningNote: z.string().optional().describe('Nota breve que explica cómo el historial de acciones previas influyó en esta recomendación (Fase C).'),
   contradictions: z.array(z.string()).optional().describe('Discrepancias detectadas entre diferentes fuentes de datos.'),
 });
 
@@ -58,7 +60,8 @@ export async function analyzeDiagnosticWithAI(
   rawData: DiagnosticRawData,
   sourcesReviewed: number,
   businessId: string,
-  reportId: string // Requerido para generar IDs de recomendación
+  reportId: string,
+  previousActions: ActionTracking[] = [] // Fase C: Inyección de memoria
 ): Promise<DiagnosticAnalysis> {
   const aiConfig = await getAIConfig(businessId);
 
@@ -70,6 +73,17 @@ export async function analyzeDiagnosticWithAI(
     ? `⚠️ AVISO IMPORTANTE: Este informe está en construcción. Faltan ${15 - sourcesReviewed} fuentes por revisar para tener el panorama completo. Menciona esto en el resumen ejecutivo.`
     : "";
 
+  // Formatear historial de acciones para el prompt
+  const learningContext = previousActions.length > 0 
+    ? `\nCONTEXTO DE APRENDIZAJE Y ACCIONES PREVIAS DEL NEGOCIO:
+${previousActions.map(a => `- Pilar: ${a.pilar} | Acción: "${a.description}" | Resultado: ${a.impactStatus || 'En curso'} | Valor Inicial: ${a.baselineValue} -> Valor Actual: ${a.resultValue || 'Pendiente'}`).join('\n')}
+
+INSTRUCCIONES DE APRENDIZAJE:
+- Si una acción previa tuvo resultado positivo (improved), valida el logro en la 'learningNote' y sugiere el siguiente paso evolutivo.
+- Si una acción previa no mostró mejoras (declined/stable), NO repitas la misma recomendación: cambia de ángulo táctico y explica brevemente el ajuste en la 'learningNote'.
+- Si no hay acciones previas para un pilar o el resultado es 'too_early', ignora este contexto para ese pilar.`
+    : "\nNo hay historial de acciones previas aplicadas para este negocio.";
+
   const systemPrompt = `Eres el Consultor Senior de Estrategia Comercial de Markix.
 Tu misión es analizar la salud de un negocio basado en "El Corazón de Markix".
 
@@ -78,6 +92,7 @@ ${JSON.stringify(rawData, null, 2)}
 
 FUENTES REVISADAS: ${sourcesReviewed} de 15.
 ${constructionWarning}
+${learningContext}
 
 INSTRUCCIONES DE ANÁLISIS:
 1. Analiza los 4 pilares: 
@@ -85,24 +100,11 @@ INSTRUCCIONES DE ANÁLISIS:
    - Radar de Churn: Fidelización, puntos y clientes en riesgo.
    - Protección de Reputación: Valoraciones en directorio y respuestas.
    - Operación Blindada: Conexión entre Catálogo, Inventario, Contabilidad y Citas.
-2. Identifica oportunidades reales: Si hay datos (ej. muchas ventas pero poco stock, o chatbot inactivo con muchas visitas), destaca la oportunidad.
-3. Semáforos: 
-   - Verde: Operación óptima.
-   - Amarillo: Funcionalidades infrautilizadas.
-   - Rojo: Riesgo de pérdida de dinero o clientes.
-4. Contradicciones: Reporta si los datos de un módulo no coinciden con otro.
-5. Lenguaje: Directo, humano, sin jerga corporativa compleja.
+2. Identifica oportunidades reales respaldadas por datos.
+3. Semáforos: Verde (Óptimo), Amarillo (Mejorable), Rojo (Riesgo).
+4. Lenguaje: Directo, empático y humano. CERO invención de datos.
 
-IMPORTANTE: Responde estrictamente en formato JSON que cumpla con el siguiente esquema:
-{
-  "executiveSummary": "párrafo",
-  "pillars": {
-    "ventaProactiva": { "status": "green|yellow|red", "realState": "...", "hasOpportunity": boolean, "opportunityData": "...", "recommendation": "...", "priority": "High|Medium|Low", "contradictions": [] },
-    "radarChurn": { ... },
-    "reputacion": { ... },
-    "operacionBlindada": { ... }
-  }
-}`;
+IMPORTANTE: Responde estrictamente en formato JSON que cumpla con el esquema definido.`;
 
   try {
     let result: any;
@@ -112,16 +114,13 @@ IMPORTANTE: Responde estrictamente en formato JSON que cumpla con el siguiente e
         const { output } = await localAi.generate({
             model: `googleai/${aiConfig.model}`,
             system: systemPrompt,
-            prompt: 'Genera el diagnóstico comercial.',
+            prompt: 'Genera el diagnóstico comercial estructurado.',
             output: { schema: DiagnosticAnalysisSchema },
             config: { temperature: 0.2 },
         });
         result = output;
     } else {
-        let endpoint = 'https://api.openai.com/v1/chat/completions';
-        if (aiConfig.provider === 'deepseek') endpoint = 'https://api.deepseek.com/chat/completions';
-        else if (aiConfig.provider === 'groq') endpoint = 'https://api.groq.com/openai/v1/chat/completions';
-
+        const endpoint = aiConfig.provider === 'deepseek' ? 'https://api.deepseek.com/chat/completions' : 'https://api.openai.com/v1/chat/completions';
         const response = await fetch(endpoint, {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${aiConfig.apiKey}`, 'Content-Type': 'application/json' },
@@ -138,9 +137,8 @@ IMPORTANTE: Responde estrictamente en formato JSON que cumpla con el siguiente e
         result = extractJson(data.choices?.[0]?.message?.content || "");
     }
 
-    if (!result) throw new Error('No se pudo procesar el análisis.');
+    if (!result) throw new Error('No se pudo procesar el análisis estructurado.');
 
-    // FASE A: Inyectar IDs de recomendación deterministas
     const validated = DiagnosticAnalysisSchema.parse(result);
     return {
       executiveSummary: validated.executiveSummary,

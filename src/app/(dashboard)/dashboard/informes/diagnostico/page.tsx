@@ -1,9 +1,8 @@
-
 'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { useUser, useFirestore, useCollection, useMemoFirebase, setDocumentNonBlocking } from '@/firebase';
-import { collection, query, where, orderBy, doc, limit, setDoc, Timestamp } from 'firebase/firestore';
+import { collection, query, where, orderBy, doc, limit, setDoc, Timestamp, getDocs } from 'firebase/firestore';
 import { useSubscription } from '@/hooks/useSubscription';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -40,7 +39,8 @@ import {
     Circle,
     ArrowRight,
     Activity,
-    Clock
+    Clock,
+    BrainCircuit
 } from 'lucide-react';
 import { format, startOfMonth, isToday, differenceInDays } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -70,13 +70,12 @@ const PILLAR_LABELS: Record<string, string> = {
 };
 
 /**
- * Componente para renderizar un pilar con seguimiento de acciones e impacto (Fase B).
+ * Componente para renderizar un pilar con seguimiento de acciones e impacto (Fase B + C).
  */
 const PillarCard = ({ 
     title, 
     data, 
     pilarKey,
-    businessId,
     reportId,
     appliedActions,
     onToggleAction,
@@ -85,7 +84,6 @@ const PillarCard = ({
     title: string, 
     data: PillarAnalysis, 
     pilarKey: string,
-    businessId: string,
     reportId: string,
     appliedActions: any[],
     onToggleAction: (pilarKey: string, recommendation: string) => void,
@@ -98,7 +96,6 @@ const PillarCard = ({
   const action = appliedActions.find(a => a.id === `${reportId}_${pilarKey}`);
   const isApplied = action?.status === 'applied';
 
-  // --- LÓGICA VISUAL DE IMPACTO (Fase B) ---
   const renderImpactBadge = () => {
       if (!action || !action.impactStatus) return null;
 
@@ -165,12 +162,22 @@ const PillarCard = ({
           </div>
         )}
 
+        {/* NOTA DE APRENDIZAJE IA (Fase C) */}
+        {data.learningNote && (
+            <div className="p-3 bg-indigo-50 border border-indigo-100 rounded-2xl flex items-start gap-2.5 animate-in fade-in slide-in-from-top-1 duration-500">
+                <BrainCircuit className="h-4 w-4 text-indigo-600 shrink-0 mt-0.5" />
+                <div className="space-y-0.5">
+                    <span className="text-[9px] font-black uppercase text-indigo-700 tracking-widest">Ajuste por Aprendizaje</span>
+                    <p className="text-[11px] font-medium text-indigo-800 leading-tight italic">{data.learningNote}</p>
+                </div>
+            </div>
+        )}
+
         <div className="space-y-1 pt-2">
           <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Recomendación</p>
           <div className="flex flex-col gap-3">
               <p className="text-sm font-bold text-slate-900">{data.recommendation}</p>
               
-              {/* ACCIÓN DE SEGUIMIENTO (Fase A/B) */}
               <div className="pt-2">
                   {isApplied ? (
                       <div className="space-y-3">
@@ -226,7 +233,6 @@ export default function DiagnosticoComercialPage() {
   const [activeTab, setActiveTab] = useState('analysis');
   const [isProcessingAction, setIsProcessingAction] = useState(false);
 
-  // Filtros de UI
   const [searchTerm, setSearchTerm] = useState('');
   const [filterPilar, setFilterPilar] = useState('all');
   const [filterPriority, setFilterPriority] = useState('all');
@@ -234,7 +240,6 @@ export default function DiagnosticoComercialPage() {
 
   const businessId = profile?.role === 'super_admin' ? (user?.uid || '') : user?.uid || '';
 
-  // 1. Cargar Historial de Informes
   const reportsQuery = useMemoFirebase(() => {
     if (!businessId || !firestore) return null;
     return query(
@@ -244,14 +249,12 @@ export default function DiagnosticoComercialPage() {
   }, [businessId, firestore]);
   const { data: allReports, isLoading: loadingReports } = useCollection<any>(reportsQuery);
 
-  // 2. Cargar Acciones Aplicadas (Fase A/B)
   const actionsQuery = useMemoFirebase(() => {
     if (!businessId || !firestore) return null;
     return collection(firestore, `businesses/${businessId}/diagnosticActions`);
   }, [businessId, firestore]);
   const { data: appliedActions, isLoading: loadingActions } = useCollection<any>(actionsQuery);
 
-  // 3. Resolver Informe Activo (con filtros de fecha)
   const activeReport = useMemo(() => {
     if (!allReports || allReports.length === 0) return null;
     if (dateRange.from && dateRange.to) {
@@ -260,7 +263,6 @@ export default function DiagnosticoComercialPage() {
     return allReports[0];
   }, [allReports, dateRange]);
 
-  // 4. Resolver Comparación Histórica (Fase 6)
   const previousReport = useMemo(() => {
     if (!allReports || !activeReport) return null;
     return allReports.find(r => r.createdAt < activeReport.createdAt) || null;
@@ -315,7 +317,7 @@ export default function DiagnosticoComercialPage() {
   }, [allReports]);
 
   const handleRequestGeneration = async (bypassConfirm = false) => {
-    if (!businessId || usedCount >= currentLimit || isLoadingSub) return;
+    if (!businessId || usedCount >= currentLimit || loadingSub) return;
     if (!bypassConfirm && activeReport?.createdAt && isToday(new Date(activeReport.createdAt))) {
       setShowConfirmDialog(true);
       return;
@@ -330,11 +332,21 @@ export default function DiagnosticoComercialPage() {
       // 2. FASE B: Evaluación automática de impacto de acciones previas
       await evaluateAppliedActionsImpact(businessId, extraction.data);
 
-      // 3. Generación de análisis IA
-      const reportId = doc(collection(firestore, 'placeholder')).id;
-      const analysis = await analyzeDiagnosticWithAI(extraction.data, extraction.sourcesReviewed, businessId, reportId);
+      // 3. FASE C: Recuperar historial para aprendizaje de IA
+      const actionsSnap = await getDocs(collection(firestore, `businesses/${businessId}/diagnosticActions`));
+      const previousActions = actionsSnap.docs.map(d => d.data());
 
-      // 4. Persistencia del nuevo informe
+      // 4. Generación de análisis IA con contexto histórico
+      const reportId = doc(collection(firestore, 'placeholder')).id;
+      const analysis = await analyzeDiagnosticWithAI(
+        extraction.data, 
+        extraction.sourcesReviewed, 
+        businessId, 
+        reportId,
+        previousActions as any
+      );
+
+      // 5. Persistencia del nuevo informe
       const reportRef = doc(firestore, `businesses/${businessId}/diagnosticReports`, reportId);
       await setDoc(reportRef, {
         id: reportId,
@@ -345,7 +357,7 @@ export default function DiagnosticoComercialPage() {
         data: { executiveSummary: analysis.executiveSummary, raw: extraction.data, pillars: analysis.pillars }
       });
       
-      toast({ title: "¡Análisis e Impacto Completado!" });
+      toast({ title: "¡Análisis con Aprendizaje Completado!" });
     } catch (error: any) {
       toast({ variant: "destructive", title: "Error", description: error.message });
     } finally {
@@ -366,7 +378,6 @@ export default function DiagnosticoComercialPage() {
             await setDoc(actionRef, { status: 'pending', updatedAt: new Date().toISOString() }, { merge: true });
             toast({ title: "Acción marcada como pendiente" });
         } else {
-            // Mapeo dinámico de métricas para baseline (Fase A)
             const metricMap: Record<string, any> = {
                 ventaProactiva: { key: 'totalSales30d', val: activeReport.data.raw.ronda1_ventas.totalSales30d },
                 radarChurn: { key: 'churnRiskCount', val: activeReport.data.raw.ronda2_clientes.churnRiskCount },
@@ -389,7 +400,7 @@ export default function DiagnosticoComercialPage() {
                 impactStatus: null,
                 updatedAt: new Date().toISOString()
             });
-            toast({ title: "¡Acción marcada como aplicada!", description: "Mediremos el impacto en tu próximo informe." });
+            toast({ title: "¡Acción marcada como aplicada!", description: "La IA aprenderá de este resultado en tu próximo informe." });
         }
     } catch (e) {
         toast({ variant: 'destructive', title: "Error al actualizar acción" });
@@ -406,6 +417,7 @@ export default function DiagnosticoComercialPage() {
         Oportunidad: p.opportunityData,
         Prioridad: p.priority,
         Recomendacion: p.recommendation,
+        Aprendizaje: p.learningNote || 'N/A',
         Semaforo: p.status
     }));
     const ws = XLSX.utils.json_to_sheet(data);
@@ -422,9 +434,9 @@ export default function DiagnosticoComercialPage() {
     docPdf.text(`Generado: ${new Date(activeReport.createdAt).toLocaleString()}`, 14, 30);
     (docPdf as any).autoTable({
         startY: 40,
-        head: [['Pilar', 'Estado', 'Prioridad', 'Recomendación']],
+        head: [['Pilar', 'Estado', 'Recomendación', 'Aprendizaje']],
         body: Object.entries(activeReport.data.pillars).map(([key, p]: [string, any]) => [
-            PILLAR_LABELS[key], p.realState, p.priority, p.recommendation
+            PILLAR_LABELS[key], p.realState, p.recommendation, p.learningNote || '---'
         ])
     });
     docPdf.save(`Reporte_Markix_${activeReport.id.slice(0,5)}.pdf`);
@@ -476,7 +488,6 @@ export default function DiagnosticoComercialPage() {
         </TabsList>
 
         <TabsContent value="analysis" className="space-y-8 outline-none">
-            {/* KPI TRACKER Y EVOLUCIÓN */}
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
                 <Card className="lg:col-span-1 border-2 border-primary/10 shadow-sm rounded-3xl p-6 bg-white">
                     <div className="space-y-2">
@@ -541,7 +552,6 @@ export default function DiagnosticoComercialPage() {
                         </CardContent>
                     </Card>
 
-                    {/* BARRA DE FILTROS PARA PILARES */}
                     <div className="flex flex-col md:flex-row gap-4 items-end bg-white p-6 rounded-[2rem] border shadow-sm border-primary/10">
                         <div className="flex-1 space-y-2 w-full">
                             <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">Buscador Táctico</Label>
@@ -581,7 +591,6 @@ export default function DiagnosticoComercialPage() {
                                 title={PILLAR_LABELS[key]} 
                                 data={p as PillarAnalysis} 
                                 pilarKey={key}
-                                businessId={businessId}
                                 reportId={activeReport.id}
                                 appliedActions={appliedActions || []}
                                 onToggleAction={handleToggleAction}
