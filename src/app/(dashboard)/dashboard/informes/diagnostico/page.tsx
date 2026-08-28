@@ -284,7 +284,17 @@ export default function DiagnosticoComercialPage() {
 
   const previousReport = useMemo(() => {
     if (!allReports || !activeReport) return null;
-    return allReports.find(r => r.createdAt < activeReport.createdAt) || null;
+    
+    const activeDate = activeReport.createdAt.split('T')[0];
+    
+    // Buscar primero el informe más reciente que sea de un día anterior
+    const reportFromDifferentDay = allReports.find(r => {
+      const rDate = r.createdAt.split('T')[0];
+      return rDate < activeDate;
+    });
+
+    // Fallback al anterior inmediato si no hay de días anteriores
+    return reportFromDifferentDay || allReports.find(r => r.createdAt < activeReport.createdAt) || null;
   }, [allReports, activeReport]);
 
   const trends = useMemo(() => {
@@ -322,7 +332,6 @@ export default function DiagnosticoComercialPage() {
 
   const currentLimit = useMemo(() => {
     if (!plan) return 1;
-    // Normalización de tildes para comparación robusta de planes
     const normalizedPlan = plan.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
     if (normalizedPlan.includes('profesional')) return PLAN_GENERATION_LIMITS.profesional;
     if (normalizedPlan.includes('estandar')) return PLAN_GENERATION_LIMITS.estandar;
@@ -346,17 +355,11 @@ export default function DiagnosticoComercialPage() {
     setIsGenerating(true);
     setShowConfirmDialog(false);
     try {
-      // 1. Extracción de 15 fuentes
       const extraction = await extractDiagnosticData(businessId);
-      
-      // 2. FASE B: Evaluación automática de impacto de acciones previas
       await evaluateAppliedActionsImpact(businessId, extraction.data);
-
-      // 3. FASE C: Recuperar historial para aprendizaje de IA
       const actionsSnap = await getDocs(collection(firestore, `businesses/${businessId}/diagnosticActions`));
       const previousActions = actionsSnap.docs.map(d => d.data());
 
-      // 4. Generación de análisis IA con contexto histórico
       const reportId = doc(collection(firestore, 'placeholder')).id;
       const analysis = await analyzeDiagnosticWithAI(
         extraction.data, 
@@ -366,7 +369,6 @@ export default function DiagnosticoComercialPage() {
         previousActions as any
       );
 
-      // 5. Persistencia del nuevo informe
       const reportRef = doc(firestore, `businesses/${businessId}/diagnosticReports`, reportId);
       await setDoc(reportRef, {
         id: reportId,
@@ -532,24 +534,26 @@ export default function DiagnosticoComercialPage() {
                     </div>
 
                     <div className="flex gap-4">
-                        {trends ? (
-                            <div className="flex gap-6">
-                                <div className="text-center">
-                                    <p className="text-[9px] font-black text-muted-foreground uppercase mb-1">Ventas</p>
+                        <div className="flex gap-6">
+                            <div className="text-center">
+                                <p className="text-[9px] font-black text-muted-foreground uppercase mb-1">Ventas</p>
+                                {trends && trends.sales !== null ? (
                                     <div className={cn("flex items-center gap-1 font-bold text-sm", (trends.sales || 0) >= 0 ? "text-green-600" : "text-red-600")}>
                                         {(trends.sales || 0) >= 0 ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
                                         {Math.abs(trends.sales || 0).toFixed(1)}%
                                     </div>
-                                </div>
-                                <div className="text-center">
-                                    <p className="text-[9px] font-black text-muted-foreground uppercase mb-1">Ticket</p>
+                                ) : <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest italic">—</p>}
+                            </div>
+                            <div className="text-center">
+                                <p className="text-[9px] font-black text-muted-foreground uppercase mb-1">Ticket</p>
+                                {trends && trends.ticket !== null ? (
                                     <div className={cn("flex items-center gap-1 font-bold text-sm", (trends.ticket || 0) >= 0 ? "text-green-600" : "text-red-600")}>
                                         {(trends.ticket || 0) >= 0 ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
                                         {Math.abs(trends.ticket || 0).toFixed(1)}%
                                     </div>
-                                </div>
+                                ) : <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest italic">—</p>}
                             </div>
-                        ) : <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest italic">📊 Comparación histórica no disponible</p>}
+                        </div>
                     </div>
                 </Card>
             </div>
