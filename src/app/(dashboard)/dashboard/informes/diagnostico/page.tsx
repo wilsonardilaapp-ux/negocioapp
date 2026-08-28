@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, query, where, orderBy, limit, doc, setDoc } from 'firebase/firestore';
+import { collection, query, where, orderBy, limit, doc, setDoc, Timestamp } from 'firebase/firestore';
 import { useSubscription } from '@/hooks/useSubscription';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -17,13 +17,27 @@ import {
     DialogFooter 
 } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
+import { Input } from "@/components/ui/input";
+import { 
+    Select, 
+    SelectContent, 
+    SelectItem, 
+    SelectTrigger, 
+    SelectValue 
+} from "@/components/ui/select";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 import { 
     FileBarChart, 
     Lock, 
     RefreshCw, 
     Loader2, 
     ShieldAlert, 
-    Calendar, 
+    Calendar as CalendarIcon, 
     TrendingUp, 
     ChevronRight,
     CheckCircle2,
@@ -31,19 +45,23 @@ import {
     Search,
     Zap,
     AlertTriangle,
-    Target
+    Target,
+    Filter,
+    X,
+    ArrowUpDown
 } from 'lucide-react';
-import { format, startOfMonth, isToday } from 'date-fns';
+import { format, startOfMonth, isToday, endOfDay, startOfDay } from 'date-fns';
 import { es } from 'date-fns/locale';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
 import { extractDiagnosticData } from '@/services/diagnostic/data-extractor';
 import { analyzeDiagnosticWithAI, type PillarAnalysis } from '@/services/diagnostic/ai-analyzer';
 import { cn } from '@/lib/utils';
+import { DateRange } from "react-day-picker";
 
 /**
- * @fileOverview Fase 3 - Informe de Diagnóstico Comercial.
- * Implementa el análisis estratégico con IA basado en el Corazón de Markix.
+ * @fileOverview Fase 4 - Buscador, Filtros y Calendario.
+ * Implementa navegación histórica y filtrado de hallazgos.
  */
 
 const PLAN_GENERATION_LIMITS: Record<string, number> = {
@@ -52,6 +70,13 @@ const PLAN_GENERATION_LIMITS: Record<string, number> = {
     'basico': 4,
     'crecimiento': 1,
     'free': 1,
+};
+
+const PILLAR_LABELS: Record<string, string> = {
+  ventaProactiva: "Venta Proactiva",
+  radarChurn: "Radar de Churn",
+  reputacion: "Protección de Reputación",
+  operacionBlindada: "Operación Blindada"
 };
 
 const PillarCard = ({ title, data }: { title: string, data: PillarAnalysis }) => {
@@ -134,6 +159,15 @@ export default function DiagnosticoComercialPage() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [showConfirmModal, setShowConfirmDialog] = useState(false);
 
+  // --- ESTADOS DE FILTRADO (FASE 4) ---
+  const [searchTerm, setSearchTerm] = useState('');
+  const [pilarFilter, setPilarFilter] = useState<string>('all');
+  const [priorityFilter, setPriorityFilter] = useState<string>('all');
+  const [dateRange, setDateRange] = useState<DateRange | undefined>({
+    from: startOfMonth(new Date()),
+    to: new Date()
+  });
+
   const currentLimit = useMemo(() => {
     if (!plan) return 1;
     const planKey = plan.toLowerCase();
@@ -143,6 +177,7 @@ export default function DiagnosticoComercialPage() {
     return PLAN_GENERATION_LIMITS.crecimiento;
   }, [plan]);
 
+  // Consulta de conteo de uso mensual
   const monthStartISO = startOfMonth(new Date()).toISOString();
   const usageQuery = useMemoFirebase(() => {
     if (!user?.uid || !firestore) return null;
@@ -156,22 +191,60 @@ export default function DiagnosticoComercialPage() {
   const usedCount = reportsThisMonth?.length || 0;
   const hasRemainingAttempts = currentLimit === Infinity || usedCount < currentLimit;
 
-  const lastReportQuery = useMemoFirebase(() => {
-    if (!user?.uid || !firestore) return null;
+  // Consulta histórica filtrada por calendario
+  const reportsHistoryQuery = useMemoFirebase(() => {
+    if (!user?.uid || !firestore || !dateRange?.from) return null;
+    
+    let q = collection(firestore, `businesses/${user.uid}/diagnosticReports`);
+    
+    // Filtrado por fecha si existe rango
+    const fromISO = startOfDay(dateRange.from).toISOString();
+    const toISO = dateRange.to ? endOfDay(dateRange.to).toISOString() : endOfDay(dateRange.from).toISOString();
+    
     return query(
-        collection(firestore, `businesses/${user.uid}/diagnosticReports`),
-        orderBy('createdAt', 'desc'),
-        limit(1)
+        q,
+        where('createdAt', '>=', fromISO),
+        where('createdAt', '<=', toISO),
+        orderBy('createdAt', 'desc')
     );
-  }, [user?.uid, firestore]);
+  }, [user?.uid, firestore, dateRange]);
 
-  const { data: lastReportArr, isLoading: loadingLastReport } = useCollection(lastReportQuery);
-  const lastReport = lastReportArr?.[0] || null;
+  const { data: historyReports, isLoading: loadingHistory } = useCollection(reportsHistoryQuery);
+  
+  // El reporte activo es el primero del historial filtrado o el último absoluto
+  const activeReport = historyReports?.[0] || null;
+
+  // Lógica de filtrado de pilares (Fase 4)
+  const filteredPillars = useMemo(() => {
+    if (!activeReport?.data?.pillars) return [];
+
+    const pillarsArray = Object.entries(activeReport.data.pillars).map(([key, value]) => ({
+      key,
+      title: PILLAR_LABELS[key] || key,
+      ...(value as PillarAnalysis)
+    }));
+
+    return pillarsArray
+      .filter(p => {
+        const matchesSearch = p.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                             p.recommendation.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                             p.realState.toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesPilar = pilarFilter === 'all' || p.key === pilarFilter;
+        const matchesPriority = priorityFilter === 'all' || p.priority === priorityFilter;
+        
+        return matchesSearch && matchesPilar && matchesPriority;
+      })
+      // Ordenar por prioridad: High (0), Medium (1), Low (2)
+      .sort((a, b) => {
+        const pMap = { High: 0, Medium: 1, Low: 2 };
+        return pMap[a.priority] - pMap[b.priority];
+      });
+  }, [activeReport, searchTerm, pilarFilter, priorityFilter]);
 
   const handleRequestGeneration = async (bypassConfirm = false) => {
     if (!user || !hasRemainingAttempts) return;
 
-    if (!bypassConfirm && lastReport?.createdAt && isToday(new Date(lastReport.createdAt))) {
+    if (!bypassConfirm && activeReport?.createdAt && isToday(new Date(activeReport.createdAt))) {
       setShowConfirmDialog(true);
       return;
     }
@@ -180,10 +253,7 @@ export default function DiagnosticoComercialPage() {
     setShowConfirmDialog(false);
 
     try {
-      // 1. Extracción de datos reales
       const extraction = await extractDiagnosticData(user.uid);
-      
-      // 2. Análisis con IA Activa
       const analysis = await analyzeDiagnosticWithAI(extraction.data, extraction.sourcesReviewed, user.uid);
 
       const reportId = doc(collection(firestore, 'placeholder')).id;
@@ -206,11 +276,10 @@ export default function DiagnosticoComercialPage() {
       
       toast({
         title: "¡Informe Generado!",
-        description: `Se han analizado ${extraction.sourcesReviewed} fuentes. El diagnóstico de IA está listo.`,
+        description: `Diagnóstico de IA listo basado en ${extraction.sourcesReviewed} fuentes.`,
       });
 
     } catch (error: any) {
-      console.error("Error al generar diagnóstico:", error);
       toast({
         variant: "destructive",
         title: "Error al generar",
@@ -221,7 +290,7 @@ export default function DiagnosticoComercialPage() {
     }
   };
 
-  const isLoading = loadingSub || loadingUsage || loadingLastReport;
+  const isLoading = loadingSub || loadingUsage || loadingHistory;
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500 pb-20">
@@ -239,9 +308,7 @@ export default function DiagnosticoComercialPage() {
             <FileBarChart className="h-9 w-9 text-primary" />
             Informe de Diagnóstico Comercial
           </h1>
-          <p className="text-muted-foreground font-medium">
-            Análisis bajo demanda basado en el corazón de Markix.
-          </p>
+          <p className="text-muted-foreground font-medium">Análisis estratégico bajo demanda con IA.</p>
         </div>
 
         <div className="flex flex-col items-end gap-2 w-full md:w-auto">
@@ -257,74 +324,116 @@ export default function DiagnosticoComercialPage() {
                 )}
             </Button>
             <Badge variant="outline" className="h-8 px-4 rounded-lg border-2 font-bold bg-white">
-                Informe basado en [{lastReport?.sourcesReviewed || 0}] de 15 fuentes revisadas
+                Informe basado en [{activeReport?.sourcesReviewed || 0}] de 15 fuentes revisadas
             </Badge>
         </div>
       </div>
 
-      <Card className="border-2 border-primary/10 shadow-sm rounded-3xl overflow-hidden">
-        <CardContent className="p-6 grid grid-cols-1 md:grid-cols-3 gap-8 items-center">
-            <div className="space-y-2">
-                <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Plan de Negocio</p>
-                <div className="flex items-center gap-2">
-                    <Badge className="bg-primary text-white font-black px-3 py-1 rounded-lg uppercase text-[10px]">
-                        {plan || 'Cargando...'}
-                    </Badge>
-                </div>
-            </div>
-
+      {/* --- PANEL DE CONTROL Y FILTROS (FASE 4) --- */}
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        <Card className="lg:col-span-1 border-2 border-primary/10 shadow-sm rounded-3xl h-full flex flex-col justify-center p-6">
             <div className="space-y-2">
                 <div className="flex justify-between items-end">
-                    <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Uso Mensual</p>
+                    <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Uso {format(new Date(), 'MMMM', {locale: es})}</p>
                     <span className="text-xs font-bold">{usedCount} / {currentLimit === Infinity ? '∞' : currentLimit}</span>
                 </div>
                 <Progress 
                     value={currentLimit === Infinity ? 0 : (usedCount / currentLimit) * 100} 
                     className="h-2" 
-                    indicatorClassName={usedCount >= currentLimit ? 'bg-destructive' : 'bg-primary'}
                 />
+                <p className="text-[9px] font-bold text-muted-foreground uppercase text-center pt-1">
+                    {plan || 'Plan Crecimiento'}
+                </p>
             </div>
+        </Card>
 
-            <div className="flex flex-col md:items-end justify-center gap-1">
-                {!hasRemainingAttempts ? (
-                    <div className="flex flex-col items-end gap-2 animate-in slide-in-from-right-2 text-right">
-                        <p className="text-xs font-bold text-destructive">Límite mensual alcanzado</p>
-                        <Button size="sm" variant="outline" asChild className="h-8 text-[10px] font-black border-primary text-primary hover:bg-primary/5">
-                            <Link href="/dashboard/subscription">Mejorar Plan <ChevronRight className="ml-1 h-3 w-3" /></Link>
-                        </Button>
-                    </div>
-                ) : (
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                        <TrendingUp className="h-4 w-4 text-green-500" />
-                        <p className="text-[10px] font-bold uppercase tracking-tighter">
-                            Te quedan {currentLimit === Infinity ? 'generaciones ilimitadas' : `${currentLimit - usedCount} intentos`} este mes
-                        </p>
-                    </div>
-                )}
+        <Card className="lg:col-span-3 border-2 border-gray-100 shadow-sm rounded-3xl p-4">
+            <div className="flex flex-col md:flex-row gap-4 items-center">
+                <div className="relative flex-1 group w-full">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
+                    <Input 
+                        placeholder="Buscar en recomendaciones..." 
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="pl-10 h-11 bg-white border-2 rounded-xl focus-visible:ring-primary/20"
+                    />
+                </div>
+
+                <div className="flex items-center gap-2 w-full md:w-auto">
+                    <Popover>
+                        <PopoverTrigger asChild>
+                            <Button variant="outline" className={cn("h-11 border-2 rounded-xl font-bold gap-2 bg-white min-w-[240px]", !dateRange && "text-muted-foreground")}>
+                                <CalendarIcon className="h-4 w-4 text-primary" />
+                                {dateRange?.from ? (
+                                    dateRange.to ? (
+                                        <>{format(dateRange.from, "dd/MM/yy")} - {format(dateRange.to, "dd/MM/yy")}</>
+                                    ) : format(dateRange.from, "dd/MM/yy")
+                                ) : "Historial por fecha"}
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="end">
+                            <Calendar
+                                initialFocus
+                                mode="range"
+                                defaultMonth={dateRange?.from}
+                                selected={dateRange}
+                                onSelect={setDateRange}
+                                numberOfMonths={2}
+                                locale={es}
+                            />
+                        </PopoverContent>
+                    </Popover>
+
+                    <Select value={pilarFilter} onValueChange={setPilarFilter}>
+                        <SelectTrigger className="h-11 border-2 rounded-xl w-40 font-bold bg-white">
+                            <SelectValue placeholder="Pilar" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">Todos los Pilares</SelectItem>
+                            {Object.entries(PILLAR_LABELS).map(([key, label]) => (
+                                <SelectItem key={key} value={key}>{label}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+
+                    <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+                        <SelectTrigger className="h-11 border-2 rounded-xl w-32 font-bold bg-white">
+                            <SelectValue placeholder="Prioridad" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">Todas</SelectItem>
+                            <SelectItem value="High" className="text-red-600 font-bold">Alta</SelectItem>
+                            <SelectItem value="Medium" className="text-orange-600 font-bold">Media</SelectItem>
+                            <SelectItem value="Low" className="text-blue-600 font-bold">Baja</SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
             </div>
-        </CardContent>
-      </Card>
+        </Card>
+      </div>
 
       {isLoading ? (
         <div className="flex flex-col items-center justify-center py-20 gap-3 border-2 border-dashed rounded-[2rem] bg-muted/20">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
             <p className="text-sm font-medium text-muted-foreground animate-pulse">Sincronizando con la nube...</p>
         </div>
-      ) : lastReport ? (
+      ) : activeReport ? (
         <div className="space-y-8 animate-in slide-in-from-bottom-4 duration-700">
             <Card className="rounded-[2.5rem] border-2 border-gray-100 shadow-xl overflow-hidden">
                 <CardHeader className="bg-muted/30 border-b p-8">
                     <div className="flex justify-between items-center">
                         <div>
-                            <CardTitle className="text-2xl font-black tracking-tight text-gray-900">Resultados del Diagnóstico</CardTitle>
+                            <CardTitle className="text-2xl font-black tracking-tight text-gray-900">Análisis Seleccionado</CardTitle>
                             <p className="text-sm font-medium text-muted-foreground flex items-center gap-2 mt-1">
-                                <Calendar className="h-4 w-4" />
-                                Generado el {format(new Date(lastReport.createdAt), "d 'de' MMMM 'de' yyyy 'a las' p", { locale: es })}
+                                <CalendarIcon className="h-4 w-4" />
+                                Generado el {format(new Date(activeReport.createdAt), "d 'de' MMMM, yyyy 'a las' p", { locale: es })}
                             </p>
                         </div>
-                        <Badge className="bg-green-500 text-white font-black px-4 py-1 rounded-full text-[10px] uppercase tracking-widest border-none shadow-sm">
-                            Última Versión
-                        </Badge>
+                        {historyReports && historyReports.length > 1 && (
+                            <Badge variant="secondary" className="bg-primary/10 text-primary font-black px-4 py-1 rounded-full text-[10px] uppercase tracking-widest border-none">
+                                {historyReports.length} Informes en rango
+                            </Badge>
+                        )}
                     </div>
                 </CardHeader>
                 <CardContent className="p-10">
@@ -332,44 +441,43 @@ export default function DiagnosticoComercialPage() {
                         <div className="absolute top-0 right-0 p-4 opacity-5"><FileBarChart size={80} /></div>
                         <h3 className="text-xs font-black uppercase tracking-[0.2em] text-primary mb-4">Resumen Ejecutivo</h3>
                         <p className="text-lg font-medium text-gray-700 leading-relaxed italic">
-                            &quot;{lastReport.data.executiveSummary}&quot;
+                            &quot;{activeReport.data.executiveSummary}&quot;
                         </p>
                     </div>
                 </CardContent>
             </Card>
 
-            {/* Renderizado de los 4 Pilares */}
-            {lastReport.data.pillars && (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                <PillarCard title="Venta Proactiva y Autónoma" data={lastReport.data.pillars.ventaProactiva} />
-                <PillarCard title="Radar de Churn (Retención)" data={lastReport.data.pillars.radarChurn} />
-                <PillarCard title="Protección de Reputación" data={lastReport.data.pillars.reputacion} />
-                <PillarCard title="Operación Blindada" data={lastReport.data.pillars.operacionBlindada} />
-              </div>
-            )}
+            {/* Renderizado de Pilares Filtrados y Ordenados */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                {filteredPillars.map((p) => (
+                    <PillarCard key={p.key} title={p.title} data={p} />
+                ))}
+            </div>
 
-            <Card className="bg-muted/20 border-dashed rounded-[2rem] border-2">
-              <CardHeader className="text-center p-8">
-                <div className="flex items-center justify-center gap-2 text-muted-foreground">
-                   <Target className="h-5 w-5" />
-                   <span className="text-[10px] font-black uppercase tracking-widest">Fuentes de Datos Analizadas</span>
-                </div>
-                <CardDescription className="text-xs font-medium">
-                  Este diagnóstico se construyó cruzando información de {lastReport.sourcesReviewed} módulos operativos.
-                </CardDescription>
-              </CardHeader>
-            </Card>
+            {filteredPillars.length === 0 && (
+                <Card className="border-2 border-dashed bg-muted/20 py-20 rounded-[2rem]">
+                    <CardContent className="text-center space-y-4">
+                        <Filter className="h-10 w-10 mx-auto text-muted-foreground/30" />
+                        <p className="text-sm font-medium text-muted-foreground">
+                            No se encontraron hallazgos con los filtros aplicados. Prueba ajustando la búsqueda.
+                        </p>
+                        <Button variant="ghost" onClick={() => { setSearchTerm(''); setPilarFilter('all'); setPriorityFilter('all'); }} className="text-xs font-bold uppercase">
+                            Limpiar filtros
+                        </Button>
+                    </CardContent>
+                </Card>
+            )}
         </div>
       ) : (
         <Card className="border-2 border-dashed bg-muted/20 py-24 rounded-[2rem]">
             <CardContent className="text-center space-y-6">
                 <div className="p-4 bg-white rounded-3xl shadow-sm border w-fit mx-auto">
-                    <Zap className="h-12 w-12 text-primary/30" />
+                    <Target className="h-12 w-12 text-primary/30" />
                 </div>
                 <div className="space-y-2">
-                    <h3 className="text-xl font-bold text-gray-800 uppercase tracking-tighter">Sin Diagnóstico Previo</h3>
+                    <h3 className="text-xl font-bold text-gray-800 uppercase tracking-tighter">Sin Datos en este Rango</h3>
                     <p className="text-sm text-muted-foreground max-w-sm mx-auto leading-relaxed font-medium">
-                        Tu negocio aún no ha generado un informe inteligente. Presiona el botón superior para realizar el primer análisis integral.
+                        No hay informes generados para las fechas seleccionadas. Ajusta el calendario o genera un nuevo diagnóstico.
                     </p>
                 </div>
             </CardContent>
@@ -380,29 +488,20 @@ export default function DiagnosticoComercialPage() {
         <DialogContent className="rounded-3xl border-none shadow-2xl p-0 overflow-hidden max-w-md">
             <DialogHeader className="p-8 pb-2 bg-amber-50">
                 <DialogTitle className="flex items-center gap-2 text-amber-700">
-                    <ShieldAlert className="h-5 w-5" /> 
-                    Confirmación de Gasto
+                    <ShieldAlert className="h-5 w-5" /> Confirmación de Gasto
                 </DialogTitle>
                 <DialogDescription className="font-medium text-amber-600/80">
-                    Ya generaste un informe hoy a las {lastReport?.createdAt && format(new Date(lastReport.createdAt), "p")}.
+                    Ya generaste un informe hoy.
                 </DialogDescription>
             </DialogHeader>
             <div className="p-8 space-y-4">
                 <p className="text-sm text-gray-600 leading-relaxed">
                     ¿Estás seguro de que quieres generar uno nuevo ahora? Esto descontará <strong>1 intento</strong> de tu límite mensual.
                 </p>
-                <div className="bg-muted p-4 rounded-xl border-2 border-dashed text-center">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Te quedarán</p>
-                    <p className="text-2xl font-black text-gray-900">{currentLimit === Infinity ? '∞' : currentLimit - usedCount - 1} intentos este mes</p>
-                </div>
             </div>
             <DialogFooter className="p-6 pt-0 flex flex-col sm:flex-row gap-2">
-                <Button variant="ghost" onClick={() => setShowConfirmDialog(false)} className="flex-1 font-bold">
-                    Ver el actual
-                </Button>
-                <Button onClick={() => handleRequestGeneration(true)} className="flex-1 font-black bg-amber-600 hover:bg-amber-700 text-white">
-                    Sí, generar nuevo
-                </Button>
+                <Button variant="ghost" onClick={() => setShowConfirmDialog(false)} className="flex-1 font-bold">Cancelar</Button>
+                <Button onClick={() => handleRequestGeneration(true)} className="flex-1 font-black bg-amber-600 hover:bg-amber-700 text-white">Sí, generar nuevo</Button>
             </DialogFooter>
         </DialogContent>
       </Dialog>
