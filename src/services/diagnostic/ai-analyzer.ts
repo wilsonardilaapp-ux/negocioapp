@@ -25,6 +25,7 @@ const PillarAnalysisSchema = z.object({
   priority: z.enum(['High', 'Medium', 'Low']).default('Medium'),
   learningNote: z.string().optional(),
   contradictions: z.array(z.string()).optional().default([]),
+  recommendationId: z.string().optional(), // Agregado para permitir rastreo de acciones
 });
 
 const DiagnosticAnalysisSchema = z.object({
@@ -42,7 +43,7 @@ const DiagnosticAnalysisSchema = z.object({
   }),
 });
 
-export type PillarAnalysis = z.infer<typeof PillarAnalysisSchema> & { recommendationId?: string };
+export type PillarAnalysis = z.infer<typeof PillarAnalysisSchema>;
 export type DiagnosticAnalysis = z.infer<typeof DiagnosticAnalysisSchema>;
 
 // --- UTILIDADES DE PARSEO RESILIENTE ---
