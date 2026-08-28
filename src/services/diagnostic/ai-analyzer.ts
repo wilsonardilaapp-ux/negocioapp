@@ -4,9 +4,12 @@
  * @fileOverview Motor de análisis estratégico con IA para el Diagnóstico Comercial.
  * - Consume el proveedor de IA activo (Google AI, OpenAI, DeepSeek, etc.).
  * - Genera un análisis estructurado basado en los 4 pilares del Corazón de Markix.
+ * - FIX: Implementa instanciación local de Genkit para inyectar API Keys dinámicas sin depender de variables de entorno.
  */
 
-import { ai } from '@/ai/genkit';
+import { genkit } from 'genkit';
+import { googleAI } from '@genkit-ai/google-genai';
+import { openAI } from 'genkitx-openai';
 import { z } from 'zod';
 import { getAIConfig } from '@/ai/flows/chat-flow';
 import type { DiagnosticRawData } from './data-extractor';
@@ -48,6 +51,29 @@ export async function analyzeDiagnosticWithAI(
     throw new Error('No hay un motor de IA configurado o activo en la plataforma.');
   }
 
+  // --- SOLUCIÓN QUIRÚRGICA: Instancia local de Genkit para inyección de llaves dinámicas ---
+  const instancePlugins = [];
+  
+  if (aiConfig.provider === 'googleai') {
+    instancePlugins.push(googleAI({ apiKey: aiConfig.apiKey }));
+  } else {
+    // Configuración para OpenAI, DeepSeek y otros compatibles
+    const openAIConfig: any = { apiKey: aiConfig.apiKey };
+    if (aiConfig.provider === 'deepseek') {
+      openAIConfig.baseURL = 'https://api.deepseek.com/v1';
+    }
+    instancePlugins.push(openAI(openAIConfig));
+  }
+
+  const localAi = genkit({
+    plugins: instancePlugins,
+  });
+
+  const modelId = aiConfig.provider === 'googleai' 
+    ? `googleai/${aiConfig.model}` 
+    : `openai/${aiConfig.model}`;
+  // ---------------------------------------------------------------------------------------
+
   const constructionWarning = sourcesReviewed < 8 
     ? `⚠️ AVISO IMPORTANTE: Este informe está en construcción. Faltan ${15 - sourcesReviewed} fuentes por revisar para tener el panorama completo. Menciona esto en el resumen ejecutivo.`
     : "";
@@ -78,8 +104,10 @@ INSTRUCCIONES DE ANÁLISIS:
 IMPORTANTE: Responde estrictamente en formato JSON que cumpla con el esquema solicitado.`;
 
   try {
-    const { output } = await ai.generate({
-      model: aiConfig.provider === 'googleai' ? `googleai/${aiConfig.model}` : `openai/${aiConfig.model}`,
+    console.log(`[AI-ANALYZER] Iniciando generación con instancia local (${aiConfig.provider}) para negocio: ${businessId}`);
+    
+    const { output } = await localAi.generate({
+      model: modelId as any,
       system: systemPrompt,
       prompt: 'Realiza el diagnóstico comercial exhaustivo del negocio basándote en los datos proporcionados.',
       output: {
@@ -87,7 +115,6 @@ IMPORTANTE: Responde estrictamente en formato JSON que cumpla con el esquema sol
       },
       config: {
         temperature: 0.2,
-        apiKey: aiConfig.apiKey,
       },
     });
 
@@ -97,7 +124,7 @@ IMPORTANTE: Responde estrictamente en formato JSON que cumpla con el esquema sol
 
     return output;
   } catch (error: any) {
-    console.error('[AI-ANALYZER] Error:', error.message);
+    console.error('[AI-ANALYZER] Error Crítico:', error.message);
     throw new Error('Error al procesar el análisis con IA: ' + error.message);
   }
 }
