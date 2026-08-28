@@ -16,6 +16,7 @@ export interface TrackingEvent {
   channel: 'presencial' | 'online' | 'redes_sociales' | 'directo';
   invoiceId: string | null;
   orderId: string | null;
+  consecutiveNumber?: string | null; // Añadido para trazabilidad en reportes
   sellerId: string | null;
   sellerName: string | null;
   customerId: string | null;

@@ -30,6 +30,7 @@ export function registerPOSTracking(
     channel: 'presencial',
     invoiceId: invoice.id,
     orderId: null,
+    consecutiveNumber: invoice.consecutiveNumber,
     sellerId: invoice.vendedorId,
     sellerName: sellerName || 'Vendedor POS',
     customerId: invoice.customer.id || null,
@@ -89,6 +90,7 @@ export function registerPublicOrderTracking(
     channel,
     invoiceId: null,
     orderId: order.id,
+    consecutiveNumber: order.id.slice(-8).toUpperCase(), // Usar el ID corto como consecutivo para pedidos online
     sellerId: null,
     sellerName: 'Cliente Online',
     customerId: null,
