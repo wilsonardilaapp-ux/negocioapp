@@ -132,10 +132,12 @@ export default function DiagnosticoComercialPage() {
 
   const currentLimit = useMemo(() => {
     if (!plan) return 1;
-    const planKey = plan.toLowerCase();
-    if (planKey.includes('profesional')) return PLAN_GENERATION_LIMITS.profesional;
-    if (planKey.includes('estandar')) return PLAN_GENERATION_LIMITS.estandar;
-    if (planKey.includes('basico')) return PLAN_GENERATION_LIMITS.basico;
+    // Normalización para ignorar acentos y asegurar emparejamiento con el objeto PLAN_GENERATION_LIMITS
+    const normalizedPlan = plan.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    
+    if (normalizedPlan.includes('profesional')) return PLAN_GENERATION_LIMITS.profesional;
+    if (normalizedPlan.includes('estandar')) return PLAN_GENERATION_LIMITS.estandar;
+    if (normalizedPlan.includes('basico')) return PLAN_GENERATION_LIMITS.basico;
     return PLAN_GENERATION_LIMITS.crecimiento;
   }, [plan]);
 
