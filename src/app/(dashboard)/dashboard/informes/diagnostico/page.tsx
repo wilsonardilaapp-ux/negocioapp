@@ -5,8 +5,8 @@ import { useUser, useFirestore, useCollection, useMemoFirebase, setDocumentNonBl
 import { collection, query, where, orderBy, doc, limit, setDoc, Timestamp, getDocs } from 'firebase/firestore';
 import { useSubscription } from '@/hooks/useSubscription';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { 
     Dialog, 
@@ -17,6 +17,7 @@ import {
     DialogFooter 
 } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { 
     FileBarChart, 
     Lock, 
