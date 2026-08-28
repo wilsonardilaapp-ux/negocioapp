@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -285,16 +286,13 @@ export default function DiagnosticoComercialPage() {
   const previousReport = useMemo(() => {
     if (!allReports || !activeReport) return null;
     
-    const activeDate = activeReport.createdAt.split('T')[0];
+    const activeDate = new Date(activeReport.createdAt).toISOString().split('T')[0];
     
-    // Buscar primero el informe más reciente que sea de un día anterior
-    const reportFromDifferentDay = allReports.find(r => {
-      const rDate = r.createdAt.split('T')[0];
+    // Buscar primero el informe más reciente que sea de un día anterior (Sin fallback al mismo día)
+    return allReports.find(r => {
+      const rDate = new Date(r.createdAt).toISOString().split('T')[0];
       return rDate < activeDate;
-    });
-
-    // Fallback al anterior inmediato si no hay de días anteriores
-    return reportFromDifferentDay || allReports.find(r => r.createdAt < activeReport.createdAt) || null;
+    }) || null;
   }, [allReports, activeReport]);
 
   const trends = useMemo(() => {
@@ -495,7 +493,7 @@ export default function DiagnosticoComercialPage() {
                 disabled={isGenerating || usedCount >= currentLimit || isLoading}
                 className="h-12 px-8 rounded-xl font-black uppercase tracking-widest shadow-lg shadow-primary/20 w-full md:w-auto"
             >
-                {isGenerating ? <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Analizando...</> : <><RefreshCw className="mr-2 h-5 w-5" /> Generar Nuevo Informe</>}
+                {isGenerating ? <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Analizando...</> : <><RefreshCw className="mr-2 h-4 w-4" /> Generar Nuevo Informe</>}
             </Button>
             <Badge variant="outline" className="h-8 px-4 rounded-lg border-2 font-bold bg-white">
                 Fuentes Revisadas: [{activeReport?.sourcesReviewed || 0} / 15]
@@ -538,18 +536,18 @@ export default function DiagnosticoComercialPage() {
                             <div className="text-center">
                                 <p className="text-[9px] font-black text-muted-foreground uppercase mb-1">Ventas</p>
                                 {trends && trends.sales !== null ? (
-                                    <div className={cn("flex items-center gap-1 font-bold text-sm", (trends.sales || 0) >= 0 ? "text-green-600" : "text-red-600")}>
-                                        {(trends.sales || 0) >= 0 ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
-                                        {Math.abs(trends.sales || 0).toFixed(1)}%
+                                    <div className={cn("flex items-center gap-1 font-bold text-sm", trends.sales >= 0 ? "text-green-600" : "text-red-600")}>
+                                        {trends.sales >= 0 ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
+                                        {Math.abs(trends.sales).toFixed(1)}%
                                     </div>
                                 ) : <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest italic">—</p>}
                             </div>
                             <div className="text-center">
                                 <p className="text-[9px] font-black text-muted-foreground uppercase mb-1">Ticket</p>
                                 {trends && trends.ticket !== null ? (
-                                    <div className={cn("flex items-center gap-1 font-bold text-sm", (trends.ticket || 0) >= 0 ? "text-green-600" : "text-red-600")}>
-                                        {(trends.ticket || 0) >= 0 ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
-                                        {Math.abs(trends.ticket || 0).toFixed(1)}%
+                                    <div className={cn("flex items-center gap-1 font-bold text-sm", trends.ticket >= 0 ? "text-green-600" : "text-red-600")}>
+                                        {trends.ticket >= 0 ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
+                                        {Math.abs(trends.ticket).toFixed(1)}%
                                     </div>
                                 ) : <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest italic">—</p>}
                             </div>
@@ -629,7 +627,7 @@ export default function DiagnosticoComercialPage() {
         <TabsContent value="history" className="outline-none animate-in fade-in duration-500">
             <Card className="rounded-3xl border-2 border-gray-100 bg-white overflow-hidden shadow-sm">
                 <CardHeader className="bg-muted/20 border-b">
-                    <CardTitle className="text-xl font-black">Historial de Diagnósticos</CardTitle>
+                    <CardTitle className="text-xl font-black">Historial de Informes</CardTitle>
                     <CardDescription>Consulta la evolución estratégica de tu negocio en el tiempo.</CardDescription>
                 </CardHeader>
                 <CardContent className="p-0">
@@ -653,9 +651,12 @@ export default function DiagnosticoComercialPage() {
                                     <TableCell><Badge variant="outline" className="font-bold uppercase text-[9px]">{r.planAtGeneration || 'N/A'}</Badge></TableCell>
                                     <TableCell className="text-center font-black text-xs text-primary">[{r.sourcesReviewed} / 15]</TableCell>
                                     <TableCell className="text-right pr-8">
-                                        <Button variant="ghost" size="sm" className="font-black text-[10px] uppercase tracking-widest gap-2 hover:text-primary" onClick={() => { setActiveTab('analysis'); setDateRange({ from: r.createdAt, to: r.createdAt }); }}>
+                                        <button 
+                                          onClick={() => { setActiveTab('analysis'); setDateRange({ from: r.createdAt, to: r.createdAt }); }}
+                                          className="flex items-center gap-2 ml-auto font-black text-[10px] uppercase tracking-widest text-muted-foreground hover:text-primary transition-colors"
+                                        >
                                             <Eye size={14} /> Ver Informe
-                                        </Button>
+                                        </button>
                                     </TableCell>
                                 </TableRow>
                             ))}
