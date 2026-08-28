@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import { useUser, useFirestore, useCollection, useMemoFirebase, addDocumentNonBlocking } from '@/firebase';
-import { collection, query, where, orderBy, limit, doc } from 'firebase/firestore';
+import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import { collection, query, where, orderBy, limit, doc, setDoc } from 'firebase/firestore';
 import { useSubscription } from '@/hooks/useSubscription';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -36,31 +36,30 @@ import { format, startOfMonth, isToday } from 'date-fns';
 import { es } from 'date-fns/locale';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
+import { extractDiagnosticData } from '@/services/diagnostic/data-extractor';
 
 /**
- * @fileOverview Fase 1 - Informe de Diagnóstico Comercial.
- * Implementa el control de generación bajo demanda y límites por plan.
+ * @fileOverview Fase 2 - Informe de Diagnóstico Comercial.
+ * Implementa la extracción de datos reales de las 15 fuentes del corazón de Markix.
  */
 
-// Mapeo de límites por plan solicitado
 const PLAN_GENERATION_LIMITS: Record<string, number> = {
     'profesional': Infinity,
     'estandar': 10,
     'basico': 4,
     'crecimiento': 1,
-    'free': 1, // Fallback para planes de prueba o sin nombre específico
+    'free': 1,
 };
 
 export default function DiagnosticoComercialPage() {
   const { user, profile } = useUser();
   const firestore = useFirestore();
   const { toast } = useToast();
-  const { plan, planDetails, isLoading: loadingSub } = useSubscription();
+  const { plan, isLoading: loadingSub } = useSubscription();
 
   const [isGenerating, setIsGenerating] = useState(false);
   const [showConfirmModal, setShowConfirmDialog] = useState(false);
 
-  // 1. RESOLUCIÓN DE LÍMITES
   const currentLimit = useMemo(() => {
     if (!plan) return 1;
     const planKey = plan.toLowerCase();
@@ -70,7 +69,6 @@ export default function DiagnosticoComercialPage() {
     return PLAN_GENERATION_LIMITS.crecimiento;
   }, [plan]);
 
-  // 2. CONSULTA DE CONSUMO DEL MES ACTUAL
   const monthStartISO = startOfMonth(new Date()).toISOString();
   const usageQuery = useMemoFirebase(() => {
     if (!user?.uid || !firestore) return null;
@@ -84,7 +82,6 @@ export default function DiagnosticoComercialPage() {
   const usedCount = reportsThisMonth?.length || 0;
   const hasRemainingAttempts = currentLimit === Infinity || usedCount < currentLimit;
 
-  // 3. CONSULTA DEL ÚLTIMO INFORME (Modo Lectura)
   const lastReportQuery = useMemoFirebase(() => {
     if (!user?.uid || !firestore) return null;
     return query(
@@ -97,11 +94,9 @@ export default function DiagnosticoComercialPage() {
   const { data: lastReportArr, isLoading: loadingLastReport } = useCollection(lastReportQuery);
   const lastReport = lastReportArr?.[0] || null;
 
-  // 4. HANDLER DE GENERACIÓN
   const handleRequestGeneration = async (bypassConfirm = false) => {
     if (!user || !hasRemainingAttempts) return;
 
-    // Validación de protección de gasto (una generación por día natural)
     if (!bypassConfirm && lastReport?.createdAt && isToday(new Date(lastReport.createdAt))) {
       setShowConfirmDialog(true);
       return;
@@ -111,30 +106,36 @@ export default function DiagnosticoComercialPage() {
     setShowConfirmDialog(false);
 
     try {
-      // Placeholder para Fases 2 y 3 (Extracción y Análisis IA)
+      // --- FASE 2: EXTRACCIÓN DE DATOS REALES ---
+      const extraction = await extractDiagnosticData(user.uid);
+      
       const reportId = doc(collection(firestore, 'placeholder')).id;
-      const reportsCol = collection(firestore, `businesses/${user.uid}/diagnosticReports`);
+      const reportRef = doc(firestore, `businesses/${user.uid}/diagnosticReports`, reportId);
       
       const newReportData = {
         id: reportId,
         createdAt: new Date().toISOString(),
         planAtGeneration: plan,
         status: 'completed',
-        sourcesReviewed: 0, // Se actualizará en Fase 2
+        sourcesReviewed: extraction.sourcesReviewed,
         data: {
-          executiveSummary: "Generación exitosa. Los datos reales se inyectarán en la Fase 2.",
-          pillars: {} // Se inyectará en Fase 3
+          executiveSummary: extraction.sourcesReviewed > 7 
+            ? "Datos recolectados exitosamente. Listo para análisis de IA." 
+            : "Fuentes parciales detectadas. Se requiere más actividad en la plataforma para un diagnóstico profundo.",
+          raw: extraction.data,
+          pillars: {} // Fase 3
         }
       };
 
-      await addDocumentNonBlocking(reportsCol, newReportData);
+      await setDoc(reportRef, newReportData);
       
       toast({
         title: "¡Informe Generado!",
-        description: "El diagnóstico ha sido actualizado con éxito.",
+        description: `Se han analizado ${extraction.sourcesReviewed} fuentes operativas.`,
       });
 
     } catch (error: any) {
+      console.error("Error al generar diagnóstico:", error);
       toast({
         variant: "destructive",
         title: "Error al generar",
@@ -149,16 +150,14 @@ export default function DiagnosticoComercialPage() {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500 pb-20">
-      {/* Banner de Seguridad - Fase 0 */}
       <Alert className="bg-muted/50 border-primary/20 shadow-sm rounded-2xl border-2">
         <Lock className="h-4 w-4 text-primary" />
         <AlertTitle className="text-xs font-black uppercase tracking-widest text-primary">Modo de Seguridad</AlertTitle>
         <AlertDescription className="text-sm font-medium">
-          🔒 Módulo en modo lectura — no modifica ni afecta tu operación comercial.
+          🔒 Módulo en modo lectura — no modifica ni afecta tu operación.
         </AlertDescription>
       </Alert>
 
-      {/* Cabecera Ejecutiva */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
         <div className="space-y-1">
           <h1 className="text-3xl font-black tracking-tight text-gray-900 flex items-center gap-3">
@@ -177,18 +176,17 @@ export default function DiagnosticoComercialPage() {
                 className="h-12 px-8 rounded-xl font-black uppercase tracking-widest shadow-lg shadow-primary/20 w-full md:w-auto"
             >
                 {isGenerating ? (
-                    <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Analizando...</>
+                    <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Analizando fuentes...</>
                 ) : (
                     <><RefreshCw className="mr-2 h-5 w-5" /> Generar Informe Actualizado</>
                 )}
             </Button>
             <Badge variant="outline" className="h-8 px-4 rounded-lg border-2 font-bold bg-white">
-                Informe basado en [{lastReport?.sourcesReviewed || 0}] de 15 fuentes
+                Informe basado en [{lastReport?.sourcesReviewed || 0}] de 15 fuentes revisadas
             </Badge>
         </div>
       </div>
 
-      {/* Control de Consumo y Límites */}
       <Card className="border-2 border-primary/10 shadow-sm rounded-3xl overflow-hidden">
         <CardContent className="p-6 grid grid-cols-1 md:grid-cols-3 gap-8 items-center">
             <div className="space-y-2">
@@ -232,7 +230,6 @@ export default function DiagnosticoComercialPage() {
         </CardContent>
       </Card>
 
-      {/* Visualización del Informe */}
       {isLoading ? (
         <div className="flex flex-col items-center justify-center py-20 gap-3 border-2 border-dashed rounded-[2rem] bg-muted/20">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -255,7 +252,6 @@ export default function DiagnosticoComercialPage() {
                 </div>
             </CardHeader>
             <CardContent className="p-10 space-y-8">
-                {/* Resumen Ejecutivo Placeholder */}
                 <div className="p-8 bg-primary/5 rounded-[2rem] border border-primary/10 relative overflow-hidden">
                     <div className="absolute top-0 right-0 p-4 opacity-5"><FileBarChart size={80} /></div>
                     <h3 className="text-xs font-black uppercase tracking-[0.2em] text-primary mb-4">Resumen Ejecutivo</h3>
@@ -265,13 +261,19 @@ export default function DiagnosticoComercialPage() {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center justify-center text-center py-10 opacity-40">
-                    <div className="p-10 border-2 border-dashed rounded-[2rem] space-y-2">
-                        <Info className="h-8 w-8 mx-auto text-muted-foreground" />
-                        <p className="text-xs font-bold uppercase tracking-widest">Extracción de datos (Fase 2)</p>
+                    <div className="p-10 border-2 border-dashed rounded-[2rem] space-y-4">
+                        <CheckCircle2 className="h-8 w-8 mx-auto text-green-500" />
+                        <div className="space-y-1">
+                            <p className="text-xs font-black uppercase tracking-widest">Extracción de datos completada</p>
+                            <p className="text-[10px] text-muted-foreground font-bold">Se revisaron {lastReport.sourcesReviewed} fuentes operativas.</p>
+                        </div>
                     </div>
-                    <div className="p-10 border-2 border-dashed rounded-[2rem] space-y-2">
+                    <div className="p-10 border-2 border-dashed rounded-[2rem] space-y-4">
                         <Search className="h-8 w-8 mx-auto text-muted-foreground" />
-                        <p className="text-xs font-bold uppercase tracking-widest">Análisis del Corazón (Fase 3)</p>
+                        <div className="space-y-1">
+                            <p className="text-xs font-black uppercase tracking-widest">Análisis del Corazón (Fase 3)</p>
+                            <p className="text-[10px] text-muted-foreground font-bold">Pendiente de autorización.</p>
+                        </div>
                     </div>
                 </div>
             </CardContent>
@@ -297,7 +299,6 @@ export default function DiagnosticoComercialPage() {
         </Card>
       )}
 
-      {/* MODAL DE CONFIRMACIÓN - PROTECCIÓN DE GASTO */}
       <Dialog open={showConfirmModal} onOpenChange={setShowConfirmDialog}>
         <DialogContent className="rounded-3xl border-none shadow-2xl p-0 overflow-hidden max-w-md">
             <DialogHeader className="p-8 pb-2 bg-amber-50">
