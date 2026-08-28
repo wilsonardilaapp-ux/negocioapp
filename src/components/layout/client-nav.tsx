@@ -1,3 +1,4 @@
+
 "use client";
 
 import Link from "next/link";
@@ -39,6 +40,7 @@ import {
   Lightbulb,
   User,
   CalendarCheck,
+  FileBarChart,
 } from "lucide-react";
 
 import { SidebarMenu, SidebarMenuItem, SidebarMenuButton, useSidebar } from "@/components/ui/sidebar";
@@ -47,6 +49,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 const allNavItems = [
   // 1-3: DASHBOARD Y LANDING
   { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
+  { href: "/dashboard/informes/diagnostico", icon: FileBarChart, label: "Informe de Diagnóstico" },
   { href: "/dashboard/landing-page", icon: FileText, label: "Landing Page" },
   { href: "/dashboard/share-landing", icon: Share2, label: "Compartir Landing Page" },
   
