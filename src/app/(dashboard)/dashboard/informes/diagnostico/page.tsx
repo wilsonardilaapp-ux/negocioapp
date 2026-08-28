@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
-import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, query, where, orderBy, doc, setDoc, limit } from 'firebase/firestore';
+import React, { useState, useMemo, useEffect } from 'react';
+import { useUser, useFirestore, useCollection, useMemoFirebase, setDocumentNonBlocking } from '@/firebase';
+import { collection, query, where, orderBy, doc, limit, setDoc, Timestamp } from 'firebase/firestore';
 import { useSubscription } from '@/hooks/useSubscription';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -26,14 +26,29 @@ import {
     Calendar, 
     Zap, 
     AlertTriangle, 
-    Target 
+    Target,
+    Search,
+    Filter,
+    History,
+    FileSpreadsheet,
+    FileText,
+    TrendingUp,
+    TrendingDown,
+    Minus,
+    CheckCircle2,
+    Circle,
+    ArrowRight
 } from 'lucide-react';
-import { format, startOfMonth, isToday } from 'date-fns';
+import { format, startOfMonth, isToday, isWithinInterval } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
 import { extractDiagnosticData } from '@/services/diagnostic/data-extractor';
 import { analyzeDiagnosticWithAI, type PillarAnalysis } from '@/services/diagnostic/ai-analyzer';
 import { cn } from '@/lib/utils';
+import { WhatsAppIcon } from '@/components/icons';
+import * as XLSX from 'xlsx';
+import { jsPDF } from 'jspdf';
+import 'jspdf-autotable';
 
 const PLAN_GENERATION_LIMITS: Record<string, number> = {
     'profesional': Infinity,
@@ -50,27 +65,37 @@ const PILLAR_LABELS: Record<string, string> = {
   operacionBlindada: "Operación Blindada"
 };
 
-const PillarCard = ({ title, data }: { title: string, data: PillarAnalysis }) => {
-  const statusColors = {
-    green: 'bg-green-500',
-    yellow: 'bg-yellow-500',
-    red: 'bg-red-500',
-  };
+/**
+ * Componente para renderizar un pilar con seguimiento de acciones (Fase A).
+ */
+const PillarCard = ({ 
+    title, 
+    data, 
+    pilarKey,
+    businessId,
+    reportId,
+    appliedActions,
+    onToggleAction,
+    isProcessingAction
+}: { 
+    title: string, 
+    data: PillarAnalysis, 
+    pilarKey: string,
+    businessId: string,
+    reportId: string,
+    appliedActions: any[],
+    onToggleAction: (pilarKey: string, recommendation: string) => void,
+    isProcessingAction: boolean
+}) => {
+  const statusColors = { green: 'bg-green-500', yellow: 'bg-yellow-500', red: 'bg-red-500' };
+  const priorityVariants = { High: 'destructive', Medium: 'default', Low: 'secondary' } as const;
+  const priorityLabels = { High: 'Prioridad Alta', Medium: 'Prioridad Media', Low: 'Prioridad Baja' };
 
-  const priorityVariants = {
-    High: 'destructive',
-    Medium: 'default',
-    Low: 'secondary',
-  } as const;
-
-  const priorityLabels = {
-    High: 'Prioridad Alta',
-    Medium: 'Prioridad Media',
-    Low: 'Prioridad Baja',
-  };
+  const action = appliedActions.find(a => a.id === `${reportId}_${pilarKey}`);
+  const isApplied = action?.status === 'applied';
 
   return (
-    <Card className="rounded-[2rem] border-2 border-gray-100 shadow-sm hover:shadow-md transition-shadow overflow-hidden flex flex-col h-full">
+    <Card className="rounded-[2rem] border-2 border-gray-100 shadow-sm hover:shadow-md transition-all overflow-hidden flex flex-col h-full">
       <CardHeader className="bg-muted/30 border-b pb-4">
         <div className="flex justify-between items-center">
           <div className="flex items-center gap-2">
@@ -100,7 +125,31 @@ const PillarCard = ({ title, data }: { title: string, data: PillarAnalysis }) =>
 
         <div className="space-y-1 pt-2">
           <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Recomendación</p>
-          <p className="text-sm font-bold text-slate-900">{data.recommendation}</p>
+          <div className="flex flex-col gap-3">
+              <p className="text-sm font-bold text-slate-900">{data.recommendation}</p>
+              
+              {/* ACCIÓN DE SEGUIMIENTO (Fase A) */}
+              <div className="pt-2">
+                  {isApplied ? (
+                      <div className="flex items-center gap-2 text-[10px] font-black text-green-600 uppercase bg-green-50 p-2 rounded-xl border border-green-100 animate-in zoom-in duration-300">
+                          <CheckCircle2 className="h-4 w-4" />
+                          <span>Aplicada el {format(new Date(action.appliedAt), 'dd/MM/yyyy')}</span>
+                          <button onClick={() => onToggleAction(pilarKey, data.recommendation)} className="ml-auto text-muted-foreground hover:text-red-500 underline">Deshacer</button>
+                      </div>
+                  ) : (
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        disabled={isProcessingAction}
+                        onClick={() => onToggleAction(pilarKey, data.recommendation)}
+                        className="h-8 text-[10px] font-black uppercase tracking-widest gap-2 rounded-lg border-primary/20 text-primary hover:bg-primary/5"
+                      >
+                        {isProcessingAction ? <Loader2 className="h-3 w-3 animate-spin" /> : <Circle className="h-3 w-3" />}
+                        Marcar como aplicada
+                      </Button>
+                  )}
+              </div>
+          </div>
         </div>
 
         {data.contradictions && data.contradictions.length > 0 && (
@@ -122,55 +171,106 @@ const PillarCard = ({ title, data }: { title: string, data: PillarAnalysis }) =>
 };
 
 export default function DiagnosticoComercialPage() {
-  const { user } = useUser();
+  const { user, profile } = useUser();
   const firestore = useFirestore();
   const { toast } = useToast();
   const { plan, isLoading: loadingSub } = useSubscription();
 
   const [isGenerating, setIsGenerating] = useState(false);
   const [showConfirmModal, setShowConfirmDialog] = useState(false);
+  const [activeTab, setActiveTab] = useState('analysis');
+  const [isProcessingAction, setIsProcessingAction] = useState(false);
+
+  // Filtros de UI
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterPilar, setFilterPilar] = useState('all');
+  const [filterPriority, setFilterPriority] = useState('all');
+  const [dateRange, setDateRange] = useState<{ from: string; to: string }>({ from: '', to: '' });
+
+  const businessId = profile?.role === 'super_admin' ? (user?.uid || '') : user?.uid || '';
+
+  // 1. Cargar Historial de Informes
+  const reportsQuery = useMemoFirebase(() => {
+    if (!businessId || !firestore) return null;
+    return query(
+        collection(firestore, `businesses/${businessId}/diagnosticReports`),
+        orderBy('createdAt', 'desc')
+    );
+  }, [businessId, firestore]);
+  const { data: allReports, isLoading: loadingReports } = useCollection<any>(reportsQuery);
+
+  // 2. Cargar Acciones Aplicadas (Fase A)
+  const actionsQuery = useMemoFirebase(() => {
+    if (!businessId || !firestore) return null;
+    return collection(firestore, `businesses/${businessId}/diagnosticActions`);
+  }, [businessId, firestore]);
+  const { data: appliedActions, isLoading: loadingActions } = useCollection<any>(actionsQuery);
+
+  // 3. Resolver Informe Activo (con filtros de fecha)
+  const activeReport = useMemo(() => {
+    if (!allReports || allReports.length === 0) return null;
+    if (dateRange.from && dateRange.to) {
+        return allReports.find(r => r.createdAt >= dateRange.from && r.createdAt <= dateRange.to) || allReports[0];
+    }
+    return allReports[0];
+  }, [allReports, dateRange]);
+
+  // 4. Resolver Comparación Histórica (Fase 6)
+  const previousReport = useMemo(() => {
+    if (!allReports || !activeReport) return null;
+    return allReports.find(r => r.createdAt < activeReport.createdAt) || null;
+  }, [allReports, activeReport]);
+
+  const trends = useMemo(() => {
+    if (!activeReport || !previousReport) return null;
+    const curr = activeReport.data.raw.ronda1_ventas;
+    const prev = previousReport.data.raw.ronda1_ventas;
+
+    const calc = (c: any, p: any) => {
+        if (typeof c !== 'number' || typeof p !== 'number' || p === 0) return null;
+        return ((c - p) / p) * 100;
+    };
+
+    return {
+        sales: calc(curr.totalSales30d, prev.totalSales30d),
+        orders: calc(curr.totalOrders30d, prev.totalOrders30d),
+        ticket: calc(curr.ticketPromedio, prev.ticketPromedio)
+    };
+  }, [activeReport, previousReport]);
+
+  const filteredPillars = useMemo(() => {
+    if (!activeReport) return [];
+    return Object.entries(activeReport.data.pillars)
+      .filter(([key, p]: [string, any]) => {
+          const matchesSearch = p.recommendation.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                               p.realState.toLowerCase().includes(searchTerm.toLowerCase());
+          const matchesPilar = filterPilar === 'all' || key === filterPilar;
+          const matchesPriority = filterPriority === 'all' || p.priority === filterPriority;
+          return matchesSearch && matchesPilar && matchesPriority;
+      })
+      .sort((a: any, b: any) => {
+          const priorityMap: any = { High: 0, Medium: 1, Low: 2 };
+          return priorityMap[a[1].priority] - priorityMap[b[1].priority];
+      });
+  }, [activeReport, searchTerm, filterPilar, filterPriority]);
 
   const currentLimit = useMemo(() => {
     if (!plan) return 1;
-    // Normalización para ignorar acentos y asegurar emparejamiento con el objeto PLAN_GENERATION_LIMITS
     const normalizedPlan = plan.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-    
     if (normalizedPlan.includes('profesional')) return PLAN_GENERATION_LIMITS.profesional;
     if (normalizedPlan.includes('estandar')) return PLAN_GENERATION_LIMITS.estandar;
     if (normalizedPlan.includes('basico')) return PLAN_GENERATION_LIMITS.basico;
     return PLAN_GENERATION_LIMITS.crecimiento;
   }, [plan]);
 
-  const monthStartISO = startOfMonth(new Date()).toISOString();
-  const usageQuery = useMemoFirebase(() => {
-    if (!user?.uid || !firestore) return null;
-    return query(
-        collection(firestore, `businesses/${user.uid}/diagnosticReports`),
-        where('createdAt', '>=', monthStartISO)
-    );
-  }, [user?.uid, firestore, monthStartISO]);
-
-  const { data: reportsThisMonth, isLoading: loadingUsage } = useCollection(usageQuery);
-  const usedCount = reportsThisMonth?.length || 0;
-  const hasRemainingAttempts = currentLimit === Infinity || usedCount < currentLimit;
-
-  // Consulta para el último informe generado
-  const lastReportQuery = useMemoFirebase(() => {
-    if (!user?.uid || !firestore) return null;
-    return query(
-        collection(firestore, `businesses/${user.uid}/diagnosticReports`),
-        orderBy('createdAt', 'desc'),
-        limit(1)
-    );
-  }, [user?.uid, firestore]);
-
-  const { data: lastReports, isLoading: loadingLast } = useCollection(lastReportQuery);
-  const activeReport = lastReports?.[0] || null;
+  const usedCount = useMemo(() => {
+      if (!allReports) return 0;
+      const monthStart = startOfMonth(new Date()).toISOString();
+      return allReports.filter(r => r.createdAt >= monthStart).length;
+  }, [allReports]);
 
   const handleRequestGeneration = async (bypassConfirm = false) => {
-    if (!user || !hasRemainingAttempts) return;
-
-    // Protección de gasto: Confirmar si ya se generó uno hoy
+    if (!businessId || usedCount >= currentLimit) return;
     if (!bypassConfirm && activeReport?.createdAt && isToday(new Date(activeReport.createdAt))) {
       setShowConfirmDialog(true);
       return;
@@ -178,76 +278,137 @@ export default function DiagnosticoComercialPage() {
 
     setIsGenerating(true);
     setShowConfirmDialog(false);
-
     try {
-      // FASE 2: Extracción de datos reales
-      const extraction = await extractDiagnosticData(user.uid);
-      
-      // FASE 3: Análisis Estratégico con IA activa
-      const analysis = await analyzeDiagnosticWithAI(extraction.data, extraction.sourcesReviewed, user.uid);
-
+      const extraction = await extractDiagnosticData(businessId);
       const reportId = doc(collection(firestore, 'placeholder')).id;
-      const reportRef = doc(firestore, `businesses/${user.uid}/diagnosticReports`, reportId);
+      const analysis = await analyzeDiagnosticWithAI(extraction.data, extraction.sourcesReviewed, businessId, reportId);
 
-      const newReportData = {
+      const reportRef = doc(firestore, `businesses/${businessId}/diagnosticReports`, reportId);
+      await setDoc(reportRef, {
         id: reportId,
         createdAt: new Date().toISOString(),
         planAtGeneration: plan,
         status: 'completed',
         sourcesReviewed: extraction.sourcesReviewed,
-        data: {
-          executiveSummary: analysis.executiveSummary,
-          raw: extraction.data,
-          pillars: analysis.pillars
-        }
-      };
-
-      await setDoc(reportRef, newReportData);
-      toast({ title: "¡Informe Generado!", description: `Análisis listo basado en ${extraction.sourcesReviewed} fuentes.` });
-
-    } catch (error: any) {
-      toast({ 
-        variant: "destructive", 
-        title: "Error al generar", 
-        description: error.message || "No se pudo procesar la solicitud de IA." 
+        data: { executiveSummary: analysis.executiveSummary, raw: extraction.data, pillars: analysis.pillars }
       });
+      toast({ title: "¡Análisis Completado!" });
+    } catch (error: any) {
+      toast({ variant: "destructive", title: "Error", description: error.message });
     } finally {
       setIsGenerating(false);
     }
   };
 
-  const isLoading = loadingSub || loadingUsage || loadingLast;
+  const handleToggleAction = async (pilarKey: string, recommendation: string) => {
+    if (!activeReport || !businessId) return;
+    setIsProcessingAction(true);
+    try {
+        const actionId = `${activeReport.id}_${pilarKey}`;
+        const actionRef = doc(firestore, `businesses/${businessId}/diagnosticActions`, actionId);
+        
+        const existing = appliedActions?.find(a => a.id === actionId);
+        
+        if (existing?.status === 'applied') {
+            await setDoc(actionRef, { status: 'pending', updatedAt: new Date().toISOString() }, { merge: true });
+            toast({ title: "Acción marcada como pendiente" });
+        } else {
+            // Mapeo dinámico de métricas para baseline (simplificado para MVP)
+            const metricMap: Record<string, any> = {
+                ventaProactiva: { key: 'totalSales30d', val: activeReport.data.raw.ronda1_ventas.totalSales30d },
+                radarChurn: { key: 'churnRiskCount', val: activeReport.data.raw.ronda2_clientes.churnRiskCount },
+                reputacion: { key: 'directoryRating', val: activeReport.data.raw.ronda4_motores.directoryRating },
+                operacionBlindada: { key: 'pendingOrdersCount', val: activeReport.data.raw.ronda3_operacion.pendingOrdersCount }
+            };
+
+            const baseline = metricMap[pilarKey];
+
+            await setDoc(actionRef, {
+                id: actionId,
+                reportId: activeReport.id,
+                pilar: pilarKey,
+                description: recommendation,
+                status: 'applied',
+                appliedAt: new Date().toISOString(),
+                baselineValue: baseline?.val || 0,
+                targetMetricKey: baseline?.key || 'unknown',
+                resultValue: null,
+                impactStatus: null,
+                updatedAt: new Date().toISOString()
+            });
+            toast({ title: "¡Acción marcada como aplicada!", description: "Mediremos el impacto en tu próximo informe." });
+        }
+    } catch (e) {
+        toast({ variant: 'destructive', title: "Error al actualizar acción" });
+    } finally {
+        setIsProcessingAction(false);
+    }
+  };
+
+  const handleExportExcel = () => {
+    if (!activeReport) return;
+    const data = Object.entries(activeReport.data.pillars).map(([key, p]: [string, any]) => ({
+        Pilar: PILLAR_LABELS[key] || key,
+        Estado: p.realState,
+        Oportunidad: p.opportunityData,
+        Prioridad: p.priority,
+        Recomendacion: p.recommendation,
+        Semaforo: p.status
+    }));
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Diagnóstico");
+    XLSX.writeFile(wb, `Diagnostico_Markix_${activeReport.id.slice(0,5)}.xlsx`);
+  };
+
+  const handleExportPDF = () => {
+    if (!activeReport) return;
+    const docPdf = new jsPDF();
+    docPdf.text("INFORME DE DIAGNÓSTICO COMERCIAL - MARKIX", 14, 20);
+    docPdf.setFontSize(10);
+    docPdf.text(`Generado: ${new Date(activeReport.createdAt).toLocaleString()}`, 14, 30);
+    (docPdf as any).autoTable({
+        startY: 40,
+        head: [['Pilar', 'Estado', 'Prioridad', 'Recomendación']],
+        body: Object.entries(activeReport.data.pillars).map(([key, p]: [string, any]) => [
+            PILLAR_LABELS[key], p.realState, p.priority, p.recommendation
+        ])
+    });
+    docPdf.save(`Reporte_Markix_${activeReport.id.slice(0,5)}.pdf`);
+  };
+
+  const handleShareWhatsApp = () => {
+    if (!activeReport) return;
+    const msg = `*Markix Diagnóstico Comercial*\n\nResumen: ${activeReport.data.executiveSummary}\n\nVer informe completo en tu panel.`;
+    window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
+  };
+
+  const isLoading = loadingSub || loadingReports || loadingActions;
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500 pb-20">
       <Alert className="bg-muted/50 border-primary/20 shadow-sm rounded-2xl border-2">
         <Lock className="h-4 w-4 text-primary" />
-        <AlertTitle className="text-xs font-black uppercase tracking-widest text-primary">Modo de Seguridad</AlertTitle>
-        <AlertDescription className="text-sm font-medium">
-          🔒 Módulo en modo lectura — no modifica ni afecta tu operación.
-        </AlertDescription>
+        <AlertTitle className="text-xs font-black uppercase tracking-widest text-primary">Inteligencia Estratégica</AlertTitle>
+        <AlertDescription className="text-sm font-medium">Analizador táctico en modo lectura — Identifica oportunidades sin alterar tu operación.</AlertDescription>
       </Alert>
 
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
         <div className="space-y-1">
           <h1 className="text-3xl font-black tracking-tight text-gray-900 flex items-center gap-3">
             <FileBarChart className="h-9 w-9 text-primary" />
-            Diagnóstico de Negocio
+            Diagnóstico Comercial
           </h1>
-          <p className="text-muted-foreground font-medium">Análisis estratégico basado en el Corazón de Markix.</p>
+          <p className="text-muted-foreground font-medium">Hoja de ruta táctica basada en el Corazón de Markix.</p>
         </div>
 
         <div className="flex flex-col items-end gap-2 w-full md:w-auto">
             <Button 
                 onClick={() => handleRequestGeneration()}
-                disabled={isGenerating || !hasRemainingAttempts || isLoading}
+                disabled={isGenerating || usedCount >= currentLimit || isLoading}
                 className="h-12 px-8 rounded-xl font-black uppercase tracking-widest shadow-lg shadow-primary/20 w-full md:w-auto"
             >
-                {isGenerating ? (
-                    <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Analizando...</>
-                ) : (
-                    <><RefreshCw className="mr-2 h-5 w-5" /> Generar Nuevo Informe</>
-                )}
+                {isGenerating ? <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Analizando...</> : <><RefreshCw className="mr-2 h-5 w-5" /> Generar Nuevo Informe</>}
             </Button>
             <Badge variant="outline" className="h-8 px-4 rounded-lg border-2 font-bold bg-white">
                 Fuentes Revisadas: [{activeReport?.sourcesReviewed || 0} / 15]
@@ -255,85 +416,177 @@ export default function DiagnosticoComercialPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        <Card className="lg:col-span-1 border-2 border-primary/10 shadow-sm rounded-3xl p-6">
-            <div className="space-y-2">
-                <div className="flex justify-between items-end">
-                    <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Uso del Mes</p>
-                    <span className="text-xs font-bold">{usedCount} / {currentLimit === Infinity ? '∞' : currentLimit}</span>
-                </div>
-                <Progress value={currentLimit === Infinity ? 0 : (usedCount / currentLimit) * 100} className="h-2" />
-                <p className="text-[9px] font-bold text-muted-foreground uppercase text-center pt-1">{plan || 'Plan Crecimiento'}</p>
-            </div>
-        </Card>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="bg-muted/50 p-1 rounded-xl mb-6">
+            <TabsTrigger value="analysis" className="gap-2 rounded-lg font-bold"><Target className="h-4 w-4" /> Análisis Activo</TabsTrigger>
+            <TabsTrigger value="history" className="gap-2 rounded-lg font-bold"><History className="h-4 w-4" /> Historial de Informes</TabsTrigger>
+        </TabsList>
 
-        <Card className="lg:col-span-3 border-2 border-gray-100 shadow-sm rounded-3xl p-6 flex items-center gap-4">
-            <div className="p-3 bg-muted rounded-2xl"><Calendar className="h-6 w-6 text-muted-foreground" /></div>
-            <div>
-                <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Último Análisis</p>
-                <p className="text-sm font-bold text-slate-900">
-                    {activeReport?.createdAt ? format(new Date(activeReport.createdAt), "EEEE, d 'de' MMMM 'a las' p", { locale: es }) : 'Sin diagnóstico previo'}
-                </p>
-            </div>
-        </Card>
-      </div>
-
-      {isLoading ? (
-        <div className="flex flex-col items-center justify-center py-20 gap-3 border-2 border-dashed rounded-[2rem] bg-muted/20">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            <p className="text-sm font-medium text-muted-foreground">Sincronizando con el cerebro de IA...</p>
-        </div>
-      ) : activeReport ? (
-        <div className="space-y-8 animate-in slide-in-from-bottom-4 duration-700">
-            {/* RESUMEN EJECUTIVO */}
-            <Card className="rounded-[2.5rem] border-2 border-gray-100 shadow-xl overflow-hidden">
-                <CardHeader className="bg-muted/30 border-b p-8">
-                    <CardTitle className="text-2xl font-black">Resumen Ejecutivo</CardTitle>
-                </CardHeader>
-                <CardContent className="p-10">
-                    <div className="p-8 bg-primary/5 rounded-[2rem] border border-primary/10">
-                        <p className="text-lg font-medium text-gray-700 leading-relaxed italic">&quot;{activeReport.data.executiveSummary}&quot;</p>
+        <TabsContent value="analysis" className="space-y-8 outline-none">
+            {/* KPI TRACKER Y EVOLUCIÓN */}
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                <Card className="lg:col-span-1 border-2 border-primary/10 shadow-sm rounded-3xl p-6 bg-white">
+                    <div className="space-y-2">
+                        <div className="flex justify-between items-end">
+                            <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Uso del Mes</p>
+                            <span className="text-xs font-bold">{usedCount} / {currentLimit === Infinity ? '∞' : currentLimit}</span>
+                        </div>
+                        <Progress value={currentLimit === Infinity ? 0 : (usedCount / currentLimit) * 100} className="h-2" />
+                        <p className="text-[9px] font-bold text-muted-foreground uppercase text-center pt-1">{plan || 'Plan Crecimiento'}</p>
                     </div>
+                </Card>
+
+                <Card className="lg:col-span-3 border-2 border-gray-100 shadow-sm rounded-3xl p-6 bg-white flex flex-col md:flex-row items-center justify-between gap-6">
+                    <div className="flex items-center gap-4">
+                        <div className="p-3 bg-muted rounded-2xl"><Calendar className="h-6 w-6 text-muted-foreground" /></div>
+                        <div>
+                            <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Informe en Pantalla</p>
+                            <p className="text-sm font-bold text-slate-900">
+                                {activeReport?.createdAt ? format(new Date(activeReport.createdAt), "EEEE, d 'de' MMMM", { locale: es }) : 'No hay datos'}
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="flex gap-4">
+                        {trends ? (
+                            <div className="flex gap-6">
+                                <div className="text-center">
+                                    <p className="text-[9px] font-black text-muted-foreground uppercase mb-1">Ventas</p>
+                                    <div className={cn("flex items-center gap-1 font-bold text-sm", (trends.sales || 0) >= 0 ? "text-green-600" : "text-red-600")}>
+                                        {(trends.sales || 0) >= 0 ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
+                                        {Math.abs(trends.sales || 0).toFixed(1)}%
+                                    </div>
+                                </div>
+                                <div className="text-center">
+                                    <p className="text-[9px] font-black text-muted-foreground uppercase mb-1">Ticket</p>
+                                    <div className={cn("flex items-center gap-1 font-bold text-sm", (trends.ticket || 0) >= 0 ? "text-green-600" : "text-red-600")}>
+                                        {(trends.ticket || 0) >= 0 ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
+                                        {Math.abs(trends.ticket || 0).toFixed(1)}%
+                                    </div>
+                                </div>
+                            </div>
+                        ) : <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest italic">📊 Comparación histórica no disponible</p>}
+                    </div>
+                </Card>
+            </div>
+
+            {activeReport && (
+                <>
+                    <Card className="rounded-[2.5rem] border-2 border-gray-100 shadow-xl overflow-hidden bg-white animate-in zoom-in duration-500">
+                        <CardHeader className="bg-muted/30 border-b p-8 flex flex-col md:flex-row justify-between items-center gap-4">
+                            <CardTitle className="text-2xl font-black">Resumen Ejecutivo</CardTitle>
+                            <div className="flex gap-2">
+                                <Button variant="outline" size="sm" onClick={handleExportExcel} className="font-bold gap-2"><FileSpreadsheet size={16} className="text-green-600" /> Excel</Button>
+                                <Button variant="outline" size="sm" onClick={handleExportPDF} className="font-bold gap-2"><FileText size={16} className="text-primary" /> PDF</Button>
+                                <Button variant="outline" size="sm" onClick={handleShareWhatsApp} className="font-bold gap-2 border-green-200 text-green-700 bg-green-50"><WhatsAppIcon className="h-4 w-4" /> Compartir</Button>
+                            </div>
+                        </CardHeader>
+                        <CardContent className="p-10">
+                            <div className="p-8 bg-primary/5 rounded-[2rem] border border-primary/10">
+                                <p className="text-lg font-medium text-gray-700 leading-relaxed italic">&quot;{activeReport.data.executiveSummary}&quot;</p>
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    {/* BARRA DE FILTROS PARA PILARES */}
+                    <div className="flex flex-col md:flex-row gap-4 items-end bg-white p-6 rounded-[2rem] border shadow-sm border-primary/10">
+                        <div className="flex-1 space-y-2 w-full">
+                            <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">Buscador Táctico</Label>
+                            <div className="relative group">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
+                                <Input placeholder="Buscar en recomendaciones..." className="pl-10 h-11 border-2 focus-visible:ring-primary/20" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+                            </div>
+                        </div>
+                        <div className="w-full md:w-48 space-y-2">
+                            <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">Filtrar Pilar</Label>
+                            <Select value={filterPilar} onValueChange={setFilterPilar}>
+                                <SelectTrigger className="h-11 border-2 font-bold"><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">Todos los pilares</SelectItem>
+                                    {Object.entries(PILLAR_LABELS).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="w-full md:w-48 space-y-2">
+                            <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">Prioridad</Label>
+                            <Select value={filterPriority} onValueChange={setFilterPriority}>
+                                <SelectTrigger className="h-11 border-2 font-bold"><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">Todas</SelectItem>
+                                    <SelectItem value="High" className="text-red-600 font-bold">Alta</SelectItem>
+                                    <SelectItem value="Medium" className="text-amber-600 font-bold">Media</SelectItem>
+                                    <SelectItem value="Low" className="text-blue-600 font-bold">Baja</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        {filteredPillars.map(([key, p]: [string, any]) => (
+                            <PillarCard 
+                                key={key} 
+                                title={PILLAR_LABELS[key]} 
+                                data={p as PillarAnalysis} 
+                                pilarKey={key}
+                                businessId={businessId}
+                                reportId={activeReport.id}
+                                appliedActions={appliedActions || []}
+                                onToggleAction={handleToggleAction}
+                                isProcessingAction={isProcessingAction}
+                            />
+                        ))}
+                    </div>
+                </>
+            )}
+        </TabsContent>
+
+        <TabsContent value="history" className="outline-none animate-in fade-in duration-500">
+            <Card className="rounded-3xl border-2 border-gray-100 bg-white overflow-hidden shadow-sm">
+                <CardHeader className="bg-muted/20 border-b">
+                    <CardTitle className="text-xl font-black">Historial de Diagnósticos</CardTitle>
+                    <CardDescription>Consulta la evolución estratégica de tu negocio en el tiempo.</CardDescription>
+                </CardHeader>
+                <CardContent className="p-0">
+                    <Table>
+                        <TableHeader className="bg-muted/10">
+                            <TableRow>
+                                <TableHead className="pl-8 font-black text-[10px] uppercase">Fecha y Hora</TableHead>
+                                <TableHead className="font-black text-[10px] uppercase">Plan al Generar</TableHead>
+                                <TableHead className="font-black text-[10px] uppercase text-center">Fuentes</TableHead>
+                                <TableHead className="font-black text-[10px] uppercase text-right pr-8">Acción</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {loadingReports ? (
+                                <TableRow><TableCell colSpan={4} className="h-32 text-center"><Loader2 className="animate-spin h-6 w-6 mx-auto text-primary" /></TableCell></TableRow>
+                            ) : allReports?.map(r => (
+                                <TableRow key={r.id} className="hover:bg-muted/30">
+                                    <TableCell className="pl-8 py-4 font-bold text-sm text-slate-700">
+                                        {format(new Date(r.createdAt), "d 'de' MMMM, yyyy - p", { locale: es })}
+                                    </TableCell>
+                                    <TableCell><Badge variant="outline" className="font-bold uppercase text-[9px]">{r.planAtGeneration || 'N/A'}</Badge></TableCell>
+                                    <TableCell className="text-center font-black text-xs text-primary">[{r.sourcesReviewed} / 15]</TableCell>
+                                    <TableCell className="text-right pr-8">
+                                        <Button variant="ghost" size="sm" className="font-black text-[10px] uppercase tracking-widest gap-2 hover:text-primary" onClick={() => { setActiveTab('analysis'); setDateRange({ from: r.createdAt, to: r.createdAt }); }}>
+                                            <Eye size={14} /> Ver Informe
+                                        </Button>
+                                    </TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
                 </CardContent>
             </Card>
+        </TabsContent>
+      </Tabs>
 
-            {/* PILARES */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                {Object.entries(activeReport.data.pillars).map(([key, p]: [string, any]) => (
-                    <PillarCard 
-                        key={key} 
-                        title={PILLAR_LABELS[key] || key} 
-                        data={p as PillarAnalysis} 
-                    />
-                ))}
-            </div>
-        </div>
-      ) : (
-        <div className="text-center py-32 bg-muted/20 border-2 border-dashed rounded-[2rem]">
-            <Target className="h-12 w-12 mx-auto text-muted-foreground/30 mb-4" />
-            <p className="font-bold text-gray-500 uppercase tracking-tighter">Presiona el botón para iniciar el diagnóstico</p>
-        </div>
-      )}
-
-      {/* CONFIRMACIÓN DE RE-GENERACIÓN EN EL MISMO DÍA */}
       <Dialog open={showConfirmModal} onOpenChange={setShowConfirmDialog}>
         <DialogContent className="rounded-3xl border-none shadow-2xl p-0 overflow-hidden max-w-md">
-            <DialogHeader className="p-8 pb-2 bg-amber-50">
-                <DialogTitle className="flex items-center gap-2 text-amber-700">
-                    <ShieldAlert className="h-5 w-5" /> Protección de Gasto
-                </DialogTitle>
-                <DialogDescription className="font-medium text-amber-600/80">
-                    Ya generaste un informe hoy.
-                </DialogDescription>
-            </DialogHeader>
-            <div className="p-8 space-y-4">
-                <p className="text-sm text-gray-600 leading-relaxed">
-                    ¿Seguro que quieres generar uno nuevo ahora? Esto descontará <strong>1 intento</strong> de tu límite mensual.
-                </p>
-            </div>
+            <DialogHeader className="p-8 pb-2 bg-amber-50"><DialogTitle className="flex items-center gap-2 text-amber-700"><ShieldAlert className="h-5 w-5" /> Protección de Gasto</DialogTitle></DialogHeader>
+            <div className="p-8 space-y-4"><p className="text-sm text-gray-600 leading-relaxed">¿Seguro que quieres generar uno nuevo ahora? Esto descontará 1 intento de tu límite mensual.</p></div>
             <DialogFooter className="p-6 pt-0 flex flex-col sm:flex-row gap-2">
                 <Button variant="ghost" onClick={() => setShowConfirmDialog(false)} className="flex-1 font-bold">Cancelar</Button>
-                <Button onClick={() => handleRequestGeneration(true)} className="flex-1 font-black bg-amber-600 hover:bg-amber-700 text-white">Sí, generar nuevo</Button>
+                <Button onClick={() => handleRequestGeneration(true)} className="flex-1 font-black bg-amber-600 hover:bg-amber-700 text-white">Generar nuevo</Button>
             </DialogFooter>
         </DialogContent>
       </Dialog>

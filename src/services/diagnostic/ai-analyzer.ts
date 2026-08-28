@@ -4,8 +4,7 @@
  * @fileOverview Motor de análisis estratégico con IA para el Diagnóstico Comercial.
  * - Consume el proveedor de IA activo (Google AI, OpenAI, DeepSeek, etc.).
  * - Genera un análisis estructurado basado en los 4 pilares del Corazón de Markix.
- * - FIX: Implementa enrutamiento dual. Genkit para Google AI y Fetch directo para compatibles con OpenAI (DeepSeek).
- * - Garantiza compatibilidad con modelos externos sin errores de registro en el plugin.
+ * - FASE A: Inyecta identificadores únicos por recomendación para seguimiento.
  */
 
 import { genkit } from 'genkit';
@@ -34,30 +33,32 @@ const DiagnosticAnalysisSchema = z.object({
   }),
 });
 
-export type PillarAnalysis = z.infer<typeof PillarAnalysisSchema>;
-export type DiagnosticAnalysis = z.infer<typeof DiagnosticAnalysisSchema>;
+export type PillarAnalysis = z.infer<typeof PillarAnalysisSchema> & { recommendationId?: string };
+export type DiagnosticAnalysis = {
+  executiveSummary: string;
+  pillars: {
+    ventaProactiva: PillarAnalysis;
+    radarChurn: PillarAnalysis;
+    reputacion: PillarAnalysis;
+    operacionBlindada: PillarAnalysis;
+  };
+};
 
-/**
- * Limpia y parsea un bloque de texto que contiene JSON, manejando posibles bloques de código markdown.
- */
 function extractJson(text: string) {
     try {
         const jsonMatch = text.match(/\{[\s\S]*\}/);
         if (!jsonMatch) return null;
         return JSON.parse(jsonMatch[0]);
     } catch (e) {
-        console.error("[AI-ANALYZER] Error parseando JSON de respuesta:", e);
         return null;
     }
 }
 
-/**
- * Procesa los datos reales con el LLM activo para generar el informe estratégico.
- */
 export async function analyzeDiagnosticWithAI(
   rawData: DiagnosticRawData,
   sourcesReviewed: number,
-  businessId: string
+  businessId: string,
+  reportId: string // Requerido para generar IDs de recomendación
 ): Promise<DiagnosticAnalysis> {
   const aiConfig = await getAIConfig(businessId);
 
@@ -104,75 +105,55 @@ IMPORTANTE: Responde estrictamente en formato JSON que cumpla con el siguiente e
 }`;
 
   try {
-    console.log(`[AI-ANALYZER] Iniciando generación (${aiConfig.provider}) para negocio: ${businessId}`);
+    let result: any;
     
-    // RUTA 1: Google AI (Gemini) usando Genkit
     if (aiConfig.provider === 'googleai') {
-        const localAi = genkit({
-            plugins: [googleAI({ apiKey: aiConfig.apiKey })],
-        });
-
+        const localAi = genkit({ plugins: [googleAI({ apiKey: aiConfig.apiKey })] });
         const { output } = await localAi.generate({
             model: `googleai/${aiConfig.model}`,
             system: systemPrompt,
-            prompt: 'Realiza el diagnóstico comercial exhaustivo del negocio basándote en los datos proporcionados.',
-            output: {
-                schema: DiagnosticAnalysisSchema,
-            },
-            config: {
+            prompt: 'Genera el diagnóstico comercial.',
+            output: { schema: DiagnosticAnalysisSchema },
+            config: { temperature: 0.2 },
+        });
+        result = output;
+    } else {
+        let endpoint = 'https://api.openai.com/v1/chat/completions';
+        if (aiConfig.provider === 'deepseek') endpoint = 'https://api.deepseek.com/chat/completions';
+        else if (aiConfig.provider === 'groq') endpoint = 'https://api.groq.com/openai/v1/chat/completions';
+
+        const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${aiConfig.apiKey}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                model: aiConfig.model,
+                messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: 'Genera el JSON.' }],
                 temperature: 0.2,
-            },
+                response_format: { type: "json_object" } 
+            }),
         });
 
-        if (!output) throw new Error('El motor de IA no devolvió un análisis válido.');
-        return output;
+        if (!response.ok) throw new Error(`API Error ${response.status}`);
+        const data = await response.json();
+        result = extractJson(data.choices?.[0]?.message?.content || "");
     }
 
-    // RUTA 2: Proveedores compatibles con OpenAI (DeepSeek, OpenAI, Groq, etc.) usando Fetch
-    let endpoint = 'https://api.openai.com/v1/chat/completions';
-    if (aiConfig.provider === 'deepseek') {
-        endpoint = 'https://api.deepseek.com/chat/completions';
-    } else if (aiConfig.provider === 'groq') {
-        endpoint = 'https://api.groq.com/openai/v1/chat/completions';
-    }
+    if (!result) throw new Error('No se pudo procesar el análisis.');
 
-    console.log(`[AI-ANALYZER] Despachando vía Fetch a: ${endpoint}`);
-
-    const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-            'Authorization': `Bearer ${aiConfig.apiKey}`,
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-            model: aiConfig.model,
-            messages: [
-                { role: 'system', content: systemPrompt },
-                { role: 'user', content: 'Genera el JSON de diagnóstico comercial.' }
-            ],
-            temperature: 0.2,
-            response_format: { type: "json_object" } 
-        }),
-    });
-
-    if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Error API ${aiConfig.provider} (${response.status}): ${errorText}`);
-    }
-
-    const data = await response.json();
-    const rawContent = data.choices?.[0]?.message?.content || "";
-    const jsonResult = extractJson(rawContent);
-
-    if (!jsonResult) {
-        throw new Error('No se pudo extraer un formato JSON válido de la respuesta de la IA.');
-    }
-
-    // Validación final con Zod para asegurar integridad de la interfaz
-    return DiagnosticAnalysisSchema.parse(jsonResult);
+    // FASE A: Inyectar IDs de recomendación deterministas
+    const validated = DiagnosticAnalysisSchema.parse(result);
+    return {
+      executiveSummary: validated.executiveSummary,
+      pillars: {
+        ventaProactiva: { ...validated.pillars.ventaProactiva, recommendationId: `${reportId}_ventaProactiva` },
+        radarChurn: { ...validated.pillars.radarChurn, recommendationId: `${reportId}_radarChurn` },
+        reputacion: { ...validated.pillars.reputacion, recommendationId: `${reportId}_reputacion` },
+        operacionBlindada: { ...validated.pillars.operacionBlindada, recommendationId: `${reportId}_operacionBlindada` },
+      }
+    };
 
   } catch (error: any) {
-    console.error('[AI-ANALYZER] Error Crítico:', error.message);
-    throw new Error('Error al procesar el análisis con IA: ' + error.message);
+    console.error('[AI-ANALYZER] Error:', error.message);
+    throw new Error('Fallo en análisis IA: ' + error.message);
   }
 }
