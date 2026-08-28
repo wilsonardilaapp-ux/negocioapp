@@ -24,14 +24,14 @@ export interface DiagnosticRawData {
   ronda3_operacion: {
     pendingOrdersCount: number | "dato pendiente";
     lowStockCount: number | "dato pendiente";
-    accountingMovementsCount: number | "dato pendiente";
+    accountingMovementsCount: number | string | "dato pendiente";
   };
   ronda4_motores: {
     chatbotEnabled: boolean | "dato pendiente";
     activePromotionsCount: number | "dato pendiente";
     activeCouponsCount: number | "dato pendiente";
     directoryRating: number | "dato pendiente";
-    reservationsCount: number | "dato pendiente";
+    reservationsCount: number | string | "dato pendiente";
   };
 }
 
