@@ -104,7 +104,7 @@ export function PublicMenuChatWidget({ businessId, isPreview = false, products =
       // --- RESOLUCIÓN DE IDENTIDAD Y SUGERENCIAS ---
       if (result.detectedProductId && !isPreview) {
         // Buscar el producto original en el catálogo local (Resolución Híbrida)
-        const originalProduct = products.find(p => 
+        const originalProduct = (products || []).find(p => 
             p.id === result.detectedProductId || 
             p.name.toLowerCase().trim() === result.detectedProductId?.toLowerCase().trim()
         );
