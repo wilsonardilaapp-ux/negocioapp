@@ -694,7 +694,7 @@ function SimulatorView() {
                   <div className="absolute top-0 right-0 p-4 opacity-10 text-white"><CheckCircle size={60} /></div>
                   <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40">4. Rentabilidad Neta</p>
                   <div className="space-y-3">
-                    <div className="flex justify-between items-end border-b border-white/10 pb-2"><span className="text-xs font-bold text-white/60">Margen:</span><span className="font-black text-sm text-white">{margenNeto}%</span></div>
+                    <div className="flex justify-between items-end border-b border-white/10 pb-2"><span className="text-xs font-bold text-white/60">Margen:</span><span className="font-black text-sm">{margenNeto}%</span></div>
                     <div className="flex flex-col pt-3">
                         <span className="text-[9px] font-black uppercase text-orange-400 tracking-widest mb-1">Ganancia Neta Extra:</span>
                         <span className="text-2xl font-black text-white">{recommendation?.isProfitable ? formatCOP(recommendation.gananciaNetaExtra) : 'Fase Inversión'}</span>
@@ -763,4 +763,3 @@ export default function PricingSimulatorPage() {
     </>
   );
 }
-
