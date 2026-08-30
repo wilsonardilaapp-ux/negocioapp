@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { Button } from '@/components/ui/button';
-import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
 import { MessageCircle, X, Send, Loader2, Sparkles, CheckCircle, ThumbsUp, ShoppingCart } from 'lucide-react';
@@ -36,14 +36,14 @@ export function PublicMenuChatWidget({ businessId, isPreview = false, products =
   const [sessionId, setSessionId] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // 1. Suscripción al estado GLOBAL del módulo (Control maestro de Super Admin)
+  // 1. Suscripción al estado GLOBAL del módulo
   const globalModuleRef = useMemoFirebase(
     () => doc(firestore, 'modules', PUBLIC_MENU_CHATBOT_MODULE_ID),
     [firestore]
   );
   const { data: globalModule } = useDoc<Module>(globalModuleRef);
 
-  // 2. Suscripción a la configuración del negocio (Control local del cliente)
+  // 2. Suscripción a la configuración del negocio
   const configRef = useMemoFirebase(
     () => doc(firestore, `businesses/${businessId}/publicMenuChatbot`, 'main'), 
     [firestore, businessId]
@@ -105,28 +105,33 @@ export function PublicMenuChatWidget({ businessId, isPreview = false, products =
 
       // --- LÓGICA DE INTEGRACIÓN CON MOTOR DE SUGERENCIAS ---
       if (result.detectedProductId && products.length > 0 && !isPreview) {
-        // Resolución híbrida ID o Nombre
         const searchInput = result.detectedProductId.toLowerCase().trim();
-        const product = products.find(p => 
+        
+        // Resolución local del producto original para obtener el nombre exacto
+        const originalProduct = products.find(p => 
             p.id === result.detectedProductId || 
             p.name.toLowerCase().trim() === searchInput
         );
 
-        if (product) {
-            // Normalizar a ID para la metadata
-            botMessage.detectedProductId = product.id;
+        if (originalProduct) {
+            botMessage.detectedProductId = originalProduct.id; // Normalizar a ID
 
             try {
-                const suggestion = await getSuggestion({ businessId, productId: product.id });
+                // Consultar sugerencia en el servidor
+                const suggestion = await getSuggestion({ 
+                  businessId, 
+                  productId: originalProduct.id 
+                });
+
                 if (suggestion && suggestion.suggestedProduct) {
                     botMessage.suggestionData = {
-                        originalProductId: product.id,
+                        originalProductId: originalProduct.id,
                         suggestedProductId: suggestion.suggestedProduct.id,
                         reason: suggestion.reason || `¡Excelente elección! Muchos clientes también llevan ${suggestion.suggestedProduct.name}.`,
                         ruleId: suggestion.ruleId
                     };
                     
-                    // REGISTRO DE IMPRESIÓN (Métricas mostradas)
+                    // Registrar que la sugerencia se mostró
                     updateSuggestionMetrics({ 
                         businessId, 
                         ruleId: suggestion.ruleId || 'ai-generated', 
@@ -134,7 +139,7 @@ export function PublicMenuChatWidget({ businessId, isPreview = false, products =
                     });
                 }
             } catch (e) {
-                console.warn("[Chatbot Suggestion] Error fetching suggestion:", e);
+                console.warn("[Chatbot Suggestion] Error:", e);
             }
         }
       }
@@ -190,11 +195,10 @@ export function PublicMenuChatWidget({ businessId, isPreview = false, products =
 
   if (!isPreview && (!isGlobalActive || !isLocalActive)) return null;
 
-  const bottomClass = isPlatformBot ? 'bottom-28' : 'bottom-6';
   const positionClass = config.position === 'bottom-left' ? 'left-6' : 'right-6';
 
   return (
-    <div className={cn("fixed z-[100] flex flex-col items-end", bottomClass, positionClass)}>
+    <div className={cn("fixed z-[100] flex flex-col items-end", isPlatformBot ? 'bottom-28' : 'bottom-6', positionClass)}>
       {isOpen && (
         <Card className="w-[320px] sm:w-[380px] h-[500px] mb-4 shadow-2xl flex flex-col border-2 overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-300">
           <CardHeader className="p-4 border-b flex flex-row items-center justify-between" style={{ backgroundColor: config.headerColor }}>
@@ -220,8 +224,7 @@ export function PublicMenuChatWidget({ businessId, isPreview = false, products =
                         <div className={cn("max-w-[85%] p-3 rounded-2xl text-sm shadow-sm", msg.role === 'user' ? "bg-primary text-white" : "bg-white border text-gray-800")} style={msg.role === 'user' ? { backgroundColor: config.buttonColor } : { color: config.textColor }}>{msg.content}</div>
                     </div>
                     
-                    {/* Bloque de Acciones Interactivas */}
-                    {(msg.detectedProductId || msg.suggestionData) && msg.role === 'model' && (
+                    {msg.role === 'model' && (msg.detectedProductId || msg.suggestionData) && (
                         <motion.div 
                             initial={{ opacity: 0, y: 10 }}
                             animate={{ opacity: 1, y: 0 }}
