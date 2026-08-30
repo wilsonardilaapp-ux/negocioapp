@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -102,42 +101,38 @@ export function PublicMenuChatWidget({ businessId, isPreview = false, products =
         timestamp: new Date()
       };
 
-      // --- CONEXIÓN CON MOTOR DE SUGERENCIAS (REPLICANDO CATALOG PAGE) ---
+      // --- RESOLUCIÓN DE IDENTIDAD Y SUGERENCIAS ---
       if (result.detectedProductId && !isPreview) {
-        try {
-            // 1. Resolver el producto original en el catálogo local
-            const originalProduct = products.find(p => 
-                p.id === result.detectedProductId || 
-                p.name.toLowerCase().trim() === result.detectedProductId?.toLowerCase().trim()
-            );
+        // Buscar el producto original en el catálogo local (Resolución Híbrida)
+        const originalProduct = products.find(p => 
+            p.id === result.detectedProductId || 
+            p.name.toLowerCase().trim() === result.detectedProductId?.toLowerCase().trim()
+        );
 
-            if (originalProduct) {
-                botMessage.detectedProductId = originalProduct.id;
+        if (originalProduct) {
+            botMessage.detectedProductId = originalProduct.id;
 
-                // 2. Consultar sugerencia usando el formato de OBJETO correcto
-                const suggestion = await getSuggestion({ 
-                  businessId, 
-                  productId: originalProduct.id 
+            // Consultar motor de sugerencias con el ID técnico resuelto
+            const suggestion = await getSuggestion({ 
+              businessId, 
+              productId: originalProduct.id 
+            });
+
+            if (suggestion && suggestion.suggestedProduct) {
+                botMessage.suggestionData = {
+                    originalProductId: originalProduct.id,
+                    suggestedProductId: suggestion.suggestedProduct.id,
+                    reason: suggestion.reason || `¡Excelente elección! Muchos clientes también llevan ${suggestion.suggestedProduct.name}.`,
+                    ruleId: suggestion.ruleId
+                };
+                
+                // Registrar impresión para el Dashboard
+                updateSuggestionMetrics({ 
+                    businessId, 
+                    ruleId: suggestion.ruleId || 'ai-generated', 
+                    event: 'shown' 
                 });
-
-                if (suggestion && suggestion.suggestedProduct) {
-                    botMessage.suggestionData = {
-                        originalProductId: originalProduct.id,
-                        suggestedProductId: suggestion.suggestedProduct.id,
-                        reason: suggestion.reason || `¡Excelente elección! Muchos clientes también llevan ${suggestion.suggestedProduct.name}.`,
-                        ruleId: suggestion.ruleId
-                    };
-                    
-                    // Registrar impresión
-                    updateSuggestionMetrics({ 
-                        businessId, 
-                        ruleId: suggestion.ruleId || 'ai-generated', 
-                        event: 'shown' 
-                    });
-                }
             }
-        } catch (e) {
-            console.warn("[Chatbot Suggestion Error]:", e);
         }
       }
 
@@ -153,11 +148,20 @@ export function PublicMenuChatWidget({ businessId, isPreview = false, products =
     if (!msg.suggestionData || !onAddToCart) return;
     const original = products.find(p => p.id === msg.suggestionData?.originalProductId);
     const suggested = products.find(p => p.id === msg.suggestionData?.suggestedProductId);
+    
     if (original && suggested) {
         onAddToCart(original, 1);
         onAddToCart(suggested, 1);
-        updateSuggestionMetrics({ businessId, ruleId: msg.suggestionData.ruleId || 'ai-generated', event: 'accepted' });
-        setMessages(prev => [...prev, { role: 'model', content: `✅ ¡Perfecto! He agregado ${original.name} y ${suggested.name} a tu carrito.`, timestamp: new Date() }]);
+        updateSuggestionMetrics({ 
+            businessId, 
+            ruleId: msg.suggestionData.ruleId || 'ai-generated', 
+            event: 'accepted' 
+        });
+        setMessages(prev => [...prev, { 
+            role: 'model', 
+            content: `✅ ¡Perfecto! He agregado ${original.name} y ${suggested.name} a tu carrito.`, 
+            timestamp: new Date() 
+        }]);
         toast({ title: "Productos agregados" });
     }
   };
@@ -167,7 +171,11 @@ export function PublicMenuChatWidget({ businessId, isPreview = false, products =
     const product = products.find(p => p.id === msg.detectedProductId);
     if (product) {
         onAddToCart(product, 1);
-        setMessages(prev => [...prev, { role: 'model', content: `✅ Listo, he agregado ${product.name} a tu carrito.`, timestamp: new Date() }]);
+        setMessages(prev => [...prev, { 
+            role: 'model', 
+            content: `✅ Listo, he agregado ${product.name} a tu carrito.`, 
+            timestamp: new Date() 
+        }]);
         toast({ title: "Producto agregado" });
     }
   };
@@ -180,64 +188,72 @@ export function PublicMenuChatWidget({ businessId, isPreview = false, products =
 
   return (
     <div className={cn("fixed z-[100] flex flex-col items-end", isPlatformBot ? 'bottom-28' : 'bottom-6', config.position === 'bottom-left' ? 'left-6' : 'right-6')}>
-      {isOpen && (
-        <Card className="w-[320px] sm:w-[380px] h-[500px] mb-4 shadow-2xl flex flex-col border-2 overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-300">
-          <CardHeader className="p-4 border-b flex flex-row items-center justify-between" style={{ backgroundColor: config.headerColor }}>
-            <div className="flex items-center gap-3">
-              <Avatar className="h-10 w-10 border-2 border-white/20">
-                <AvatarImage src={config.avatarUrl || ''} />
-                <AvatarFallback>{config.assistantName.charAt(0)}</AvatarFallback>
-              </Avatar>
-              <CardTitle className="text-sm font-bold text-white">{config.assistantName}</CardTitle>
-            </div>
-            <Button variant="ghost" size="icon" className="text-white h-8 w-8 hover:bg-white/10" onClick={() => setIsOpen(false)}><X className="h-5 w-5" /></Button>
-          </CardHeader>
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.9, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.9, y: 20 }}
+            className="w-[320px] sm:w-[380px] h-[500px] mb-4 shadow-2xl flex flex-col border-2 overflow-hidden bg-background rounded-3xl"
+          >
+            <CardHeader className="p-4 border-b flex flex-row items-center justify-between shrink-0" style={{ backgroundColor: config.headerColor }}>
+              <div className="flex items-center gap-3">
+                <Avatar className="h-10 w-10 border-2 border-white/20">
+                  <AvatarImage src={config.avatarUrl || ''} />
+                  <AvatarFallback>{config.assistantName.charAt(0)}</AvatarFallback>
+                </Avatar>
+                <CardTitle className="text-sm font-bold text-white">{config.assistantName}</CardTitle>
+              </div>
+              <Button variant="ghost" size="icon" className="text-white h-8 w-8 hover:bg-white/10" onClick={() => setIsOpen(false)}><X className="h-5 w-5" /></Button>
+            </CardHeader>
 
-          <ScrollArea className="flex-1 p-4" ref={scrollRef} style={{ backgroundColor: config.secondaryColor }}>
-            <div className="space-y-4 pb-4">
-                {messages.map((msg, i) => {
-                  const product = products.find(p => p.id === msg.detectedProductId);
-                  const suggested = products.find(p => p.id === msg.suggestionData?.suggestedProductId);
-                  return (
-                    <div key={i} className="space-y-3">
-                        <div className={cn("flex", msg.role === 'user' ? 'justify-end' : 'justify-start')}>
-                            <div className={cn("max-w-[85%] p-3 rounded-2xl text-sm shadow-sm", msg.role === 'user' ? "bg-primary text-white" : "bg-white border text-gray-800")} style={msg.role === 'user' ? { backgroundColor: config.buttonColor } : {}}>{msg.content}</div>
-                        </div>
-                        {msg.role === 'model' && (msg.detectedProductId || msg.suggestionData) && (
-                            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-white border-2 border-primary/20 p-4 rounded-[1.5rem] shadow-lg space-y-3 mx-2">
-                                <div className="flex items-center gap-2 text-primary">
-                                    <Sparkles className="h-4 w-4 fill-primary" />
-                                    <span className="text-[10px] font-black uppercase tracking-widest">{msg.suggestionData ? 'Sugerencia Recomendada' : 'Acción Rápida'}</span>
-                                </div>
-                                {msg.suggestionData && <p className="text-xs font-medium text-gray-700 leading-snug">{msg.suggestionData.reason}</p>}
-                                <div className="flex flex-col gap-2">
-                                    {msg.suggestionData && suggested && (
-                                        <Button size="sm" className="w-full font-black h-10 gap-2" onClick={() => handleAcceptSuggestion(msg)}>
-                                            <ShoppingCart className="h-3 w-3" /> Agregar {product?.name || 'Ítem'} + {suggested.name}
-                                        </Button>
-                                    )}
-                                    {product && (
-                                        <Button size="sm" variant={msg.suggestionData ? "outline" : "default"} className="w-full font-bold h-10 gap-2" onClick={() => handleAddOnlyOriginal(msg)}>
-                                            <ShoppingCart className="h-3 w-3" /> Solo agregar {product.name}
-                                        </Button>
-                                    )}
-                                </div>
-                            </motion.div>
-                        )}
-                    </div>
-                )})}
-                {isLoading && <div className="flex justify-start"><div className="bg-white border p-3 rounded-2xl shadow-sm"><Loader2 className="h-4 w-4 animate-spin text-primary" /></div></div>}
-            </div>
-          </ScrollArea>
+            <ScrollArea className="flex-1 p-4" ref={scrollRef} style={{ backgroundColor: config.secondaryColor }}>
+              <div className="space-y-4 pb-4">
+                  {messages.map((msg, i) => {
+                    const product = products.find(p => p.id === msg.detectedProductId);
+                    const suggested = products.find(p => p.id === msg.suggestionData?.suggestedProductId);
+                    
+                    return (
+                      <div key={i} className="space-y-3">
+                          <div className={cn("flex", msg.role === 'user' ? 'justify-end' : 'justify-start')}>
+                              <div className={cn("max-w-[85%] p-3 rounded-2xl text-sm shadow-sm", msg.role === 'user' ? "bg-primary text-white" : "bg-white border text-gray-800")} style={msg.role === 'user' ? { backgroundColor: config.buttonColor } : {}}>{msg.content}</div>
+                          </div>
+                          {msg.role === 'model' && (msg.detectedProductId || msg.suggestionData) && (
+                              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-white border-2 border-primary/20 p-4 rounded-[1.5rem] shadow-lg space-y-3 mx-2">
+                                  <div className="flex items-center gap-2 text-primary">
+                                      <Sparkles className="h-4 w-4 fill-primary" />
+                                      <span className="text-[10px] font-black uppercase tracking-widest">{msg.suggestionData ? 'Sugerencia Recomendada' : 'Acción Rápida'}</span>
+                                  </div>
+                                  {msg.suggestionData && <p className="text-xs font-medium text-gray-700 leading-snug">{msg.suggestionData.reason}</p>}
+                                  <div className="flex flex-col gap-2">
+                                      {msg.suggestionData && suggested && (
+                                          <Button size="sm" className="w-full font-black h-10 gap-2" onClick={() => handleAcceptSuggestion(msg)}>
+                                              <ShoppingCart className="h-3 w-3" /> Agregar {product?.name || 'Ítem'} + {suggested.name}
+                                          </Button>
+                                      )}
+                                      {product && (
+                                          <Button size="sm" variant={msg.suggestionData ? "outline" : "default"} className="w-full font-bold h-10 gap-2" onClick={() => handleAddOnlyOriginal(msg)}>
+                                              <ShoppingCart className="h-3 w-3" /> Solo agregar {product.name}
+                                          </Button>
+                                      )}
+                                  </div>
+                              </motion.div>
+                          )}
+                      </div>
+                  )})}
+                  {isLoading && <div className="flex justify-start"><div className="bg-white border p-3 rounded-2xl shadow-sm"><Loader2 className="h-4 w-4 animate-spin text-primary" /></div></div>}
+              </div>
+            </ScrollArea>
 
-          <CardFooter className="p-4 border-t bg-white">
-            <div className="flex w-full gap-2">
-              <Input placeholder="Pregunta algo..." value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleSend()} className="h-10" />
-              <Button size="icon" onClick={handleSend} disabled={isLoading || !input.trim()} style={{ backgroundColor: config.buttonColor }}><Send className="h-4 w-4" /></Button>
-            </div>
-          </CardFooter>
-        </Card>
-      )}
+            <CardFooter className="p-4 border-t bg-white shrink-0">
+              <div className="flex w-full gap-2">
+                <Input placeholder="Pregunta algo..." value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleSend()} className="h-10" />
+                <Button size="icon" onClick={handleSend} disabled={isLoading || !input.trim()} style={{ backgroundColor: config.buttonColor }}><Send className="h-4 w-4" /></Button>
+              </div>
+            </CardFooter>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <Button size="lg" className={cn("rounded-full h-16 w-16 shadow-xl hover:scale-105 transition-transform overflow-hidden", config.avatarUrl && !isOpen ? "p-0" : "")} style={{ backgroundColor: config.buttonColor }} onClick={() => setIsOpen(!isOpen)}>
         {isOpen ? <X className="h-8 w-8 text-white" /> : config.avatarUrl ? <img src={config.avatarUrl} alt="Avatar" className="h-full w-full object-cover" /> : <MessageCircle className="h-8 w-8 text-white" />}
