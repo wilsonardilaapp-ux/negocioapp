@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
-import { MessageCircle, X, Send, Loader2, Sparkles, CheckCircle, ThumbsUp, ShoppingCart } from 'lucide-react';
+import { MessageCircle, X, Send, Loader2, Sparkles, ShoppingCart } from 'lucide-react';
 import { useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { doc, setDoc, Timestamp, increment } from 'firebase/firestore';
 import { publicMenuChatbotFlow } from '@/ai/flows/public-menu-chatbot-flow';
@@ -19,6 +19,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import type { Module } from '@/models/module';
 import type { Product } from '@/models/product';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useToast } from '@/hooks/use-toast';
 
 interface PublicMenuChatWidgetProps {
   businessId: string;
@@ -29,6 +30,7 @@ interface PublicMenuChatWidgetProps {
 
 export function PublicMenuChatWidget({ businessId, isPreview = false, products = [], onAddToCart }: PublicMenuChatWidgetProps) {
   const firestore = useFirestore();
+  const { toast } = useToast();
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<LocalMessage[]>([]);
   const [input, setInput] = useState('');
@@ -45,7 +47,7 @@ export function PublicMenuChatWidget({ businessId, isPreview = false, products =
 
   // 2. Suscripción a la configuración del negocio
   const configRef = useMemoFirebase(
-    () => doc(firestore, `businesses/${businessId}/publicMenuChatbot`, 'main'), 
+    () => (businessId ? doc(firestore, `businesses/${businessId}/publicMenuChatbot`, 'main') : null), 
     [firestore, businessId]
   );
   const { data: configData } = useDoc<PublicMenuChatbotConfig>(configRef);
@@ -103,19 +105,19 @@ export function PublicMenuChatWidget({ businessId, isPreview = false, products =
         detectedProductId: result.detectedProductId 
       };
 
-      // --- CORRECCIÓN QUIRÚRGICA: Integración con Motor de Sugerencias ---
+      // --- SINCRONIZACIÓN CON MOTOR DE SUGERENCIAS DEL MENÚ ---
       if (result.detectedProductId && !isPreview) {
         try {
-            // Resolver localmente el ID técnico por si la IA devolvió un nombre
+            // Resolver el producto original
             const resolvedProduct = products.find(p => 
                 p.id === result.detectedProductId || 
                 p.name.toLowerCase().trim() === result.detectedProductId?.toLowerCase().trim()
             );
 
             if (resolvedProduct) {
-                botMessage.detectedProductId = resolvedProduct.id; // Normalizar a ID
+                botMessage.detectedProductId = resolvedProduct.id;
 
-                // Consultar sugerencia en el servidor
+                // REUTILIZACIÓN EXACTA: getSuggestion({ businessId, productId })
                 const suggestion = await getSuggestion({ 
                   businessId, 
                   productId: resolvedProduct.id 
@@ -138,7 +140,7 @@ export function PublicMenuChatWidget({ businessId, isPreview = false, products =
                 }
             }
         } catch (e) {
-            console.warn("[Chatbot Suggestion] Error:", e);
+            console.warn("[Chatbot Suggestion] Error en motor:", e);
         }
       }
 
@@ -171,6 +173,8 @@ export function PublicMenuChatWidget({ businessId, isPreview = false, products =
             content: `✅ ¡Perfecto! He agregado ${original.name} y ${suggested.name} a tu carrito.`, 
             timestamp: new Date() 
         }]);
+
+        toast({ title: "Productos agregados", description: `${original.name} + ${suggested.name} ya están en tu carrito.` });
     }
   };
 
@@ -184,6 +188,7 @@ export function PublicMenuChatWidget({ businessId, isPreview = false, products =
             content: `✅ Listo, he agregado ${product.name} a tu carrito.`, 
             timestamp: new Date() 
         }]);
+        toast({ title: "Producto agregado", description: `${product.name} ya está en tu carrito.` });
     }
   };
 
@@ -213,57 +218,57 @@ export function PublicMenuChatWidget({ businessId, isPreview = false, products =
           <ScrollArea className="flex-1 p-4" ref={scrollRef} style={{ backgroundColor: config.secondaryColor }}>
             <div className="space-y-4 pb-4">
                 {messages.map((msg, i) => {
-                const product = products.find(p => p.id === msg.detectedProductId);
-                const suggested = products.find(p => p.id === msg.suggestionData?.suggestedProductId);
-                
-                return (
-                <div key={i} className="space-y-3">
-                    <div className={cn("flex", msg.role === 'user' ? 'justify-end' : 'justify-start')}>
-                        <div className={cn("max-w-[85%] p-3 rounded-2xl text-sm shadow-sm", msg.role === 'user' ? "bg-primary text-white" : "bg-white border text-gray-800")} style={msg.role === 'user' ? { backgroundColor: config.buttonColor } : { color: config.textColor }}>{msg.content}</div>
+                  const product = products.find(p => p.id === msg.detectedProductId);
+                  const suggested = products.find(p => p.id === msg.suggestionData?.suggestedProductId);
+                  
+                  return (
+                    <div key={i} className="space-y-3">
+                        <div className={cn("flex", msg.role === 'user' ? 'justify-end' : 'justify-start')}>
+                            <div className={cn("max-w-[85%] p-3 rounded-2xl text-sm shadow-sm", msg.role === 'user' ? "bg-primary text-white" : "bg-white border text-gray-800")} style={msg.role === 'user' ? { backgroundColor: config.buttonColor } : { color: config.textColor }}>{msg.content}</div>
+                        </div>
+                        
+                        {msg.role === 'model' && (msg.detectedProductId || msg.suggestionData) && (
+                            <motion.div 
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                className="bg-white border-2 border-primary/20 p-4 rounded-[1.5rem] shadow-lg space-y-3 mx-2"
+                            >
+                                <div className="flex items-center gap-2 text-primary">
+                                    <Sparkles className="h-4 w-4 fill-primary" />
+                                    <span className="text-[10px] font-black uppercase tracking-widest">
+                                        {msg.suggestionData ? 'Sugerencia Recomendada' : 'Acción Rápida'}
+                                    </span>
+                                </div>
+
+                                {msg.suggestionData && (
+                                    <p className="text-xs font-medium text-gray-700 leading-snug">{msg.suggestionData.reason}</p>
+                                )}
+
+                                <div className="flex flex-col gap-2">
+                                    {msg.suggestionData && suggested && (
+                                        <Button 
+                                            size="sm" 
+                                            className="w-full font-black h-10 gap-2 shadow-sm"
+                                            onClick={() => handleAcceptSuggestion(msg)}
+                                        >
+                                            <ShoppingCart className="h-3 w-3" /> Agregar {product?.name || 'Ítem'} + {suggested.name}
+                                        </Button>
+                                    )}
+                                    
+                                    {product && (
+                                        <Button 
+                                            size="sm" 
+                                            variant={msg.suggestionData ? "outline" : "default"}
+                                            className={cn("w-full font-bold h-10 gap-2", !msg.suggestionData && "shadow-md")}
+                                            onClick={() => handleAddOnlyOriginal(msg)}
+                                        >
+                                            <ShoppingCart className="h-3 w-3" /> Solo agregar {product.name}
+                                        </Button>
+                                    )}
+                                </div>
+                            </motion.div>
+                        )}
                     </div>
-                    
-                    {msg.role === 'model' && (msg.detectedProductId || msg.suggestionData) && (
-                        <motion.div 
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            className="bg-white border-2 border-primary/20 p-4 rounded-[1.5rem] shadow-lg space-y-3 mx-2"
-                        >
-                            <div className="flex items-center gap-2 text-primary">
-                                <Sparkles className="h-4 w-4 fill-primary" />
-                                <span className="text-[10px] font-black uppercase tracking-widest">
-                                    {msg.suggestionData ? 'Sugerencia Inteligente' : 'Acción Rápida'}
-                                </span>
-                            </div>
-
-                            {msg.suggestionData && (
-                                <p className="text-xs font-medium text-gray-700 leading-snug">{msg.suggestionData.reason}</p>
-                            )}
-
-                            <div className="flex flex-col gap-2">
-                                {msg.suggestionData && suggested && (
-                                    <Button 
-                                        size="sm" 
-                                        className="w-full font-black h-10 gap-2 shadow-sm"
-                                        onClick={() => handleAcceptSuggestion(msg)}
-                                    >
-                                        <ShoppingCart className="h-3 w-3" /> Agregar {product?.name || 'Ítem'} + {suggested.name}
-                                    </Button>
-                                )}
-                                
-                                {product && (
-                                    <Button 
-                                        size="sm" 
-                                        variant={msg.suggestionData ? "outline" : "default"}
-                                        className={cn("w-full font-bold h-10 gap-2", !msg.suggestionData && "shadow-md")}
-                                        onClick={() => handleAddOnlyOriginal(msg)}
-                                    >
-                                        <ShoppingCart className="h-3 w-3" /> Solo agregar {product.name}
-                                    </Button>
-                                )}
-                            </div>
-                        </motion.div>
-                    )}
-                </div>
                 )})}
                 {isLoading && <div className="flex justify-start"><div className="bg-white border p-3 rounded-2xl shadow-sm"><Loader2 className="h-4 w-4 animate-spin text-primary" /></div></div>}
             </div>
