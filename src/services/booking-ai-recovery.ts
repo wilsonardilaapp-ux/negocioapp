@@ -39,15 +39,15 @@ export async function generateRecoveryMessage(
     Escribe un mensaje de WhatsApp para "${customerName}", quien no nos visita hace ${daysSinceLastVisit} días.
     Su último servicio fue "${lastServiceName}".
     
-    REGLAS ESTRICTAS DE REDACCIÓN (BLOQUEO DE LONGITUD):
-    1. Usa ${toneInstructions[tone]}.
-    2. El mensaje DEBE ser ultra-breve y directo.
-    3. CUERPO DEL TEXTO: MÁXIMO 20 PALABRAS (alrededor de 120 caracteres).
-    4. NO inventes descuentos, precios ni servicios que no existan.
+    REGLAS DE ORO DE LONGITUD (INCUMPLE Y SERÁS RECHAZADO):
+    1. Estilo: ${toneInstructions[tone]}.
+    2. Brevedad: El mensaje debe ser EXTREMADAMENTE corto.
+    3. El CUERPO del texto (sin el link) debe tener MÁXIMO 140 caracteres.
+    4. NO inventes descuentos ni servicios ficticios.
     5. Finaliza obligatoriamente con el enlace de reserva en una nueva línea: ${bookingUrl}
-    6. El mensaje TOTAL (saludo + texto + enlace) NUNCA debe superar los 220 caracteres.
+    6. El mensaje TOTAL (texto + link) NO puede superar los 230 caracteres bajo ninguna circunstancia.
     
-    Responde solo con el texto del mensaje listo para enviar.
+    Responde únicamente con el texto del mensaje listo para enviar.
   `;
 
   try {
@@ -57,17 +57,20 @@ export async function generateRecoveryMessage(
       throw new Error('Fallback required');
     }
 
-    // Limpieza de seguridad para asegurar que no se pase del límite absoluto de la UI (250)
+    // Limpieza de seguridad: Recorte estricto a 245 para dejar margen a la UI
     return aiResponse.trim().substring(0, 245);
   } catch (error) {
-    // Fallback manual ultra-conciso según el tono
+    // Fallback manual ultra-conciso resiliente a nombres largos
+    let baseMsg = "";
     if (tone === 'formal') {
-      return `Estimado/a ${customerName}, le saludamos de ${businessName}. Le extrañamos por aquí. Puede agendar su próximo ${lastServiceName} en este enlace: ${bookingUrl}`;
+      baseMsg = `Estimado/a ${customerName}, le saludamos de ${businessName}. Le extrañamos por aquí. Puede agendar su próximo ${lastServiceName} en:`;
+    } else if (tone === 'beneficios') {
+      baseMsg = `¡Hola ${customerName}! Dale el mejor cuidado a tu imagen con ${lastServiceName} en ${businessName}. Agenda aquí:`;
+    } else {
+      baseMsg = `¡Hola ${customerName}! 😊 Te extrañamos en ${businessName}. ¿Agendamos tu ${lastServiceName}? Reserva aquí:`;
     }
-    if (tone === 'beneficios') {
-      return `¡Hola ${customerName}! Dale el mejor cuidado a tu imagen con ${lastServiceName} en ${businessName}. Te esperamos pronto. Agenda aquí: ${bookingUrl}`;
-    }
-    // Default / Cercano
-    return `¡Hola ${customerName}! 😊 Te extrañamos en ${businessName}. ¿Te gustaría agendar tu ${lastServiceName}? Nos encantaría verte. Reserva aquí: ${bookingUrl}`;
+
+    const finalFallback = `${baseMsg}\n${bookingUrl}`;
+    return finalFallback.substring(0, 245);
   }
 }
