@@ -70,7 +70,6 @@ export function PublicMenuChatWidget({ businessId, isPreview = false, products =
 
     const userMsg = input.trim();
     
-    // Capturar historial antes de limpiar input (últimos 6 turnos)
     const chatHistory = messages.slice(-6).map(m => ({
       role: m.role,
       content: m.content
@@ -82,7 +81,6 @@ export function PublicMenuChatWidget({ businessId, isPreview = false, products =
 
     try {
       if (!isPreview) {
-        // Registro en subcolección conversations del documento main
         const convRef = doc(firestore, `businesses/${businessId}/publicMenuChatbot/main/conversations`, sessionId);
         setDoc(convRef, {
           sessionId,
@@ -107,8 +105,17 @@ export function PublicMenuChatWidget({ businessId, isPreview = false, products =
 
       // --- LÓGICA DE INTEGRACIÓN CON MOTOR DE SUGERENCIAS ---
       if (result.detectedProductId && products.length > 0 && !isPreview) {
-        const product = products.find(p => p.id === result.detectedProductId);
+        // Resolución híbrida ID o Nombre
+        const searchInput = result.detectedProductId.toLowerCase().trim();
+        const product = products.find(p => 
+            p.id === result.detectedProductId || 
+            p.name.toLowerCase().trim() === searchInput
+        );
+
         if (product) {
+            // Normalizar a ID para la metadata
+            botMessage.detectedProductId = product.id;
+
             try {
                 const suggestion = await getSuggestion({ businessId, productId: product.id });
                 if (suggestion && suggestion.suggestedProduct) {
@@ -119,7 +126,7 @@ export function PublicMenuChatWidget({ businessId, isPreview = false, products =
                         ruleId: suggestion.ruleId
                     };
                     
-                    // Registrar impresión de sugerencia
+                    // REGISTRO DE IMPRESIÓN (Métricas mostradas)
                     updateSuggestionMetrics({ 
                         businessId, 
                         ruleId: suggestion.ruleId || 'ai-generated', 
@@ -150,7 +157,6 @@ export function PublicMenuChatWidget({ businessId, isPreview = false, products =
         onAddToCart(original, 1);
         onAddToCart(suggested, 1);
         
-        // Registrar aceptación
         updateSuggestionMetrics({ 
             businessId, 
             ruleId: msg.suggestionData.ruleId || 'ai-generated', 
@@ -178,7 +184,6 @@ export function PublicMenuChatWidget({ businessId, isPreview = false, products =
     }
   };
 
-  // LÓGICA DE VISIBILIDAD
   const isPlatformBot = businessId === 'platform-bot';
   const isGlobalActive = globalModule?.status === 'active' || isPlatformBot;
   const isLocalActive = config.isActive === true || isPlatformBot;

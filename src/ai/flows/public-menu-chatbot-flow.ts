@@ -123,7 +123,7 @@ REGLAS DE INTERACCIÓN MANDATORIAS:
 1. Si el cliente confirma Nombre, WhatsApp, Servicio, Fecha y Hora, responde amablemente y agrega al final en una sola línea:
 [BOOKING_DATA: {"customerName":"...","customerPhone":"...","serviceName":"...","date":"YYYY-MM-DD","startTime":"HH:mm"}]
 
-2. Si el cliente menciona el NOMBRE de un producto del catálogo, muestra interés en COMPRAR, o pregunta precios de algo específico, DEBES identificar el ID del producto y agregar al final en una sola línea:
+2. Si el cliente menciona el NOMBRE de un producto del catálogo, muestra interés en COMPRAR, o pregunta precios de algo específico, DEBES identificar el ID del producto y agregar al final en una sola línea (ES OBLIGATORIO):
 [INTEREST: {"productId": "ID_DEL_PRODUCTO_DETECTADO"}]
 
 3. Si el usuario pregunta por varios productos, detecta el más relevante de la última pregunta.
@@ -285,7 +285,6 @@ REGLAS DE INTERACCIÓN MANDATORIAS:
       return { answer: rawAnswer, source: 'ai_generated', detectedProductId };
 
     } catch (error: any) {
-      // REGISTRO DE ERROR REAL PARA DIAGNÓSTICO EN TERMINAL
       console.error("[Chatbot Pipeline Error Critical]:", error);
       
       return { 
