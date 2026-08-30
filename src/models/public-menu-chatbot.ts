@@ -47,6 +47,7 @@ export interface LocalMessage {
   content: string;
   timestamp: Date;
   detectedProductId?: string; // ID del producto detectado en la conversación
+  detectedCouponCode?: string; // Código de cupón detectado
   // Metadata para acciones interactivas
   suggestionData?: {
     originalProductId: string;
@@ -90,6 +91,7 @@ export const PublicMenuChatbotOutputSchema = z.object({
   answer: z.string().describe('Respuesta generada'),
   source: z.enum(['custom_response', 'business_info', 'catalog', 'ai_generated', 'fallback']).describe('Fuente de la respuesta'),
   detectedProductId: z.string().optional().describe('ID del producto si el usuario expresa interés o intención de compra'),
+  detectedCouponCode: z.string().optional().describe('Código de cupón si el usuario menciona uno o quiere aplicarlo'),
 });
 
 export type PublicMenuChatbotOutput = z.infer<typeof PublicMenuChatbotOutputSchema>;

@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
-import { MessageCircle, X, Send, Loader2, Sparkles, ShoppingCart, CheckCircle2 } from 'lucide-react';
+import { MessageCircle, X, Send, Loader2, Sparkles, ShoppingCart, CheckCircle2, Ticket } from 'lucide-react';
 import { useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { doc, setDoc, Timestamp, increment } from 'firebase/firestore';
 import { publicMenuChatbotFlow } from '@/ai/flows/public-menu-chatbot-flow';
@@ -20,15 +20,17 @@ import type { Module } from '@/models/module';
 import type { Product } from '@/models/product';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useToast } from '@/hooks/use-toast';
+import { couponService } from '@/services/coupon-service';
 
 interface PublicMenuChatWidgetProps {
   businessId: string;
   isPreview?: boolean;
   products?: Product[];
   onAddToCart?: (product: Product, quantity: number) => void;
+  onApplyCoupon?: (code: string) => Promise<{ success: boolean, message?: string }>;
 }
 
-export function PublicMenuChatWidget({ businessId, isPreview = false, products = [], onAddToCart }: PublicMenuChatWidgetProps) {
+export function PublicMenuChatWidget({ businessId, isPreview = false, products = [], onAddToCart, onApplyCoupon }: PublicMenuChatWidgetProps) {
   const firestore = useFirestore();
   const { toast } = useToast();
   const [isOpen, setIsOpen] = useState(false);
@@ -88,6 +90,17 @@ export function PublicMenuChatWidget({ businessId, isPreview = false, products =
 
       const botMessage: LocalMessage = { role: 'model', content: result.answer, timestamp: new Date() };
 
+      // Lógica de Cupones Transaccional
+      if (result.detectedCouponCode && onApplyCoupon) {
+        const couponResult = await onApplyCoupon(result.detectedCouponCode);
+        if (couponResult.success) {
+            botMessage.content += `\n\n✅ ¡Cupón **${result.detectedCouponCode}** aplicado con éxito al carrito!`;
+        } else {
+            botMessage.content += `\n\n⚠️ No pude aplicar el cupón **${result.detectedCouponCode}**: ${couponResult.message}`;
+        }
+      }
+
+      // Lógica de Sugerencias (Preservada)
       if (result.detectedProductId && !isPreview) {
         const originalProduct = products.find(p => 
             p.id === result.detectedProductId || 
@@ -166,7 +179,7 @@ export function PublicMenuChatWidget({ businessId, isPreview = false, products =
                               <div className={cn("max-w-[85%] p-3 rounded-2xl text-sm shadow-sm", msg.role === 'user' ? "bg-primary text-white" : "bg-white border text-gray-800")} style={msg.role === 'user' ? { backgroundColor: config.buttonColor } : {}}>{msg.content}</div>
                           </div>
                           {msg.role === 'model' && (msg.detectedProductId || msg.suggestionData) && (
-                              <div className="bg-emerald-50/60 border border-emerald-200/60 p-4 rounded-[1.5rem] shadow-sm space-y-3 mx-2 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-emerald-50/60 border border-emerald-200/60 p-4 rounded-[1.5rem] shadow-sm space-y-3 mx-2">
                                   <div className="flex items-center gap-2 text-emerald-700">
                                       <Sparkles className="h-4 w-4 fill-emerald-500" />
                                       <span className="text-[10px] font-black uppercase tracking-widest">Sugerencia especial</span>
@@ -210,7 +223,7 @@ export function PublicMenuChatWidget({ businessId, isPreview = false, products =
                                           No, gracias
                                       </Button>
                                   </div>
-                              </div>
+                              </motion.div>
                           )}
                       </div>
                   )})}
@@ -219,7 +232,7 @@ export function PublicMenuChatWidget({ businessId, isPreview = false, products =
             </ScrollArea>
             <CardFooter className="p-4 border-t bg-white shrink-0">
               <div className="flex w-full gap-2">
-                <Input placeholder="Pregunta algo..." value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleSend()} className="h-10" />
+                <Input placeholder="Pregunta por productos o cupones..." value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleSend()} className="h-10" />
                 <Button size="icon" onClick={handleSend} disabled={isLoading || !input.trim()} style={{ backgroundColor: config.buttonColor }}><Send className="h-4 w-4" /></Button>
               </div>
             </CardFooter>

@@ -49,6 +49,7 @@ interface PurchaseModalProps {
   businessInfo: LandingHeaderConfigData['businessInfo'] | null;
   paymentSettings: PaymentSettings | null;
   origin?: string;
+  externalCoupon?: Coupon | null; // Nuevo prop para cupón desde el chatbot
 }
 
 const formatCurrency = (value: number) => {
@@ -67,7 +68,19 @@ const PAYMENT_METHOD_LABELS: Record<string, string> = {
     pagoContraEntrega: 'Pago contra entrega',
 };
 
-export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, onUpdateQuantity, onClearCart, businessId, businessInfo, paymentSettings, origin = 'web' }: PurchaseModalProps) {
+export function PurchaseModal({ 
+  isOpen, 
+  onOpenChange, 
+  cartItems, 
+  onRemoveItem, 
+  onUpdateQuantity, 
+  onClearCart, 
+  businessId, 
+  businessInfo, 
+  paymentSettings, 
+  origin = 'web',
+  externalCoupon = null
+}: PurchaseModalProps) {
   const { toast } = useToast();
   const firestore = useFirestore();
   const [tipoEntrega, setTipoEntrega] = useState<TipoEntrega>('domicilio');
@@ -77,6 +90,14 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
   const [couponCode, setCouponCode] = useState('');
   const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null);
   const [isValidatingCoupon, setIsValidatingCoupon] = useState(false);
+
+  // Sincronizar cupón externo (Chatbot)
+  useEffect(() => {
+    if (externalCoupon) {
+      setAppliedCoupon(externalCoupon);
+      setCouponCode(externalCoupon.codigo);
+    }
+  }, [externalCoupon]);
 
   useEffect(() => {
     if (isOpen && businessId) {
@@ -273,15 +294,9 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
         };
 
         const cleanOrderData = JSON.parse(JSON.stringify(orderData));
-        
-        // Ejecutamos la escritura
         await setDocumentNonBlocking(newOrderRef, cleanOrderData);
-
-        // REGISTRO DE RASTREO (PUENTE DE ANALÍTICAS)
         registerPublicOrderTracking(firestore, businessId, orderData);
-
-        // Disparar notificación automática (Fire and forget)
-        sendOrderConfirmation({ businessId, orderId }).catch(e => console.error("[OrderNotification Trigger Failure]:", e.message));
+        sendOrderConfirmation({ businessId, orderId }).catch(e => console.error(e.message));
 
         const paymentLabel = PAYMENT_METHOD_LABELS[selectedPaymentMethod] ?? selectedPaymentMethod;
         
@@ -324,12 +339,7 @@ export function PurchaseModal({ isOpen, onOpenChange, cartItems, onRemoveItem, o
         onClearCart();
         onOpenChange(false);
     } catch (error: any) {
-        console.error("Error al procesar el pedido:", error);
-        toast({
-            variant: "destructive",
-            title: "Error al enviar pedido",
-            description: error.message || "Ocurrió un problema al guardar tu pedido. Por favor intenta de nuevo."
-        });
+        toast({ variant: "destructive", title: "Error", description: error.message });
     }
   };
 

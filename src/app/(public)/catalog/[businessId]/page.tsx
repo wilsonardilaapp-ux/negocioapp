@@ -29,6 +29,7 @@ import { updateSuggestionMetrics } from '@/ai/flows/update-suggestion-metrics-fl
 import { PublicMenuChatWidget } from '@/components/public-menu-chatbot/PublicMenuChatWidget';
 import { useToast } from '@/hooks/use-toast';
 import { promotionService } from '@/services/promotion-service';
+import { couponService } from '@/services/coupon-service';
 import { useSubscription } from '@/hooks/useSubscription';
 
 // Componentes de Fidelización y Reseñas
@@ -86,6 +87,9 @@ function CatalogPageContent({ params }: CatalogPageProps) {
     const [currentPage, setCurrentPage] = useState(1);
     const [selectedCategory, setSelectedCategory] = useState('Todas');
     const [searchTerm, setSearchTerm] = useState('');
+
+    // --- ESTADO GLOBAL DE CUPÓN ---
+    const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null);
     
     // Captura de origen de la URL (ej. ?ref=qr)
     const orderOrigin = useMemo(() => {
@@ -290,6 +294,26 @@ function CatalogPageContent({ params }: CatalogPageProps) {
             };
         });
     }, []);
+
+    const handleApplyCouponFromChat = async (code: string): Promise<{ success: boolean, message?: string }> => {
+        if (!pageData.resolvedBusinessId) return { success: false, message: 'Identidad del negocio no resuelta.' };
+        
+        const subtotal = cartItems.reduce((sum, item) => {
+            const unitPrice = item.appliedPromotion?.discountedPrice ?? item.price;
+            return sum + (unitPrice * item.quantity);
+        }, 0);
+
+        try {
+            const result = await couponService.validateCoupon(pageData.resolvedBusinessId, code, subtotal);
+            if (result.success && result.coupon) {
+                setAppliedCoupon(result.coupon);
+                return { success: true };
+            }
+            return { success: false, message: result.error };
+        } catch (e) {
+            return { success: false, message: 'Error técnico al validar cupón.' };
+        }
+    };
 
     if (isLoading) {
         return (
@@ -637,6 +661,7 @@ function CatalogPageContent({ params }: CatalogPageProps) {
                 businessInfo={pageData.headerConfig?.businessInfo || null}
                 paymentSettings={pageData.paymentSettings}
                 origin={orderOrigin}
+                externalCoupon={appliedCoupon}
             />
 
             {activeSuggestion && (
@@ -658,6 +683,7 @@ function CatalogPageContent({ params }: CatalogPageProps) {
                 businessId={pageData.resolvedBusinessId!} 
                 products={pageData.products || []}
                 onAddToCart={handleAddToCart}
+                onApplyCoupon={handleApplyCouponFromChat}
             />
         </div>
     );
