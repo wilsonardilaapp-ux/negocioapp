@@ -18,6 +18,7 @@ import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import type { Module } from '@/models/module';
 import type { Product } from '@/models/product';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface PublicMenuChatWidgetProps {
   businessId: string;
