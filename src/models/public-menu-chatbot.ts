@@ -46,6 +46,7 @@ export interface LocalMessage {
   role: 'user' | 'model';
   content: string;
   timestamp: Date;
+  detectedProductId?: string; // ID del producto detectado en la conversación
   // Metadata para acciones interactivas
   suggestionData?: {
     originalProductId: string;

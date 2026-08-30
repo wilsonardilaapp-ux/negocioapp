@@ -119,14 +119,15 @@ ${formattedServices}
 CATÁLOGO DE PRODUCTOS:
 ${formattedCatalog}
 
-REGLAS DE INTERACCIÓN:
+REGLAS DE INTERACCIÓN MANDATORIAS:
 1. Si el cliente confirma Nombre, WhatsApp, Servicio, Fecha y Hora, responde amablemente y agrega al final en una sola línea:
 [BOOKING_DATA: {"customerName":"...","customerPhone":"...","serviceName":"...","date":"YYYY-MM-DD","startTime":"HH:mm"}]
 
-2. Si el cliente expresa interés en COMPRAR o PREGUNTA por un producto específico del catálogo, responde con la información y agrega al final en una sola línea:
-[INTEREST: {"productId": "ID_DEL_PRODUCTO"}]
+2. Si el cliente menciona el NOMBRE de un producto del catálogo, muestra interés en COMPRAR, o pregunta precios de algo específico, DEBES identificar el ID del producto y agregar al final en una sola línea:
+[INTEREST: {"productId": "ID_DEL_PRODUCTO_DETECTADO"}]
 
-3. Si faltan datos para agendar, pídelos amablemente y NO agregues el tag de reserva.`;
+3. Si el usuario pregunta por varios productos, detecta el más relevante de la última pregunta.
+4. Si faltan datos para agendar, pídelos amablemente y NO agregues el tag de reserva.`;
 
       let rawAnswer = '';
       let lastError = null;
@@ -294,15 +295,3 @@ REGLAS DE INTERACCIÓN:
     }
   }
 );
-
-/**
- * Función de utilidad preservada para el mapeo de datos de aplicación a formularios.
- * NO MODIFICAR para mantener compatibilidad con componentes externos.
- */
-export async function mapAppToFormData(data: any) {
-  if (!data) return {};
-  return {
-    ...data,
-    mappedAt: new Date().toISOString()
-  };
-}
