@@ -218,6 +218,12 @@ export function PublicMenuChatWidget({ businessId, isPreview = false, products =
                 const product = products.find(p => p.id === msg.detectedProductId);
                 const suggested = products.find(p => p.id === msg.suggestionData?.suggestedProductId);
                 
+                console.log('🔵 [DEBUG WIDGET MESSAGE]:', {
+                    role: msg.role,
+                    detectedProductId: msg.detectedProductId,
+                    suggestionData: msg.suggestionData
+                });
+
                 return (
                 <div key={i} className="space-y-3">
                     <div className={cn("flex", msg.role === 'user' ? 'justify-end' : 'justify-start')}>

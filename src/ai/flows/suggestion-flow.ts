@@ -15,6 +15,8 @@ export async function getSuggestion(input: SuggestionInput): Promise<SuggestionO
 
   try {
     const { businessId, productId } = input;
+    console.log('🔴 [DEBUG getSuggestion INPUT]:', { businessId, productId });
+
     if (!businessId || !productId) return createEmptyResponse();
 
     const firestore = await getAdminFirestore();
@@ -48,6 +50,7 @@ export async function getSuggestion(input: SuggestionInput): Promise<SuggestionO
     const rulesSnap = await rulesQuery.get();
                                                               
     if (rulesSnap.empty) {
+      console.log('🔴 [DEBUG getSuggestion RESULT]: No rules found for', triggerId);
       return createEmptyResponse();
     }
 
@@ -79,15 +82,18 @@ export async function getSuggestion(input: SuggestionInput): Promise<SuggestionO
 
       const suggestedDoc = await firestore.doc(`businesses/${businessId}/products/${bestRule.suggestedItem}`).get();
       if (suggestedDoc.exists) {
-        return {
+        const result: SuggestionOutput = {
           suggestedProduct: { ...suggestedDoc.data(), id: suggestedDoc.id } as Product,
           suggestionType: bestRule.suggestionType,
           reason: 'Sugerencia especial para ti',
           ruleId: bestRule.id,
         };
+        console.log('🔴 [DEBUG getSuggestion RESULT]:', result);
+        return result;
       }
     }
 
+    console.log('🔴 [DEBUG getSuggestion RESULT]: No valid rules after filtering');
     return createEmptyResponse();
 
   } catch (error) {
