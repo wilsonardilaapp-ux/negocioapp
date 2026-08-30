@@ -176,7 +176,11 @@ export function PublicMenuChatWidget({ businessId, isPreview = false, products =
                                     <div className="flex items-center gap-3 bg-white p-2.5 rounded-xl border border-emerald-100 shadow-sm">
                                       <div className="relative w-14 h-14 rounded-lg overflow-hidden flex-shrink-0 bg-gray-50 border">
                                         {suggested.images?.[0] ? (
-                                          <Image src={suggested.images[0]} alt={suggested.name} fill className="object-cover" />
+                                          <img 
+                                            src={suggested.images[0]} 
+                                            alt={suggested.name} 
+                                            className="w-full h-full object-cover" 
+                                          />
                                         ) : (
                                           <div className="w-full h-full flex items-center justify-center text-muted-foreground/30"><ShoppingCart size={20} /></div>
                                         )}
