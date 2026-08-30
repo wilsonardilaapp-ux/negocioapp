@@ -1,13 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useUser, useFirestore, useCollection, useMemoFirebase, setDocumentNonBlocking, deleteDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase';
 import { collection, doc } from 'firebase/firestore';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { 
-  Users, 
   PlusCircle, 
   Loader2, 
   Search,
@@ -15,10 +14,10 @@ import {
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { ReservasTabs } from '@/components/reservas/ReservasTabs';
 import { StaffCard } from '@/components/reservas/StaffCard';
 import { StaffForm } from '@/components/reservas/StaffForm';
 import type { BookingStaff, BookingService } from '@/models/booking';
+import { createPortal } from 'react-dom';
 
 /**
  * @fileOverview Página administrativa para la gestión del equipo de profesionales.
@@ -32,8 +31,10 @@ export default function ProfesionalesPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingStaff, setEditingStaff] = useState<BookingStaff | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [mounted, setMounted] = useState(false);
 
-  // Consultar subcolecciones del negocio
+  useEffect(() => { setMounted(true); }, []);
+
   const staffQuery = useMemoFirebase(() => {
     if (!user?.uid || !firestore) return null;
     return collection(firestore, `businesses/${user.uid}/bookingStaff`);
@@ -102,24 +103,19 @@ export default function ProfesionalesPage() {
 
   const isLoading = isStaffLoading || isServicesLoading;
 
-  return (
-    <div className="space-y-6 animate-in fade-in duration-500 pb-10">
-      <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div className="space-y-1">
-          <h1 className="text-3xl font-black tracking-tight flex items-center gap-3">
-            <Users className="h-8 w-8 text-primary" />
-            Profesionales y Equipo
-          </h1>
-          <p className="text-muted-foreground">Gestiona los especialistas que atienden a tus clientes.</p>
-        </div>
+  const headerActions = mounted && document.getElementById('reservas-header-actions') 
+    ? createPortal(
         <Button onClick={() => handleOpenModal()} className="font-bold shadow-md h-12 px-6">
           <PlusCircle className="mr-2 h-5 w-5" />
           Nuevo Profesional
-        </Button>
-      </header>
+        </Button>,
+        document.getElementById('reservas-header-actions')!
+      ) 
+    : null;
 
-      <ReservasTabs />
-
+  return (
+    <div className="animate-in slide-in-from-bottom-2 duration-500">
+      {headerActions}
       <div className="flex items-center gap-4 max-w-md mb-6">
         <div className="relative flex-1 group">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />

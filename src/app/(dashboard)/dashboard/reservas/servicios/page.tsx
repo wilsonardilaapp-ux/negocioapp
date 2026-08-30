@@ -1,7 +1,6 @@
-
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useUser, useFirestore, useCollection, useMemoFirebase, setDocumentNonBlocking, deleteDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase';
 import { collection, doc } from 'firebase/firestore';
 import { 
@@ -38,7 +37,6 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { 
-  CalendarCheck, 
   PlusCircle, 
   Clock, 
   DollarSign, 
@@ -47,14 +45,13 @@ import {
   Loader2, 
   Frown, 
   Tag, 
-  AlertCircle,
   Save
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useSubscription } from '@/hooks/useSubscription';
 import type { BookingService } from '@/models/booking';
 import { cn } from '@/lib/utils';
-import { ReservasTabs } from '@/components/reservas/ReservasTabs';
+import { createPortal } from 'react-dom';
 
 const formatCurrency = (value: number) => {
   return new Intl.NumberFormat('es-CO', {
@@ -68,15 +65,15 @@ export default function BookingServicesPage() {
   const { user, isUserLoading } = useUser();
   const firestore = useFirestore();
   const { toast } = useToast();
-  
-  // No bloqueamos toda la UI con isSubLoading para evitar bloqueos por queries pesadas
   const { isModuleAuthorized, isLoading: isSubLoading } = useSubscription();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingService, setEditingService] = useState<BookingService | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
-  // Firestore Query
+  useEffect(() => { setMounted(true); }, []);
+
   const servicesQuery = useMemoFirebase(() => {
     if (!user?.uid || !firestore) return null;
     return collection(firestore, `businesses/${user.uid}/bookingServices`);
@@ -159,7 +156,16 @@ export default function BookingServicesPage() {
     }
   };
 
-  // Solo mostramos el loader principal si los datos básicos del usuario y los servicios están cargando
+  const headerActions = mounted && document.getElementById('reservas-header-actions') 
+    ? createPortal(
+        <Button onClick={() => handleOpenModal()} className="font-bold shadow-md">
+          <PlusCircle className="mr-2 h-4 w-4" />
+          Nuevo Servicio
+        </Button>,
+        document.getElementById('reservas-header-actions')!
+      ) 
+    : null;
+
   if (isUserLoading || areServicesLoading) {
     return (
       <div className="flex flex-col items-center justify-center h-64 gap-4">
@@ -169,7 +175,6 @@ export default function BookingServicesPage() {
     );
   }
 
-  // Si ya terminó de cargar el plan y no está autorizado, mostramos el aviso
   if (!isSubLoading && !isAuthorized) {
     return (
       <Card className="border-destructive/20 bg-destructive/5">
@@ -185,24 +190,8 @@ export default function BookingServicesPage() {
   }
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
-      <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div className="space-y-1">
-          <h1 className="text-3xl font-black tracking-tight flex items-center gap-3">
-            <CalendarCheck className="h-8 w-8 text-primary" />
-            Servicios de Citas
-          </h1>
-          <p className="text-muted-foreground">Gestiona los servicios que tus clientes pueden agendar online.</p>
-        </div>
-        <Button onClick={() => handleOpenModal()} className="font-bold shadow-md">
-          <PlusCircle className="mr-2 h-4 w-4" />
-          Nuevo Servicio
-        </Button>
-      </header>
-
-      {/* Inyección de la barra de pestañas unificada */}
-      <ReservasTabs />
-
+    <div className="animate-in slide-in-from-bottom-2 duration-500">
+      {headerActions}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {services && services.length > 0 ? (
           services.map((service) => (
@@ -275,7 +264,7 @@ export default function BookingServicesPage() {
                   Crea tu primer servicio para que tus clientes puedan empezar a agendar citas.
                 </p>
               </div>
-              <Button onClick={() => handleOpenModal()} variant="outline" className="font-bold border-primary text-primary hover:bg-primary/5">
+              <Button onClick={() => handleOpenModal()} variant="outline" className="font-bold border-primary text-primary hover:bg-primary/5 h-12 px-8 rounded-xl">
                 Crear mi primer servicio
               </Button>
             </CardContent>
@@ -283,7 +272,6 @@ export default function BookingServicesPage() {
         )}
       </div>
 
-      {/* MODAL DE CREACIÓN / EDICIÓN */}
       <Dialog open={isModalOpen} onOpenChange={(open) => !isSaving && setIsModalOpen(open)}>
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>

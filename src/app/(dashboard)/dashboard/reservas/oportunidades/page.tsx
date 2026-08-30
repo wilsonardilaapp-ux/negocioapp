@@ -1,16 +1,14 @@
-
 'use client';
 
 import { useMemo, useState } from 'react';
 import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, query } from 'firebase/firestore';
+import { collection } from 'firebase/firestore';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
-import { ReservasTabs } from '@/components/reservas/ReservasTabs';
 import { OpportunityKPIs } from '@/components/reservas/OpportunityKPIs';
 import { OpportunityCard } from '@/components/reservas/OpportunityCard';
 import { DailyOpportunitiesFeed } from '@/components/reservas/DailyOpportunitiesFeed';
 import { BookingChurnService, type RiskLevel } from '@/services/booking-churn';
-import { Target, Loader2, Search, Filter, ShoppingBag, ArrowRight } from 'lucide-react';
+import { ShoppingBag, Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import {
   Select,
@@ -23,7 +21,7 @@ import type { Reservation } from '@/models/booking';
 
 /**
  * @fileOverview Radar de Oportunidades y Retención (Churn).
- * Integra el Feed de Oportunidades Diarias ("Oportunidades de Hoy").
+ * Header y Tabs manejados por el layout.
  */
 
 export default function OportunidadesPage() {
@@ -32,12 +30,10 @@ export default function OportunidadesPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [riskFilter, setRiskFilter] = useState<RiskLevel | 'all'>('all');
 
-  // RESOLUCIÓN SEGURA DE BUSINESS ID
   const businessId = useMemo(() => {
     return (profile as any)?.businessId || (user as any)?.businessId || user?.uid || '';
   }, [user, profile]);
 
-  // Consulta index-free para evitar fallos por falta de índices compuestos
   const reservationsQuery = useMemoFirebase(() => {
     if (!businessId || !firestore) return null;
     return collection(firestore, `businesses/${businessId}/reservations`);
@@ -45,10 +41,8 @@ export default function OportunidadesPage() {
 
   const { data: reservations, isLoading } = useCollection<Reservation>(reservationsQuery);
 
-  // --- LÓGICA DE ANÁLISIS ---
   const { opportunities, metrics } = useMemo(() => {
     if (!reservations) return { opportunities: [], metrics: { criticalCount: 0, overdueCount: 0, upcomingCount: 0, totalAtRiskRevenue: 0, totalOpportunities: 0 } };
-    // El servicio procesa y filtra los datos en memoria
     return BookingChurnService.getBookingOpportunities(reservations);
   }, [reservations]);
 
@@ -62,20 +56,8 @@ export default function OportunidadesPage() {
   }, [opportunities, riskFilter, searchTerm]);
 
   return (
-    <div className="space-y-10 animate-in fade-in duration-500 pb-20">
-      <header className="space-y-1">
-        <h1 className="text-3xl font-black tracking-tight text-gray-900 flex items-center gap-3">
-          <Target className="h-8 w-8 text-primary" />
-          Radar de Crecimiento
-        </h1>
-        <p className="text-muted-foreground font-medium">Detecta y recupera ventas utilizando inteligencia artificial y datos históricos.</p>
-      </header>
-
-      <div className="pt-2">
-        <ReservasTabs />
-      </div>
-
-      {/* --- SECCIÓN 1: FEED DE ACCIONES DEL DÍA --- */}
+    <div className="space-y-10 animate-in slide-in-from-bottom-2 duration-500">
+      {/* SECCIÓN 1: FEED DE ACCIONES DEL DÍA */}
       <section className="space-y-6">
         <DailyOpportunitiesFeed />
       </section>

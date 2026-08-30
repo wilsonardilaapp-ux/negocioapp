@@ -5,12 +5,12 @@ import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebas
 import { collection, doc, writeBatch } from 'firebase/firestore';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Clock, Save, Loader2, Info, CheckCircle2 } from 'lucide-react';
+import { Save, Loader2, Info, CheckCircle2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { ReservasTabs } from '@/components/reservas/ReservasTabs';
 import { AvailabilityGrid } from '@/components/reservas/AvailabilityGrid';
 import type { BookingAvailability } from '@/models/booking';
 import { cn } from '@/lib/utils';
+import { createPortal } from 'react-dom';
 
 /**
  * @fileOverview Página administrativa para configurar la disponibilidad global de atención semanal.
@@ -29,8 +29,10 @@ export default function HorariosPage() {
   const { toast } = useToast();
   const [isSaving, setIsSaving] = useState(false);
   const [localAvailability, setLocalAvailability] = useState<BookingAvailability[]>(defaultAvailability);
+  const [mounted, setMounted] = useState(false);
 
-  // Consulta a la subcolección de disponibilidad
+  useEffect(() => { setMounted(true); }, []);
+
   const availabilityQuery = useMemoFirebase(() => {
     if (!user?.uid || !firestore) return null;
     return collection(firestore, `businesses/${user.uid}/bookingAvailability`);
@@ -40,7 +42,6 @@ export default function HorariosPage() {
 
   useEffect(() => {
     if (savedAvailability && savedAvailability.length > 0) {
-      // Sincronizar datos de Firestore con la matriz local de 7 días
       const newAvail = [...defaultAvailability];
       savedAvailability.forEach(item => {
         if (item.dayOfWeek >= 0 && item.dayOfWeek < 7) {
@@ -65,7 +66,6 @@ export default function HorariosPage() {
       const colRef = collection(firestore, `businesses/${user.uid}/bookingAvailability`);
       
       localAvailability.forEach(day => {
-        // ID de documento basado en el índice del día (0-6) para acceso determinista
         const docRef = doc(colRef, day.dayOfWeek.toString());
         batch.set(docRef, day, { merge: true });
       });
@@ -79,24 +79,19 @@ export default function HorariosPage() {
     }
   };
 
-  return (
-    <div className="space-y-6 animate-in fade-in duration-500 pb-20">
-      <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div className="space-y-1">
-          <h1 className="text-3xl font-black tracking-tight text-gray-900 flex items-center gap-3">
-            <Clock className="h-8 w-8 text-primary" />
-            Horarios de Atención
-          </h1>
-          <p className="text-muted-foreground">Define la jornada de trabajo para el agendamiento online.</p>
-        </div>
+  const headerActions = mounted && document.getElementById('reservas-header-actions') 
+    ? createPortal(
         <Button onClick={handleSave} disabled={isSaving || isLoading} className="font-bold shadow-lg h-12 px-8">
           {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
           Guardar Horarios
-        </Button>
-      </header>
+        </Button>,
+        document.getElementById('reservas-header-actions')!
+      ) 
+    : null;
 
-      <ReservasTabs />
-
+  return (
+    <div className="animate-in slide-in-from-bottom-2 duration-500">
+      {headerActions}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
         <div className="lg:col-span-2 space-y-4">
           {isLoading ? (
@@ -105,12 +100,10 @@ export default function HorariosPage() {
               <p className="text-sm text-muted-foreground font-medium">Recuperando matriz de turnos...</p>
             </div>
           ) : (
-            <div className="animate-in slide-in-from-bottom-3 duration-600">
-              <AvailabilityGrid 
-                availability={localAvailability} 
-                onChange={handleDayUpdate} 
-              />
-            </div>
+            <AvailabilityGrid 
+              availability={localAvailability} 
+              onChange={handleDayUpdate} 
+            />
           )}
         </div>
 
