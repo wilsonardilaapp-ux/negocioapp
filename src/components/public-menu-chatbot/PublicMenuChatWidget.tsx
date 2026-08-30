@@ -103,44 +103,42 @@ export function PublicMenuChatWidget({ businessId, isPreview = false, products =
         detectedProductId: result.detectedProductId 
       };
 
-      // --- LÓGICA DE INTEGRACIÓN CON MOTOR DE SUGERENCIAS ---
-      if (result.detectedProductId && products.length > 0 && !isPreview) {
-        const searchInput = result.detectedProductId.toLowerCase().trim();
-        
-        // Resolución local del producto original para obtener el nombre exacto
-        const originalProduct = products.find(p => 
-            p.id === result.detectedProductId || 
-            p.name.toLowerCase().trim() === searchInput
-        );
+      // --- CORRECCIÓN QUIRÚRGICA: Integración con Motor de Sugerencias ---
+      if (result.detectedProductId && !isPreview) {
+        try {
+            // Resolver localmente el ID técnico por si la IA devolvió un nombre
+            const resolvedProduct = products.find(p => 
+                p.id === result.detectedProductId || 
+                p.name.toLowerCase().trim() === result.detectedProductId?.toLowerCase().trim()
+            );
 
-        if (originalProduct) {
-            botMessage.detectedProductId = originalProduct.id; // Normalizar a ID
+            if (resolvedProduct) {
+                botMessage.detectedProductId = resolvedProduct.id; // Normalizar a ID
 
-            try {
                 // Consultar sugerencia en el servidor
                 const suggestion = await getSuggestion({ 
                   businessId, 
-                  productId: originalProduct.id 
+                  productId: resolvedProduct.id 
                 });
 
                 if (suggestion && suggestion.suggestedProduct) {
                     botMessage.suggestionData = {
-                        originalProductId: originalProduct.id,
+                        originalProductId: resolvedProduct.id,
                         suggestedProductId: suggestion.suggestedProduct.id,
                         reason: suggestion.reason || `¡Excelente elección! Muchos clientes también llevan ${suggestion.suggestedProduct.name}.`,
                         ruleId: suggestion.ruleId
                     };
                     
-                    // Registrar que la sugerencia se mostró
+                    // Registrar impresión en el Dashboard
                     updateSuggestionMetrics({ 
                         businessId, 
                         ruleId: suggestion.ruleId || 'ai-generated', 
                         event: 'shown' 
                     });
                 }
-            } catch (e) {
-                console.warn("[Chatbot Suggestion] Error:", e);
             }
+        } catch (e) {
+            console.warn("[Chatbot Suggestion] Error:", e);
         }
       }
 
@@ -218,12 +216,6 @@ export function PublicMenuChatWidget({ businessId, isPreview = false, products =
                 const product = products.find(p => p.id === msg.detectedProductId);
                 const suggested = products.find(p => p.id === msg.suggestionData?.suggestedProductId);
                 
-                console.log('🔵 [DEBUG WIDGET MESSAGE]:', {
-                    role: msg.role,
-                    detectedProductId: msg.detectedProductId,
-                    suggestionData: msg.suggestionData
-                });
-
                 return (
                 <div key={i} className="space-y-3">
                     <div className={cn("flex", msg.role === 'user' ? 'justify-end' : 'justify-start')}>

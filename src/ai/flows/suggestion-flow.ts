@@ -10,12 +10,8 @@ import type { SuggestionInput, SuggestionOutput } from '@/models/suggestion-io';
 // ============================================
 
 export async function getSuggestion(input: SuggestionInput): Promise<SuggestionOutput> {
-  const reqId = Date.now().toString().slice(-4);
-  const logPrefix = `[SUGGESTION-${reqId}]`;
-
   try {
     const { businessId, productId } = input;
-    console.log('🔴 [DEBUG getSuggestion INPUT]:', { businessId, productId });
 
     if (!businessId || !productId) return createEmptyResponse();
 
@@ -50,7 +46,6 @@ export async function getSuggestion(input: SuggestionInput): Promise<SuggestionO
     const rulesSnap = await rulesQuery.get();
                                                               
     if (rulesSnap.empty) {
-      console.log('🔴 [DEBUG getSuggestion RESULT]: No rules found for', triggerId);
       return createEmptyResponse();
     }
 
@@ -88,16 +83,14 @@ export async function getSuggestion(input: SuggestionInput): Promise<SuggestionO
           reason: 'Sugerencia especial para ti',
           ruleId: bestRule.id,
         };
-        console.log('🔴 [DEBUG getSuggestion RESULT]:', result);
         return result;
       }
     }
 
-    console.log('🔴 [DEBUG getSuggestion RESULT]: No valid rules after filtering');
     return createEmptyResponse();
 
   } catch (error) {
-    console.error(`${logPrefix} ❌ Error crítico:`, error);
+    console.error(`[SUGGESTION] ❌ Error crítico:`, error);
     return createEmptyResponse();
   }
 }
