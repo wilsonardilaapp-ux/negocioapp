@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
-import { MessageCircle, X, Send, Loader2, Sparkles, ShoppingCart } from 'lucide-react';
+import { MessageCircle, X, Send, Loader2, Sparkles, ShoppingCart, CheckCircle2 } from 'lucide-react';
 import { useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { doc, setDoc, Timestamp, increment } from 'firebase/firestore';
 import { publicMenuChatbotFlow } from '@/ai/flows/public-menu-chatbot-flow';
@@ -89,7 +89,6 @@ export function PublicMenuChatWidget({ businessId, isPreview = false, products =
       const botMessage: LocalMessage = { role: 'model', content: result.answer, timestamp: new Date() };
 
       if (result.detectedProductId && !isPreview) {
-        // Resolución Híbrida Local
         const originalProduct = products.find(p => 
             p.id === result.detectedProductId || 
             p.name.toLowerCase().trim() === result.detectedProductId?.toLowerCase().trim()
@@ -161,27 +160,51 @@ export function PublicMenuChatWidget({ businessId, isPreview = false, products =
                     const product = products.find(p => p.id === msg.detectedProductId);
                     const suggested = products.find(p => p.id === msg.suggestionData?.suggestedProductId);
                     
-                    // Log solicitado para depuración de widget
-                    console.log('🔵 [DEBUG WIDGET MESSAGE]:', { role: msg.role, detectedProductId: msg.detectedProductId, suggestionData: msg.suggestionData });
-
                     return (
                       <div key={i} className="space-y-3">
                           <div className={cn("flex", msg.role === 'user' ? 'justify-end' : 'justify-start')}>
                               <div className={cn("max-w-[85%] p-3 rounded-2xl text-sm shadow-sm", msg.role === 'user' ? "bg-primary text-white" : "bg-white border text-gray-800")} style={msg.role === 'user' ? { backgroundColor: config.buttonColor } : {}}>{msg.content}</div>
                           </div>
                           {msg.role === 'model' && (msg.detectedProductId || msg.suggestionData) && (
-                              <div className="bg-white border-2 border-primary/20 p-4 rounded-[1.5rem] shadow-lg space-y-3 mx-2 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                                  <div className="flex items-center gap-2 text-primary">
-                                      <Sparkles className="h-4 w-4 fill-primary" /><span className="text-[10px] font-black uppercase tracking-widest">{msg.suggestionData ? 'Sugerencia Recomendada' : 'Acción Rápida'}</span>
+                              <div className="bg-emerald-50/60 border border-emerald-200/60 p-4 rounded-[1.5rem] shadow-sm space-y-3 mx-2 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                                  <div className="flex items-center gap-2 text-emerald-700">
+                                      <Sparkles className="h-4 w-4 fill-emerald-500" />
+                                      <span className="text-[10px] font-black uppercase tracking-widest">Sugerencia especial</span>
                                   </div>
-                                  {msg.suggestionData && <p className="text-xs font-medium text-gray-700 leading-snug">{msg.suggestionData.reason}</p>}
-                                  <div className="flex flex-col gap-2">
-                                      {msg.suggestionData && suggested && (
-                                          <Button size="sm" className="w-full font-black h-10 gap-2" onClick={() => handleAcceptSuggestion(msg)}><ShoppingCart className="h-3 w-3" /> Agregar {product?.name || 'Ítem'} + {suggested.name}</Button>
-                                      )}
-                                      {product && (
-                                          <Button size="sm" variant={msg.suggestionData ? "outline" : "default"} className="w-full font-bold h-10 gap-2" onClick={() => handleAddOnlyOriginal(msg)}><ShoppingCart className="h-3 w-3" /> Solo agregar {product.name}</Button>
-                                      )}
+                                  
+                                  {suggested && (
+                                    <div className="flex items-center gap-3 bg-white p-2.5 rounded-xl border border-emerald-100 shadow-sm">
+                                      <div className="relative w-14 h-14 rounded-lg overflow-hidden flex-shrink-0 bg-gray-50 border">
+                                        {suggested.images?.[0] ? (
+                                          <Image src={suggested.images[0]} alt={suggested.name} fill className="object-cover" />
+                                        ) : (
+                                          <div className="w-full h-full flex items-center justify-center text-muted-foreground/30"><ShoppingCart size={20} /></div>
+                                        )}
+                                      </div>
+                                      <div className="flex-1 min-w-0">
+                                        <h4 className="text-xs font-bold text-gray-900 truncate">{suggested.name}</h4>
+                                        <p className="text-xs font-black text-emerald-600 mt-0.5">${suggested.price.toLocaleString('es-CO')}</p>
+                                        <span className="text-[9px] font-bold text-muted-foreground uppercase">Recomendado para ti</span>
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  <div className="grid grid-cols-2 gap-2 mt-3">
+                                      <Button 
+                                          size="sm" 
+                                          className="w-full font-black h-10 gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white border-none shadow-md transition-all active:scale-95" 
+                                          onClick={() => suggested ? handleAcceptSuggestion(msg) : handleAddOnlyOriginal(msg)}
+                                      >
+                                          <CheckCircle2 className="h-4 w-4" /> Agregar
+                                      </Button>
+                                      <Button 
+                                          size="sm" 
+                                          variant="outline" 
+                                          className="w-full font-bold h-10 gap-2 rounded-xl bg-white border-emerald-100 text-emerald-700 hover:bg-emerald-50 transition-all active:scale-95" 
+                                          onClick={() => handleAddOnlyOriginal(msg)}
+                                      >
+                                          No, gracias
+                                      </Button>
                                   </div>
                               </div>
                           )}
