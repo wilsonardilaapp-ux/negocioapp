@@ -145,7 +145,11 @@ REGLAS DE INTERACCIÓN:
 4. Si el cliente menciona un producto del catálogo o quiere comprar:
 [INTEREST: {"productId": "ID_DEL_PRODUCTO"}]
 5. VENTA PROACTIVA: Si el cliente tiene intención de compra, menciona un cupón o promo relevante para ayudarlo a decidir.
-6. NUNCA inventes códigos ni porcentajes que no estén en la lista.`;
+6. FORMATO DE RESPUESTA: 
+   - Usa **negritas** para resaltar nombres de productos y precios.
+   - Usa listas con guiones para desgloses.
+   - Usa saltos de línea (\n) para separar conceptos claramente. NUNCA envíes párrafos largos comprimidos si estás listando precios o ahorros.
+7. NUNCA inventes códigos ni porcentajes que no estén en la lista.`;
 
       let rawAnswer = '';
       let lastError = null;

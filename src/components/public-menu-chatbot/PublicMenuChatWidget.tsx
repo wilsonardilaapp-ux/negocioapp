@@ -7,8 +7,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/componen
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
 import { MessageCircle, X, Send, Loader2, Sparkles, ShoppingCart, CheckCircle2, Ticket } from 'lucide-react';
-import { useFirestore, useDoc, useMemoFirebase } from '@/firebase';
-import { doc, setDoc, Timestamp, increment } from 'firebase/firestore';
+import { useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
+import { doc, setDoc, Timestamp, increment, collection, query, where } from 'firebase/firestore';
 import { publicMenuChatbotFlow } from '@/ai/flows/public-menu-chatbot-flow';
 import { getSuggestion } from '@/ai/flows/suggestion-flow';
 import { updateSuggestionMetrics } from '@/ai/flows/update-suggestion-metrics-flow';
@@ -100,7 +100,7 @@ export function PublicMenuChatWidget({ businessId, isPreview = false, products =
         }
       }
 
-      // Lógica de Sugerencias (Preservada)
+      // Lógica de Sugerencias
       if (result.detectedProductId && !isPreview) {
         const originalProduct = products.find(p => 
             p.id === result.detectedProductId || 
@@ -140,7 +140,7 @@ export function PublicMenuChatWidget({ businessId, isPreview = false, products =
         onAddToCart(original, 1);
         onAddToCart(suggested, 1);
         updateSuggestionMetrics({ businessId, ruleId: msg.suggestionData.ruleId || 'ai-generated', event: 'accepted' });
-        setMessages(prev => [...prev, { role: 'model', content: `✅ ¡Perfecto! He agregado ${original.name} y ${suggested.name} a tu carrito.`, timestamp: new Date() }]);
+        setMessages(prev => [...prev, { role: 'model', content: `✅ ¡Perfecto! He agregado **${original.name}** y **${suggested.name}** a tu carrito.`, timestamp: new Date() }]);
         toast({ title: "Productos agregados" });
     }
   };
@@ -150,9 +150,23 @@ export function PublicMenuChatWidget({ businessId, isPreview = false, products =
     const product = products.find(p => p.id === msg.detectedProductId);
     if (product) {
         onAddToCart(product, 1);
-        setMessages(prev => [...prev, { role: 'model', content: `✅ Listo, he agregado ${product.name} a tu carrito.`, timestamp: new Date() }]);
+        setMessages(prev => [...prev, { role: 'model', content: `✅ Listo, he agregado **${product.name}** a tu carrito.`, timestamp: new Date() }]);
         toast({ title: "Producto agregado" });
     }
+  };
+
+  /**
+   * Parsea el texto del mensaje para renderizar negritas básicas (**texto**).
+   */
+  const renderMessageContent = (text: string) => {
+    if (!text) return null;
+    const parts = text.split(/(\*\*.*?\*\*)/g);
+    return parts.map((part, i) => {
+      if (part.startsWith('**') && part.endsWith('**')) {
+        return <strong key={i} className="font-black text-inherit">{part.slice(2, -2)}</strong>;
+      }
+      return part;
+    });
   };
 
   return (
@@ -176,7 +190,15 @@ export function PublicMenuChatWidget({ businessId, isPreview = false, products =
                     return (
                       <div key={i} className="space-y-3">
                           <div className={cn("flex", msg.role === 'user' ? 'justify-end' : 'justify-start')}>
-                              <div className={cn("max-w-[85%] p-3 rounded-2xl text-sm shadow-sm", msg.role === 'user' ? "bg-primary text-white" : "bg-white border text-gray-800")} style={msg.role === 'user' ? { backgroundColor: config.buttonColor } : {}}>{msg.content}</div>
+                              <div 
+                                className={cn(
+                                    "max-w-[85%] p-3 rounded-2xl text-sm shadow-sm whitespace-pre-wrap leading-relaxed", 
+                                    msg.role === 'user' ? "bg-primary text-white" : "bg-white border text-gray-800"
+                                )} 
+                                style={msg.role === 'user' ? { backgroundColor: config.buttonColor } : {}}
+                              >
+                                {renderMessageContent(msg.content)}
+                              </div>
                           </div>
                           {msg.role === 'model' && (msg.detectedProductId || msg.suggestionData) && (
                               <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-emerald-50/60 border border-emerald-200/60 p-4 rounded-[1.5rem] shadow-sm space-y-3 mx-2">
