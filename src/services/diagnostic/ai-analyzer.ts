@@ -9,7 +9,7 @@
 
 import { genkit } from 'genkit';
 import { googleAI } from '@genkit-ai/google-genai';
-import { z } from 'zod';
+import { z } from 'genkit';
 import { getAIConfig } from '@/ai/flows/chat-flow';
 import type { DiagnosticRawData } from './data-extractor';
 import type { ActionTracking } from './impact-evaluator';

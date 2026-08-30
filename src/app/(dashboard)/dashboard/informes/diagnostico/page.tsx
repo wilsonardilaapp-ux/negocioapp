@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -286,9 +285,9 @@ export default function DiagnosticoComercialPage() {
   const previousReport = useMemo(() => {
     if (!allReports || !activeReport) return null;
     
+    // Búsqueda estricta de informe en fecha de calendario anterior
     const activeDate = new Date(activeReport.createdAt).toISOString().split('T')[0];
     
-    // Buscar primero el informe más reciente que sea de un día anterior (Sin fallback al mismo día)
     return allReports.find(r => {
       const rDate = new Date(r.createdAt).toISOString().split('T')[0];
       return rDate < activeDate;
@@ -533,23 +532,21 @@ export default function DiagnosticoComercialPage() {
 
                     <div className="flex gap-4">
                         <div className="flex gap-6">
-                            <div className="text-center">
+                            <div className="text-center min-w-[80px]">
                                 <p className="text-[9px] font-black text-muted-foreground uppercase mb-1">Ventas</p>
                                 {trends && trends.sales !== null ? (
-                                    <div className={cn("flex items-center gap-1 font-bold text-sm", trends.sales >= 0 ? "text-green-600" : "text-red-600")}>
-                                        {trends.sales >= 0 ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
-                                        {Math.abs(trends.sales).toFixed(1)}%
+                                    <div className={cn("flex items-center justify-center gap-1 font-bold text-sm", trends.sales >= 0 ? "text-green-600" : "text-red-600")}>
+                                        {trends.sales >= 0 ? "↗" : "↘"} {Math.abs(trends.sales).toFixed(1)}%
                                     </div>
-                                ) : <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest italic">—</p>}
+                                ) : <p className="text-sm font-black text-slate-300">—</p>}
                             </div>
-                            <div className="text-center">
+                            <div className="text-center min-w-[80px]">
                                 <p className="text-[9px] font-black text-muted-foreground uppercase mb-1">Ticket</p>
                                 {trends && trends.ticket !== null ? (
-                                    <div className={cn("flex items-center gap-1 font-bold text-sm", trends.ticket >= 0 ? "text-green-600" : "text-red-600")}>
-                                        {trends.ticket >= 0 ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
-                                        {Math.abs(trends.ticket).toFixed(1)}%
+                                    <div className={cn("flex items-center justify-center gap-1 font-bold text-sm", trends.ticket >= 0 ? "text-green-600" : "text-red-600")}>
+                                        {trends.ticket >= 0 ? "↗" : "↘"} {Math.abs(trends.ticket).toFixed(1)}%
                                     </div>
-                                ) : <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest italic">—</p>}
+                                ) : <p className="text-sm font-black text-slate-300">—</p>}
                             </div>
                         </div>
                     </div>
