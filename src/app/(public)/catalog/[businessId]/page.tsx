@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, useMemo, useCallback, Suspense } from 'react';
@@ -655,7 +654,11 @@ function CatalogPageContent({ params }: CatalogPageProps) {
                 />
             )}
 
-            <PublicMenuChatWidget businessId={pageData.resolvedBusinessId!} />
+            <PublicMenuChatWidget 
+                businessId={pageData.resolvedBusinessId!} 
+                products={pageData.products || []}
+                onAddToCart={handleAddToCart}
+            />
         </div>
     );
 }

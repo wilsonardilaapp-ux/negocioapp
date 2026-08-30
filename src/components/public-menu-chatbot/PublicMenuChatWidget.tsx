@@ -6,22 +6,27 @@ import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
-import { MessageCircle, X, Send, Loader2 } from 'lucide-react';
+import { MessageCircle, X, Send, Loader2, Sparkles, CheckCircle, ThumbsUp, ShoppingCart } from 'lucide-react';
 import { useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { doc, setDoc, Timestamp, increment } from 'firebase/firestore';
 import { publicMenuChatbotFlow } from '@/ai/flows/public-menu-chatbot-flow';
+import { getSuggestion } from '@/ai/flows/suggestion-flow';
+import { updateSuggestionMetrics } from '@/ai/flows/update-suggestion-metrics-flow';
 import type { PublicMenuChatbotConfig, LocalMessage } from '@/models/public-menu-chatbot';
 import { DEFAULT_CHATBOT_CONFIG, PUBLIC_MENU_CHATBOT_MODULE_ID } from '@/models/public-menu-chatbot';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import type { Module } from '@/models/module';
+import type { Product } from '@/models/product';
 
 interface PublicMenuChatWidgetProps {
   businessId: string;
   isPreview?: boolean;
+  products?: Product[];
+  onAddToCart?: (product: Product, quantity: number) => void;
 }
 
-export function PublicMenuChatWidget({ businessId, isPreview = false }: PublicMenuChatWidgetProps) {
+export function PublicMenuChatWidget({ businessId, isPreview = false, products = [], onAddToCart }: PublicMenuChatWidgetProps) {
   const firestore = useFirestore();
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<LocalMessage[]>([]);
@@ -91,23 +96,76 @@ export function PublicMenuChatWidget({ businessId, isPreview = false }: PublicMe
         sessionId,
         history: chatHistory
       });
-      setMessages(prev => [...prev, { role: 'model', content: result.answer, timestamp: new Date() }]);
+
+      const botMessage: LocalMessage = { role: 'model', content: result.answer, timestamp: new Date() };
+
+      // --- LÓGICA DE INTEGRACIÓN CON MOTOR DE SUGERENCIAS ---
+      if (result.detectedProductId && products.length > 0 && !isPreview) {
+        const product = products.find(p => p.id === result.detectedProductId);
+        if (product) {
+            try {
+                const suggestion = await getSuggestion({ businessId, productId: product.id });
+                if (suggestion && suggestion.suggestedProduct) {
+                    botMessage.suggestionData = {
+                        originalProductId: product.id,
+                        suggestedProductId: suggestion.suggestedProduct.id,
+                        reason: suggestion.reason || `¡Excelente elección! Muchos clientes también llevan ${suggestion.suggestedProduct.name}.`,
+                        ruleId: suggestion.ruleId
+                    };
+                    
+                    // Registrar impresión de sugerencia
+                    updateSuggestionMetrics({ 
+                        businessId, 
+                        ruleId: suggestion.ruleId || 'ai-generated', 
+                        event: 'shown' 
+                    });
+                }
+            } catch (e) {
+                console.warn("[Chatbot Suggestion] Error fetching suggestion:", e);
+            }
+        }
+      }
+
+      setMessages(prev => [...prev, botMessage]);
     } catch (error) {
-      setMessages(prev => [...prev, { role: 'model', content: 'Error técnico.', timestamp: new Date() }]);
+      setMessages(prev => [...prev, { role: 'model', content: 'Lo siento, tuve un problema al procesar tu mensaje. Intenta de nuevo.', timestamp: new Date() }]);
     } finally {
       setIsLoading(false);
     }
   };
 
-  // LÓGICA DE VISIBILIDAD:
-  // Si es el bot de plataforma ('platform-bot'), forzamos la visibilidad ignorando el kill-switch.
+  const handleAcceptSuggestion = (msg: LocalMessage) => {
+    if (!msg.suggestionData || !onAddToCart) return;
+    
+    const original = products.find(p => p.id === msg.suggestionData?.originalProductId);
+    const suggested = products.find(p => p.id === msg.suggestionData?.suggestedProductId);
+
+    if (original && suggested) {
+        onAddToCart(original, 1);
+        onAddToCart(suggested, 1);
+        
+        // Registrar aceptación
+        updateSuggestionMetrics({ 
+            businessId, 
+            ruleId: msg.suggestionData.ruleId || 'ai-generated', 
+            event: 'accepted' 
+        });
+
+        setMessages(prev => [...prev, { 
+            role: 'model', 
+            content: `✅ ¡Perfecto! He agregado ${original.name} y ${suggested.name} a tu carrito.`, 
+            timestamp: new Date() 
+        }]);
+    }
+  };
+
+  // LÓGICA DE VISIBILIDAD
   const isPlatformBot = businessId === 'platform-bot';
   const isGlobalActive = globalModule?.status === 'active' || isPlatformBot;
   const isLocalActive = config.isActive === true || isPlatformBot;
 
   if (!isPreview && (!isGlobalActive || !isLocalActive)) return null;
 
-  // Ajuste de posición para evitar colisión con el botón de WhatsApp (bottom-8) en la landing
   const bottomClass = isPlatformBot ? 'bottom-28' : 'bottom-6';
   const positionClass = config.position === 'bottom-left' ? 'left-6' : 'right-6';
 
@@ -127,10 +185,52 @@ export function PublicMenuChatWidget({ businessId, isPreview = false }: PublicMe
           </CardHeader>
 
           <ScrollArea className="flex-1 p-4" ref={scrollRef} style={{ backgroundColor: config.secondaryColor }}>
-            <div className="space-y-4">
+            <div className="space-y-4 pb-4">
                 {messages.map((msg, i) => (
-                <div key={i} className={cn("flex", msg.role === 'user' ? 'justify-end' : 'justify-start')}>
-                    <div className={cn("max-w-[85%] p-3 rounded-2xl text-sm shadow-sm", msg.role === 'user' ? "bg-primary text-white" : "bg-white border text-gray-800")} style={msg.role === 'user' ? { backgroundColor: config.buttonColor } : { color: config.textColor }}>{msg.content}</div>
+                <div key={i} className="space-y-3">
+                    <div className={cn("flex", msg.role === 'user' ? 'justify-end' : 'justify-start')}>
+                        <div className={cn("max-w-[85%] p-3 rounded-2xl text-sm shadow-sm", msg.role === 'user' ? "bg-primary text-white" : "bg-white border text-gray-800")} style={msg.role === 'user' ? { backgroundColor: config.buttonColor } : { color: config.textColor }}>{msg.content}</div>
+                    </div>
+                    
+                    {/* Render de Sugerencia Interactiva */}
+                    {msg.suggestionData && (
+                        <motion.div 
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="bg-white border-2 border-primary/20 p-4 rounded-[1.5rem] shadow-lg space-y-3 mx-2"
+                        >
+                            <div className="flex items-center gap-2 text-primary">
+                                <Sparkles className="h-4 w-4 fill-primary" />
+                                <span className="text-[10px] font-black uppercase tracking-widest">Sugerencia Inteligente</span>
+                            </div>
+                            <p className="text-xs font-medium text-gray-700 leading-snug">{msg.suggestionData.reason}</p>
+                            <div className="flex gap-2">
+                                <Button 
+                                    size="sm" 
+                                    className="flex-1 font-bold h-9 gap-2"
+                                    onClick={() => handleAcceptSuggestion(msg)}
+                                >
+                                    <ShoppingCart className="h-3 w-3" /> ¡Lo quiero!
+                                </Button>
+                                <Button 
+                                    size="sm" 
+                                    variant="outline" 
+                                    className="flex-1 font-bold h-9"
+                                    onClick={() => {
+                                        const prod = products.find(p => p.id === msg.suggestionData?.originalProductId);
+                                        if (prod && onAddToCart) onAddToCart(prod, 1);
+                                        setMessages(prev => [...prev, { 
+                                            role: 'model', 
+                                            content: `Entendido. He agregado solo ${prod?.name || 'el producto'} a tu carrito.`, 
+                                            timestamp: new Date() 
+                                        }]);
+                                    }}
+                                >
+                                    No, gracias
+                                </Button>
+                            </div>
+                        </motion.div>
+                    )}
                 </div>
                 ))}
                 {isLoading && <div className="flex justify-start"><div className="bg-white border p-3 rounded-2xl shadow-sm"><Loader2 className="h-4 w-4 animate-spin text-primary" /></div></div>}

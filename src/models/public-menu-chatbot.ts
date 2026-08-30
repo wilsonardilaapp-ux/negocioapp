@@ -46,6 +46,13 @@ export interface LocalMessage {
   role: 'user' | 'model';
   content: string;
   timestamp: Date;
+  // Metadata para acciones interactivas
+  suggestionData?: {
+    originalProductId: string;
+    suggestedProductId: string;
+    reason: string;
+    ruleId: string | null;
+  };
 }
 
 export const DEFAULT_CHATBOT_CONFIG: PublicMenuChatbotConfig = {
@@ -81,6 +88,7 @@ export type PublicMenuChatbotInput = z.infer<typeof PublicMenuChatbotInputSchema
 export const PublicMenuChatbotOutputSchema = z.object({
   answer: z.string().describe('Respuesta generada'),
   source: z.enum(['custom_response', 'business_info', 'catalog', 'ai_generated', 'fallback']).describe('Fuente de la respuesta'),
+  detectedProductId: z.string().optional().describe('ID del producto si el usuario expresa interés o intención de compra'),
 });
 
 export type PublicMenuChatbotOutput = z.infer<typeof PublicMenuChatbotOutputSchema>;

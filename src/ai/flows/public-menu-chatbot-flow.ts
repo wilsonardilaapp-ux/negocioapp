@@ -1,9 +1,9 @@
 'use server';
 
 /**
- * @fileOverview Flujo de Genkit para el chatbot del menú público con ejecución determinista de agendamiento.
+ * @fileOverview Flujo de Genkit para el chatbot del menú público con ejecución determinista de agendamiento y sugerencias.
  * 
- * - Implementa extracción por etiquetas [BOOKING_DATA: ...] para máxima resiliencia.
+ * - Implementa extracción por etiquetas [BOOKING_DATA: ...] y [INTEREST: ...] para máxima resiliencia.
  * - Capa 0: Resolución de Tenant (Slug a UID) con normalización de tildes.
  * - Capa 3: Implementación de Fallback automático entre proveedores (Google -> DeepSeek).
  * - Capa 5: Extracción robusta con Regex multilínea y validación de campos obligatorios.
@@ -80,7 +80,7 @@ export const publicMenuChatbotFlow = ai.defineFlow(
       const products = catalogSnap.data()?.products || [];
       const services = servicesSnap.docs.map(doc => ({ ...doc.data(), id: doc.id } as BookingService));
 
-      const formattedCatalog = products.map((p: any) => `- ${p.name}: $${p.price}`).join('\n');
+      const formattedCatalog = products.map((p: any) => `- ${p.name} (ID: ${p.id}): $${p.price}`).join('\n');
       const formattedServices = services.map((s: BookingService) => `- ${s.name}: $${s.price} (${s.durationMinutes} min)`).join('\n');
 
       // --- CAPA 3: CONFIGURACIÓN IA Y CADENA DE FALLBACK ---
@@ -119,10 +119,14 @@ ${formattedServices}
 CATÁLOGO DE PRODUCTOS:
 ${formattedCatalog}
 
-REGLAS DE AGENDAMIENTO:
+REGLAS DE INTERACCIÓN:
 1. Si el cliente confirma Nombre, WhatsApp, Servicio, Fecha y Hora, responde amablemente y agrega al final en una sola línea:
 [BOOKING_DATA: {"customerName":"...","customerPhone":"...","serviceName":"...","date":"YYYY-MM-DD","startTime":"HH:mm"}]
-2. Si faltan datos, pídelos amablemente y NO agregues el tag de reserva.`;
+
+2. Si el cliente expresa interés en COMPRAR o PREGUNTA por un producto específico del catálogo, responde con la información y agrega al final en una sola línea:
+[INTEREST: {"productId": "ID_DEL_PRODUCTO"}]
+
+3. Si faltan datos para agendar, pídelos amablemente y NO agregues el tag de reserva.`;
 
       let rawAnswer = '';
       let lastError = null;
@@ -205,6 +209,23 @@ REGLAS DE AGENDAMIENTO:
       }
 
       // --- CAPA 5: EXTRACCIÓN Y PERSISTENCIA NATIVA ---
+      
+      // 5.1 Detección de Interés en Productos (Sugerencias)
+      const interestRegex = /\[INTEREST:\s*(\{[\s\S]*?\})\s*\]/i;
+      const interestMatch = rawAnswer.match(interestRegex);
+      let detectedProductId: string | undefined = undefined;
+
+      if (interestMatch && interestMatch[1]) {
+        try {
+          const interestData = JSON.parse(interestMatch[1]);
+          detectedProductId = interestData.productId;
+          rawAnswer = rawAnswer.replace(interestRegex, '').trim();
+        } catch (e) {
+          console.error("[Chatbot Extraction] Error parsing interest data:", e);
+        }
+      }
+
+      // 5.2 Detección de Agendamiento
       const bookingRegex = /\[BOOKING_DATA:\s*(\{[\s\S]*?\})\s*\]/i;
       const bookingMatch = rawAnswer.match(bookingRegex);
       
@@ -250,17 +271,17 @@ REGLAS DE AGENDAMIENTO:
             await db.collection(`businesses/${businessId}/reservations`).doc(reservationId).set(reservationPayload);
             
             const cleanAnswer = rawAnswer.replace(bookingRegex, '').trim();
-            return { answer: cleanAnswer, source: 'ai_generated' };
+            return { answer: cleanAnswer, source: 'ai_generated', detectedProductId };
           } else {
             throw new Error("Missing required booking fields");
           }
         } catch (e) {
           const fallbackCleanAnswer = rawAnswer.replace(bookingRegex, '').trim();
-          return { answer: fallbackCleanAnswer, source: 'ai_generated' };
+          return { answer: fallbackCleanAnswer, source: 'ai_generated', detectedProductId };
         }
       }
 
-      return { answer: rawAnswer, source: 'ai_generated' };
+      return { answer: rawAnswer, source: 'ai_generated', detectedProductId };
 
     } catch (error: any) {
       // REGISTRO DE ERROR REAL PARA DIAGNÓSTICO EN TERMINAL
