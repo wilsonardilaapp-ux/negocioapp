@@ -460,7 +460,7 @@ export default function PedidosPorCanalPage() {
                 { id: 'redes', label: 'Redes Sociales', ref: 'redes', icon: Instagram, color: 'text-pink-600' },
                 { id: 'landing', label: 'Landing Page', ref: 'landing', icon: Facebook, color: 'text-indigo-600' },
                 { id: 'qr', label: 'QR General', ref: 'qr', icon: QrCode, color: 'text-orange-600' },
-                { id: 'blog', label: 'Blog', ref: 'blog', icon: BookOpen, color: 'text-purple-600', customUrl: `${blogBaseUrl}?ref=blog` },
+                { id: 'blog', label: 'Blog', ref: 'blog', icon: BookOpen, color: 'text-purple-600' },
             ].map((chan) => {
                 const trackedUrl = (chan as any).customUrl || `${baseUrl}?ref=${chan.ref}`;
                 return (
