@@ -64,6 +64,7 @@ export type Order = {
   orderDate: string;
   orderStatus: OrderStatus;
   tipoEntrega: TipoEntrega;
+  customerPhoneNormalized?: string;
   origin?: string;              // Canal de origen (ej. 'qr', 'whatsapp', 'web')
   paymentStatus?: 'pending' | 'paid'; // Estado del cobro
   notes?: string;               // Requerimientos especiales o notas de despacho
