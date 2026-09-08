@@ -31,6 +31,7 @@ import { useToast } from '@/hooks/use-toast';
 import { promotionService } from '@/services/promotion-service';
 import { couponService } from '@/services/coupon-service';
 import { useSubscription } from '@/hooks/useSubscription';
+import { saveAttribution } from '@/lib/tracking/attribution';
 
 // Componentes de Fidelización y Reseñas
 import ReviewForm from '@/components/catalogo/ReviewForm';
@@ -94,6 +95,14 @@ function CatalogPageContent({ params }: CatalogPageProps) {
     // Captura de origen de la URL (ej. ?ref=qr)
     const orderOrigin = useMemo(() => {
         return searchParams.get('ref') || 'web';
+    }, [searchParams]);
+
+    // --- PERSISTENCIA DE ATRIBUCIÓN (ADITIVO) ---
+    useEffect(() => {
+        const ref = searchParams.get('ref');
+        if (ref) {
+            saveAttribution(ref);
+        }
     }, [searchParams]);
 
     // Estado para la sesión de fidelización del cliente
@@ -663,21 +672,6 @@ function CatalogPageContent({ params }: CatalogPageProps) {
                 origin={orderOrigin}
                 externalCoupon={appliedCoupon}
             />
-
-            {activeSuggestion && (
-                <SuggestionModal 
-                    isOpen={!!activeSuggestion}
-                    onOpenChange={(open) => !open && setActiveSuggestion(null)}
-                    originalProduct={activeSuggestion.original}
-                    suggestion={activeSuggestion.suggestion}
-                    onAccept={acceptSuggestion}
-                    onDecline={() => {
-                        handleAddToCart(activeSuggestion.original, 1);
-                        setActiveSuggestion(null);
-                        setIsCartOpen(true);
-                    }}
-                />
-            )}
 
             <PublicMenuChatWidget 
                 businessId={pageData.resolvedBusinessId!} 

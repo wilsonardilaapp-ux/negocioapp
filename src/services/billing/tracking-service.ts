@@ -48,6 +48,7 @@ export function registerPOSTracking(
 /**
  * Registra un evento de rastreo para un pedido realizado desde el catálogo público.
  * Mapea los parámetros de referencia (?ref=) a los canales de analíticas correspondientes.
+ * Actualizado para soportar el campo origin dinámico de la orden.
  */
 export function registerPublicOrderTracking(
   db: Firestore,
@@ -59,6 +60,7 @@ export function registerPublicOrderTracking(
   const trackingColRef = collection(db, `businesses/${businessId}/tracking_events`);
   
   // Mapeo inteligente de orígenes (ref=...) a fuentes y canales oficiales
+  // Toma el valor persistido en order.origin
   const origin = order.origin?.toLowerCase() || 'web';
   
   let source: TrackingEvent['source'] = 'catalogo_web';
@@ -71,7 +73,7 @@ export function registerPublicOrderTracking(
     source = 'qr';
     channel = 'presencial';
   } else if (origin === 'redes' || origin === 'redes_sociales') {
-    source = 'qr'; // Fallback a un tipo existente o podrías extender el tipo en tracking.ts
+    source = 'qr'; 
     channel = 'redes_sociales';
   } else if (origin === 'facebook') {
     source = 'facebook';
@@ -82,6 +84,9 @@ export function registerPublicOrderTracking(
   } else if (origin === 'landing') {
     source = 'catalogo_web';
     channel = 'online';
+  } else if (origin === 'blog') {
+    source = 'catalogo_web';
+    channel = 'online';
   }
 
   const eventData: Omit<TrackingEvent, 'trackingId'> = {
@@ -90,7 +95,7 @@ export function registerPublicOrderTracking(
     channel,
     invoiceId: null,
     orderId: order.id,
-    consecutiveNumber: order.id.slice(-8).toUpperCase(), // Usar el ID corto como consecutivo para pedidos online
+    consecutiveNumber: order.id.slice(-8).toUpperCase(), 
     sellerId: null,
     sellerName: 'Cliente Online',
     customerId: null,

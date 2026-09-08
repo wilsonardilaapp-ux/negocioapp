@@ -29,6 +29,7 @@ import Image from 'next/image';
 import type { CartItem } from '@/models/cart';
 import { sendOrderConfirmation } from '@/actions/order-notifications';
 import { registerPublicOrderTracking } from '@/services/billing/tracking-service';
+import { getAttribution } from '@/lib/tracking/attribution';
 
 const purchaseSchema = z.object({
   fullName: z.string().min(3, { message: 'El nombre es requerido.' }),
@@ -271,12 +272,16 @@ export function PurchaseModal({
             };
         });
 
+        // Recuperar atribución persistida (ADITIVO)
+        const finalOrigin = getAttribution();
+
         const orderData: Order = {
             id: orderId,
             businessId,
             customerName: data.fullName,
             customerEmail: data.email,
             customerPhone: data.whatsapp,
+            customerPhoneNormalized: normalizePhoneNumber(data.whatsapp),
             customerAddress: tipoEntrega === 'domicilio' ? (data.address || '') : 'Recogida en tienda',
             items: orderItems,
             subtotal: subtotalProducts,
@@ -290,7 +295,7 @@ export function PurchaseModal({
             orderDate: now,
             orderStatus: 'Pendiente' as OrderStatus,
             tipoEntrega,
-            origin: origin,
+            origin: finalOrigin, // Inyectamos el origen persistido
         };
 
         const cleanOrderData = JSON.parse(JSON.stringify(orderData));
