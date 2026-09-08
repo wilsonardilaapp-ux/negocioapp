@@ -1,5 +1,5 @@
 // Helper de Atribución Last-Click para Markix (Blindado)
-export const ALLOWED_CHANNELS = ['web', 'whatsapp', 'redes', 'landing', 'qr'] as const;
+export const ALLOWED_CHANNELS = ['web', 'whatsapp', 'redes', 'landing', 'qr', 'blog'] as const;
 export type AllowedChannel = (typeof ALLOWED_CHANNELS)[number];
 
 const STORAGE_KEY = 'markix_attribution_channel';

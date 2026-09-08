@@ -4,8 +4,7 @@ import { useMemo, useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart';
 import { PieChart, Pie, Cell, Legend, ResponsiveContainer } from 'recharts';
-import { 
-    Loader2, 
+import { Loader2, 
     Receipt, 
     BarChart3, 
     History,
@@ -27,8 +26,7 @@ import {
     Info,
     MousePointer2,
     Zap,
-    ArrowLeft
-} from 'lucide-react';
+    ArrowLeft, BookOpen } from 'lucide-react';
 import { useUser, useFirestore, useMemoFirebase, useDoc, useCollection } from '@/firebase';
 import { doc, getDoc, collection, query, where, limit, orderBy } from 'firebase/firestore';
 import { Input } from '@/components/ui/input';
@@ -152,19 +150,38 @@ export default function PedidosPorCanalPage() {
     fetchLogs();
   }, [user?.uid, filterChannel]);
 
+  const CHANNEL_NAMES: Record<string, string> = {
+    import_manual: 'IMPORT MANUAL',
+    web: 'WEB',
+    whatsapp: 'WHATSAPP',
+    landing: 'LANDING PAGE',
+    redes: 'REDES SOCIALES',
+    qr: 'QR GENERAL',
+    blog: 'BLOG'
+  };
+
   const marketingStats = useMemo(() => {
     if (!allOrders) return [];
-    const counts: Record<string, number> = {};
+    const counts: Record<string, number> = {
+      import_manual: 0,
+      web: 0,
+      whatsapp: 0,
+      landing: 0,
+      redes: 0,
+      qr: 0,
+      blog: 0
+    };
     let total = 0;
 
     allOrders.forEach(o => {
-        const origin = o.origin || 'web';
+        const origin = (o.origin || 'web').toLowerCase();
         counts[origin] = (counts[origin] || 0) + 1;
         total++;
     });
 
-    return Object.entries(counts).map(([name, count]) => ({
-        name: name.toUpperCase().replace('_', ' '),
+    return Object.entries(counts).map(([key, count]) => ({
+        id: key,
+        name: CHANNEL_NAMES[key] || key.toUpperCase().replace('_', ' '),
         count,
         percentage: total > 0 ? (count / total) * 100 : 0
     })).sort((a, b) => b.count - a.count);
@@ -337,6 +354,7 @@ export default function PedidosPorCanalPage() {
   };
 
   const baseUrl = typeof window !== 'undefined' ? `${window.location.origin}/catalog/${user?.uid}` : '';
+  const blogBaseUrl = typeof window !== 'undefined' ? `${window.location.origin}/blog/${user?.uid}` : '';
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
@@ -398,8 +416,8 @@ export default function PedidosPorCanalPage() {
                     {loadingOrders ? <Loader2 className="animate-spin mx-auto mt-20" /> : marketingStats.length > 0 ? (
                         <ResponsiveContainer width="100%" height="100%">
                             <PieChart>
-                                <Pie data={marketingStats} cx="50%" cy="50%" innerRadius={50} outerRadius={80} dataKey="count" nameKey="name">
-                                    {marketingStats.map((_, index) => <Cell key={index} fill={COLORS[index % COLORS.length]} />)}
+                                <Pie data={marketingStats.filter(s => s.count > 0)} cx="50%" cy="50%" innerRadius={50} outerRadius={80} dataKey="count" nameKey="name">
+                                    {marketingStats.filter(s => s.count > 0).map((_, index) => <Cell key={index} fill={COLORS[index % COLORS.length]} />)}
                                 </Pie>
                                 <ChartTooltip />
                             </PieChart>
@@ -411,8 +429,8 @@ export default function PedidosPorCanalPage() {
                         <p className="text-[10px] font-black uppercase text-muted-foreground">Tip Estratégico</p>
                         <p className="text-[11px] text-primary leading-tight font-medium">Usa los enlaces de abajo para saber exactamente de dónde vienen tus clientes.</p>
                     </div>
-                    <div className="space-y-2">
-                        {marketingStats.slice(0, 3).map((s, i) => (
+                    <div className="space-y-2 max-h-[175px] overflow-y-auto pr-1">
+                        {marketingStats.map((s, i) => (
                             <div key={i} className="flex justify-between items-center text-xs">
                                 <span className="font-bold flex items-center gap-1.5">
                                     <div className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
@@ -435,15 +453,16 @@ export default function PedidosPorCanalPage() {
             <p className="text-sm text-muted-foreground">Copia estos enlaces o descarga los códigos QR para tus campañas de marketing.</p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
             {[
                 { id: 'web', label: 'Catálogo Web', ref: 'web', icon: Globe, color: 'text-blue-600' },
                 { id: 'whatsapp', label: 'WhatsApp', ref: 'whatsapp', icon: Smartphone, color: 'text-green-600' },
                 { id: 'redes', label: 'Redes Sociales', ref: 'redes', icon: Instagram, color: 'text-pink-600' },
                 { id: 'landing', label: 'Landing Page', ref: 'landing', icon: Facebook, color: 'text-indigo-600' },
                 { id: 'qr', label: 'QR General', ref: 'qr', icon: QrCode, color: 'text-orange-600' },
+                { id: 'blog', label: 'Blog', ref: 'blog', icon: BookOpen, color: 'text-purple-600', customUrl: `${blogBaseUrl}?ref=blog` },
             ].map((chan) => {
-                const trackedUrl = `${baseUrl}?ref=${chan.ref}`;
+                const trackedUrl = (chan as any).customUrl || `${baseUrl}?ref=${chan.ref}`;
                 return (
                     <Card key={chan.id} className="overflow-hidden border-gray-100 hover:border-primary/20 transition-all group flex flex-col">
                         <CardHeader className="p-4 pb-2 border-b bg-muted/20">
