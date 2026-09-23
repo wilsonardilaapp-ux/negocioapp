@@ -228,7 +228,7 @@ const PlanCard = ({
             {isHybrid && <Badge variant="outline" className="bg-orange-50 border-orange-200 text-orange-700">Híbrido</Badge>}
           </div>
           <p className="text-sm text-gray-500 mt-1 min-h-[40px]">
-            {!isHybrid ? subscriptionPlan?.description : null}
+            {!isHybrid ? subscriptionPlan?.description : `Pago base + comisión por pedido.`}
           </p>
           <div className="mb-4">
             <span className="text-4xl font-bold text-gray-900">
@@ -237,7 +237,11 @@ const PlanCard = ({
             <span className="text-gray-400 text-sm">
               /mes
             </span>
-            {/* Línea de comisión por pedido oculta */}
+            {isHybrid && (
+              <p className="text-sm font-bold text-orange-600 mt-1">
+                + {hybridPlan?.commissionType === 'percent' ? `${hybridPlan.pricePerOrder}%` : `$${hybridPlan?.pricePerOrder.toLocaleString('es-CO')}`} por pedido
+              </p>
+            )}
           </div>
           <ul className="space-y-2 mb-2">
             {visibleFeatures.map((feature, idx) => (
