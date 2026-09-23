@@ -1,0 +1,395 @@
+"use client";
+
+import React, { useState, useMemo } from 'react';
+import { useSubscription } from '@/hooks/useSubscription';
+import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import { collection, doc, setDoc, deleteDoc } from 'firebase/firestore';
+import type { InventoryBatch } from '@/models/inventory-expiration';
+import type { Product } from '@/models/product';
+import { getDaysUntilExpiration, calculateExpirationStatus } from '@/services/expiration-alert-service';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { 
+  Clock, 
+  AlertTriangle, 
+  CalendarX, 
+  CheckCircle, 
+  Package, 
+  Search, 
+  Frown, 
+  Loader2, 
+  FlaskConical, 
+  Trash2 
+} from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+
+export default function VencimientosPage() {
+  const { isModuleAuthorized, isLoading: isSubLoading } = useSubscription();
+  const { user, profile } = useUser();
+  const isSuperAdmin = profile?.role === 'super_admin';
+  const firestore = useFirestore();
+  const { toast } = useToast();
+
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterStatus, setFilterStatus] = useState<'all' | 'expired' | 'critical' | 'warning' | 'good'>('all');
+  const [isSeeding, setIsSeeding] = useState(false);
+  const [isClearing, setIsClearing] = useState(false);
+
+  const isAuthorized = useMemo(() => {
+    return isModuleAuthorized ? isModuleAuthorized('alertas-vencimiento') : false;
+  }, [isModuleAuthorized]);
+
+  // Consulta de productos del negocio
+  const productsQuery = useMemoFirebase(() => {
+    if (!firestore || !user) return null;
+    return collection(firestore, 'businesses', user.uid, 'products');
+  }, [firestore, user]);
+  const { data: products, isLoading: isProductsLoading } = useCollection<Product>(productsQuery);
+
+  // Consulta de lotes de inventario
+  const batchesQuery = useMemoFirebase(() => {
+    if (!firestore || !user) return null;
+    return collection(firestore, 'businesses', user.uid, 'inventoryBatches');
+  }, [firestore, user]);
+  const { data: batches, isLoading: isBatchesLoading } = useCollection<InventoryBatch>(batchesQuery);
+
+  const productMap = useMemo(() => {
+    const map = new Map<string, Product>();
+    products?.forEach(p => map.set(p.id, p));
+    return map;
+  }, [products]);
+
+  // Procesamiento de lotes
+  const processedBatches = useMemo(() => {
+    if (!batches) return [];
+    return batches.map(batch => {
+      const daysRemaining = getDaysUntilExpiration(batch.expirationDate);
+      const status = calculateExpirationStatus(daysRemaining);
+      const product = productMap.get(batch.productId);
+      return {
+        ...batch,
+        productName: product?.name || `ID: ${batch.productId}`,
+        daysRemaining,
+        status,
+      };
+    });
+  }, [batches, productMap]);
+
+  // Métricas de los 4 estados
+  const metrics = useMemo(() => {
+    return {
+      expired: processedBatches.filter(b => b.status === 'expired').length,
+      critical: processedBatches.filter(b => b.status === 'critical').length,
+      warning: processedBatches.filter(b => b.status === 'warning').length,
+      good: processedBatches.filter(b => b.status === 'good').length,
+    };
+  }, [processedBatches]);
+
+  // Filtrado de lotes para la tabla
+  const filteredBatches = useMemo(() => {
+    return processedBatches.filter(item => {
+      const matchesSearch = item.productName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (item.batchNumber && item.batchNumber.toLowerCase().includes(searchTerm.toLowerCase()));
+      const matchesStatus = filterStatus === 'all' || item.status === filterStatus;
+      return matchesSearch && matchesStatus;
+    }).sort((a, b) => a.daysRemaining - b.daysRemaining);
+  }, [processedBatches, searchTerm, filterStatus]);
+
+  // --- Handlers de prueba rápida ---
+  const handleSeedMockBatches = async () => {
+    if (!firestore || !user) return;
+    setIsSeeding(true);
+    try {
+      const now = new Date();
+      const formatDate = (daysOffset: number) => {
+        const d = new Date(now);
+        d.setDate(d.getDate() + daysOffset);
+        return d.toISOString().split('T')[0];
+      };
+
+      // Asociar a productos existentes del negocio si los hay
+      const p1 = products?.[0]?.id || 'prod-mock-1';
+      const p2 = products?.[1]?.id || products?.[0]?.id || 'prod-mock-2';
+
+      const mockData: InventoryBatch[] = [
+        {
+          id: 'test-batch-expired',
+          businessId: user.uid,
+          productId: p1,
+          batchNumber: 'LOTE-VENC-001',
+          expirationDate: formatDate(-5), // Vencido hace 5 días
+          quantity: 8,
+          createdAt: new Date().toISOString(),
+        },
+        {
+          id: 'test-batch-critical',
+          businessId: user.uid,
+          productId: p2,
+          batchNumber: 'LOTE-CRIT-002',
+          expirationDate: formatDate(3), // Vence en 3 días
+          quantity: 15,
+          createdAt: new Date().toISOString(),
+        },
+        {
+          id: 'test-batch-warning',
+          businessId: user.uid,
+          productId: p1,
+          batchNumber: 'LOTE-PROX-003',
+          expirationDate: formatDate(18), // Vence en 18 días
+          quantity: 30,
+          createdAt: new Date().toISOString(),
+        },
+        {
+          id: 'test-batch-good',
+          businessId: user.uid,
+          productId: p2,
+          batchNumber: 'LOTE-BUEN-004',
+          expirationDate: formatDate(90), // Vence en 90 días
+          quantity: 60,
+          createdAt: new Date().toISOString(),
+        }
+      ];
+
+      for (const item of mockData) {
+        const batchRef = doc(firestore, 'businesses', user.uid, 'inventoryBatches', item.id);
+        await setDoc(batchRef, item);
+      }
+
+      toast({
+        title: "¡Lotes de prueba cargados!",
+        description: "Se crearon 4 lotes cubriendo los 4 estados de vencimiento."
+      });
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Error al cargar",
+        description: error.message
+      });
+    } finally {
+      setIsSeeding(false);
+    }
+  };
+
+  const handleClearMockBatches = async () => {
+    if (!firestore || !user) return;
+    setIsClearing(true);
+    try {
+      const mockIds = [
+        'test-batch-expired',
+        'test-batch-critical',
+        'test-batch-warning',
+        'test-batch-good'
+      ];
+      for (const id of mockIds) {
+        const batchRef = doc(firestore, 'businesses', user.uid, 'inventoryBatches', id);
+        await deleteDoc(batchRef);
+      }
+
+      toast({
+        title: "Lotes de prueba eliminados",
+        description: "La lista ha vuelto a su estado limpio."
+      });
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Error al limpiar",
+        description: error.message
+      });
+    } finally {
+      setIsClearing(false);
+    }
+  };
+
+  if (isSubLoading || isProductsLoading || isBatchesLoading) {
+    return (
+      <div className="flex items-center justify-center h-64 gap-2 text-muted-foreground">
+        <Loader2 className="h-6 w-6 animate-spin text-primary" />
+        <span>Cargando módulo de vencimientos...</span>
+      </div>
+    );
+  }
+
+  if (!isAuthorized) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Módulo de Vencimientos Desactivado</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col items-center justify-center text-center gap-4 min-h-[350px]">
+          <Frown className="h-12 w-12 text-muted-foreground" />
+          <h3 className="text-xl font-semibold">Funcionalidad no disponible</h3>
+          <p className="text-muted-foreground max-w-sm">
+            El módulo de &quot;Alertas de Vencimiento de Inventario&quot; no está activo en tu plan actual. Por favor, contacta al administrador de la plataforma.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Encabezado con Botones de Prueba */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-black tracking-tight text-gray-900 flex items-center gap-2">
+            <Clock className="w-7 h-7 text-amber-600" />
+            Control de Vencimientos de Inventario
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            Monitoreo preventivo de fechas de caducidad por lote de producto en tiempo real.
+          </p>
+        </div>
+
+        {/* Barra de herramientas para pruebas (Solo Superadmin) */}
+        {isSuperAdmin && (
+          <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleSeedMockBatches}
+            disabled={isSeeding || isClearing}
+            className="font-bold border-amber-300 bg-amber-50/60 hover:bg-amber-100 text-amber-900 gap-1.5"
+          >
+            {isSeeding ? <Loader2 className="h-4 w-4 animate-spin" /> : <FlaskConical className="h-4 w-4 text-amber-600" />}
+            Cargar 4 Lotes de Prueba
+          </Button>
+
+          {processedBatches.some(b => b.id.startsWith('test-batch-')) && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleClearMockBatches}
+              disabled={isSeeding || isClearing}
+              className="font-bold text-red-600 border-red-200 hover:bg-red-50 gap-1.5"
+            >
+              {isClearing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4 text-red-500" />}
+              Limpiar Pruebas
+            </Button>
+          )}
+          </div>
+        )}
+      </div>
+
+      {/* Tarjetas de Métricas */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <Card className="border-red-200 bg-red-50/40 cursor-pointer hover:shadow-sm transition" onClick={() => setFilterStatus('expired')}>
+          <CardContent className="p-4 flex items-center justify-between">
+            <div>
+              <p className="text-xs font-bold uppercase text-red-700">Ya Vencidos</p>
+              <p className="text-2xl font-black text-red-900">{metrics.expired}</p>
+            </div>
+            <CalendarX className="w-8 h-8 text-red-500 opacity-80" />
+          </CardContent>
+        </Card>
+
+        <Card className="border-orange-200 bg-orange-50/40 cursor-pointer hover:shadow-sm transition" onClick={() => setFilterStatus('critical')}>
+          <CardContent className="p-4 flex items-center justify-between">
+            <div>
+              <p className="text-xs font-bold uppercase text-orange-700">Críticos (&le; 7 días)</p>
+              <p className="text-2xl font-black text-orange-900">{metrics.critical}</p>
+            </div>
+            <AlertTriangle className="w-8 h-8 text-orange-500 opacity-80" />
+          </CardContent>
+        </Card>
+
+        <Card className="border-amber-200 bg-amber-50/40 cursor-pointer hover:shadow-sm transition" onClick={() => setFilterStatus('warning')}>
+          <CardContent className="p-4 flex items-center justify-between">
+            <div>
+              <p className="text-xs font-bold uppercase text-amber-700">Próximos (&le; 30 días)</p>
+              <p className="text-2xl font-black text-amber-900">{metrics.warning}</p>
+            </div>
+            <Clock className="w-8 h-8 text-amber-500 opacity-80" />
+          </CardContent>
+        </Card>
+
+        <Card className="border-green-200 bg-green-50/40 cursor-pointer hover:shadow-sm transition" onClick={() => setFilterStatus('good')}>
+          <CardContent className="p-4 flex items-center justify-between">
+            <div>
+              <p className="text-xs font-bold uppercase text-green-700">En Buen Estado</p>
+              <p className="text-2xl font-black text-green-900">{metrics.good}</p>
+            </div>
+            <CheckCircle className="w-8 h-8 text-green-500 opacity-80" />
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Tabla de Lotes */}
+      <Card>
+        <CardHeader className="pb-4">
+          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
+            <div>
+              <CardTitle className="text-lg">Lotes Monitoreados</CardTitle>
+              <CardDescription>Mostrando {filteredBatches.length} de {processedBatches.length} lotes registrados</CardDescription>
+            </div>
+            <div className="flex items-center gap-2 w-full md:w-auto">
+              <div className="relative w-full md:w-64">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar producto o lote..."
+                  value={searchTerm}
+                  onChange={e => setSearchTerm(e.target.value)}
+                  className="pl-8 h-9"
+                />
+              </div>
+              {filterStatus !== 'all' && (
+                <Badge variant="outline" className="cursor-pointer font-bold" onClick={() => setFilterStatus('all')}>
+                  Limpiar Filtro ✕
+                </Badge>
+              )}
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {filteredBatches.length === 0 ? (
+            <div className="py-12 text-center text-muted-foreground space-y-2">
+              <Package className="w-10 h-10 mx-auto opacity-40" />
+              <p className="font-semibold">No se encontraron lotes para este criterio</p>
+              <p className="text-xs">Los lotes registrados en Firestore aparecerán aquí con su conteo regresivo de caducidad.</p>
+            </div>
+          ) : (
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Producto</TableHead>
+                    <TableHead>Nº Lote</TableHead>
+                    <TableHead className="text-right">Cantidad</TableHead>
+                    <TableHead>Fecha Vencimiento</TableHead>
+                    <TableHead>Días Restantes</TableHead>
+                    <TableHead>Estado</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredBatches.map(b => (
+                    <TableRow key={b.id}>
+                      <TableCell className="font-semibold text-gray-900">{b.productName}</TableCell>
+                      <TableCell className="font-mono text-xs">{b.batchNumber || '—'}</TableCell>
+                      <TableCell className="text-right font-medium">{b.quantity} unids.</TableCell>
+                      <TableCell>{b.expirationDate}</TableCell>
+                      <TableCell>
+                        {b.daysRemaining < 0 ? (
+                          <span className="text-red-700 font-bold">Vencido hace {Math.abs(b.daysRemaining)} d</span>
+                        ) : (
+                          <span className="font-bold text-gray-800">{b.daysRemaining} días</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {b.status === 'expired' && <Badge variant="destructive">Vencido</Badge>}
+                        {b.status === 'critical' && <Badge className="bg-orange-500 hover:bg-orange-600 text-white">Crítico (&le; 7d)</Badge>}
+                        {b.status === 'warning' && <Badge className="bg-amber-500 hover:bg-amber-600 text-white">Próximo (&le; 30d)</Badge>}
+                        {b.status === 'good' && <Badge variant="outline" className="text-green-700 border-green-300 bg-green-50">Vigente</Badge>}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}

@@ -7,7 +7,8 @@ import { useMemo } from 'react';
 import { useSubscription } from "@/hooks/useSubscription";
 import { useUser } from "@/firebase";
 import { normalizeModuleId } from "@/lib/utils";
-import { Clock, LayoutDashboard,
+import {
+  LayoutDashboard,
   FileText,
   Share2,
   ShoppingCart,
@@ -39,7 +40,8 @@ import { Clock, LayoutDashboard,
   Lightbulb,
   User,
   CalendarCheck,
-  FileBarChart, } from "lucide-react";
+  FileBarChart,
+} from "lucide-react";
 
 import { SidebarMenu, SidebarMenuItem, SidebarMenuButton, useSidebar } from "@/components/ui/sidebar";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -90,7 +92,6 @@ const allNavItems = [
   // 27-31: GESTIÓN Y CONFIGURACIÓN
   { href: "/dashboard/contabilidad", icon: Calculator, label: "Contabilidad", moduleId: 'contabilidad' },
   { href: "/dashboard/kardex", icon: Layers, label: "Inventario Kardex", moduleId: 'inventario-kardex' },
-  { href: "/dashboard/vencimientos", icon: Clock, label: "Vencimientos", moduleId: "alertas-vencimiento" },
   { href: "/dashboard/configuracion/factura", icon: Receipt, label: "Editor Factura" },
   { href: "/dashboard/configuracion/impresoras", icon: Printer, label: "Impresoras" },
   { href: "/dashboard/configuracion/chatbot-menu", icon: Bot, label: "Chatbot Menú", moduleId: 'chatbot-menu-publico' },
