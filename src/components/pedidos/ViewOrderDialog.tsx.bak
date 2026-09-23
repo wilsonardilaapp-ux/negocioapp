@@ -142,6 +142,16 @@ export function ViewOrderDialog({ order }: ViewOrderDialogProps) {
                                 <span>{formatCurrency(order.deliveryFee!)}</span>
                             </div>
                         )}
+                        {(() => {
+                            const calculatedFee = (order as any).serviceFee ?? Math.max(0, (order.total || 0) - ((order.subtotal || 0) + (order.deliveryFee || 0) + (order.packagingCost || 0) + ((order as any).vatAmount || Math.round((order.subtotal || 0) * 0.19))));
+                            if (calculatedFee <= 0) return null;
+                            return (
+                                <div className="flex justify-between items-center text-xs">
+                                    <span className="text-muted-foreground">Tarifa de servicio:</span>
+                                    <span className="font-semibold text-foreground">{formatCurrency(calculatedFee)}</span>
+                                </div>
+                            );
+                        })()}
                          {(order.vatAmount ?? 0) > 0 && (
                              <div className="flex justify-between items-center text-xs text-muted-foreground">
                                 <span>IVA:</span>
