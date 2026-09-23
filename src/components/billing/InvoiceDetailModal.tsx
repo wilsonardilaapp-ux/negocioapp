@@ -54,7 +54,8 @@ export function InvoiceDetailModal({ invoice, isOpen, onClose, mode = 'view', bu
   const firestore = useFirestore();
   const { toast } = useToast();
 
-  const businessRef = useMemoFirebase(() => user?.uid ? doc(firestore, 'businesses', user.uid) : null, [user?.uid, firestore]);
+  const bId = invoice?.businessId || user?.uid;
+  const businessRef = useMemoFirebase(() => (firestore && bId ? doc(firestore, 'businesses', bId) : null), [bId, firestore]);
   const { data: business } = useDoc<Business>(businessRef);
 
   if (!invoice) return null;
@@ -67,6 +68,8 @@ export function InvoiceDetailModal({ invoice, isOpen, onClose, mode = 'view', bu
 
   // --- LÓGICA DE DERIVACIÓN DE PORCENTAJES ---
   const baseTaxable = invoice.subtotal - invoice.discount;
+  const serviceFee = (invoice as any).serviceFee ?? Math.max(0, invoice.total - (invoice.subtotal - (invoice.discount || 0) + (invoice.tax || 0) + (invoice.tip || 0)));
+
   
   // Calcular % de descuento basado en el subtotal original
   const discPct = invoice.discount > 0 && invoice.subtotal > 0 
@@ -195,6 +198,13 @@ export function InvoiceDetailModal({ invoice, isOpen, onClose, mode = 'view', bu
                     <span>Subtotal Neto</span>
                     <span>{formatCurrency(invoice.subtotal)}</span>
                 </div>
+                {serviceFee > 0 && (
+                  <div className="flex justify-between text-[11px] font-bold text-amber-400 uppercase tracking-tighter animate-in fade-in slide-in-from-left-1">
+                    <span>Tarifa de servicio</span>
+                    <span>+{formatCurrency(serviceFee)}</span>
+                  </div>
+                )}
+
                 <div className="flex justify-between items-center text-[10px] font-bold text-slate-400 uppercase tracking-widest">
                     <span>{taxLabel} (19%)</span>
                     <span>{formatCurrency(invoice.tax)}</span>

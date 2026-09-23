@@ -75,6 +75,10 @@ const PrintPOSInvoicePage = () => {
                 price: i.unitPrice
             })),
             subtotal: invoice.subtotal,
+            discount: invoice.discount || 0,
+            tax: invoice.tax || 0,
+            tip: invoice.tip || 0,
+            serviceFee: (invoice as any).serviceFee ?? Math.max(0, invoice.total - (invoice.subtotal - (invoice.discount || 0) + (invoice.tax || 0) + (invoice.tip || 0))),
             deliveryFee: 0,
             packaging: 0,
             total: invoice.total

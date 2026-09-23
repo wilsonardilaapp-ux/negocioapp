@@ -172,15 +172,18 @@ function RegisterForm() {
       const refCode = searchParams.get('ref');
 
       let planDetails: SubscriptionPlan | HybridPlan | null = null;
+      let resolvedPlanType: 'fijo' | 'hibrido' = 'hibrido';
 
       if (planParam) {
           const standardPlanSnap = await getDoc(doc(firestore, 'plans', planParam));
           if (standardPlanSnap.exists()) {
               planDetails = { ...standardPlanSnap.data(), id: standardPlanSnap.id } as SubscriptionPlan;
+              resolvedPlanType = 'fijo';
           } else {
               const hybridPlanSnap = await getDoc(doc(firestore, 'hybrid_plans', planParam));
               if (hybridPlanSnap.exists()) {
                   planDetails = { ...hybridPlanSnap.data(), id: hybridPlanSnap.id } as HybridPlan;
+                  resolvedPlanType = 'hibrido';
               }
           }
       }
@@ -227,6 +230,7 @@ function RegisterForm() {
         logoURL: 'https://seeklogo.com/images/E/eco-friendly-logo-7087A22106-seeklogo.com.png',
         description: 'Bienvenido a mi negocio en Markix.',
         planName: planDetails?.name || 'Plan Crecimiento',
+        planType: resolvedPlanType,
         // --- Referral System ---
         referralCode: generatedReferralCode,
         referredByBusinessId,

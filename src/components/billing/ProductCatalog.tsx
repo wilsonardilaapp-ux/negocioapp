@@ -6,16 +6,44 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Search, Package, ShoppingCart, AlertCircle } from 'lucide-react';
 import type { Product } from '@/models/product';
+import { calcularPrecioCliente, type PricingContext } from '@/constants/pricingPlans';
 import { cn } from '@/lib/utils';
 import Image from 'next/image';
 
 interface ProductCatalogProps {
+  planContext?: PricingContext;
   products: Product[];
   onAddToCart: (product: Product) => void;
   isLoading: boolean;
 }
 
-export default function ProductCatalog({ products, onAddToCart, isLoading }: ProductCatalogProps) {
+
+function ProductItemImage({ product }: { product: Product }) {
+  const [imgError, setImgError] = useState(false);
+  const rawImage = product.images?.[0] || (product as any).image || (product as any).imageUrl;
+  const hasValidImage = Boolean(rawImage && typeof rawImage === 'string' && rawImage.trim() !== '' && !imgError);
+
+  if (hasValidImage) {
+    return (
+      <Image 
+        src={rawImage} 
+        alt={product.name} 
+        fill 
+        sizes="(max-width: 768px) 50vw, 20vw"
+        className="object-cover"
+        onError={() => setImgError(true)}
+      />
+    );
+  }
+
+  return (
+    <div className="flex flex-col items-center justify-center h-full w-full bg-slate-100 dark:bg-slate-800/80 text-slate-400 dark:text-slate-500">
+      <Package size={44} strokeWidth={1.5} className="opacity-80" />
+    </div>
+  );
+}
+
+export default function ProductCatalog({ products, onAddToCart, isLoading, planContext }: ProductCatalogProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('Todas');
 
@@ -80,19 +108,8 @@ export default function ProductCatalog({ products, onAddToCart, isLoading }: Pro
                 className="overflow-hidden cursor-pointer hover:ring-2 hover:ring-primary transition-all rounded-2xl border-none shadow-sm"
                 onClick={() => onAddToCart(product)}
               >
-                <div className="relative aspect-square bg-muted">
-                  {product.images?.[0] ? (
-                    <Image 
-                      src={product.images[0]} 
-                      alt={product.name} 
-                      fill 
-                      className="object-cover"
-                    />
-                  ) : (
-                    <div className="flex items-center justify-center h-full text-muted-foreground/20">
-                      <Package size={40} />
-                    </div>
-                  )}
+                <div className="relative aspect-square bg-muted overflow-hidden">
+                  <ProductItemImage product={product} />
                   {product.stock < 5 && (
                     <div className="absolute top-2 right-2">
                       <Badge variant="destructive" className="text-[8px] h-4">Bajo Stock</Badge>

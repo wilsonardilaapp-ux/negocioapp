@@ -27,6 +27,7 @@ export type Business = {
     deliveryFee?: number;
     packagingFee?: number;
     planName?: string;
+    planType?: 'fijo' | 'hibrido'; // ADITIVO: Tipo de modelo de suscripción
     status: EntityStatus;
     imageLimit?: number | null;
     productLimit?: number | null;

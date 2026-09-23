@@ -66,6 +66,8 @@ export type Order = {
   tipoEntrega: TipoEntrega;
   customerPhoneNormalized?: string;
   origin?: string;              // Canal de origen (ej. 'qr', 'whatsapp', 'web')
+  channel?: 'domicilio' | 'mesa'; // ADITIVO v5: Canal unificado del pedido
+  serviceFee?: number;          // ADITIVO v5: Tarifa de servicio aplicada en el pedido
   paymentStatus?: 'pending' | 'paid'; // Estado del cobro
   notes?: string;               // Requerimientos especiales o notas de despacho
   // --- Campos de Atribución ROI (Fase 4.1) ---

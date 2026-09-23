@@ -14,10 +14,12 @@ import { TrackingConfirmationCard } from '@/components/billing/TrackingConfirmat
 import { Loader2, Calculator, CreditCard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
+import { useSubscription } from '@/hooks/useSubscription';
 import { processSale } from '@/services/billing/billing-service';
 import { registerPOSTracking } from '@/services/billing/tracking-service';
 import { useSearchParams } from 'next/navigation';
 import { AnimatePresence } from 'framer-motion';
+import { calcularPrecioCliente, type PricingContext } from '@/constants/pricingPlans';
 
 /**
  * @fileOverview Página principal de la Terminal de Facturación (POS).
@@ -52,6 +54,14 @@ export default function POSPage() {
   const [cart, setCart] = useState<POSItem[]>([]);
   const [customerName, setCustomerName] = useState('Cliente General');
   const [customerPhone, setCustomerPhone] = useState('');
+  const [consumptionType, setConsumptionType] = useState<'sede' | 'para_llevar' | 'domicilio'>('sede');
+  const [deliveryAddress, setDeliveryAddress] = useState('');
+
+  // Tasas dinámicas configuradas desde Super Admin (Planes Híbridos)
+  const { plan: subPlan, allHybridPlans } = useSubscription();
+  const activeHybridPlan = (subPlan as any)?.tableCommissionRate !== undefined ? subPlan : (allHybridPlans?.[0] || subPlan);
+  const tableRate = Number((activeHybridPlan as any)?.tableCommissionRate ?? 2); // Comisión en Mesa (QR) / Para llevar
+  const deliveryRate = Number((activeHybridPlan as any)?.pricePerOrder ?? (activeHybridPlan as any)?.comisionRate ?? 4); // Configuración de Comisión / Domicilio
   const [isProcessing, setIsProcessing] = useState(false);
   const [lastSaleEvent, setLastSaleEvent] = useState<Invoice | null>(null);
   
@@ -65,6 +75,19 @@ export default function POSPage() {
   const [cashReceived, setCashReceived] = useState(0);
 
   const businessType = (business?.category || 'Retail') as VerticalType;
+  const pricingContext: PricingContext = useMemo(() => {
+    const pName = (business as any)?.planName || (business as any)?.plan || "";
+    const pLower = typeof pName === "string" ? pName.toLowerCase() : "";
+    const isHybrid = pLower.includes("crecimiento") || pLower.includes("estándar") || pLower.includes("profesional") || pLower.includes("básico");
+    const type = (business as any)?.planType || (isHybrid ? "hibrido" : "fijo");
+    return {
+      planType: type,
+      planName: (business as any)?.planName || pName || "Plan Menfy",
+      planSlug: (business as any)?.planSlug,
+      comisionRate: (business as any)?.comision || (business as any)?.commission,
+    };
+  }, [business]);
+
 
   // --- LÓGICA DE MESA (EXTRACCIÓN BLINDADA) ---
   const orderOrigin = searchParams?.get('ref') || 'web';
@@ -88,7 +111,9 @@ export default function POSPage() {
       ? (baseTaxable * (tipValue / 100))
       : tipValue;
 
-    const totalFinal = baseTaxable + calculatedTax + calculatedTip;
+    const serviceFeeRate = consumptionType === 'domicilio' ? deliveryRate : tableRate;
+    const calculatedServiceFee = Math.round(subtotal * (serviceFeeRate / 100));
+    const totalFinal = baseTaxable + calculatedTax + calculatedTip + calculatedServiceFee;
     const change = Math.max(0, cashReceived - totalFinal);
 
     return {
@@ -97,13 +122,17 @@ export default function POSPage() {
       tax: Math.round(calculatedTax),
       tip: Math.round(calculatedTip),
       total: Math.round(totalFinal),
-      change
+      change,
+      serviceFee: calculatedServiceFee,
+      serviceFeeRate
     };
-  }, [cart, discountType, discountValue, taxRate, tipValue, tipType, cashReceived]);
+  }, [cart, discountType, discountValue, taxRate, tipValue, tipType, cashReceived, consumptionType, tableRate, deliveryRate]);
 
   // 4. Handlers de Carrito
   const handleAddToCart = (product: Product) => {
     if (isProcessing) return;
+    const rawBase = product.basePrice ?? product.price;
+    const effectivePrice = pricingContext ? calcularPrecioCliente(rawBase, pricingContext, 'mesa') : rawBase;
     setLastSaleEvent(null); // Ocultar confirmación previa al iniciar nueva venta
     setCart(prev => {
       const existing = prev.find(item => item.productId === product.id);
@@ -118,8 +147,8 @@ export default function POSPage() {
         productId: product.id,
         name: product.name,
         quantity: 1,
-        unitPrice: product.price,
-        subtotal: product.price,
+        unitPrice: effectivePrice,
+        subtotal: effectivePrice,
         taxAmount: 0,
         discountAmount: 0
       }];
@@ -170,6 +199,7 @@ export default function POSPage() {
                 tax: financialSummary.tax,
                 discount: financialSummary.discount,
                 tip: financialSummary.tip,
+                serviceFee: financialSummary.serviceFee,
                 total: financialSummary.total,
                 paymentMethod: paymentMethod as any,
                 cashReceived,
@@ -213,6 +243,8 @@ export default function POSPage() {
         setCart([]);
         setCustomerName('Cliente General');
         setCustomerPhone('');
+        setDeliveryAddress('');
+        setConsumptionType('sede');
         setCashReceived(0);
         setDiscountValue(0);
         setTipValue(0);
@@ -291,6 +323,10 @@ export default function POSPage() {
               onCustomerNameChange={setCustomerName}
               customerPhone={customerPhone}
               onCustomerPhoneChange={setCustomerPhone}
+              consumptionType={consumptionType}
+              onConsumptionTypeChange={setConsumptionType}
+              deliveryAddress={deliveryAddress}
+              onDeliveryAddressChange={setDeliveryAddress}
               
               discountType={discountType}
               onDiscountTypeChange={setDiscountType}

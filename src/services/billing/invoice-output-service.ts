@@ -15,25 +15,34 @@ export const InvoiceOutputService = {
   /**
    * Genera la cadena de texto formateada para enviar por WhatsApp.
    */
-  generateWhatsAppMessage: (invoice: Invoice, businessName: string) => {
+    generateWhatsAppMessage: (invoice: Invoice, businessName: string) => {
     const itemsText = invoice.items.map(i => `• ${i.quantity}x ${i.name} - ${formatCurrency(i.subtotal)}`).join('\n');
-    
-    return `*RESUMEN DE COMPRA - ${businessName.toUpperCase()}* 📄\n` +
+    const effectiveBizName = businessName && businessName !== 'Nuestro Negocio' && businessName !== 'Markix Business' 
+      ? businessName 
+      : ((invoice as any).businessName || 'Salón de Belleza natural');
+
+    const sFee = (invoice as any).serviceFee ?? Math.max(0, invoice.total - (invoice.subtotal - (invoice.discount || 0) + (invoice.tax || 0) + (invoice.tip || 0)));
+    const discPct = invoice.discount > 0 && invoice.subtotal > 0 ? Math.round((invoice.discount / invoice.subtotal) * 100) : null;
+    const baseForTip = invoice.subtotal - (invoice.discount || 0);
+    const tipPct = invoice.tip > 0 && baseForTip > 0 ? Math.round((invoice.tip / baseForTip) * 100) : 5;
+
+    return `*RESUMEN DE COMPRA - ${effectiveBizName.toUpperCase()}* 🌸\n` +
       `--------------------------------\n` +
       `*Factura:* ${invoice.consecutiveNumber}\n` +
       `*Cliente:* ${invoice.customer.name}\n` +
-      `*Fecha:* ${new Date(invoice.createdAt).toLocaleString()}\n` +
+      `*Fecha:* ${new Date(invoice.createdAt).toLocaleString('es-CO')}\n` +
       `--------------------------------\n` +
       `*PRODUCTOS:*\n${itemsText}\n` +
       `--------------------------------\n` +
       `*SUBTOTAL:* ${formatCurrency(invoice.subtotal)}\n` +
-      (invoice.discount > 0 ? `*DESCUENTO:* -${formatCurrency(invoice.discount)}\n` : '') +
-      `*IVA:* ${formatCurrency(invoice.tax)}\n` +
-      (invoice.tip > 0 ? `*PROPINA:* ${formatCurrency(invoice.tip)}\n` : '') +
+      (sFee > 0 ? `*TARIFA DE SERVICIO:* +${formatCurrency(sFee)}\n` : '') +
+      (invoice.discount > 0 ? `*DESCUENTO ${discPct ? `(${discPct}%)` : ''}:* -${formatCurrency(invoice.discount)}\n` : '') +
+      `*IVA (19%):* ${formatCurrency(invoice.tax)}\n` +
+      (invoice.tip > 0 ? `*PROPINA / SERVICIO (${tipPct}%):* ${formatCurrency(invoice.tip)}\n` : '') +
       `*TOTAL:* ${formatCurrency(invoice.total)}\n` +
       `--------------------------------\n` +
       `*PAGO:* ${invoice.paymentMethod.toUpperCase()}\n` +
-      `¡Gracias por tu preferencia! 🚀`;
+      `¡Gracias por tu preferencia! 🌸`;
   },
 
   /**
@@ -102,32 +111,50 @@ export const InvoiceOutputService = {
     const rightCol = 140;
     doc.setFontSize(10);
     doc.setTextColor(100);
-    doc.text('SUBTOTAL:', rightCol, finalY + 15);
-    doc.text(formatCurrency(invoice.subtotal), 195, finalY + 15, { align: 'right' });
-    
-    if (invoice.discount > 0) {
-        doc.text('DESCUENTOS:', rightCol, finalY + 22);
-        doc.text(`-${formatCurrency(invoice.discount)}`, 195, finalY + 22, { align: 'right' });
+
+    const sFee = (invoice as any).serviceFee ?? Math.max(0, invoice.total - (invoice.subtotal - (invoice.discount || 0) + (invoice.tax || 0) + (invoice.tip || 0)));
+    const discPct = invoice.discount > 0 && invoice.subtotal > 0 ? Math.round((invoice.discount / invoice.subtotal) * 100) : null;
+    let curY = finalY + 15;
+
+    doc.text('SUBTOTAL NETO:', rightCol, curY);
+    doc.text(formatCurrency(invoice.subtotal), 195, curY, { align: 'right' });
+
+    if (sFee > 0) {
+      curY += 7;
+      doc.text('TARIFA DE SERVICIO:', rightCol, curY);
+      doc.text(`+${formatCurrency(sFee)}`, 195, curY, { align: 'right' });
     }
-    
-    doc.text('IMPUESTOS:', rightCol, finalY + 29);
-    doc.text(formatCurrency(invoice.tax), 195, finalY + 29, { align: 'right' });
+
+    if (invoice.discount > 0) {
+      curY += 7;
+      doc.text(`DESCUENTO ${discPct ? `(${discPct}%)` : ''}:`, rightCol, curY);
+      doc.text(`-${formatCurrency(invoice.discount)}`, 195, curY, { align: 'right' });
+    }
+
+    if (invoice.tax > 0) {
+      curY += 7;
+      doc.text('IVA (19%):', rightCol, curY);
+      doc.text(formatCurrency(invoice.tax), 195, curY, { align: 'right' });
+    }
 
     if (invoice.tip > 0) {
-        doc.text('PROPINA/SERVICIO:', rightCol, finalY + 36);
-        doc.text(formatCurrency(invoice.tip), 195, finalY + 36, { align: 'right' });
+      curY += 7;
+      doc.text('PROPINA / SERVICIO:', rightCol, curY);
+      doc.text(formatCurrency(invoice.tip), 195, curY, { align: 'right' });
     }
 
     // Border and Total
+    curY += 5;
     doc.setDrawColor(30, 41, 59);
     doc.setLineWidth(0.5);
-    doc.line(rightCol, finalY + 42, 195, finalY + 42);
-    
-    doc.setFontSize(14);
+    doc.line(rightCol, curY, 195, curY);
+
+    curY += 8;
+    doc.setFontSize(13);
     doc.setTextColor(0);
     doc.setFont('helvetica', 'bold');
-    doc.text('TOTAL FINAL:', rightCol, finalY + 52);
-    doc.text(formatCurrency(invoice.total), 195, finalY + 52, { align: 'right' });
+    doc.text('TOTAL A PAGAR:', rightCol, curY);
+    doc.text(formatCurrency(invoice.total), 195, curY, { align: 'right' });
 
     // Payment Footer
     doc.setFontSize(9);

@@ -63,7 +63,8 @@ export function InvoiceActionsMenu({ invoice, businessType }: InvoiceActionsMenu
   const [isCancelAlertOpen, setIsCancelAlertOpen] = useState(false);
 
   // Obtener nombre del negocio para WhatsApp/PDF
-  const businessRef = useMemoFirebase(() => user ? doc(firestore, 'businesses', user.uid) : null, [user, firestore]);
+  const bId = invoice?.businessId || user?.uid;
+  const businessRef = useMemoFirebase(() => (firestore && bId ? doc(firestore, 'businesses', bId) : null), [bId, firestore]);
   const { data: business } = useDoc<Business>(businessRef);
 
   const labels = VERTICAL_LABELS[businessType] || VERTICAL_LABELS.Retail;

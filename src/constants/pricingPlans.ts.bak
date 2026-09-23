@@ -1,0 +1,88 @@
+/**
+ * @fileOverview Constante central única y funciones de cálculo de precios.
+ * Regla de negocio:
+ * - Plan FIJO: comision 0%. El cliente paga basePrice exacto.
+ * - Plan HÍBRIDO: base + comision con redondeo a múltiplo de $100 hacia arriba.
+ * - El restaurante SIEMPRE recibe el 100% de su precio base.
+ */
+
+export const PORCENTAJES_HIBRIDOS = {
+  arranque: 0.15,
+  crecimiento: 0.12,
+  profesional: 0.10,
+  unlimited: 0.09,
+} as const;
+
+export const PLANES_FIJOS = {
+  comision: 0,
+} as const;
+
+export type PlanType = 'fijo' | 'hibrido';
+
+export type PricingContext = {
+  planType?: PlanType;
+  comisionRate?: number; // Ej: 0.12 o 12
+  planSlug?: string;
+  planName?: string;
+};
+
+/**
+ * Redondeo a múltiplo de $100 hacia arriba
+ * Ej: 20000 * 1.15 = 23000 -> 23000
+ * Ej: 13000 * 1.15 = 14950 -> 15000
+ */
+export function roundUp100(value: number): number {
+  if (!value || isNaN(value) || value <= 0) return 0;
+  // Normalizar micro-épsilon flotante de JavaScript (ej. 24200.000000000004 -> 24200)
+  const cleanValue = Math.round(value * 100) / 100;
+  return Math.ceil(cleanValue / 100) * 100;
+}
+
+/**
+ * Obtiene el porcentaje de comisión híbrido a aplicar
+ */
+export function obtenerTasaComisionHibrida(context?: PricingContext | null): number {
+  if (!context) return PORCENTAJES_HIBRIDOS.arranque; // Default híbrido: 15%
+
+  // Si tiene tasa numérica directa configurada en su plan
+  if (context.comisionRate !== undefined && context.comisionRate !== null) {
+    const rate = Number(context.comisionRate);
+    return rate > 1 ? rate / 100 : rate;
+  }
+
+  // Si se puede inferir por slug o nombre
+  const identifier = (context.planSlug || context.planName || '').toLowerCase();
+  if (identifier.includes('arranque')) return PORCENTAJES_HIBRIDOS.arranque;
+  if (identifier.includes('crecimiento')) return PORCENTAJES_HIBRIDOS.crecimiento;
+  if (identifier.includes('profesional')) return PORCENTAJES_HIBRIDOS.profesional;
+  if (identifier.includes('unlimited') || identifier.includes('ilimitado')) return PORCENTAJES_HIBRIDOS.unlimited;
+
+  return PORCENTAJES_HIBRIDOS.arranque; // 15% por defecto
+}
+
+/**
+ * Función única central: calcularPrecioCliente
+ * - Si planType === 'fijo' -> retorna basePrice sin recargo ni redondeo.
+ * - Si planType === 'hibrido' -> basePrice * (1 + %plan) redondeado a $100 arriba.
+ */
+export function calcularPrecioCliente(
+  basePrice: number | undefined | null,
+  context?: PricingContext | null
+): number {
+  const safeBase = Number(basePrice) || 0;
+  if (safeBase <= 0) return 0;
+
+  // Si es plan fijo o no se define tipo híbrido, no hay recargo
+  if (context?.planType === 'fijo') {
+    return safeBase;
+  }
+
+  if (context?.planType === 'hibrido') {
+    const tasa = obtenerTasaComisionHibrida(context);
+    const precioCalculado = safeBase * (1 + tasa);
+    return roundUp100(precioCalculado);
+  }
+
+  // Fallback seguro: si no se especifica, se mantiene el precio base exacto
+  return safeBase;
+}

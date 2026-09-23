@@ -2,6 +2,8 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { ShieldAlert, ShieldCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -24,8 +26,8 @@ import {
   ArrowRight,
   FileDown
 } from 'lucide-react';
-import { useCollection, useFirestore, useMemoFirebase, useDoc, addDocumentNonBlocking } from '@/firebase';
-import { collection, getDocs, doc } from 'firebase/firestore';
+import { useCollection, useFirestore, useMemoFirebase, useDoc, addDocumentNonBlocking, useUser, setDocumentNonBlocking } from '@/firebase';
+import { collection, getDocs, doc, getDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import type { HybridPlan, HybridBillingResult } from '@/models/hybrid-plan';
 import type { Business } from '@/models/business';
@@ -63,6 +65,7 @@ const YEARS = Array.from({ length: 2040 - 2024 + 1 }, (_, i) => (2024 + i).toStr
 
 export default function HybridBillingPage() {
   const firestore = useFirestore();
+  const { user } = useUser();
   const { toast } = useToast();
   const [isCalculating, setIsCalculating] = useState(false);
   const [billingResults, setBillingResults] = useState<HybridBillingResult[]>([]);
@@ -70,10 +73,29 @@ export default function HybridBillingPage() {
   // Período seleccionado
   const [selectedMonth, setSelectedMonth] = useState<string>(new Date().getMonth().toString());
   const [selectedYear, setSelectedYear] = useState<string>(new Date().getFullYear().toString());
+  const [billingPeriodType, setBillingPeriodType] = useState<'monthly' | 'biweekly' | 'weekly'>('monthly');
+  const [selectedFortnight, setSelectedFortnight] = useState<'1' | '2'>('1');
+  const [selectedWeek, setSelectedWeek] = useState<'1' | '2' | '3' | '4'>('1');
+  const [billingAutoSuspension, setBillingAutoSuspension] = useState<boolean>(false);
+  const [suspendingBusiness, setSuspendingBusiness] = useState<{ id: string; name: string; isSuspended: boolean } | null>(null);
 
   // Data fetching
   const hybridPlansQuery = useMemoFirebase(() => !firestore ? null : collection(firestore, 'hybrid_plans'), [firestore]);
   const { data: hybridPlans } = useCollection<HybridPlan>(hybridPlansQuery);
+
+  useEffect(() => {
+    if (!firestore) return;
+    const fetchSuspensionConfig = async () => {
+      try {
+        const cfgRef = doc(firestore, 'globalConfig', 'billing');
+        const snap = await getDoc(cfgRef);
+        if (snap.exists() && snap.data().billingAutoSuspension !== undefined) {
+          setBillingAutoSuspension(Boolean(snap.data().billingAutoSuspension));
+        }
+      } catch (e) {}
+    };
+    fetchSuspensionConfig();
+  }, [firestore]);
 
   const businessesQuery = useMemoFirebase(() => !firestore ? null : collection(firestore, 'businesses'), [firestore]);
   const { data: businesses, isLoading: loadingBusinesses } = useCollection<Business>(businessesQuery);
@@ -90,6 +112,57 @@ export default function HybridBillingPage() {
   };
 
   // Helpers robustos
+  const handleToggleAutoSuspension = async () => {
+    if (!firestore) return;
+    const newValue = !billingAutoSuspension;
+    setBillingAutoSuspension(newValue);
+    try {
+      const cfgRef = doc(firestore, 'globalConfig', 'billing');
+      await setDocumentNonBlocking(cfgRef, { billingAutoSuspension: newValue }, { merge: true });
+      toast({
+        title: `Suspensión ${newValue ? 'AUTOMÁTICA activada' : 'MANUAL activada'}`,
+        description: newValue 
+          ? 'Los restaurantes con facturas vencidas se suspenderán solos.' 
+          : 'Tú decides manualmente cuándo suspender o reactivar.'
+      });
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Error', description: e.message });
+    }
+  };
+
+  const handleConfirmSuspension = async () => {
+    if (!firestore || !suspendingBusiness || !user) return;
+    const nextStatus = suspendingBusiness.isSuspended ? 'active' : 'suspended';
+    try {
+      const bRef = doc(firestore, 'businesses', suspendingBusiness.id);
+      await setDocumentNonBlocking(bRef, { status: nextStatus }, { merge: true });
+      
+      // Registrar en log
+      const logRef = doc(collection(firestore, 'suspensionLog'));
+      await setDocumentNonBlocking(logRef, {
+        businessId: suspendingBusiness.id,
+        businessName: suspendingBusiness.name,
+        action: nextStatus === 'suspended' ? 'suspend' : 'reactivate',
+        mode: 'manual',
+        userId: user.uid,
+        userEmail: user.email,
+        timestamp: new Date().toISOString()
+      });
+
+      toast({
+        title: nextStatus === 'suspended' ? 'Restaurante suspendido' : 'Restaurante reactivado',
+        description: `El estado de "${suspendingBusiness.name}" ha sido actualizado.`
+      });
+
+      // Actualizar estado local en billingResults
+      setBillingResults(prev => prev.map(r => r.businessId === suspendingBusiness.id ? { ...r, isSuspended: nextStatus === 'suspended' } : r));
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Error', description: e.message });
+    } finally {
+      setSuspendingBusiness(null);
+    }
+  };
+
   const parseAmount = (val: any): number => {
     if (typeof val === 'number') return val;
     if (typeof val === 'string') {
@@ -124,6 +197,9 @@ export default function HybridBillingPage() {
       const referenceMonth = startOfMonth(referenceDate);
 
       for (const business of businesses) {
+        // FASE 5: Ignorar negocios de planes fijos en este panel
+        if (business.planType && business.planType !== 'hibrido') continue;
+
         const businessKey = business.name.toLowerCase().trim();
 
         const plan = hybridPlans.find(p => p.name === business.planName || p.id === business.planName);
@@ -138,22 +214,61 @@ export default function HybridBillingPage() {
             if (!orderDate) return false;
             const matchesMonth = isSameMonth(orderDate, referenceMonth);
             const notCancelled = o.orderStatus !== 'Cancelado';
-            return matchesMonth && notCancelled;
+            if (!matchesMonth || !notCancelled) return false;
+
+            if (billingPeriodType === 'monthly') return true;
+            const day = orderDate.getDate();
+            if (billingPeriodType === 'biweekly') {
+              return selectedFortnight === '1' ? day <= 15 : day > 15;
+            }
+            if (billingPeriodType === 'weekly') {
+              if (selectedWeek === '1') return day >= 1 && day <= 7;
+              if (selectedWeek === '2') return day >= 8 && day <= 14;
+              if (selectedWeek === '3') return day >= 15 && day <= 21;
+              return day >= 22;
+            }
+            return true;
         });
         
         const orderCount = currentMonthOrders.length;
         const totalSalesValue = currentMonthOrders.reduce((sum, o) => sum + parseAmount(o.subtotal), 0);
 
-        let variableAmount = 0;
-        const commissionConfig = parseAmount(plan.pricePerOrder);
+        let mesaOrdersCount = 0;
+        let mesaOrdersValue = 0;
+        let mesaCommission = 0;
+        let deliveryOrdersCount = 0;
+        let deliveryOrdersValue = 0;
+        let deliveryCommission = 0;
 
-        if (plan.commissionType === 'percent') {
-          const comisionCalculada = totalSalesValue * (commissionConfig / 100);
-          const tope = parseAmount(plan.maxCommissionPerOrder);
-          variableAmount = (tope > 0 && orderCount > 0) ? Math.min(comisionCalculada, tope * orderCount) : comisionCalculada;
-        } else {
-          variableAmount = orderCount * commissionConfig;
+        const tableCommissionRate = parseAmount(plan.tableCommissionRate) || 3;
+        const deliveryCommissionConfig = parseAmount(plan.pricePerOrder);
+
+        for (const order of currentMonthOrders) {
+          const isMesa = order.channel === 'mesa' || order.origin === 'qr';
+          const orderTotal = Number(order.total || 0);
+
+          if (isMesa) {
+            mesaOrdersCount++;
+            mesaOrdersValue += orderTotal;
+            mesaCommission += orderTotal * (tableCommissionRate / 100);
+          } else {
+            deliveryOrdersCount++;
+            deliveryOrdersValue += orderTotal;
+            if (plan.commissionType === 'percent') {
+              deliveryCommission += orderTotal * (deliveryCommissionConfig / 100);
+            } else {
+              deliveryCommission += deliveryCommissionConfig;
+            }
+          }
         }
+
+        mesaCommission = Math.round(mesaCommission);
+        deliveryCommission = Math.round(deliveryCommission);
+        let variableAmount = mesaCommission + deliveryCommission;
+
+        const dueDateObj = new Date(referenceDate.getTime() + 5 * 24 * 60 * 60 * 1000);
+        const isOverdue = dueDateObj.getTime() < Date.now();
+        const isSuspended = business.status === 'suspended';
 
         const billingResult: HybridBillingResult = {
           businessId: business.id,
@@ -161,11 +276,30 @@ export default function HybridBillingPage() {
           ownerEmail: business.ownerEmail,
           phone: business.phone,
           planName: plan.name,
-          basePrice: parseAmount(plan.basePrice),
+          basePrice: (() => {
+            let b = parseAmount(plan.basePrice);
+            if (billingPeriodType === 'biweekly') return Math.round(b / 2);
+            if (billingPeriodType === 'weekly') return Math.round(b / 4);
+            return b;
+          })(),
           orderCount,
           ordersTotalValue: totalSalesValue,
           variableAmount,
-          totalAmount: parseAmount(plan.basePrice) + variableAmount,
+          mesaOrdersCount,
+          mesaOrdersValue,
+          mesaCommission,
+          deliveryOrdersCount,
+          deliveryOrdersValue,
+          deliveryCommission,
+          dueDate: dueDateObj.toISOString(),
+          isOverdue,
+          isSuspended,
+          totalAmount: (() => {
+            let b = parseAmount(plan.basePrice);
+            if (billingPeriodType === 'biweekly') b = Math.round(b / 2);
+            if (billingPeriodType === 'weekly') b = Math.round(b / 4);
+            return b + variableAmount;
+          })(),
           status: 'pending',
           paymentMethod: 'Nequi',
           commissionType: plan.commissionType || 'fixed',
@@ -267,7 +401,27 @@ export default function HybridBillingPage() {
         if (paymentConfig.bancolombia?.enabled) paymentDetails += `\n🏦 Bancolombia: ${paymentConfig.bancolombia.accountNumber}`;
     }
 
-    const message = `Hola *${res.businessName}*! 👋 
+    let message = '';
+    if (billingPeriodType === 'weekly') {
+      const weekRange = selectedWeek === '1' ? '1 al 7' : selectedWeek === '2' ? '8 al 14' : selectedWeek === '3' ? '15 al 21' : '22 al fin de mes';
+      message = `Hola *${res.businessName}*, adjuntamos el reporte de la semana (${weekRange} de ${currentMonthLabel} ${selectedYear}):
+• Base Plan: ${formatCurrency(res.basePrice)}
+• Comisiones (${res.orderCount} pedidos): ${formatCurrency(res.variableAmount)}
+• TOTAL A TRANSFERIR: ${formatCurrency(res.totalAmount)}
+
+Recuerda que estas comisiones ya fueron cobradas al cliente final en los pedidos.
+Por favor transfiere a Nequi ${paymentDetails || ''} antes del martes 6:00 PM.`;
+    } else if (billingPeriodType === 'biweekly') {
+      const fortRange = selectedFortnight === '1' ? '1 al 15' : '16 al fin de mes';
+      message = `Hola *${res.businessName}*, adjuntamos el reporte de la quincena (${fortRange} de ${currentMonthLabel} ${selectedYear}):
+• Base Plan: ${formatCurrency(res.basePrice)}
+• Comisiones (${res.orderCount} pedidos): ${formatCurrency(res.variableAmount)}
+• TOTAL A TRANSFERIR: ${formatCurrency(res.totalAmount)}
+
+Recuerda que estas comisiones ya fueron cobradas al cliente final en los pedidos.
+Por favor transfiere a Nequi ${paymentDetails || ''} antes del vencimiento establecido.`;
+    } else {
+      message = `Hola *${res.businessName}*! 👋 
 
 Aquí está tu resumen de facturación para el mes de *${currentMonthLabel} ${selectedYear}*:
 
@@ -284,6 +438,7 @@ Aquí está tu resumen de facturación para el mes de *${currentMonthLabel} ${se
 📍 *Métodos de pago:*${paymentDetails || '\nConsulta los datos bancarios con el administrador.'}
 
 Gracias por tu puntualidad! 🚀`;
+    }
 
     // 1. Intentar crear la notificación en el panel del cliente
     try {
@@ -321,7 +476,60 @@ Gracias por tu puntualidad! 🚀`;
             </CardTitle>
             <CardDescription>Gestión de comisiones para planes híbridos (Zentry)</CardDescription>
           </div>
+          <div className="flex items-center gap-3 bg-background/80 p-2.5 rounded-xl border shadow-sm">
+            <div className="flex flex-col text-right">
+              <span className="text-xs font-bold text-foreground">
+                Suspensión: {billingAutoSuspension ? 'AUTOMÁTICA' : 'MANUAL'}
+              </span>
+              <span className="text-[10px] text-muted-foreground" title="Automática: los restaurantes con factura vencida se bloquean solos. Manual: tú decides cuándo suspender.">
+                {billingAutoSuspension ? 'Bloqueo automático si vence' : 'Control manual por admin'}
+              </span>
+            </div>
+            <Switch 
+              checked={billingAutoSuspension} 
+              onCheckedChange={handleToggleAutoSuspension}
+              className="data-[state=checked]:bg-destructive"
+            />
+          </div>
           <div className="flex gap-2 items-center">
+            {/* TOGGLE MODALIDAD DE COBRO (FASE 5) */}
+            <Select value={billingPeriodType} onValueChange={(val: any) => setBillingPeriodType(val)}>
+              <SelectTrigger className="w-[125px] font-bold">
+                <SelectValue placeholder="Modalidad" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="monthly">Mensual</SelectItem>
+                <SelectItem value="biweekly">Quincenal</SelectItem>
+                <SelectItem value="weekly">Semanal</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {billingPeriodType === 'biweekly' && (
+              <Select value={selectedFortnight} onValueChange={(val: any) => setSelectedFortnight(val)}>
+                <SelectTrigger className="w-[185px]">
+                  <SelectValue placeholder="Quincena" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1">1ra Quincena (1 al 15)</SelectItem>
+                  <SelectItem value="2">2da Quincena (16 al fin)</SelectItem>
+                </SelectContent>
+              </Select>
+            )}
+
+            {billingPeriodType === 'weekly' && (
+              <Select value={selectedWeek} onValueChange={(val: any) => setSelectedWeek(val)}>
+                <SelectTrigger className="w-[175px]">
+                  <SelectValue placeholder="Semana" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1">Semana 1 (1 al 7)</SelectItem>
+                  <SelectItem value="2">Semana 2 (8 al 14)</SelectItem>
+                  <SelectItem value="3">Semana 3 (15 al 21)</SelectItem>
+                  <SelectItem value="4">Semana 4 (22 al fin)</SelectItem>
+                </SelectContent>
+              </Select>
+            )}
+
             {/* SELECTORES DE MES Y AÑO */}
             <Select value={selectedMonth} onValueChange={setSelectedMonth}>
               <SelectTrigger className="w-[140px]">
@@ -372,7 +580,7 @@ Gracias por tu puntualidad! 🚀`;
           <CardContent className="flex items-center gap-2">
             <CalendarIcon className="w-5 h-5 text-primary" />
             <div className="text-xl font-bold capitalize">
-              {MONTHS[parseInt(selectedMonth)].label} {selectedYear}
+              {billingPeriodType === 'weekly' ? `Semana ${selectedWeek} · ` : billingPeriodType === 'biweekly' ? `Quincena ${selectedFortnight} · ` : ''}{MONTHS[parseInt(selectedMonth)].label} {selectedYear}
             </div>
           </CardContent>
         </Card>
@@ -438,20 +646,30 @@ Gracias por tu puntualidad! 🚀`;
                                 className="data-[state=checked]:bg-green-500"
                             />
                             <span className={cn("text-[10px] font-bold uppercase", res.status === 'paid' ? "text-green-600" : "text-orange-600")}>
-                                {res.status === 'paid' ? 'Pagado' : 'Pendiente'}
+                                {res.status === 'paid' ? 'Pagado' : 'Pendiente · vence martes 6:00 PM'}
                             </span>
                         </div>
                     </TableCell>
                     <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-2">
                         <Button 
                             variant="outline" 
                             size="sm" 
                             className="bg-green-50 text-green-700 hover:bg-green-100 hover:text-green-800 border-green-200"
                             onClick={() => handleSendWhatsApp(res)}
                         >
-                            <WhatsAppIcon className="mr-2 h-4 w-4" />
-                            Enviar Cobro
+                            <WhatsAppIcon className="mr-1.5 h-3.5 w-3.5" />
+                            Enviar
                         </Button>
+                        <Button
+                            variant={res.isSuspended ? "default" : "destructive"}
+                            size="sm"
+                            className="text-xs"
+                            onClick={() => setSuspendingBusiness({ id: res.businessId, name: res.businessName, isSuspended: Boolean(res.isSuspended) })}
+                        >
+                            {res.isSuspended ? 'Reactivar' : 'Suspender'}
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 )) : (
@@ -470,6 +688,32 @@ Gracias por tu puntualidad! 🚀`;
           </div>
         </CardContent>
       </Card>
+    
+      {/* Modal de confirmación de suspensión manual */}
+      <AlertDialog open={!!suspendingBusiness} onOpenChange={(open) => !open && setSuspendingBusiness(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <ShieldAlert className="h-5 w-5 text-destructive" />
+              {suspendingBusiness?.isSuspended ? '¿Reactivar restaurante?' : '¿Suspender restaurante?'}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {suspendingBusiness?.isSuspended
+                ? `El restaurante "${suspendingBusiness?.name}" volverá a estar disponible para recibir pedidos en su carta y QR.`
+                : `Al suspender a "${suspendingBusiness?.name}", su carta pública y código QR dejarán de estar disponibles inmediatamente hasta que reactives el servicio.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleConfirmSuspension}
+              className={suspendingBusiness?.isSuspended ? "bg-primary" : "bg-destructive text-destructive-foreground hover:bg-destructive/90"}
+            >
+              {suspendingBusiness?.isSuspended ? 'Sí, reactivar' : 'Sí, suspender'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

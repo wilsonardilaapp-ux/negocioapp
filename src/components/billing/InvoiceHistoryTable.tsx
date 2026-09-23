@@ -56,6 +56,22 @@ interface InvoiceHistoryTableProps {
   businessType: VerticalType;
 }
 
+// Helper para formato dd/mm/aaaa hh:mm AM/PM
+const formatInvoiceDateTime = (dateStr: string) => {
+  if (!dateStr) return "N/A";
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return dateStr;
+  const day = String(d.getDate()).padStart(2, "0");
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const year = d.getFullYear();
+  let hours = d.getHours();
+  const minutes = String(d.getMinutes()).padStart(2, "0");
+  const ampm = hours >= 12 ? "PM" : "AM";
+  hours = hours % 12 || 12;
+  const formattedHours = String(hours).padStart(2, "0");
+  return `${day}/${month}/${year} ${formattedHours}:${minutes} ${ampm}`;
+};
+
 export default function InvoiceHistoryTable({ invoices, isLoading, businessType }: InvoiceHistoryTableProps) {
   const { user } = useUser();
   const firestore = useFirestore();
@@ -88,6 +104,13 @@ export default function InvoiceHistoryTable({ invoices, isLoading, businessType 
       }
 
       return matchesSearch && matchesConsumption && matchesPayment && matchesDate;
+    }).sort((a, b) => {
+      const timeA = new Date(a.createdAt).getTime() || 0;
+      const timeB = new Date(b.createdAt).getTime() || 0;
+      if (timeB !== timeA) {
+        return timeB - timeA; // Mas reciente a mas antigua
+      }
+      return b.consecutiveNumber.localeCompare(a.consecutiveNumber, undefined, { numeric: true });
     });
   }, [invoices, searchTerm, consumptionFilter, paymentFilter, dateFrom, dateTo]);
 
@@ -240,7 +263,8 @@ export default function InvoiceHistoryTable({ invoices, isLoading, businessType 
                     onCheckedChange={toggleSelectAll} 
                   />
                 </TableHead>
-                <TableHead className="text-[10px] font-black uppercase tracking-widest">Nro Factura</TableHead>
+                <TableHead className="text-[10px] font-black uppercase tracking-widest">Fecha</TableHead>
+              <TableHead className="text-[10px] font-black uppercase tracking-widest">Nro Factura</TableHead>
                 <TableHead className="text-[10px] font-black uppercase tracking-widest">Cliente</TableHead>
                 {businessType === 'Restaurante' && <TableHead className="text-[10px] font-black uppercase tracking-widest text-center">Mesa</TableHead>}
                 <TableHead className="text-[10px] font-black uppercase tracking-widest">Método</TableHead>
@@ -252,7 +276,7 @@ export default function InvoiceHistoryTable({ invoices, isLoading, businessType 
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="h-48 text-center">
+                  <TableCell colSpan={9} className="h-48 text-center">
                     <div className="flex flex-col items-center justify-center gap-2 opacity-50">
                       <Loader2 className="animate-spin" />
                       <span className="text-xs font-bold uppercase">Cargando Historial...</span>
@@ -271,7 +295,10 @@ export default function InvoiceHistoryTable({ invoices, isLoading, businessType 
                         onCheckedChange={() => toggleSelectOne(inv.id)} 
                       />
                     </TableCell>
-                    <TableCell className="font-mono text-xs font-bold text-primary">{inv.consecutiveNumber}</TableCell>
+                    <TableCell className="text-xs font-semibold text-slate-600 whitespace-nowrap">
+                    {formatInvoiceDateTime(inv.createdAt)}
+                  </TableCell>
+                  <TableCell className="font-mono text-xs font-bold text-primary">{inv.consecutiveNumber}</TableCell>
                     <TableCell>
                       <div className="flex flex-col">
                         <span className="text-xs font-black text-slate-700 uppercase">{inv.customer.name}</span>
@@ -308,7 +335,7 @@ export default function InvoiceHistoryTable({ invoices, isLoading, businessType 
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={8} className="h-48 text-center text-muted-foreground">
+                  <TableCell colSpan={9} className="h-48 text-center text-muted-foreground">
                     <p className="text-xs font-bold uppercase tracking-widest opacity-20">Sin registros encontrados</p>
                   </TableCell>
                 </TableRow>

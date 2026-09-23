@@ -15,7 +15,8 @@ import {
   Receipt, 
   DollarSign, 
   Percent,
-  Smartphone
+  Smartphone,
+  MapPin
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { POSItem, VerticalType, DiscountType } from '@/types/billing';
@@ -30,6 +31,10 @@ interface InvoiceCartProps {
   onCustomerNameChange?: (val: string) => void;
   customerPhone: string;
   onCustomerPhoneChange?: (val: string) => void;
+  consumptionType?: 'sede' | 'para_llevar' | 'domicilio';
+  onConsumptionTypeChange?: (type: 'sede' | 'para_llevar' | 'domicilio') => void;
+  deliveryAddress?: string;
+  onDeliveryAddressChange?: (val: string) => void;
   
   // Financial Control - Aligned names with page.tsx
   discountType: DiscountType;
@@ -51,6 +56,8 @@ interface InvoiceCartProps {
       tax: number;
       tip: number;
       total: number;
+      serviceFee?: number;
+      serviceFeeRate?: number;
   };
   isProcessing: boolean;
 }
@@ -64,6 +71,10 @@ export default function InvoiceCart({
   onCustomerNameChange,
   customerPhone,
   onCustomerPhoneChange,
+  consumptionType = 'sede',
+  onConsumptionTypeChange,
+  deliveryAddress = '',
+  onDeliveryAddressChange,
   discountType,
   onDiscountTypeChange,
   discountValue,
@@ -94,6 +105,34 @@ export default function InvoiceCart({
 
       <CardContent className="flex-1 flex flex-col p-4 gap-3 overflow-hidden">
         <div className="space-y-3">
+
+        {/* Selector de Tipo de Consumo */}
+        <div className="space-y-1.5 bg-slate-50 p-2 rounded-xl border border-slate-100">
+          <Label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Tipo de Consumo</Label>
+          <div className="flex gap-1.5">
+            {[
+              { id: 'sede', label: 'Sede' },
+              { id: 'para_llevar', label: 'Para llevar' },
+              { id: 'domicilio', label: 'Domicilio' }
+            ].map(item => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => onConsumptionTypeChange?.(item.id as any)}
+                disabled={isProcessing}
+                className={cn(
+                  "flex-1 py-1 px-2 rounded-lg text-[10px] font-black uppercase border transition-all text-center",
+                  consumptionType === item.id
+                    ? "bg-primary text-white border-primary shadow-sm"
+                    : "bg-white text-muted-foreground border-slate-200 hover:border-slate-300"
+                )}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1">
               <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest flex items-center gap-1">
@@ -120,6 +159,21 @@ export default function InvoiceCart({
               />
             </div>
           </div>
+
+          {consumptionType === 'domicilio' && (
+            <div className="space-y-1 animate-in fade-in duration-200 pt-1">
+              <Label className="text-[10px] font-black uppercase text-primary tracking-widest flex items-center gap-1">
+                <MapPin size={10} /> Dirección de Entrega
+              </Label>
+              <Input 
+                placeholder="Dirección completa del domicilio..." 
+                value={deliveryAddress}
+                onChange={(e) => onDeliveryAddressChange?.(e.target.value)}
+                className="h-8 font-bold bg-primary/5 border border-primary/20 text-xs text-slate-800"
+                disabled={isProcessing}
+              />
+            </div>
+          )}
 
           <div className="grid grid-cols-2 gap-3">
              <div className="space-y-1">
@@ -323,6 +377,13 @@ export default function InvoiceCart({
             <span>Subtotal Neto</span>
             <span>{formatCurrency(summary.subtotal)}</span>
           </div>
+          {summary.serviceFee !== undefined && (
+            <div className="flex justify-between text-[11px] font-bold text-amber-400 uppercase tracking-tighter animate-in fade-in slide-in-from-left-1">
+              <span>Tarifa de servicio</span>
+              <span>+{formatCurrency(summary.serviceFee)}</span>
+            </div>
+          )}
+
           {summary.discount > 0 && (
             <div className="flex justify-between text-[11px] font-bold text-red-400 uppercase tracking-tighter animate-in fade-in slide-in-from-left-1">
                 <span>Descuento {discountType === 'percent' ? `(${discountValue}%)` : ''}</span>

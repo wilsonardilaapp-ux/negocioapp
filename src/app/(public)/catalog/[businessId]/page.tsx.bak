@@ -1,0 +1,696 @@
+'use client';
+
+import React, { useState, useEffect, useMemo, useCallback, Suspense } from 'react';
+import { useParams, useSearchParams } from 'next/navigation';
+import { useFirebase, useCollection, useDoc, useMemoFirebase } from '@/firebase';
+import { doc, getDoc, collectionGroup, query, where, getDocs, limit, collection } from 'firebase/firestore';
+
+import CatalogHeader from '@/components/catalogo/catalog-header';
+import PublicProductCard from '@/components/catalogo/public-product-card';
+import ProductViewModal from '@/components/catalogo/product-view-modal';
+import { PurchaseModal } from '@/components/catalogo/purchase-modal';
+import { CartDrawer } from '@/components/catalogo/cart-drawer';
+import { SuggestionModal } from '@/components/suggestions/suggestion-modal';
+import { Frown, Loader2, PackageSearch, LayoutGrid, Star, Award, ChevronLeft, ChevronRight, Search, Ticket, Calendar, CheckCircle2 } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
+import type { LandingHeaderConfigData } from '@/models/landing-page';
+import type { Product } from '@/models/product';
+import type { Promotion } from '@/models/promotion';
+import type { Coupon } from '@/models/coupon';
+import type { PaymentSettings } from '@/models/payment-settings';
+import type { SuggestionOutput } from '@/models/suggestion-io';
+import type { CartItem } from '@/models/cart';
+import { getSuggestion } from '@/ai/flows/suggestion-flow';
+import { updateSuggestionMetrics } from '@/ai/flows/update-suggestion-metrics-flow';
+import { PublicMenuChatWidget } from '@/components/public-menu-chatbot/PublicMenuChatWidget';
+import { useToast } from '@/hooks/use-toast';
+import { promotionService } from '@/services/promotion-service';
+import { couponService } from '@/services/coupon-service';
+import { useSubscription } from '@/hooks/useSubscription';
+import { saveAttribution } from '@/lib/tracking/attribution';
+
+// Componentes de Fidelización y Reseñas
+import ReviewForm from '@/components/catalogo/ReviewForm';
+import ReviewSummary from '@/components/reviews/ReviewSummary';
+import LoyaltyStatus from '@/components/loyalty/LoyaltyStatus';
+import RewardsCatalog from '@/components/loyalty/RewardsCatalog';
+import type { Business } from '@/models/business';
+import type { Reward } from '@/services/loyalty-service';
+
+// Carrusel
+import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
+import Autoplay from "embla-carousel-autoplay";
+import Image from 'next/image';
+import { cn } from '@/lib/utils';
+import Link from 'next/link';
+
+interface CatalogPageProps {
+    params: { businessId: string };
+}
+
+const ITEMS_PER_PAGE = 20;
+
+function CatalogPageContent({ params }: CatalogPageProps) {
+    const slug = decodeURIComponent(params.businessId);
+    const searchParams = useSearchParams();
+    const { firestore, isNetworkEnabled } = useFirebase();
+    const { toast } = useToast();
+    const { isModuleAuthorized } = useSubscription();
+
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+    const [pageData, setPageData] = useState<{
+        headerConfig: LandingHeaderConfigData | null;
+        products: Product[] | null;
+        promotions: Promotion[] | null;
+        coupons: Coupon[] | null;
+        paymentSettings: PaymentSettings | null;
+        resolvedBusinessId: string | null;
+    }>({
+        headerConfig: null,
+        products: null,
+        promotions: null,
+        coupons: null,
+        paymentSettings: null,
+        resolvedBusinessId: null,
+    });
+
+    const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+    const [cartItems, setCartItems] = useState<CartItem[]>([]);
+    const [isCartOpen, setIsCartOpen] = useState(false);
+    const [isPurchaseModalOpen, setIsPurchaseModalOpen] = useState(false);
+    
+    // --- ESTADOS DE FILTRADO, BÚSQUEDA Y PAGINACIÓN ---
+    const [currentPage, setCurrentPage] = useState(1);
+    const [selectedCategory, setSelectedCategory] = useState('Todas');
+    const [searchTerm, setSearchTerm] = useState('');
+
+    // --- ESTADO GLOBAL DE CUPÓN ---
+    const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null);
+    
+    // Captura de origen de la URL (ej. ?ref=qr)
+    const orderOrigin = useMemo(() => {
+        return searchParams.get('ref') || 'web';
+    }, [searchParams]);
+
+    // --- PERSISTENCIA DE ATRIBUCIÓN (ADITIVO) ---
+    useEffect(() => {
+        const ref = searchParams.get('ref');
+        if (ref) {
+            saveAttribution(ref);
+        }
+    }, [searchParams]);
+
+    // Estado para la sesión de fidelización del cliente
+    const [loyaltySession, setLoyaltySession] = useState<{ balance: number; whatsapp: string } | null>(null);
+    const [activeSuggestion, setActiveSuggestion] = useState<{ original: Product, suggestion: SuggestionOutput } | null>(null);
+
+    useEffect(() => {
+        if (!firestore || !slug || !isNetworkEnabled) {
+            return;
+        }
+
+        const fetchData = async () => {
+            setIsLoading(true);
+            setError(null);
+            try {
+                // 1. RESOLUCIÓN DE IDENTIDAD (SLUG -> UID)
+                let businessId = slug;
+                const shareConfigQuery = query(collectionGroup(firestore, 'shareConfig'), where('slug', '==', slug), limit(1));
+                const querySnapshot = await getDocs(shareConfigQuery);
+                
+                if (!querySnapshot.empty) {
+                    const foundDoc = querySnapshot.docs[0];
+                    const parentId = foundDoc.ref.parent.parent?.id;
+                    if (parentId) businessId = parentId;
+                }
+
+                // 2. OBTENER DATOS CON EL ID CANÓNICO
+                const publicCatalogRef = doc(firestore, 'businesses', businessId, 'publicData', 'catalog');
+                const paymentSettingsRef = doc(firestore, 'paymentSettings', businessId);
+                const couponsQuery = query(
+                    collection(firestore, 'cupones'),
+                    where('businessId', '==', businessId),
+                    where('activo', '==', true)
+                );
+                
+                const [catalogSnap, paymentSnap, couponsSnap] = await Promise.all([
+                    getDoc(publicCatalogRef),
+                    getDoc(paymentSettingsRef),
+                    getDocs(couponsQuery)
+                ]);
+
+                if (!catalogSnap.exists()) {
+                    throw new Error("El catálogo no ha sido configurado o publicado por el negocio.");
+                }
+
+                const data = catalogSnap.data();
+                setPageData({
+                    headerConfig: data.headerConfig as LandingHeaderConfigData,
+                    products: data.products as Product[],
+                    promotions: (data.promotions as Promotion[]) || [],
+                    coupons: couponsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Coupon)),
+                    paymentSettings: paymentSnap.exists() ? (paymentSnap.data() as PaymentSettings) : null,
+                    resolvedBusinessId: businessId,
+                });
+
+            } catch (e: any) {
+                setError(e.message);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        fetchData();
+    }, [slug, firestore, isNetworkEnabled]);
+
+    const categoriesList = useMemo(() => {
+        if (!pageData.products) return ['Todas'];
+        const uniqueCats = Array.from(new Set(pageData.products.map(p => p.category).filter(Boolean)));
+        return ['Todas', ...uniqueCats.sort()];
+    }, [pageData.products]);
+
+    const filteredProducts = useMemo(() => {
+        if (!pageData.products) return [];
+        return pageData.products.filter(p => {
+            const matchesCategory = selectedCategory === 'Todas' || p.category === selectedCategory;
+            const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase());
+            return matchesCategory && matchesSearch;
+        });
+    }, [pageData.products, selectedCategory, searchTerm]);
+
+    const totalPages = Math.ceil(filteredProducts.length / ITEMS_PER_PAGE);
+    const paginatedProducts = useMemo(() => {
+        const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+        return filteredProducts.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+    }, [filteredProducts, currentPage]);
+
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [selectedCategory, searchTerm]);
+
+    const handlePageChange = (newPage: number) => {
+        setCurrentPage(newPage);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
+    const businessRef = useMemoFirebase(() => 
+        pageData.resolvedBusinessId ? doc(firestore, 'businesses', pageData.resolvedBusinessId) : null,
+    [firestore, pageData.resolvedBusinessId]);
+    const { data: businessInfo } = useDoc<Business>(businessRef);
+
+    const rewardsQuery = useMemoFirebase(() => 
+        pageData.resolvedBusinessId ? query(collection(firestore, `businesses/${pageData.resolvedBusinessId}/rewards`), where('isActive', '==', true)) : null,
+    [firestore, pageData.resolvedBusinessId]);
+    const { data: rewards } = useCollection<Reward>(rewardsQuery);
+
+    const isLoyaltyActive = useMemo(() => isModuleAuthorized('loyalty'), [isModuleAuthorized]);
+    const isPromotionsActive = useMemo(() => isModuleAuthorized('promotions'), [isModuleAuthorized]);
+    const isReservasActive = useMemo(() => isModuleAuthorized('reservas-agendamiento'), [isModuleAuthorized]);
+
+    const handleAddToCart = (product: Product, quantity: number) => {
+        const discountInfo = promotionService.calculateDiscountedPrice(product, pageData.promotions || []);
+        
+        let appliedPromotion = undefined;
+        if (discountInfo.hasDiscount && discountInfo.promotion) {
+            appliedPromotion = {
+                type: discountInfo.promotion.type as 'percentage' | 'fixed',
+                originalPrice: discountInfo.originalPrice,
+                discountedPrice: discountInfo.finalPrice,
+                promotionId: discountInfo.promotion.id
+            };
+        }
+
+        setCartItems(prev => {
+            const existing = prev.find(item => item.id === product.id);
+            if (existing) {
+                return prev.map(item => 
+                    item.id === product.id 
+                        ? { 
+                            ...item, 
+                            quantity: item.quantity + quantity,
+                            appliedPromotion: item.appliedPromotion || appliedPromotion 
+                        } 
+                        : item
+                );
+            }
+            return [...prev, { ...product, quantity, appliedPromotion }];
+        });
+    };
+
+    const handleBuyNow = async (product: Product) => {
+        if (pageData.resolvedBusinessId) {
+            try {
+                const suggestion = await getSuggestion({ businessId: pageData.resolvedBusinessId, productId: product.id });
+                if (suggestion && suggestion.suggestedProduct) {
+                    setActiveSuggestion({ original: product, suggestion });
+                    updateSuggestionMetrics({ 
+                        businessId: pageData.resolvedBusinessId, 
+                        ruleId: suggestion.ruleId || 'ai-generated', 
+                        event: 'shown' 
+                    });
+                    return;
+                }
+            } catch (e) {
+                console.error("Error al buscar sugerencia:", e);
+            }
+        }
+        
+        handleAddToCart(product, 1);
+        toast({
+            title: "Producto añadido",
+            description: `${product.name} se agregó a tu carrito.`,
+            action: (
+                <button 
+                    onClick={() => setIsCartOpen(true)}
+                    className="bg-primary text-white text-[10px] font-bold uppercase px-3 py-1 rounded-full"
+                >
+                    Ver Carrito
+                </button>
+            ),
+        });
+    };
+
+    const acceptSuggestion = () => {
+        if (!activeSuggestion || !pageData.resolvedBusinessId) return;
+        
+        updateSuggestionMetrics({ 
+            businessId: pageData.resolvedBusinessId, 
+            ruleId: activeSuggestion.suggestion.ruleId || 'ai-generated', 
+            event: 'accepted' 
+        });
+
+        handleAddToCart(activeSuggestion.original, 1);
+        handleAddToCart(activeSuggestion.suggestion.suggestedProduct!, 1);
+        setActiveSuggestion(null);
+        setIsCartOpen(true);
+    };
+
+    const handleRatingSync = useCallback((productId: string, newRating: number, newCount: number) => {
+        setPageData(prev => {
+            if (!prev.products) return prev;
+            return {
+                ...prev,
+                products: prev.products.map(p => 
+                    p.id === productId 
+                    ? { ...p, rating: newRating, ratingCount: newCount } 
+                    : p
+                )
+            };
+        });
+    }, []);
+
+    const handleApplyCouponFromChat = async (code: string): Promise<{ success: boolean, message?: string }> => {
+        if (!pageData.resolvedBusinessId) return { success: false, message: 'Identidad del negocio no resuelta.' };
+        
+        const subtotal = cartItems.reduce((sum, item) => {
+            const unitPrice = item.appliedPromotion?.discountedPrice ?? item.price;
+            return sum + (unitPrice * item.quantity);
+        }, 0);
+
+        try {
+            const result = await couponService.validateCoupon(pageData.resolvedBusinessId, code, subtotal);
+            if (result.success && result.coupon) {
+                setAppliedCoupon(result.coupon);
+                return { success: true };
+            }
+            return { success: false, message: result.error };
+        } catch (e) {
+            return { success: false, message: 'Error técnico al validar cupón.' };
+        }
+    };
+
+    if (isLoading) {
+        return (
+            <div className="flex h-screen w-full items-center justify-center bg-gray-50 p-4 text-center">
+                <Loader2 className="h-12 w-12 animate-spin text-primary" />
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div className="flex h-screen w-full flex-col items-center justify-center bg-gray-50 p-4 text-center">
+                <div className="bg-white p-10 rounded-3xl shadow-sm max-w-md border border-gray-100">
+                    <h2 className="text-2xl font-bold text-red-800">Catálogo no disponible</h2>
+                    <p className="text-gray-500 leading-relaxed">{error}</p>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="bg-muted/40 min-h-screen pb-20">
+            {pageData.headerConfig && (
+                <CatalogHeader 
+                    config={pageData.headerConfig} 
+                    cartCount={cartItems.reduce((sum, item) => sum + item.quantity, 0)}
+                    onOpenCart={() => setIsCartOpen(true)}
+                />
+            )}
+
+            {pageData.headerConfig?.carouselItems && pageData.headerConfig.carouselItems.some(item => item.mediaUrl) && (
+                <div className="w-full bg-white border-b overflow-hidden">
+                    <Carousel 
+                        className="w-full" 
+                        opts={{ loop: true }}
+                        plugins={[
+                            Autoplay({
+                                delay: 5000,
+                                stopOnInteraction: true,
+                            }),
+                        ]}
+                    >
+                        <CarouselContent>
+                            {pageData.headerConfig.carouselItems.map(item => item.mediaUrl && (
+                                <CarouselItem key={item.id}>
+                                    <div className="relative aspect-video w-full">
+                                        {item.mediaType === 'image' ? (
+                                            <Image 
+                                                src={item.mediaUrl} 
+                                                alt={item.slogan || 'Promoción'} 
+                                                fill 
+                                                priority
+                                                sizes="100vw" 
+                                                className="object-cover" 
+                                            />
+                                        ) : (
+                                            <video 
+                                                src={item.mediaUrl} 
+                                                autoPlay 
+                                                loop 
+                                                muted 
+                                                className="w-full h-full object-cover" 
+                                            />
+                                        )}
+                                        {item.slogan && (
+                                            <div className="absolute inset-0 bg-black/30 flex items-center justify-center p-4">
+                                                <p className="text-white text-xl md:text-5xl font-black text-center drop-shadow-xl animate-in fade-in zoom-in duration-700">
+                                                    {item.slogan}
+                                                </p>
+                                            </div>
+                                        )}
+                                    </div>
+                                </CarouselItem>
+                            ))}
+                        </CarouselContent>
+                    </Carousel>
+                </div>
+            )}
+
+            <main className="container mx-auto px-4 py-8">
+                <div className="max-w-2xl mx-auto mb-8 animate-in fade-in slide-in-from-top-2 duration-500">
+                    <div className="relative group">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground group-focus-within:text-primary transition-colors" />
+                        <Input 
+                            type="text"
+                            placeholder="Buscar productos por nombre..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="pl-10 h-12 bg-white rounded-2xl border-gray-200 shadow-sm focus-visible:ring-primary focus-visible:border-primary"
+                        />
+                    </div>
+                </div>
+
+                <Tabs defaultValue="menu" className="w-full">
+                    <div className="flex justify-center mb-8 sticky top-4 z-40">
+                        <TabsList className="bg-white shadow-xl border rounded-full p-1 h-14 overflow-x-auto no-scrollbar max-w-full">
+                            <TabsTrigger value="menu" className="rounded-full px-6 gap-2 font-bold data-[state=active]:bg-primary data-[state=active]:text-white">
+                                <LayoutGrid className="h-4 w-4" /> Menú
+                            </TabsTrigger>
+                            {isPromotionsActive && (
+                                <TabsTrigger value="coupons" className="rounded-full px-6 gap-2 font-bold data-[state=active]:bg-primary data-[state=active]:text-white">
+                                    <Ticket className="h-4 w-4" /> Cupones
+                                </TabsTrigger>
+                            )}
+                            {isReservasActive && (
+                                <TabsTrigger value="reservas" className="rounded-full px-6 gap-2 font-bold data-[state=active]:bg-primary data-[state=active]:text-white">
+                                    <Calendar className="h-4 w-4" /> Reservar
+                                </TabsTrigger>
+                            )}
+                            <TabsTrigger value="reviews" className="rounded-full px-6 gap-2 font-bold data-[state=active]:bg-primary data-[state=active]:text-white">
+                                <Star className="h-4 w-4" /> Reseñas
+                            </TabsTrigger>
+                            {isLoyaltyActive && (
+                                <TabsTrigger value="puntos" className="rounded-full px-6 gap-2 font-bold data-[state=active]:bg-primary data-[state=active]:text-white">
+                                    <Award className="h-4 w-4" /> Mis Puntos
+                                </TabsTrigger>
+                            )}
+                        </TabsList>
+                    </div>
+
+                    <TabsContent value="menu" className="animate-in fade-in duration-500 outline-none space-y-8">
+                        {categoriesList.length > 2 && (
+                            <div className="flex items-center gap-4 overflow-x-auto pb-4 no-scrollbar">
+                                {categoriesList.map((cat) => (
+                                    <button
+                                        key={cat}
+                                        onClick={() => setSelectedCategory(cat)}
+                                        className={cn(
+                                            "rounded-full px-6 h-10 font-bold transition-all shrink-0 border",
+                                            selectedCategory === cat 
+                                                ? "bg-primary text-white border-primary shadow-md scale-105" 
+                                                : "bg-white text-muted-foreground border-gray-200 hover:bg-gray-50"
+                                        )}
+                                    >
+                                        {cat}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                            {paginatedProducts.map(product => (
+                                <PublicProductCard 
+                                    key={product.id} 
+                                    product={product} 
+                                    promotions={pageData.promotions || []}
+                                    onView={() => setSelectedProduct(product)}
+                                    onBuy={() => handleBuyNow(product)}
+                                />
+                            ))}
+                        </div>
+
+                        {totalPages > 1 && (
+                            <div className="flex flex-col items-center gap-4 mt-12 py-6 border-t">
+                                <p className="text-xs font-black uppercase tracking-widest text-muted-foreground">
+                                    Página {currentPage} de {totalPages}
+                                </p>
+                                <div className="flex items-center gap-2">
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => handlePageChange(currentPage - 1)}
+                                        disabled={currentPage === 1}
+                                        className="h-10 px-4 font-bold rounded-xl"
+                                    >
+                                        <ChevronLeft className="h-4 w-4 mr-2" /> Anterior
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => handlePageChange(currentPage + 1)}
+                                        disabled={currentPage === totalPages}
+                                        className="h-10 px-4 font-bold rounded-xl"
+                                    >
+                                        Siguiente <ChevronRight className="ml-2 h-4 w-4 ml-2" />
+                                    </Button>
+                                </div>
+                            </div>
+                        )}
+
+                        {filteredProducts.length === 0 && (
+                            <div className="flex flex-col items-center justify-center py-20 text-center text-muted-foreground">
+                                <PackageSearch className="h-16 w-16 mb-4 opacity-20" />
+                                <h3 className="text-xl font-semibold">Sin resultados</h3>
+                                <p>No encontramos productos que coincidan con tu búsqueda en esta categoría.</p>
+                            </div>
+                        )}
+                    </TabsContent>
+
+                    {isPromotionsActive && (
+                        <TabsContent value="coupons" className="max-w-4xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-500 outline-none">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                                {pageData.coupons?.map(coupon => (
+                                    <Card key={coupon.id} className="border-2 border-dashed border-primary/20 bg-white hover:border-primary/40 transition-colors shadow-sm overflow-hidden flex flex-col">
+                                        <CardHeader className="text-center pb-2">
+                                            <Badge variant="secondary" className="w-fit mx-auto mb-2 bg-primary/10 text-primary border-none font-black text-[10px] uppercase">
+                                                {coupon.tipo === 'porcentaje' ? `${coupon.valor}% DTO` : `${coupon.valor.toLocaleString()} DTO`}
+                                            </Badge>
+                                            <CardTitle className="text-2xl font-black tracking-tighter text-primary uppercase">{coupon.codigo}</CardTitle>
+                                        </CardHeader>
+                                        <CardContent className="text-center space-y-4 flex-grow">
+                                            <p className="text-xs text-muted-foreground font-medium italic">
+                                                {coupon.montoMinimo > 0 ? `En compras superiores a $${coupon.montoMinimo.toLocaleString()}` : 'Sin mínimo de compra'}
+                                            </p>
+                                        </CardContent>
+                                        <CardFooter className="bg-primary/5 p-4 border-t border-dashed border-primary/10">
+                                            <Button 
+                                                variant="outline" 
+                                                className="w-full font-black border-primary text-primary hover:bg-primary hover:text-white transition-all h-10 uppercase text-[10px] tracking-widest"
+                                                onClick={() => {
+                                                    navigator.clipboard.writeText(coupon.codigo);
+                                                    toast({ 
+                                                        title: "¡Código Copiado!", 
+                                                        description: "Pégalo en el checkout para aplicar tu descuento.",
+                                                        duration: 3000
+                                                    });
+                                                }}
+                                            >
+                                                Copiar Código
+                                            </Button>
+                                        </CardFooter>
+                                    </Card>
+                                ))}
+                            </div>
+                            {(!pageData.coupons || pageData.coupons.length === 0) && (
+                                <div className="text-center py-20 bg-white rounded-3xl border border-dashed text-muted-foreground">
+                                    <Ticket className="h-12 w-12 mx-auto mb-4 opacity-10" />
+                                    <h3 className="font-bold text-gray-400">Sin cupones vigentes</h3>
+                                    <p className="text-sm">Vuelve pronto para descubrir nuevas ofertas.</p>
+                                </div>
+                            )}
+                        </TabsContent>
+                    )}
+
+                    {isReservasActive && (
+                        <TabsContent value="reservas" className="max-w-2xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-500 outline-none">
+                            <Card className="border-none shadow-xl bg-white rounded-[2.5rem] overflow-hidden">
+                                <CardHeader className="bg-primary/5 border-b p-8 text-center">
+                                    <div className="p-4 bg-white rounded-3xl shadow-sm border w-fit mx-auto mb-4">
+                                        <Calendar className="h-10 w-10 text-primary" />
+                                    </div>
+                                    <CardTitle className="text-2xl font-black text-gray-900">Agenda tu Cita</CardTitle>
+                                    <CardDescription className="text-gray-600 font-medium max-w-sm mx-auto">
+                                        Reserva tu espacio en segundos. Elige el servicio, el profesional y el horario que mejor te convenga.
+                                    </CardDescription>
+                                </CardHeader>
+                                <CardContent className="p-8 text-center space-y-6">
+                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                        <div className="flex flex-col items-center gap-2">
+                                            <div className="p-3 bg-muted rounded-2xl"><CheckCircle2 className="h-5 w-5 text-primary" /></div>
+                                            <span className="text-xs font-bold text-gray-600">Rápido y Fácil</span>
+                                        </div>
+                                        <div className="flex flex-col items-center gap-2">
+                                            <div className="p-3 bg-muted rounded-2xl"><CheckCircle2 className="h-5 w-5 text-primary" /></div>
+                                            <span className="text-xs font-bold text-gray-600">Sin Llamadas</span>
+                                        </div>
+                                        <div className="flex flex-col items-center gap-2">
+                                            <div className="p-3 bg-muted rounded-2xl"><CheckCircle2 className="h-5 w-5 text-primary" /></div>
+                                            <span className="text-xs font-bold text-gray-600">Confirmación</span>
+                                        </div>
+                                    </div>
+                                </CardContent>
+                                <CardFooter className="p-8 pt-0">
+                                    <Button asChild className="w-full h-16 rounded-2xl text-lg font-black uppercase tracking-widest shadow-xl">
+                                        <Link href={`/reservar/${pageData.resolvedBusinessId || slug}`} target="_blank">
+                                            Ir al Portal de Reservas
+                                        </Link>
+                                    </Button>
+                                </CardFooter>
+                            </Card>
+                        </TabsContent>
+                    )}
+
+                    <TabsContent value="reviews" className="max-w-4xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-500 outline-none">
+                        <ReviewSummary 
+                            rating={businessInfo?.rating || 5.0} 
+                            reviewCount={businessInfo?.reviewCount || 0} 
+                            distribution={businessInfo?.ratingDistribution}
+                        />
+                        <ReviewForm businessId={pageData.resolvedBusinessId!} />
+                    </TabsContent>
+
+                    {isLoyaltyActive && (
+                        <TabsContent value="puntos" className="max-w-4xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-500 outline-none">
+                            <LoyaltyStatus 
+                                businessId={pageData.resolvedBusinessId!} 
+                                onSuccess={(balance, whatsapp) => setLoyaltySession({ balance, whatsapp })}
+                            />
+                            <Card className="border-none shadow-sm bg-primary/5">
+                                <CardHeader>
+                                    <div className="flex items-center gap-2">
+                                        <Award className="h-6 w-6 text-primary" />
+                                        <CardTitle className="text-xl">Premios Disponibles</CardTitle>
+                                    </div>
+                                    <CardDescription>Canjea tus puntos acumulados por estos productos o servicios.</CardDescription>
+                                </CardHeader>
+                                <CardContent>
+                                    <RewardsCatalog 
+                                        businessId={pageData.resolvedBusinessId!}
+                                        rewards={rewards || []}
+                                        currentBalance={loyaltySession?.balance || 0}
+                                        whatsapp={loyaltySession?.whatsapp || ''}
+                                        onRedeemed={() => setLoyaltySession(null)} 
+                                    />
+                                </CardContent>
+                            </Card>
+                        </TabsContent>
+                    )}
+                </Tabs>
+            </main>
+
+            <ProductViewModal 
+                product={selectedProduct} 
+                businessId={pageData.resolvedBusinessId}
+                isOpen={!!selectedProduct} 
+                onOpenChange={(open) => !open && setSelectedProduct(null)}
+                onAddToCart={(qty) => {
+                    handleAddToCart(selectedProduct!, qty);
+                    setSelectedProduct(null);
+                    setIsCartOpen(true);
+                }}
+                onRatingUpdated={handleRatingSync}
+            />
+
+            <CartDrawer 
+                isOpen={isCartOpen}
+                onOpenChange={setIsCartOpen}
+                cartItems={cartItems}
+                onRemoveItem={(id) => setCartItems(prev => prev.filter(i => i.id !== id))}
+                onUpdateQuantity={(id, qty) => setCartItems(prev => prev.map(i => i.id === id ? {...i, quantity: qty} : i))}
+                onCheckout={() => {
+                    setIsCartOpen(false);
+                    setIsPurchaseModalOpen(true);
+                }}
+            />
+
+            <PurchaseModal 
+                isOpen={isPurchaseModalOpen}
+                onOpenChange={setIsPurchaseModalOpen}
+                cartItems={cartItems}
+                onRemoveItem={(id) => setCartItems(prev => prev.filter(i => i.id !== id))}
+                onUpdateQuantity={(id, qty) => setCartItems(prev => prev.map(i => i.id === id ? {...i, quantity: qty} : i))}
+                onClearCart={() => setCartItems([])}
+                businessId={pageData.resolvedBusinessId!}
+                businessInfo={pageData.headerConfig?.businessInfo || null}
+                paymentSettings={pageData.paymentSettings}
+                origin={orderOrigin}
+                externalCoupon={appliedCoupon}
+            />
+
+            <PublicMenuChatWidget 
+                businessId={pageData.resolvedBusinessId!} 
+                products={pageData.products || []}
+                onAddToCart={handleAddToCart}
+                onApplyCoupon={handleApplyCouponFromChat}
+            />
+        </div>
+    );
+}
+
+export default function CatalogPage(props: CatalogPageProps) {
+  return (
+    <Suspense fallback={
+        <div className="flex h-screen w-full items-center justify-center bg-gray-50 p-4 text-center">
+            <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        </div>
+    }>
+      <CatalogPageContent {...props} />
+    </Suspense>
+  );
+}

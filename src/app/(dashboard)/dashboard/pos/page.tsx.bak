@@ -1,0 +1,390 @@
+'use client';
+
+import React, { useState, useMemo, useEffect } from 'react';
+import { useUser, useFirestore, useCollection, useDoc, useMemoFirebase } from '@/firebase';
+import { collection, doc } from 'firebase/firestore';
+import type { Business } from '@/models/business';
+import type { Product } from '@/models/product';
+import type { POSItem, VerticalType, DiscountType, Invoice } from '@/types/billing';
+import ProductCatalog from '@/components/billing/ProductCatalog';
+import InvoiceCart from '@/components/billing/InvoiceCart';
+import CashControl from '@/components/billing/CashControl';
+import InvoiceHistoryTable from '@/components/billing/InvoiceHistoryTable';
+import { TrackingConfirmationCard } from '@/components/billing/TrackingConfirmationCard';
+import { Loader2, Calculator, CreditCard } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { useToast } from '@/hooks/use-toast';
+import { useSubscription } from '@/hooks/useSubscription';
+import { processSale } from '@/services/billing/billing-service';
+import { registerPOSTracking } from '@/services/billing/tracking-service';
+import { useSearchParams } from 'next/navigation';
+import { AnimatePresence } from 'framer-motion';
+import { calcularPrecioCliente, type PricingContext } from '@/constants/pricingPlans';
+
+/**
+ * @fileOverview Página principal de la Terminal de Facturación (POS).
+ * Orquestador central del módulo POS con flujo operativo optimizado y rastreo inteligente.
+ */
+export default function POSPage() {
+  const { user, profile } = useUser();
+  const firestore = useFirestore();
+  const { toast } = useToast();
+  const searchParams = useSearchParams();
+
+  // 1. Obtener contexto del negocio y productos con guardias estrictas
+  const businessRef = useMemoFirebase(
+    () => (firestore && user?.uid ? doc(firestore, 'businesses', user.uid) : null),
+    [user?.uid, firestore]
+  );
+  const { data: business, isLoading: loadingBusiness } = useDoc<Business>(businessRef);
+
+  const productsQuery = useMemoFirebase(
+    () => (firestore && user?.uid ? collection(firestore, `businesses/${user.uid}/products`) : null),
+    [user?.uid, firestore]
+  );
+  const { data: products, isLoading: loadingProducts } = useCollection<Product>(productsQuery);
+
+  const invoicesQuery = useMemoFirebase(
+    () => (firestore && user?.uid ? collection(firestore, `businesses/${user.uid}/invoices`) : null),
+    [user?.uid, firestore]
+  );
+  const { data: invoices, isLoading: loadingInvoices } = useCollection<Invoice>(invoicesQuery);
+
+  // 2. Estado local del carrito y datos de cliente
+  const [cart, setCart] = useState<POSItem[]>([]);
+  const [customerName, setCustomerName] = useState('Cliente General');
+  const [customerPhone, setCustomerPhone] = useState('');
+  const [consumptionType, setConsumptionType] = useState<'sede' | 'para_llevar' | 'domicilio'>('sede');
+  const [deliveryAddress, setDeliveryAddress] = useState('');
+
+  // Tasas dinámicas configuradas desde Super Admin (Planes Híbridos)
+  const { plan: subPlan, allHybridPlans } = useSubscription();
+  const activeHybridPlan = (subPlan as any)?.tableCommissionRate !== undefined ? subPlan : (allHybridPlans?.[0] || subPlan);
+  const tableRate = Number((activeHybridPlan as any)?.tableCommissionRate ?? 2); // Comisión en Mesa (QR) / Para llevar
+  const deliveryRate = Number((activeHybridPlan as any)?.pricePerOrder ?? (activeHybridPlan as any)?.comisionRate ?? 4); // Configuración de Comisión / Domicilio
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [lastSaleEvent, setLastSaleEvent] = useState<Invoice | null>(null);
+  
+  // Variables Financieras
+  const [discountType, setDiscountType] = useState<DiscountType>('amount');
+  const [discountValue, setDiscountValue] = useState(0);
+  const [taxRate, setTaxRate] = useState(19); 
+  const [tipValue, setTipValue] = useState(0);
+  const [tipType, setTipType] = useState<DiscountType>('amount');
+  const [paymentMethod, setPaymentMethod] = useState<string>('efectivo');
+  const [cashReceived, setCashReceived] = useState(0);
+
+  const businessType = (business?.category || 'Retail') as VerticalType;
+  const pricingContext: PricingContext = useMemo(() => {
+    const pName = (business as any)?.planName || (business as any)?.plan || "";
+    const pLower = typeof pName === "string" ? pName.toLowerCase() : "";
+    const isHybrid = pLower.includes("crecimiento") || pLower.includes("estándar") || pLower.includes("profesional") || pLower.includes("básico");
+    const type = (business as any)?.planType || (isHybrid ? "hibrido" : "fijo");
+    return {
+      planType: type,
+      planName: (business as any)?.planName || pName || "Plan Menfy",
+      planSlug: (business as any)?.planSlug,
+      comisionRate: (business as any)?.comision || (business as any)?.commission,
+    };
+  }, [business]);
+
+
+  // --- LÓGICA DE MESA (EXTRACCIÓN BLINDADA) ---
+  const orderOrigin = searchParams?.get('ref') || 'web';
+  const mesaNumber = useMemo(() => {
+    const match = orderOrigin?.match(/mesa-(.+)/);
+    return (match && match.length > 1) ? match[1] : null;
+  }, [orderOrigin]);
+
+  // 3. Motor de Cálculos Reactivos
+  const financialSummary = useMemo(() => {
+    const subtotal = (cart || []).reduce((sum, item) => sum + (item.subtotal || 0), 0);
+    
+    const calculatedDiscount = discountType === 'percent' 
+      ? (subtotal * (discountValue / 100)) 
+      : discountValue;
+
+    const baseTaxable = Math.max(0, subtotal - calculatedDiscount);
+    const calculatedTax = baseTaxable * (taxRate / 100);
+    
+    const calculatedTip = tipType === 'percent'
+      ? (baseTaxable * (tipValue / 100))
+      : tipValue;
+
+    const serviceFeeRate = consumptionType === 'domicilio' ? deliveryRate : tableRate;
+    const calculatedServiceFee = Math.round(subtotal * (serviceFeeRate / 100));
+    const totalFinal = baseTaxable + calculatedTax + calculatedTip + calculatedServiceFee;
+    const change = Math.max(0, cashReceived - totalFinal);
+
+    return {
+      subtotal,
+      discount: Math.round(calculatedDiscount),
+      tax: Math.round(calculatedTax),
+      tip: Math.round(calculatedTip),
+      total: Math.round(totalFinal),
+      change,
+      serviceFee: calculatedServiceFee,
+      serviceFeeRate
+    };
+  }, [cart, discountType, discountValue, taxRate, tipValue, tipType, cashReceived, consumptionType, tableRate, deliveryRate]);
+
+  // 4. Handlers de Carrito
+  const handleAddToCart = (product: Product) => {
+    if (isProcessing) return;
+    const rawBase = product.basePrice ?? product.price;
+    const effectivePrice = pricingContext ? calcularPrecioCliente(rawBase, pricingContext, 'mesa') : rawBase;
+    setLastSaleEvent(null); // Ocultar confirmación previa al iniciar nueva venta
+    setCart(prev => {
+      const existing = prev.find(item => item.productId === product.id);
+      if (existing) {
+        return prev.map(item => 
+          item.productId === product.id 
+            ? { ...item, quantity: item.quantity + 1, subtotal: (item.quantity + 1) * item.unitPrice } 
+            : item
+        );
+      }
+      return [...prev, {
+        productId: product.id,
+        name: product.name,
+        quantity: 1,
+        unitPrice: effectivePrice,
+        subtotal: effectivePrice,
+        taxAmount: 0,
+        discountAmount: 0
+      }];
+    });
+  };
+
+  const handleUpdateQuantity = (productId: string, delta: number) => {
+    setCart(prev => prev.map(item => {
+      if (item.productId === productId) {
+        const newQty = Math.max(1, item.quantity + delta);
+        return { ...item, quantity: newQty, subtotal: newQty * item.unitPrice };
+      }
+      return item;
+    }));
+  };
+
+  const handleRemoveItem = (productId: string) => {
+    setCart(prev => prev.filter(item => item.productId !== productId));
+  };
+
+  const handleProcessSale = async () => {
+    if (!user || !firestore) return;
+
+    if (paymentMethod === 'efectivo' && cashReceived < financialSummary.total) {
+      toast({
+        variant: "destructive",
+        title: "Efectivo insuficiente",
+        description: "El monto recibido es menor al total de la venta.",
+      });
+      return;
+    }
+
+    setIsProcessing(true);
+    try {
+        const result = await processSale(
+            firestore,
+            user.uid,
+            user.uid,
+            {
+                businessId: user.uid,
+                vendedorId: user.uid,
+                customer: { 
+                  name: customerName,
+                  phone: customerPhone 
+                },
+                items: cart,
+                subtotal: financialSummary.subtotal,
+                tax: financialSummary.tax,
+                discount: financialSummary.discount,
+                tip: financialSummary.tip,
+                total: financialSummary.total,
+                paymentMethod: paymentMethod as any,
+                cashReceived,
+                changeAmount: financialSummary.change,
+                mesa: mesaNumber || undefined,
+            },
+            businessType
+        );
+
+        const synthesizedInvoice: Invoice = {
+            id: result.invoiceId,
+            consecutiveNumber: result.consecutiveStr,
+            businessId: user.uid,
+            vendedorId: user.uid,
+            customer: { name: customerName, phone: customerPhone },
+            items: cart,
+            subtotal: financialSummary.subtotal,
+            tax: financialSummary.tax,
+            discount: financialSummary.discount,
+            tip: financialSummary.tip,
+            total: financialSummary.total,
+            paymentMethod: paymentMethod as any,
+            cashReceived,
+            changeAmount: financialSummary.change,
+            createdAt: new Date().toISOString(),
+            status: 'completada'
+        };
+
+        // REGISTRO DE RASTREO INTELIGENTE
+        registerPOSTracking(firestore, user.uid, synthesizedInvoice, profile?.name || null);
+
+        // FASE 2: ALMACENAR EVENTO PARA FEEDBACK VISUAL
+        setLastSaleEvent(synthesizedInvoice);
+
+        toast({
+            title: "✅ Venta exitosa",
+            description: `Factura ${result.consecutiveStr} registrada correctamente.`,
+        });
+
+        // Limpiar estados de venta
+        setCart([]);
+        setCustomerName('Cliente General');
+        setCustomerPhone('');
+        setDeliveryAddress('');
+        setConsumptionType('sede');
+        setCashReceived(0);
+        setDiscountValue(0);
+        setTipValue(0);
+        setTipType('amount');
+
+    } catch (error: any) {
+        toast({
+            variant: "destructive",
+            title: "Fallo al registrar venta",
+            description: error.message || "Error técnico en la transacción.",
+        });
+    } finally {
+        setIsProcessing(false);
+    }
+  };
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+        if (e.key === 'F8') {
+            e.preventDefault();
+            if (cart.length > 0 && !isProcessing) {
+                handleProcessSale();
+            }
+        }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [cart, isProcessing, handleProcessSale]);
+
+  if (loadingBusiness && !business) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[80vh] gap-4">
+        <Loader2 className="h-10 w-10 animate-spin text-primary" />
+        <p className="text-muted-foreground font-medium">Iniciando Terminal de Facturación...</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-8 h-full min-h-screen pb-20 animate-in fade-in duration-500">
+      <header className="flex items-center justify-between bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100 shrink-0">
+         <div className="flex items-center gap-4">
+            <div className="p-3 bg-primary/10 rounded-2xl text-primary shadow-inner">
+                <Calculator size={32} />
+            </div>
+            <div>
+                <h1 className="text-2xl font-black tracking-tight text-slate-900">Terminal POS v1.0</h1>
+                <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Entorno: {businessType}</p>
+            </div>
+         </div>
+         <div className="hidden md:flex gap-4">
+            <div className="bg-slate-50 px-4 py-2 rounded-xl border">
+                <p className="text-[10px] font-black uppercase text-slate-400 leading-none mb-1">Vendedor</p>
+                <p className="text-xs font-bold text-slate-700">{profile?.name || user?.email}</p>
+            </div>
+         </div>
+      </header>
+
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-auto">
+        <div className="lg:col-span-7 xl:col-span-8 overflow-hidden">
+          <ProductCatalog 
+            products={products || []} 
+            onAddToCart={handleAddToCart}
+            isLoading={loadingProducts}
+          />
+        </div>
+
+        <div className="lg:col-span-5 xl:col-span-4 flex flex-col gap-6 overflow-hidden">
+          <div className="overflow-hidden">
+            <InvoiceCart 
+              items={cart}
+              onUpdateQuantity={handleUpdateQuantity}
+              onRemoveItem={handleRemoveItem}
+              businessType={businessType}
+              customerName={customerName}
+              onCustomerNameChange={setCustomerName}
+              customerPhone={customerPhone}
+              onCustomerPhoneChange={setCustomerPhone}
+              consumptionType={consumptionType}
+              onConsumptionTypeChange={setConsumptionType}
+              deliveryAddress={deliveryAddress}
+              onDeliveryAddressChange={setDeliveryAddress}
+              
+              discountType={discountType}
+              onDiscountTypeChange={setDiscountType}
+              discountValue={discountValue}
+              onDiscountValueChange={setDiscountValue}
+              taxRate={taxRate}
+              onTaxRateChange={setTaxRate}
+              tipAmount={tipValue}
+              onTipAmountChange={setTipValue}
+              tipType={tipType}
+              onTipTypeChange={setTipType}
+              paymentMethod={paymentMethod}
+              onPaymentMethodChange={setPaymentMethod}
+              
+              summary={financialSummary}
+              isProcessing={isProcessing}
+            />
+          </div>
+          
+          <div className="shrink-0 space-y-6">
+             <CashControl 
+               total={financialSummary.total} 
+               cashReceived={cashReceived}
+               onCashChange={setCashReceived}
+             />
+
+             <AnimatePresence>
+               {lastSaleEvent ? (
+                 <TrackingConfirmationCard 
+                   invoice={lastSaleEvent} 
+                   sellerName={profile?.name || null} 
+                   onClose={() => setLastSaleEvent(null)}
+                 />
+               ) : (
+                 <Button 
+                   className="w-full h-14 rounded-2xl text-lg font-black uppercase tracking-widest shadow-xl bg-primary hover:bg-primary/90 transition-all active:scale-95 disabled:opacity-30"
+                   disabled={cart.length === 0 || isProcessing}
+                   onClick={handleProcessSale}
+                 >
+                   {isProcessing ? (
+                       <><Loader2 size={24} className="mr-2 animate-spin" /> Procesando...</>
+                   ) : (
+                       <><CreditCard size={24} className="mr-2" /> Registrar Venta (F8)</>
+                   )}
+                 </Button>
+               )}
+             </AnimatePresence>
+          </div>
+        </div>
+      </div>
+
+      <section className="mt-4">
+         <InvoiceHistoryTable 
+           invoices={invoices || []} 
+           isLoading={loadingInvoices} 
+           businessType={businessType} 
+         />
+      </section>
+    </div>
+  );
+}
+

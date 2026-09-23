@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useSubscription } from '@/hooks/useSubscription';
 import CurrentPlanCard, { type CurrentPlanInfo } from './components/CurrentPlanCard';
+import HybridPlanSimulator from './components/HybridPlanSimulator';
 import UsageLimitsCard, { type UsageMetric } from './components/UsageLimitsCard';
 import PlanComparisonTable from './components/PlanComparisonTable';
 import BillingHistoryCard, { type BillingRecord } from './components/BillingHistoryCard';
@@ -222,6 +223,9 @@ function SubscriptionPageContent() {
           <CardDescription>Gestiona tu plan, revisa tus límites y mira tu historial de pagos.</CardDescription>
         </CardHeader>
       </Card>
+
+      {/* Panel dinámico y simulador de plan híbrido vs fijo (Fase 4) */}
+      <HybridPlanSimulator business={business} planDetails={planDetails} />
 
       {/* SECCIÓN CONFIRMA TU PLAN */}
       {showBanner && planDetails && (

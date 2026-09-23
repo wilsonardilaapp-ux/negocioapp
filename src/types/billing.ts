@@ -35,6 +35,7 @@ export interface Invoice {
   tax: number;      // IVA calculado
   discount: number; // Descuento global
   tip: number;      // Propina (Opcional)
+  serviceFee?: number; // Tarifa de servicio
   total: number;
   paymentMethod: 'efectivo' | 'nequi' | 'bancolombia' | 'tarjeta' | 'otros';
   cashReceived: number;

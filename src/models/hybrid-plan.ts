@@ -8,6 +8,8 @@ export const HybridPlanSchema = z.object({
   pricePerOrder: z.number().min(0, 'La comisión por pedido no puede ser negativa'),
   maxCommissionPerOrder: z.number().min(0).optional(),
   commissionType: z.enum(['fixed', 'percent']),
+  tableCommissionRate: z.number().min(0).default(3).optional(), // ADITIVO v5: % Comisión en Mesa (QR)
+  tableCommissionType: z.enum(['fixed', 'percent']).default('percent').optional(),
   variableBillingFrequency: z.enum(['weekly', 'monthly']),
   isActive: z.boolean(),
   isPublic: z.boolean(),
@@ -53,5 +55,14 @@ export type HybridBillingResult = {
   status: 'pending' | 'paid';
   paymentMethod?: string;
   commissionType: 'fixed' | 'percent';
+  mesaOrdersCount?: number;
+  mesaOrdersValue?: number;
+  mesaCommission?: number;
+  deliveryOrdersCount?: number;
+  deliveryOrdersValue?: number;
+  deliveryCommission?: number;
+  dueDate?: string;
+  isOverdue?: boolean;
+  isSuspended?: boolean;
   maxCommissionPerOrder: number;
 };

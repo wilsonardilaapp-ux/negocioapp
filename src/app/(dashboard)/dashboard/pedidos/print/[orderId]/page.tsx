@@ -71,6 +71,7 @@ const PrintInvoicePage = () => {
         const deliveryFee = order.deliveryFee ?? business.deliveryFee ?? 0;
         const packagingFee = order.packagingCost ?? business.packagingFee ?? 0;
         const discount = order.discountAmount ?? 0;
+        const serviceFee = (order as any).serviceFee ?? Math.max(0, (order.total || 0) - (itemsSubtotal + deliveryFee + packagingFee - discount));
         
         // El total final
         const total = order.total || (itemsSubtotal + deliveryFee + packagingFee - discount);
@@ -88,6 +89,7 @@ const PrintInvoicePage = () => {
             items: items,
             deliveryFee: deliveryFee,
             packaging: packagingFee,
+            serviceFee: serviceFee,
             subtotal: itemsSubtotal,
             total: total,
         };

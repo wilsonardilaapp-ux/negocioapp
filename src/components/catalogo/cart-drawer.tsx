@@ -13,8 +13,10 @@ import {
 import { Button } from '@/components/ui/button';
 import { Minus, Plus, Trash2, ShoppingBag, ArrowRight, ArrowLeft } from 'lucide-react';
 import type { CartItem } from '@/models/cart';
+import type { PricingContext } from '@/constants/pricingPlans';
 
 interface CartDrawerProps {
+  planContext?: PricingContext;
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
   cartItems: CartItem[];
@@ -31,14 +33,7 @@ const formatCurrency = (value: number) => {
     }).format(value);
 };
 
-export function CartDrawer({ 
-  isOpen, 
-  onOpenChange, 
-  cartItems, 
-  onRemoveItem, 
-  onUpdateQuantity, 
-  onCheckout 
-}: CartDrawerProps) {
+export function CartDrawer({ isOpen, onOpenChange, cartItems, onRemoveItem, onUpdateQuantity, onCheckout, planContext }: CartDrawerProps) {
   
   const subtotalProducts = useMemo(() => {
     return cartItems.reduce((sum, item) => {
@@ -146,6 +141,11 @@ export function CartDrawer({
               <p className="text-[10px] text-muted-foreground italic text-center w-full">
                 * El costo de envío e impuestos se calcularán en el siguiente paso.
               </p>
+              {planContext?.planType === 'hibrido' && (
+                <p className="text-xs font-semibold text-primary/90 text-center w-full bg-primary/10 py-1.5 px-3 rounded-lg">
+                  Cargo de servicio Markix incluido en los precios
+                </p>
+              )}
               <Button 
                 className="w-full h-14 text-lg font-bold rounded-xl shadow-lg shadow-primary/20"
                 onClick={onCheckout}

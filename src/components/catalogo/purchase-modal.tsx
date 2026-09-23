@@ -13,6 +13,7 @@ import { ShoppingBag, Minus, Plus, Tag, Trash2, Loader2, Ticket, X, CheckCircle,
 import { useToast } from '@/hooks/use-toast';
 import type { PaymentSettings } from '@/models/payment-settings';
 import type { Order, OrderItem, OrderStatus, TipoEntrega } from '@/models/order';
+import { calcularTarifaServicio, calcularPrecioCliente, type PricingContext, type CanalPedido } from '@/constants/pricingPlans';
 import { useFirestore, setDocumentNonBlocking } from '@/firebase';
 import { collection, doc } from 'firebase/firestore';
 import { cn, normalizePhoneNumber } from '@/lib/utils';
@@ -50,7 +51,8 @@ interface PurchaseModalProps {
   businessInfo: LandingHeaderConfigData['businessInfo'] | null;
   paymentSettings: PaymentSettings | null;
   origin?: string;
-  externalCoupon?: Coupon | null; // Nuevo prop para cupón desde el chatbot
+  externalCoupon?: Coupon | null;
+  planContext?: PricingContext;
 }
 
 const formatCurrency = (value: number) => {
@@ -80,7 +82,8 @@ export function PurchaseModal({
   businessInfo, 
   paymentSettings, 
   origin = 'web',
-  externalCoupon = null
+  externalCoupon = null,
+  planContext
 }: PurchaseModalProps) {
   const { toast } = useToast();
   const firestore = useFirestore();
@@ -132,10 +135,12 @@ export function PurchaseModal({
   
   const subtotalProducts = useMemo(() => {
       return cartItems.reduce((sum, item) => {
-          const unitPrice = item.appliedPromotion?.discountedPrice ?? item.price;
+          const unitPrice = (planContext?.planType === 'hibrido' && item.basePrice)
+            ? (item.appliedPromotion?.discountedPrice ?? item.basePrice)
+            : (item.appliedPromotion?.discountedPrice ?? item.price);
           return sum + (unitPrice * item.quantity);
       }, 0);
-  }, [cartItems]);
+  }, [cartItems, planContext]);
 
   const applicableGlobalPromo = useMemo(() => {
     return activePromos.find(p => 
@@ -179,11 +184,22 @@ export function PurchaseModal({
     return { finalDiscountAmount: 0, discountLabel: '' };
   }, [couponDiscountAmount, orderDiscountAmount, appliedCoupon]);
 
+  const channel: CanalPedido = (tipoEntrega === 'recoger_en_tienda' || origin === 'qr' || origin === 'mesa') ? 'mesa' : 'domicilio';
+
+  const serviceFee = useMemo(() => {
+    if (planContext?.planType !== 'hibrido') return 0;
+    return cartItems.reduce((acc, item) => {
+      const basePrice = item.basePrice ?? item.price;
+      const fee = calcularTarifaServicio(basePrice, planContext, channel);
+      return acc + (fee * item.quantity);
+    }, 0);
+  }, [cartItems, planContext, channel]);
+
   const subtotalBeforeVat = subtotalProducts - finalDiscountAmount + packagingTotal;
   const vatRate = businessInfo?.vatRate ?? 0;
   const vatAmount = subtotalBeforeVat * (vatRate / 100);
   const deliveryFee = tipoEntrega === 'domicilio' ? (businessInfo?.deliveryFee ?? 0) : 0;
-  const total = subtotalBeforeVat + vatAmount + deliveryFee;
+  const total = subtotalBeforeVat + vatAmount + deliveryFee + serviceFee;
 
   const handleApplyCoupon = async () => {
     if (!couponCode.trim()) return;
@@ -225,7 +241,7 @@ export function PurchaseModal({
         if (tipoEntrega === 'domicilio') {
             orderSummary += `${emoScooter} NUEVO PEDIDO A DOMICILIO\n`;
         } else {
-            orderSummary += `${emoStore} NUEVO PEDIDO PARA RECOGER EN TIENDA\n`;
+            orderSummary += `${emoStore} NUEVO PEDIDO PARA ENTREGA EN SEDE\n`;
         }
 
         orderSummary += `${separator}\n`;
@@ -248,7 +264,8 @@ export function PurchaseModal({
         let totalPromoSavings = 0;
 
         const orderItems: OrderItem[] = cartItems.map(item => {
-            const itemUnitPrice = item.appliedPromotion?.discountedPrice ?? item.price;
+            const basePrice = item.basePrice ?? item.price;
+            const itemUnitPrice = item.appliedPromotion?.discountedPrice ?? (planContext ? calcularPrecioCliente(basePrice, planContext, channel) : item.price);
             const itemSubtotal = itemUnitPrice * item.quantity;
             
             let itemPriceText = formatCurrency(itemUnitPrice);
@@ -289,6 +306,8 @@ export function PurchaseModal({
             discountLabel: discountLabel,
             packagingCost: packagingTotal,
             deliveryFee: deliveryFee,
+            serviceFee: serviceFee,
+            channel: channel,
             vatAmount: vatAmount,
             total: total,
             paymentMethod: selectedPaymentMethod || 'pagoContraEntrega',
@@ -323,6 +342,10 @@ export function PurchaseModal({
 
         orderSummary += `Envío:         ${tipoEntrega === 'domicilio' ? formatCurrency(deliveryFee).padStart(12) : 'Gratis'.padStart(12)}\n`;
 
+        if (serviceFee > 0) {
+            orderSummary += `Tarifa servicio: ${formatCurrency(serviceFee).padStart(11)}\n`;
+        }
+
         if (vatAmount > 0) {
             orderSummary += `IVA (${businessInfo?.vatRate}%):     ${formatCurrency(vatAmount).padStart(12)}\n`;
         }
@@ -334,7 +357,7 @@ export function PurchaseModal({
 
         const finalStatusMsg = tipoEntrega === 'domicilio' 
             ? "Tu pedido será preparado y enviado lo antes posible." 
-            : "Tu pedido estará listo para recoger en tienda muy pronto.";
+            : "Tu pedido estará listo en sede muy pronto.";
 
         orderSummary += `${emoThanks} Gracias por tu compra.\n${finalStatusMsg}\n` + "```";
 
@@ -431,7 +454,7 @@ export function PurchaseModal({
                     </Label>
                     <Label htmlFor="tienda" className={cn("flex flex-col items-center p-4 border-2 rounded-xl cursor-pointer", tipoEntrega === 'recoger_en_tienda' && "border-primary bg-primary/5")}>
                         <RadioGroupItem value="recoger_en_tienda" id="tienda" className="sr-only" />
-                        <span className="text-sm font-bold">Recoger</span>
+                        <span className="text-sm font-bold">Sede</span>
                     </Label>
                 </RadioGroup>
                 {tipoEntrega === 'domicilio' && <div className="space-y-2"><Label>Dirección *</Label><Textarea {...register('address')} /></div>}
@@ -577,9 +600,24 @@ export function PurchaseModal({
                     <span>
                         {tipoEntrega === 'domicilio' 
                             ? (deliveryFee > 0 ? formatCurrency(deliveryFee) : 'Gratis')
-                            : 'Gratis (recoger en tienda)'}
+                            : 'Gratis (en sede)'}
                     </span>
                 </div>
+
+                {serviceFee > 0 && (
+                    <div className="flex justify-between text-sm items-center">
+                        <span className="flex items-center gap-1">
+                            Tarifa de servicio:
+                            <span 
+                                className="text-[11px] cursor-help text-muted-foreground" 
+                                title="Cargo de la plataforma por gestionar tu pedido en Menfy"
+                            >
+                                ℹ️
+                            </span>
+                        </span>
+                        <span className="font-semibold text-foreground">{formatCurrency(serviceFee)}</span>
+                    </div>
+                )}
 
                 {vatAmount > 0 && (
                     <div className="flex justify-between text-sm text-muted-foreground">

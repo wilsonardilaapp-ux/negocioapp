@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import RichTextEditor from '@/components/editor/RichTextEditor';
 import type { Product } from '@/models/product';
+import { calcularPrecioCliente, obtenerTasaComisionHibrida, type PricingContext } from '@/constants/pricingPlans';
 import { UploadCloud, X, Loader2, ChevronLeft, ChevronRight, Plus, Pencil, Trash2 } from 'lucide-react';
 import Image from 'next/image';
 import { uploadMedia } from '@/ai/flows/upload-media-flow';
@@ -39,6 +40,7 @@ const productSchema = z.object({
 });
 
 interface ProductFormProps {
+    planContext?: PricingContext;
     product: Product | null;
     onSave: (data: Omit<Product, 'id' | 'businessId'>) => void;
     onCancel: () => void;
@@ -172,8 +174,8 @@ const Lightbox = ({
     );
 };
 
-export default function ProductForm({ product, onSave, onCancel, imageLimit }: ProductFormProps) {
-    const { register, handleSubmit, control, reset, formState: { errors } } = useForm<z.infer<typeof productSchema>>({
+export default function ProductForm({ product, onSave, onCancel, imageLimit, planContext }: ProductFormProps) {
+    const { register, handleSubmit, control, reset, watch, formState: { errors } } = useForm<z.infer<typeof productSchema>>({
         resolver: zodResolver(productSchema),
     });
 
@@ -181,6 +183,10 @@ export default function ProductForm({ product, onSave, onCancel, imageLimit }: P
     const [mainImage, setMainImage] = useState<MediaItem | null>(null);
     const [isUploading, setIsUploading] = useState<number | null>(null);
     const { toast } = useToast();
+    const watchedPrice = watch("price");
+    const liveClientPriceDom = calcularPrecioCliente(watchedPrice, planContext, 'domicilio');
+    const liveClientPriceMesa = calcularPrecioCliente(watchedPrice, planContext, 'mesa');
+    const isHybridPlan = planContext?.planType === 'hibrido';
 
     const [isLightboxOpen, setIsLightboxOpen] = useState(false);
     const [selectedLightboxIndex, setSelectedLightboxIndex] = useState(0);
@@ -362,12 +368,59 @@ export default function ProductForm({ product, onSave, onCancel, imageLimit }: P
                         <Input id="name" {...register("name")} placeholder="Ej: Café Orgánico de Altura" />
                         {errors.name && <p className="text-sm text-destructive mt-1">{errors.name.message}</p>}
                     </div>
-                    <div className="grid grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
                         <div>
-                            <Label htmlFor="price">Precio</Label>
+                            <Label htmlFor="price">Precio base (lo que tú recibes)</Label>
                             <Input id="price" type="number" step="0.01" {...register("price")} />
                             {errors.price && <p className="text-sm text-destructive mt-1">{errors.price.message}</p>}
                         </div>
+                        {isHybridPlan ? (
+                          <>
+                            <div>
+                              <Label htmlFor="clientPriceDom">Precio Cliente (Domicilio)</Label>
+                              <Input 
+                                id="clientPriceDom" 
+                                type="text" 
+                                readOnly 
+                                disabled 
+                                value={liveClientPriceDom > 0 ? new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(liveClientPriceDom) : '$ 0'} 
+                                className="bg-muted font-bold text-primary" 
+                              />
+                              <p className="text-[10px] text-muted-foreground mt-1">
+                                Tarifa de servicio en domicilio.
+                              </p>
+                            </div>
+                            <div>
+                              <Label htmlFor="clientPriceMesa">Precio Cliente (Mesa QR)</Label>
+                              <Input 
+                                id="clientPriceMesa" 
+                                type="text" 
+                                readOnly 
+                                disabled 
+                                value={liveClientPriceMesa > 0 ? new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(liveClientPriceMesa) : '$ 0'} 
+                                className="bg-muted font-bold text-primary" 
+                              />
+                              <p className="text-[10px] text-muted-foreground mt-1">
+                                Tarifa de servicio en mesa.
+                              </p>
+                            </div>
+                          </>
+                        ) : (
+                          <div>
+                            <Label htmlFor="clientPrice">Precio final al cliente</Label>
+                            <Input 
+                              id="clientPrice" 
+                              type="text" 
+                              readOnly 
+                              disabled 
+                              value={liveClientPriceDom > 0 ? new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(liveClientPriceDom) : '$ 0'} 
+                              className="bg-muted font-bold text-primary" 
+                            />
+                            <p className="text-[10px] text-muted-foreground mt-1">
+                              Tu plan incluye el servicio por mensualidad. Sin comisiones.
+                            </p>
+                          </div>
+                        )}
                         <div>
                             <Label htmlFor="stock">Stock</Label>
                             <Input id="stock" type="number" {...register("stock")} />

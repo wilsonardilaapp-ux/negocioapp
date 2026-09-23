@@ -27,12 +27,13 @@ export const mockOrder = {
   ],
   deliveryFee: 4000,
   packaging: 1000,
+  serviceFee: 700,
   subtotal: 47000,
   total: 52000,
 };
 
 // Simplified Order type for the template
-export type OrderType = typeof mockOrder;
+export type OrderType = Omit<typeof mockOrder, 'serviceFee'> & { serviceFee?: number; discount?: number; tax?: number; tip?: number; };
 
 interface InvoiceTemplateProps {
   config: InvoiceSettings;
@@ -169,6 +170,26 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ config, order,
   if (config.fields.showPackaging) {
     subtotalLines.push(rpad('Empaque:', SUMMARY_LABEL_W) + lpad(order.packaging.toLocaleString('es-CO'), SUMMARY_VALUE_W));
   }
+  const sFee = (order as any).serviceFee || 0;
+  if (sFee > 0) {
+    subtotalLines.push(rpad('Tarifa servicio:', SUMMARY_LABEL_W) + lpad(sFee.toLocaleString('es-CO'), SUMMARY_VALUE_W));
+  }
+
+  const disc = (order as any).discount || 0;
+  if (disc > 0) {
+    const discPct = order.subtotal > 0 ? Math.round((disc / order.subtotal) * 100) : null;
+    const discLabel = discPct ? `Descuento (${discPct}%):` : 'Descuento:';
+    subtotalLines.push(rpad(discLabel, SUMMARY_LABEL_W) + lpad(`-${disc.toLocaleString('es-CO')}`, SUMMARY_VALUE_W));
+  }
+  const tax = (order as any).tax || 0;
+  if (tax > 0) {
+    subtotalLines.push(rpad('IVA (19%):', SUMMARY_LABEL_W) + lpad(tax.toLocaleString('es-CO'), SUMMARY_VALUE_W));
+  }
+  const tip = (order as any).tip || 0;
+  if (tip > 0) {
+    subtotalLines.push(rpad('Propina/Servicio:', SUMMARY_LABEL_W) + lpad(tip.toLocaleString('es-CO'), SUMMARY_VALUE_W));
+  }
+
   const subtotalPreContent = subtotalLines.join('\n');
 
   const totalPreContent = rpad('TOTAL:', SUMMARY_LABEL_W) + lpad(order.total.toLocaleString('es-CO'), SUMMARY_VALUE_W);

@@ -4,6 +4,7 @@ export type Product = {
     name: string;
     description: string; // Puede contener HTML
     price: number;
+    basePrice?: number; // ADITIVO: Precio base asignado al restaurante
     stock: number;
     category: string;
     images: string[]; // URLs de las imágenes
