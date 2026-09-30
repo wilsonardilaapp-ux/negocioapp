@@ -133,6 +133,17 @@ const LoadingScreen = () => (
 function RegisterForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
+
+  // Captura y persistencia de código de afiliado de PartnerVerse
+  useEffect(() => {
+    const refParam = searchParams.get('ref') || searchParams.get('aff');
+    if (refParam) {
+      try {
+        localStorage.setItem('partnerverse_aff_code', refParam.trim().toUpperCase());
+        document.cookie = `partnerverse_aff_code=${refParam.trim().toUpperCase()}; path=/; max-age=${30 * 24 * 60 * 60}; SameSite=Lax`;
+      } catch {}
+    }
+  }, [searchParams]);
   const { toast } = useToast();
   const auth = useAuth();
   const firestore = useFirestore();
@@ -221,7 +232,13 @@ function RegisterForm() {
       batch.set(userDocRef, userData);
       
       const businessDocRef = doc(firestore, 'businesses', newUser.uid);
-      const businessData: Business = {
+      let affCodeToSave: string | undefined = undefined;
+      try {
+        affCodeToSave = searchParams.get('ref') || searchParams.get('aff') || localStorage.getItem('partnerverse_aff_code') || undefined;
+      } catch {}
+
+      const businessData: any = {
+        affiliateCode: affCodeToSave || null,
         id: newUser.uid,
         name: `${values.name}'s Business`,
         ownerName: values.name,
