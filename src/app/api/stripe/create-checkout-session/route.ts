@@ -33,6 +33,9 @@ export async function POST(req: NextRequest) {
         }, { merge: true });
     }
 
+    const bDoc = await firestore.collection('businesses').doc(businessId).get();
+    const businessData = bDoc.exists ? bDoc.data() : {};
+
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
       mode: 'subscription',

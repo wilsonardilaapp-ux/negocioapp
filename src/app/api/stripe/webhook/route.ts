@@ -1,3 +1,5 @@
+import { DefaultSubscriptionPlans } from '@/models/subscription-plan';
+import { reportSubscription } from '@/modules/affiliate/report';
 
 import { NextResponse } from 'next/server';
 import { stripe, getPlanFromPriceId } from '@/lib/stripe';
@@ -31,7 +33,8 @@ export async function POST(req: Request) {
         }
 
         const subscription = await stripe.subscriptions.retrieve(stripeSubscriptionId);
-        const plan = getPlanFromPriceId(subscription.items.data[0].price.id);
+        const plan = getPlanFromPriceId(subscription.items.data[0].price.id) || 'pro';
+        const planObj = DefaultSubscriptionPlans.find(p => p.id === plan) || { id: plan, name: plan, price: 29 };
 
         if (!plan) {
           throw new Error(`Plan no encontrado para priceId: ${subscription.items.data[0].price.id}`);
@@ -48,13 +51,34 @@ export async function POST(req: Request) {
 
         const subRef = firestore.collection('businesses').doc(businessId).collection('subscription').doc('current');
         await subRef.set(subscriptionData, { merge: true });
+
+        try {
+          const bDoc = await firestore.collection('businesses').doc(businessId).get();
+          const bData = bDoc.data() || {};
+          const affCode = session.metadata?.affiliateCode || bData.affiliateCode || bData.referredByCode;
+          if (affCode) {
+            reportSubscription({
+              event: 'created',
+              code: affCode,
+              eventId: session.id || `${stripeSubscriptionId}_created`,
+              usuarioId: businessId,
+              email: (session.customer_details as any)?.email || session.customer_email || bData.email,
+              restaurantName: bData.name || 'Restaurante Markix',
+              planId: planObj.id,
+              planName: planObj.name,
+              amount: planObj.price,
+              currency: 'USD'
+            });
+          }
+        } catch(e) { console.warn('[Webhook] Error created:', e); }
         break;
       }
 
       case 'customer.subscription.updated': {
         const subscription = event.data.object;
         const stripeCustomerId = subscription.customer as string;
-        const plan = getPlanFromPriceId(subscription.items.data[0].price.id);
+        const plan = getPlanFromPriceId(subscription.items.data[0].price.id) || 'pro';
+        const planObj = DefaultSubscriptionPlans.find(p => p.id === plan) || { id: plan, name: plan, price: 29 };
 
         if (!plan) {
           throw new Error(`Plan no encontrado para priceId: ${subscription.items.data[0].price.id}`);
@@ -76,6 +100,40 @@ export async function POST(req: Request) {
           updatedAt: Timestamp.now(),
         };
         await businessDoc.ref.update(subscriptionData);
+
+        try {
+          const bData = businessDoc.data() || {};
+          const affCode = (subscription.metadata as any)?.affiliateCode || bData.affiliateCode || bData.referredByCode;
+          if (affCode) {
+            reportSubscription({
+              event: 'cancelled',
+              code: affCode,
+              eventId: `${subscription.id}_cancelled`,
+              usuarioId: businessDoc.id,
+              email: bData.email,
+              restaurantName: bData.name || 'Restaurante Markix'
+            });
+          }
+        } catch(e) { console.warn('[Webhook] Error cancelled:', e); }
+
+        try {
+          const bData = businessDoc.data() || {};
+          const affCode = (subscription.metadata as any)?.affiliateCode || bData.affiliateCode || bData.referredByCode;
+          if (affCode) {
+            reportSubscription({
+              event: 'renewed',
+              code: affCode,
+              eventId: `${subscription.id}_${subscription.current_period_end}`,
+              usuarioId: businessDoc.id,
+              email: bData.email,
+              restaurantName: bData.name || 'Restaurante Markix',
+              planId: planObj.id,
+              planName: planObj.name,
+              amount: planObj.price,
+              currency: 'USD'
+            });
+          }
+        } catch(e) { console.warn('[Webhook] Error renewed:', e); }
         break;
       }
 
