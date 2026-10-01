@@ -1,7 +1,6 @@
-"use client";
 
-import { useUser } from "@/firebase";
-import { JevCopilotWidgetRetencion } from "@/jev/JevCopilotWidgetRetencion";
+'use client';
+
 import { useMemo, useState } from 'react';
 import { useMetricAnalysis } from '../hooks/useMetricAnalysis';
 import { MetricsService } from '../services/metrics.service';
@@ -21,7 +20,6 @@ import 'jspdf-autotable';
  * Se han integrado capacidades de exportación ejecutiva a Excel y PDF.
  */
 export default function ClientesRecurrentesPage() {
-  const { user } = useUser();
   const { orders, isLoading } = useMetricAnalysis();
   const { toast } = useToast();
   const [isExporting, setIsExporting] = useState<'excel' | 'pdf' | null>(null);
@@ -190,8 +188,6 @@ export default function ClientesRecurrentesPage() {
           </ChartContainer>
         </CardContent>
       </Card>
-    
-      <JevCopilotWidgetRetencion businessId={user?.uid} />
     </div>
   );
 }

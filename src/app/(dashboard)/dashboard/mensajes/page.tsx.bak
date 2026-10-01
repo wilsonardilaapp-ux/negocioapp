@@ -1,6 +1,6 @@
+
 "use client";
 
-import { JevCopilotWidgetWhatsapp } from "@/jev/JevCopilotWidgetWhatsapp";
 import { useMemo } from "react";
 import { useCollection, useFirestore, useUser, useMemoFirebase } from "@/firebase";
 import { collection, query, orderBy, doc, deleteDoc } from 'firebase/firestore';
@@ -55,8 +55,6 @@ export default function MensajesPage() {
             />
         </CardContent>
       </Card>
-    
-      <JevCopilotWidgetWhatsapp businessId={user?.uid} />
     </div>
   );
 }

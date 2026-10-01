@@ -1,7 +1,5 @@
-"use client";
+'use client';
 
-import { useUser } from "@/firebase";
-import { JevCopilotWidgetInventario } from "@/jev/JevCopilotWidgetInventario";
 import { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -16,7 +14,6 @@ import KardexMovimientos from '@/components/kardex/tabs/KardexMovimientos';
 import KardexConfiguracion from '@/components/kardex/tabs/KardexConfiguracion';
 
 export default function KardexPage() {
-    const { user } = useUser();
     const [activeTab, setActiveTab] = useState<TabKardex>('resumen');
     const kardexData = useInventarioKardex();
 
@@ -82,8 +79,6 @@ export default function KardexPage() {
                     />
                 </TabsContent>
             </Tabs>
-        
-            <JevCopilotWidgetInventario businessId={user?.uid} />
         </div>
     );
 }

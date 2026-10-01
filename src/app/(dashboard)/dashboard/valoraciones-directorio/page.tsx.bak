@@ -1,6 +1,5 @@
-"use client";
+'use client';
 
-import { JevCopilotWidgetResenas } from "@/jev/JevCopilotWidgetResenas";
 import React, { useState } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { BusinessRatingsStats } from '@/components/directory/ratings/BusinessRatingsStats';
@@ -215,8 +214,6 @@ export default function BusinessRatingsPage() {
           <BusinessRatingsList ratings={ratings} />
         </CardContent>
       </Card>
-    
-      <JevCopilotWidgetResenas businessId={user?.uid} />
     </div>
   );
 }

@@ -25,20 +25,6 @@ export type PeakHourRange = {
 };
 
 /**
- * Proveedor dinámico adicional configurado por el Superadmin.
- */
-export type CustomAIProvider = {
-    id: string;
-    name: string;
-    endpoint: string;
-    apiKey: string;
-    model?: string;
-    peakHours?: PeakHourRange[];
-    timezone?: string;
-    avoidInPeakHours?: boolean;
-};
-
-/**
  * Estructura común para los proveedores de IA con soporte para optimización horaria.
  */
 export type AIProviderFields = {
@@ -50,14 +36,6 @@ export type AIProviderFields = {
     };
     openai?: { 
         apiKey: string;
-        peakHours?: PeakHourRange[];
-        timezone?: string;
-        avoidInPeakHours?: boolean;
-    };
-    jevia?: {
-        endpoint?: string;
-        apiKey: string;
-        model?: string;
         peakHours?: PeakHourRange[];
         timezone?: string;
         avoidInPeakHours?: boolean;
@@ -99,7 +77,6 @@ export type AIProviderFields = {
         timezone?: string;
         avoidInPeakHours?: boolean;
     };
-    customProviders?: CustomAIProvider[];
 };
 
 export type Integration = {

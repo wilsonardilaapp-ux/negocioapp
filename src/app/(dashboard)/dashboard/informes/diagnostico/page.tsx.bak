@@ -1,6 +1,5 @@
-"use client";
+'use client';
 
-import { getContextoResumenGlobal, ContextoResumenGlobal } from "@/jev/contextAggregatorResumen";
 import React, { useState, useMemo, useEffect } from 'react';
 import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query, where, orderBy, doc, getDocs, setDoc } from 'firebase/firestore';
@@ -36,7 +35,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Sparkles, FileBarChart, 
+import { 
+    FileBarChart, 
     Lock, 
     RefreshCw, 
     Loader2, 
@@ -59,7 +59,8 @@ import { Sparkles, FileBarChart,
     Activity,
     Clock,
     BrainCircuit,
-    Eye } from "lucide-react";
+    Eye
+} from 'lucide-react';
 import { format, startOfMonth, isToday, differenceInDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
@@ -503,9 +504,6 @@ export default function DiagnosticoComercialPage() {
         <TabsList className="bg-muted/50 p-1 rounded-xl mb-6">
             <TabsTrigger value="analysis" className="gap-2 rounded-lg font-bold"><Target className="h-4 w-4" /> Análisis Activo</TabsTrigger>
             <TabsTrigger value="history" className="gap-2 rounded-lg font-bold"><History className="h-4 w-4" /> Historial de Informes</TabsTrigger>
-          <TabsTrigger value="resumen-ejecutivo" className="font-bold gap-1.5">
-                <Sparkles className="w-3.5 h-3.5 text-emerald-600" /> Resumen Ejecutivo
-            </TabsTrigger>
         </TabsList>
 
         <TabsContent value="analysis" className="space-y-8 outline-none">
@@ -664,9 +662,6 @@ export default function DiagnosticoComercialPage() {
                 </CardContent>
             </Card>
         </TabsContent>
-            <TabsContent value="resumen-ejecutivo" className="space-y-6 pt-4">
-                <ResumenEjecutivoTab />
-            </TabsContent>
       </Tabs>
 
       <Dialog open={showConfirmModal} onOpenChange={setShowConfirmDialog}>
@@ -681,114 +676,4 @@ export default function DiagnosticoComercialPage() {
       </Dialog>
     </div>
   );
-}
-
-
-
-function ResumenEjecutivoTab() {
-    const { user } = useUser();
-    const [data, setData] = React.useState<ContextoResumenGlobal | null>(null);
-    const [loading, setLoading] = React.useState(true);
-
-    React.useEffect(() => {
-        if (user?.uid) {
-            getContextoResumenGlobal(user.uid).then(res => {
-                setData(res);
-                setLoading(false);
-            }).catch(() => setLoading(false));
-        }
-    }, [user?.uid]);
-
-    if (loading) {
-        return (
-            <div className="flex items-center justify-center h-48 gap-2 text-muted-foreground text-xs">
-                <Loader2 className="h-5 w-5 animate-spin text-emerald-600" />
-                <span>Cargando Resumen Ejecutivo JEV AI...</span>
-            </div>
-        );
-    }
-
-    return (
-        <div className="space-y-6">
-            <Card className="border-emerald-200 bg-emerald-50/40">
-                <CardHeader>
-                    <CardTitle className="text-base font-bold text-emerald-950 flex items-center gap-2">
-                        <Activity className="w-5 h-5 text-emerald-600" /> Estado Operativo General: <span className="uppercase text-emerald-700 font-black">{data?.estadoGeneral || "SIN DATOS"}</span>
-                    </CardTitle>
-                    <CardDescription>
-                        Vista táctica y estratégica cruzando los 5 pilares operativos de Markix en tiempo real.
-                    </CardDescription>
-                </CardHeader>
-            </Card>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                <Card className="border-2">
-                    <CardHeader className="pb-2"><CardTitle className="text-sm font-bold">Asistente WhatsApp</CardTitle></CardHeader>
-                    <CardContent className="space-y-1">
-                        <div className="text-2xl font-black">{data?.whatsapp?.esSinDatos ? "SIN DATOS" : (data?.whatsapp?.sinResponder || 0)}</div>
-                        <p className="text-xs text-muted-foreground">Mensajes o chats pendientes.</p>
-                    </CardContent>
-                </Card>
-                <Card className="border-2">
-                    <CardHeader className="pb-2"><CardTitle className="text-sm font-bold">Inventario & Quiebres</CardTitle></CardHeader>
-                    <CardContent className="space-y-1">
-                        <div className="text-2xl font-black">{data?.inventario?.esSinDatos ? "SIN DATOS" : (data?.inventario?.criticos || 0)}</div>
-                        <p className="text-xs text-muted-foreground">Productos en riesgo crítico de quiebre.</p>
-                    </CardContent>
-                </Card>
-                <Card className="border-2">
-                    <CardHeader className="pb-2"><CardTitle className="text-sm font-bold">Retención de Clientes</CardTitle></CardHeader>
-                    <CardContent className="space-y-1">
-                        <div className="text-2xl font-black">{data?.retencion?.esSinDatos ? "SIN DATOS" : (data?.retencion?.enRiesgo || 0)}</div>
-                        <p className="text-xs text-muted-foreground">Clientes en riesgo de abandono.</p>
-                    </CardContent>
-                </Card>
-                <Card className="border-2">
-                    <CardHeader className="pb-2"><CardTitle className="text-sm font-bold">Reseñas & Reputación</CardTitle></CardHeader>
-                    <CardContent className="space-y-1">
-                        <div className="text-2xl font-black">{data?.resenas?.esSinDatos ? "SIN DATOS" : `${data?.resenas?.promedio || "5.0"} ⭐`}</div>
-                        <p className="text-xs text-muted-foreground">{data?.resenas?.sinResponder || 0} opinión(es) sin responder.</p>
-                    </CardContent>
-                </Card>
-                <Card className="border-2">
-                    <CardHeader className="pb-2"><CardTitle className="text-sm font-bold">Pedidos & Operación</CardTitle></CardHeader>
-                    <CardContent className="space-y-1">
-                        <div className="text-2xl font-black">{data?.pedidos?.esSinDatos ? "SIN DATOS" : (data?.pedidos?.activos || 0)}</div>
-                        <p className="text-xs text-muted-foreground">Pedidos activos ({data?.pedidos?.retrasados || 0} demorados).</p>
-                    </CardContent>
-                </Card>
-            </div>
-
-            <Card>
-                <CardHeader>
-                    <CardTitle className="text-lg font-bold flex items-center gap-2">
-                        <History className="w-5 h-5 text-primary" /> Memoria y Aprendizaje Cruzado (`jev_memory`)
-                    </CardTitle>
-                    <CardDescription>Registro inmutable de interacciones de los 5 pilares.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    {data?.historialMemoria && data.historialMemoria.length > 0 ? (
-                        <div className="space-y-2">
-                            {data.historialMemoria.map((h: any, idx: number) => (
-                                <div key={idx} className="p-3 rounded-lg border bg-gray-50 flex items-center justify-between text-xs">
-                                    <div className="space-y-0.5">
-                                        <div className="flex items-center gap-2">
-                                            <Badge variant="outline" className="text-[9px] font-bold uppercase">{h.tipo}</Badge>
-                                            <span className="font-bold text-gray-900">{h.accion}</span>
-                                        </div>
-                                        <p className="text-[10px] text-muted-foreground">{new Date(h.fechaInicio).toLocaleString("es-CO")}</p>
-                                    </div>
-                                    <Badge variant="secondary" className="font-mono text-[10px]">{h.estado}</Badge>
-                                </div>
-                            ))}
-                        </div>
-                    ) : (
-                        <div className="py-6 text-center text-muted-foreground text-xs">
-                            SIN DATOS en la memoria compartida.
-                        </div>
-                    )}
-                </CardContent>
-            </Card>
-        </div>
-    );
 }

@@ -13,6 +13,7 @@ import {
 import {
   AlertDialog,
   AlertDialogAction,
+  AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
   AlertDialogFooter,
@@ -26,12 +27,12 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, CheckCircle, XCircle, Plus, Trash2, Clock, Globe, Cpu } from 'lucide-react';
+import { Loader2, CheckCircle, XCircle, Plus, Trash2, Clock, Globe } from 'lucide-react';
 import { testApiKey } from '@/ai/flows/test-api-key-flow';
 import { useToast } from '@/hooks/use-toast';
-import type { Integration, AIProviderFields, PeakHourRange, CustomAIProvider } from '@/models/integration';
+import type { Integration, AIProviderFields, PeakHourRange } from '@/models/integration';
 
-type Provider = 'google' | 'openai' | 'jevia' | 'groq' | 'nanobanana' | 'deepseek' | 'qwen' | 'zai' | 'custom';
+type Provider = 'google' | 'openai' | 'groq' | 'nanobanana' | 'deepseek' | 'qwen' | 'zai' | 'custom';
 type TestStatus = 'idle' | 'testing' | 'success' | 'error';
 type ModalState = { isOpen: boolean; title: string; message: string };
 
@@ -47,7 +48,6 @@ export const AIProviderForm = ({
   const PROVIDER_LABELS: Record<Provider, string> = {
     google: 'Google AI (Gemini)',
     openai: 'OpenAI (GPT)',
-    jevia: 'Jev IA',
     groq: 'Groq (Llama/Mixtral)',
     nanobanana: 'NanoBanana (Gemini 2.5 Flash)',
     deepseek: 'DeepSeek',
@@ -78,14 +78,6 @@ export const AIProviderForm = ({
         peakHours: parsed?.openai?.peakHours || [],
         timezone: parsed?.openai?.timezone || 'America/Bogota',
         avoidInPeakHours: parsed?.openai?.avoidInPeakHours || false,
-      },
-      jevia: {
-        endpoint: parsed?.jevia?.endpoint || 'https://api.jevia.com/v1/chat/completions',
-        apiKey: parsed?.jevia?.apiKey || '',
-        model: parsed?.jevia?.model || 'jevia-v1',
-        peakHours: parsed?.jevia?.peakHours || [],
-        timezone: parsed?.jevia?.timezone || 'America/Bogota',
-        avoidInPeakHours: parsed?.jevia?.avoidInPeakHours || false,
       },
       groq: { 
         apiKey: parsed?.groq?.apiKey || '',
@@ -124,22 +116,21 @@ export const AIProviderForm = ({
         timezone: parsed?.custom?.timezone || 'America/Bogota',
         avoidInPeakHours: parsed?.custom?.avoidInPeakHours || false,
       },
-      customProviders: parsed?.customProviders || [],
     };
   });
 
-  const [testStatus, setTestStatus] = useState<Record<string, TestStatus>>({ 
-    google: 'idle', openai: 'idle', jevia: 'idle', groq: 'idle', 
+  const [testStatus, setTestStatus] = useState<Record<Provider, TestStatus>>({ 
+    google: 'idle', openai: 'idle', groq: 'idle', 
     nanobanana: 'idle', deepseek: 'idle', qwen: 'idle', 
     zai: 'idle', custom: 'idle' 
   });
 
   const [modalState, setModalState] = useState<ModalState>({ isOpen: false, title: '', message: '' });
 
-  const [tempRanges, setTempRanges] = useState<Record<string, { start: string, end: string }>>({
+  // Estado temporal para los nuevos rangos horarios que se están escribiendo
+  const [tempRanges, setTempRanges] = useState<Record<Provider, { start: string, end: string }>>({
     google: { start: '09:00', end: '18:00' },
     openai: { start: '09:00', end: '18:00' },
-    jevia: { start: '09:00', end: '18:00' },
     groq: { start: '09:00', end: '18:00' },
     nanobanana: { start: '09:00', end: '18:00' },
     deepseek: { start: '09:00', end: '18:00' },
@@ -148,32 +139,17 @@ export const AIProviderForm = ({
     custom: { start: '09:00', end: '18:00' },
   });
 
-  const handleTestConnection = async (provider: string, customData?: { apiKey: string; endpoint?: string; model?: string; providerName?: string }) => {
-    let apiKey = customData?.apiKey;
-    let endpoint = customData?.endpoint;
-    let model = customData?.model;
-
-    if (!customData) {
-      const config = (fields as any)[provider];
-      apiKey = config?.apiKey;
-      endpoint = config?.endpoint;
-      model = config?.model;
-    }
-
-    if (!apiKey) {
-      const label = PROVIDER_LABELS[provider as Provider] || provider;
-      setModalState({ isOpen: true, title: 'API Key Requerida', message: `Introduce una API Key para ${label}.` });
-      return; 
-    }
+  const handleTestConnection = async (provider: Provider) => {
+    const config = fields[provider];
+    const apiKey = config?.apiKey;
+    if (!apiKey) { setModalState({ isOpen: true, title: 'API Key Requerida', message: `Introduce una API Key para ${PROVIDER_LABELS[provider]}.` }); return; }
     
     setTestStatus(prev => ({ ...prev, [provider]: 'testing' }));
     try {
-      const result = await testApiKey({
-        provider,
-        apiKey,
-        endpoint,
-        model,
-        providerName: customData?.providerName || PROVIDER_LABELS[provider as Provider] || provider
+      const result = await testApiKey({ 
+        provider, 
+        apiKey, 
+        endpoint: provider === 'custom' ? fields.custom?.endpoint : undefined 
       });
       setTestStatus(prev => ({ ...prev, [provider]: result.success ? 'success' : 'error' }));
       setModalState({ isOpen: true, title: result.success ? 'Éxito' : 'Error', message: result.message });
@@ -183,10 +159,10 @@ export const AIProviderForm = ({
     }
   };
 
-  const addPeakHour = (provider: string) => {
-    const range = tempRanges[provider] || { start: '09:00', end: '18:00' };
+  const addPeakHour = (provider: Provider) => {
+    const range = tempRanges[provider];
     setFields(prev => {
-        const currentProviderFields = (prev as any)[provider] || { apiKey: '', peakHours: [], timezone: '', avoidInPeakHours: false };
+        const currentProviderFields = prev[provider] || { apiKey: '', peakHours: [], timezone: '', avoidInPeakHours: false };
         const currentPeakHours = currentProviderFields.peakHours || [];
         return {
             ...prev,
@@ -198,9 +174,9 @@ export const AIProviderForm = ({
     });
   };
 
-  const removePeakHour = (provider: string, index: number) => {
+  const removePeakHour = (provider: Provider, index: number) => {
     setFields(prev => {
-        const currentProviderFields = (prev as any)[provider] || { apiKey: '', peakHours: [], timezone: '', avoidInPeakHours: false };
+        const currentProviderFields = prev[provider] || { apiKey: '', peakHours: [], timezone: '', avoidInPeakHours: false };
         const currentPeakHours = currentProviderFields.peakHours || [];
         return {
             ...prev,
@@ -212,82 +188,36 @@ export const AIProviderForm = ({
     });
   };
 
-  // Agregar nuevo proveedor dinámico
-  const handleAddCustomProvider = () => {
-    const newId = `custom-ai-${Date.now()}`;
-    const newProvider: CustomAIProvider = {
-      id: newId,
-      name: 'Nuevo Proveedor de IA',
-      endpoint: 'https://api.tu-servicio.com/v1/chat/completions',
-      apiKey: '',
-      model: 'default',
-      avoidInPeakHours: false,
-      peakHours: [],
-      timezone: 'America/Bogota'
-    };
-
-    setFields(prev => ({
-      ...prev,
-      customProviders: [...(prev.customProviders || []), newProvider]
-    }));
-
-    setTempRanges(prev => ({ ...prev, [newId]: { start: '09:00', end: '18:00' } }));
-    toast({ title: 'Proveedor agregado', description: 'Completa los datos de tu nuevo proveedor de IA.' });
-  };
-
-  const handleUpdateCustomProvider = (id: string, updates: Partial<CustomAIProvider>) => {
-    setFields(prev => ({
-      ...prev,
-      customProviders: (prev.customProviders || []).map(p => p.id === id ? { ...p, ...updates } : p)
-    }));
-  };
-
-  const handleRemoveCustomProvider = (id: string) => {
-    setFields(prev => ({
-      ...prev,
-      customProviders: (prev.customProviders || []).map(p => p).filter(p => p.id !== id)
-    }));
-    toast({ title: 'Proveedor eliminado', description: 'El proveedor ha sido removido.' });
-  };
-
-  const TestButton = ({ provider, customData }: { provider: string; customData?: { apiKey: string; endpoint?: string; model?: string; providerName?: string } }) => {
-    const status = testStatus[provider] || 'idle';
+  const TestButton = ({ provider }: { provider: Provider }) => {
+    const status = testStatus[provider];
     if (status === 'testing') return <Button variant="outline" size="sm" disabled><Loader2 className="h-4 w-4 animate-spin mr-2" />Probando...</Button>;
-    if (status === 'success') return <Button variant="ghost" size="sm" className="text-green-600 font-bold" disabled><CheckCircle className="h-4 w-4 mr-2" />¡Éxito!</Button>;
-    if (status === 'error')   return <Button variant="destructive" size="sm" onClick={() => handleTestConnection(provider, customData)}><XCircle className="h-4 w-4 mr-2" />Reintentar</Button>;
-    return <Button variant="outline" size="sm" onClick={() => handleTestConnection(provider, customData)}>Probar Conexión</Button>;
+    if (status === 'success') return <Button variant="ghost" size="sm" className="text-green-600" disabled><CheckCircle className="h-4 w-4 mr-2" />¡Éxito!</Button>;
+    if (status === 'error')   return <Button variant="destructive" size="sm" onClick={() => handleTestConnection(provider)}><XCircle className="h-4 w-4 mr-2" />Reintentar</Button>;
+    return <Button variant="outline" size="sm" onClick={() => handleTestConnection(provider)}>Probar Conexión</Button>;
   };
 
   return (
     <div className="space-y-6">
       <ScrollArea className="h-[60vh] pr-4">
         <div className="space-y-4">
-          {/* PROVEEDORES PREDEFINIDOS (Google, OpenAI, Jev IA, etc.) */}
           {(Object.keys(PROVIDER_LABELS) as Provider[]).map((p) => (
             <Card key={p} className={fields[p]?.apiKey ? 'border-primary/30 bg-primary/5' : ''}>
-              <CardHeader className="py-3">
-                <CardTitle className="text-base flex items-center justify-between">
-                  <span>{PROVIDER_LABELS[p]}</span>
-                  {p === 'jevia' && <Badge variant="outline" className="text-xs bg-emerald-50 text-emerald-700 border-emerald-300">Nuevo</Badge>}
-                </CardTitle>
-              </CardHeader>
+              <CardHeader className="py-3"><CardTitle className="text-base">{PROVIDER_LABELS[p]}</CardTitle></CardHeader>
               <CardContent className="space-y-4 pb-4">
-                {(p === 'custom' || p === 'jevia') && (
+                {p === 'custom' && (
                   <div className="space-y-1">
                     <Label className="text-[10px] uppercase font-bold text-muted-foreground">Endpoint API (OpenAI Compatible)</Label>
                     <Input 
-                      placeholder={p === 'jevia' ? "https://api.jevia.com/v1/chat/completions" : "https://api.tu-servicio.com/v1/chat/completions"}
-                      value={fields[p]?.endpoint || ''} 
+                      placeholder="https://api.tu-servicio.com/v1/chat/completions"
+                      value={fields.custom?.endpoint || ''} 
                       onChange={(e) => {
-                        const val = e.target.value;
-                        setFields(prev => ({ ...prev, [p]: { ...prev[p]!, endpoint: val } }));
-                        setTestStatus(prev => ({ ...prev, [p]: 'idle' }));
+                        setFields(prev => ({ ...prev, custom: { ...prev.custom!, endpoint: e.target.value } }));
+                        setTestStatus(prev => ({ ...prev, custom: 'idle' }));
                       }} 
                       disabled={isSaving} 
                     />
                   </div>
                 )}
-
                 <div className="space-y-1">
                   <Label className="text-[10px] uppercase font-bold text-muted-foreground">API Key</Label>
                   <Input type="password" value={fields[p]?.apiKey || ''} onChange={(e) => {
@@ -306,7 +236,7 @@ export const AIProviderForm = ({
 
                 <Separator className="my-2" />
 
-                {/* CONFIGURACIÓN DE HORARIOS */}
+                {/* CONFIGURACIÓN DE HORARIOS DE COSTOS */}
                 <div className="space-y-3 pt-1">
                     <div className="flex items-center justify-between">
                         <div className="space-y-0.5">
@@ -360,8 +290,8 @@ export const AIProviderForm = ({
                                             <Input 
                                                 type="time" 
                                                 className="h-7 text-[10px] px-1" 
-                                                value={(tempRanges[p] || { start: '09:00', end: '18:00' }).start}
-                                                onChange={(e) => setTempRanges(prev => ({ ...prev, [p]: { ...(prev[p] || { start: '09:00', end: '18:00' }), start: e.target.value } }))}
+                                                value={tempRanges[p].start}
+                                                onChange={(e) => setTempRanges(prev => ({ ...prev, [p]: { ...prev[p], start: e.target.value } }))}
                                             />
                                         </div>
                                         <div className="space-y-1">
@@ -369,8 +299,8 @@ export const AIProviderForm = ({
                                             <Input 
                                                 type="time" 
                                                 className="h-7 text-[10px] px-1" 
-                                                value={(tempRanges[p] || { start: '09:00', end: '18:00' }).end}
-                                                onChange={(e) => setTempRanges(prev => ({ ...prev, [p]: { ...(prev[p] || { start: '09:00', end: '18:00' }), end: e.target.value } }))}
+                                                value={tempRanges[p].end}
+                                                onChange={(e) => setTempRanges(prev => ({ ...prev, [p]: { ...prev[p], end: e.target.value } }))}
                                             />
                                         </div>
                                     </div>
@@ -378,10 +308,10 @@ export const AIProviderForm = ({
                                         type="button" 
                                         variant="outline" 
                                         size="icon" 
-                                        className="h-7 w-7" 
+                                        className="h-7 w-7 shrink-0"
                                         onClick={() => addPeakHour(p)}
                                     >
-                                        <Plus className="h-4 w-4" />
+                                        <Plus className="h-3 w-3" />
                                     </Button>
                                 </div>
                             </div>
@@ -391,118 +321,19 @@ export const AIProviderForm = ({
               </CardContent>
             </Card>
           ))}
-
-          {/* SECCIÓN ESCALABLE: PROVEEDORES ADICIONALES DINÁMICOS */}
-          <div className="pt-4 border-t">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h4 className="font-bold text-sm text-gray-900 flex items-center gap-1.5">
-                  <Cpu className="h-4 w-4 text-primary" />
-                  Proveedores Adicionales de IA
-                </h4>
-                <p className="text-[11px] text-muted-foreground">Registra cualquier otro proveedor compatible con la API de OpenAI.</p>
-              </div>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={handleAddCustomProvider}
-                className="font-bold text-xs gap-1.5 border-primary text-primary hover:bg-primary/5"
-              >
-                <Plus className="h-4 w-4" />
-                Agregar Proveedor de IA
-              </Button>
-            </div>
-
-            {fields.customProviders && fields.customProviders.length > 0 ? (
-              <div className="space-y-4">
-                {fields.customProviders.map((cp) => (
-                  <Card key={cp.id} className="border-dashed border-2 border-primary/20 bg-muted/10">
-                    <CardHeader className="py-3 flex flex-row items-center justify-between">
-                      <div className="space-y-1 flex-1 mr-4">
-                        <Label className="text-[10px] uppercase font-bold text-muted-foreground">Nombre del Proveedor</Label>
-                        <Input 
-                          value={cp.name} 
-                          onChange={(e) => handleUpdateCustomProvider(cp.id, { name: e.target.value })}
-                          className="h-8 font-bold text-sm bg-white"
-                        />
-                      </div>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleRemoveCustomProvider(cp.id)}
-                        className="text-destructive hover:bg-destructive/10"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </CardHeader>
-                    <CardContent className="space-y-3 pb-4">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        <div className="space-y-1">
-                          <Label className="text-[10px] uppercase font-bold text-muted-foreground">Endpoint API (OpenAI Compatible)</Label>
-                          <Input 
-                            placeholder="https://api.tu-servicio.com/v1/chat/completions"
-                            value={cp.endpoint}
-                            onChange={(e) => handleUpdateCustomProvider(cp.id, { endpoint: e.target.value })}
-                            className="h-8 text-xs bg-white"
-                          />
-                        </div>
-                        <div className="space-y-1">
-                          <Label className="text-[10px] uppercase font-bold text-muted-foreground">Modelo (Opcional)</Label>
-                          <Input 
-                            placeholder="ej. custom-model-v1"
-                            value={cp.model || ''}
-                            onChange={(e) => handleUpdateCustomProvider(cp.id, { model: e.target.value })}
-                            className="h-8 text-xs bg-white"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="space-y-1">
-                        <Label className="text-[10px] uppercase font-bold text-muted-foreground">API Key</Label>
-                        <Input 
-                          type="password" 
-                          value={cp.apiKey} 
-                          onChange={(e) => handleUpdateCustomProvider(cp.id, { apiKey: e.target.value })}
-                          className="h-8 text-xs bg-white"
-                        />
-                      </div>
-
-                      <div className="flex justify-between items-center pt-1">
-                        <TestButton provider={cp.id} customData={{ apiKey: cp.apiKey, endpoint: cp.endpoint, model: cp.model, providerName: cp.name }} />
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            ) : (
-              <div className="p-4 border border-dashed rounded-xl text-center text-xs text-muted-foreground bg-muted/20">
-                No hay proveedores adicionales creados. Haz clic en &quot;Agregar Proveedor de IA&quot; para registrar uno nuevo.
-              </div>
-            )}
-          </div>
         </div>
       </ScrollArea>
-
-      <DialogFooter className="gap-2 sm:gap-0">
+      <DialogFooter className="border-t pt-4">
         <Button variant="outline" onClick={onCancel} disabled={isSaving}>Cancelar</Button>
-        <Button onClick={() => onSave(fields)} disabled={isSaving} className="bg-green-600 hover:bg-green-700 text-white font-bold">
-          {isSaving ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Guardando...</> : 'Guardar Configuración IA'}
+        <Button onClick={() => onSave(fields)} disabled={isSaving}>
+          {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          Guardar Configuración IA
         </Button>
       </DialogFooter>
-
       <AlertDialog open={modalState.isOpen} onOpenChange={(open) => setModalState(prev => ({ ...prev, isOpen: open }))}>
         <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{modalState.title}</AlertDialogTitle>
-            <AlertDialogDescription>{modalState.message}</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogAction onClick={() => setModalState({ isOpen: false, title: '', message: '' })}>
-              Aceptar
-            </AlertDialogAction>
-          </AlertDialogFooter>
+          <AlertDialogHeader><AlertDialogTitle>{modalState.title}</AlertDialogTitle><AlertDialogDescription>{modalState.message}</AlertDialogDescription></AlertDialogHeader>
+          <AlertDialogFooter><AlertDialogAction onClick={() => setModalState(prev => ({ ...prev, isOpen: false }))}>Cerrar</AlertDialogAction></AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </div>

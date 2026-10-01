@@ -1,6 +1,5 @@
-"use client";
+'use client';
 
-import { JevCopilotWidgetPedidos } from "@/jev/JevCopilotWidgetPedidos";
 import { useMemo, useState, useEffect } from 'react';
 import {
   useCollection,
@@ -557,8 +556,6 @@ export default function PedidosPage() {
         isOpen={isImportModalOpen} 
         onOpenChange={setIsImportModalOpen} 
       />
-    
-      <JevCopilotWidgetPedidos businessId={user?.uid} />
     </div>
   );
 }
