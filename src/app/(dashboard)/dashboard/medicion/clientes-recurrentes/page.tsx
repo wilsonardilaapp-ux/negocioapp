@@ -1,5 +1,6 @@
 "use client";
 
+import { JevSeccionClientesEnRiesgo } from "@/jev/JevSeccionClientesEnRiesgo";
 import { useUser } from "@/firebase";
 import { JevCopilotWidgetRetencion } from "@/jev/JevCopilotWidgetRetencion";
 import { useMemo, useState } from 'react';
@@ -191,6 +192,9 @@ export default function ClientesRecurrentesPage() {
         </CardContent>
       </Card>
     
+      
+    
+      <JevSeccionClientesEnRiesgo businessId={user?.uid} />
       <JevCopilotWidgetRetencion businessId={user?.uid} />
     </div>
   );
