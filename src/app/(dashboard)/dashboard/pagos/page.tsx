@@ -1,5 +1,6 @@
-'use client';
+"use client";
 
+import { JevCopilotWidgetPagos } from "@/jev/JevCopilotWidgetPagos";
 import { useState, useEffect } from "react";
 import { useUser, useFirestore, useDoc, useMemoFirebase, setDocumentNonBlocking } from "@/firebase";
 import { doc } from "firebase/firestore";
@@ -316,6 +317,8 @@ export default function PagosPage() {
             )}
         </div>
       </div>
+    
+      <JevCopilotWidgetPagos businessId={user?.uid} />
     </div>
   );
 }

@@ -196,7 +196,7 @@ export function JevCopilotWidgetResenas({ businessId }: JevWidgetResenasProps) {
 
                   {/* Pestaña 1: Por Responder */}
                   <TabsContent value="por-responder" className="space-y-3 pt-2">
-                    {data.resenasSinResponder.length === 0 ? (
+                    {(data?.resenasSinResponder || []).length === 0 ? (
                       <div className="py-8 text-center text-muted-foreground space-y-1">
                         <Check className="w-8 h-8 mx-auto text-emerald-500 opacity-60" />
                         <p className="font-semibold text-xs text-gray-800">Todas las opiniones respondidas</p>
@@ -204,7 +204,7 @@ export function JevCopilotWidgetResenas({ businessId }: JevWidgetResenasProps) {
                       </div>
                     ) : (
                       <div className="space-y-2">
-                        {data.resenasSinResponder.map((r) => (
+                        {(data?.resenasSinResponder || []).map((r) => (
                           <div
                             key={r.id}
                             className="p-3 rounded-xl border border-gray-200 bg-white hover:border-emerald-200 transition-all space-y-1.5"
@@ -240,7 +240,7 @@ export function JevCopilotWidgetResenas({ businessId }: JevWidgetResenasProps) {
 
                   {/* Pestaña 2: Borradores de Respuesta (Regla 3: Solo propone) */}
                   <TabsContent value="borradores" className="space-y-3 pt-2">
-                    {data.borradoresSugeridos.length === 0 ? (
+                    {(data?.borradoresSugeridos || []).length === 0 ? (
                       <div className="py-8 text-center text-muted-foreground space-y-1">
                         <MessageSquare className="w-8 h-8 mx-auto text-emerald-500 opacity-40" />
                         <p className="font-semibold text-xs text-gray-800">No hay respuestas pendientes</p>
@@ -248,7 +248,7 @@ export function JevCopilotWidgetResenas({ businessId }: JevWidgetResenasProps) {
                       </div>
                     ) : (
                       <div className="space-y-3">
-                        {data.borradoresSugeridos.map((borrador) => (
+                        {(data?.borradoresSugeridos || []).map((borrador) => (
                           <Card key={borrador.id} className="border border-gray-200 hover:border-emerald-200 transition-all">
                             <CardHeader className="p-3 pb-2 flex flex-row items-center justify-between space-y-0">
                               <div>
@@ -368,12 +368,12 @@ export function JevCopilotWidgetResenas({ businessId }: JevWidgetResenasProps) {
                 </Tabs>
 
                 {/* Memoria y Aprendizaje (Regla 9) */}
-                {data.patronesAprendidos.length > 0 && (
+                {(data?.patronesAprendidos || []).length > 0 && (
                   <div className="pt-2 border-t">
                     <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground mb-1">
                       Memoria JEV
                     </p>
-                    {data.patronesAprendidos.map((patron, i) => (
+                    {(data?.patronesAprendidos || []).map((patron, i) => (
                       <p key={i} className="text-[11px] text-gray-500 italic">
                         • {patron}
                       </p>

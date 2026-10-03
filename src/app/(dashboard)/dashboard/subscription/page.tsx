@@ -38,6 +38,7 @@ import type { Business } from '@/models/business';
 import { useToast } from '@/hooks/use-toast';
 import { es } from 'date-fns/locale';
 import Image from 'next/image';
+import { getJevCopilotLimitsInfo } from '@/jev/jevLimitsService';
 
 function SubscriptionPageContent() {
   const searchParams = useSearchParams();
@@ -48,6 +49,15 @@ function SubscriptionPageContent() {
   
   const planParam = searchParams.get('plan');
   const [showBanner, setShowBanner] = useState(!!planParam);
+  const [copilotUsage, setCopilotUsage] = useState({ usageToday: 0, totalReal: 20 });
+
+  useEffect(() => {
+    if (user?.uid) {
+      getJevCopilotLimitsInfo(user.uid).then(info => {
+        setCopilotUsage({ usageToday: info.usageToday, totalReal: info.totalReal });
+      }).catch(console.error);
+    }
+  }, [user?.uid]);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [selectedPlanForPayment, setSelectedPlanForPayment] = useState<SubscriptionPlan | HybridPlan | null>(null);
@@ -133,6 +143,7 @@ function SubscriptionPageContent() {
 
     const usageMetrics: UsageMetric[] = [
       { label: 'Productos', current: productsCount, limit: limits.products },
+      { label: 'Jev Copiloto', current: copilotUsage.usageToday, limit: copilotUsage.totalReal },
       { label: 'Posts de Blog', current: blogPostsCount, limit: limits.blogPosts },
       { label: 'Landing Pages', current: landingPagesCount, limit: limits.landingPages },
     ].map(metric => ({
@@ -143,7 +154,7 @@ function SubscriptionPageContent() {
     }));
     
     return { currentPlanInfo, usageMetrics };
-  }, [subscription, planDetails, productsCount, blogPostsCount, landingPagesCount, plan, limits]);
+  }, [subscription, planDetails, productsCount, blogPostsCount, landingPagesCount, plan, limits, copilotUsage]);
 
   const handlePayNow = async (selectedPlan?: SubscriptionPlan | HybridPlan) => {
     const planToProcess = selectedPlan || planDetails;

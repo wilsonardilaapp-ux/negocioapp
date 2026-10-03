@@ -1,0 +1,415 @@
+'use client';
+
+import { JevCopilotWidgetClientesNuevos } from './JevCopilotWidgetClientesNuevos';
+import React, { useState, useEffect, useTransition, useMemo } from 'react';
+import { getClientesNuevosContext, ContextoClientesNuevos, ContactoJev } from './contextAggregatorClientesNuevos';
+import { JevModalImportarContactos } from './JevModalImportarContactos';
+import { JevModalNuevoCliente } from './JevModalNuevoCliente';
+import { JevModalCampanaClientes } from './JevModalCampanaClientes';
+import { JevFiltrosClientesNuevos } from './JevFiltrosClientesNuevos';
+import { JevModalEliminarClientes } from './JevModalEliminarClientes';
+import { eliminarContactos } from './jevEngineClientesNuevos';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
+import { useToast } from '@/hooks/use-toast';
+import { 
+  Users, 
+  Upload, 
+  UserPlus, 
+  FileDown, 
+  Send, 
+  MessageSquare, 
+  Loader2, 
+  Trash2,
+  SearchX
+} from 'lucide-react';
+
+interface JevSeccionClientesNuevosProps {
+  businessId?: string;
+}
+
+export function JevSeccionClientesNuevos({ businessId }: JevSeccionClientesNuevosProps) {
+  const { toast } = useToast();
+  const [data, setData] = useState<ContextoClientesNuevos | null>(null);
+  const [seleccionadosIds, setSeleccionadosIds] = useState<Record<string, boolean>>({});
+  
+  // Modales
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [isManualModalOpen, setIsManualModalOpen] = useState(false);
+  const [isCampanaModalOpen, setIsCampanaModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [clientesCampana, setClientesCampana] = useState<ContactoJev[]>([]);
+
+  // Filtros
+  const [busqueda, setBusqueda] = useState('');
+  const [fechaDesde, setFechaDesde] = useState('');
+  const [fechaHasta, setFechaHasta] = useState('');
+  const [origenFiltro, setOrigenFiltro] = useState('Todos');
+  const [estadoFiltro, setEstadoFiltro] = useState('Todos');
+
+  const [isLoading, startTransition] = useTransition();
+
+  const cargarDatos = () => {
+    if (!businessId) return;
+    startTransition(async () => {
+      try {
+        const res = await getClientesNuevosContext(businessId);
+        setData(res);
+      } catch (e) {
+        console.error(e);
+      }
+    });
+  };
+
+  useEffect(() => {
+    if (businessId && !data) {
+      cargarDatos();
+    }
+  }, [businessId]);
+  const todosLosContactos = data?.contactos || [];
+
+  // Filtrado con lógica AND
+  const contactosFiltrados = useMemo(() => {
+    return todosLosContactos.filter((c) => {
+      if (busqueda.trim()) {
+        const q = busqueda.toLowerCase().trim();
+        const matchNombre = (c.nombre || '').toLowerCase().includes(q);
+        const matchTel = (c.telefono || '').toLowerCase().includes(q);
+        const matchEmail = (c.email || '').toLowerCase().includes(q);
+        if (!matchNombre && !matchTel && !matchEmail) return false;
+      }
+
+      if (origenFiltro !== 'Todos' && c.origen !== origenFiltro) {
+        return false;
+      }
+
+      if (estadoFiltro === 'Con campaña enviada' && !c.campanaEnviada) return false;
+      if (estadoFiltro === 'Sin campaña enviada' && c.campanaEnviada) return false;
+
+      if (fechaDesde && c.createdAt) {
+        const tContact = new Date(c.createdAt).getTime();
+        const tDesde = new Date(`${fechaDesde}T00:00:00`).getTime();
+        if (tContact < tDesde) return false;
+      }
+
+      if (fechaHasta && c.createdAt) {
+        const tContact = new Date(c.createdAt).getTime();
+        const tHasta = new Date(`${fechaHasta}T23:59:59`).getTime();
+        if (tContact > tHasta) return false;
+      }
+
+      return true;
+    });
+  }, [todosLosContactos, busqueda, origenFiltro, estadoFiltro, fechaDesde, fechaHasta]);
+
+  const hayFiltrosActivos = Boolean(
+    busqueda.trim() || origenFiltro !== 'Todos' || estadoFiltro !== 'Todos' || fechaDesde || fechaHasta
+  );
+
+  const handleLimpiarFiltros = () => {
+    setBusqueda('');
+    setOrigenFiltro('Todos');
+    setEstadoFiltro('Todos');
+    setFechaDesde('');
+    setFechaHasta('');
+  };
+
+  // Selección sobre la lista filtrada
+  const todosSeleccionados = contactosFiltrados.length > 0 && contactosFiltrados.every((c) => seleccionadosIds[c.id]);
+
+  const handleToggleSelectAll = (checked: boolean) => {
+    const nuevo = { ...seleccionadosIds };
+    contactosFiltrados.forEach((c) => {
+      if (checked) nuevo[c.id] = true;
+      else delete nuevo[c.id];
+    });
+    setSeleccionadosIds(nuevo);
+  };
+
+  const handleToggleSelectOne = (id: string, checked: boolean) => {
+    setSeleccionadosIds((prev) => {
+      const copy = { ...prev };
+      if (checked) copy[id] = true;
+      else delete copy[id];
+      return copy;
+    });
+  };
+
+  const seleccionadosList = contactosFiltrados.filter((c) => seleccionadosIds[c.id]);
+  const countSeleccionados = seleccionadosList.length;
+
+  const handleAbrirCampanaMasiva = () => {
+    setClientesCampana(seleccionadosList);
+    setIsCampanaModalOpen(true);
+  };
+
+  const handleEliminarSeleccionados = async () => {
+    if (!businessId || countSeleccionados === 0) return;
+    setIsDeleting(true);
+    try {
+      const ids = seleccionadosList.map((c) => c.id);
+      await eliminarContactos({ businessId, ids });
+      toast({
+        title: '🗑 Contactos eliminados',
+        description: `Se eliminaron ${ids.length} contacto(s) correctamente.`,
+      });
+      setSeleccionadosIds({});
+      setIsDeleteModalOpen(false);
+      cargarDatos();
+    } catch (e: any) {
+      toast({
+        variant: 'destructive',
+        title: 'Error al eliminar',
+        description: e.message || 'No se pudieron eliminar los contactos.',
+      });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  
+  const handleAbrirCampanaConIds = (ids: string[]) => {
+    const seleccionados = todosLosContactos.filter((c) => ids.includes(c.id));
+    setClientesCampana(seleccionados.length > 0 ? seleccionados : todosLosContactos);
+    setIsCampanaModalOpen(true);
+  };
+
+  const handleDescargarPlantillaCSV = () => {
+    const csvContent = "nombre,telefono,email\nJuan Perez,3001234567,juan@ejemplo.com\nMaria Gomez,3109876543,maria@ejemplo.com";
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', 'plantilla_contactos_markix.csv');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  if (!businessId) return null;
+
+  return (
+    <div className="space-y-6 my-8">
+      <Card className="border-2 border-emerald-100 shadow-sm rounded-3xl overflow-hidden bg-white">
+        <CardHeader className="bg-emerald-50/40 border-b pb-4">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <CardTitle className="text-xl font-black text-gray-900 flex items-center gap-2">
+                <Users className="w-6 h-6 text-emerald-600" />
+                Gestión y Campañas de Clientes Nuevos ({contactosFiltrados.length})
+              </CardTitle>
+              <CardDescription>
+                Importa contactos masivamente, dales de alta y envíales campañas por WhatsApp con link al Menú Público.
+              </CardDescription>
+            </div>
+
+            {/* Botones de Cabecera */}
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleDescargarPlantillaCSV}
+                className="font-bold text-xs gap-1.5 h-9"
+              >
+                <FileDown className="w-4 h-4 text-emerald-600" />
+                <span>Descargar Plantilla CSV</span>
+              </Button>
+
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsImportModalOpen(true)}
+                className="font-bold text-xs gap-1.5 h-9 border-emerald-300 text-emerald-800 bg-emerald-50/60 hover:bg-emerald-100"
+              >
+                <Upload className="w-4 h-4 text-emerald-600" />
+                <span>Importar Contactos</span>
+              </Button>
+
+              <Button
+                size="sm"
+                onClick={() => setIsManualModalOpen(true)}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs gap-1.5 h-9"
+              >
+                <UserPlus className="w-4 h-4" />
+                <span>+ Nuevo Cliente</span>
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
+
+        <CardContent className="p-6 space-y-4">
+          {/* 1. Barra de Búsqueda y Filtros */}
+          <JevFiltrosClientesNuevos
+            busqueda={busqueda}
+            onBusquedaChange={setBusqueda}
+            fechaDesde={fechaDesde}
+            onFechaDesdeChange={setFechaDesde}
+            fechaHasta={fechaHasta}
+            onFechaHastaChange={setFechaHasta}
+            origen={origenFiltro}
+            onOrigenChange={setOrigenFiltro}
+            estado={estadoFiltro}
+            onEstadoChange={setEstadoFiltro}
+            onLimpiar={handleLimpiarFiltros}
+            hayFiltrosActivos={hayFiltrosActivos}
+          />
+
+          {/* 2. Barra de Selección, Envío Masivo y Eliminación */}
+          <div className="flex flex-wrap items-center justify-between bg-gray-50 p-3 rounded-2xl border gap-2">
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="select-all-clientes"
+                checked={todosSeleccionados}
+                onCheckedChange={(c) => handleToggleSelectAll(!!c)}
+              />
+              <label htmlFor="select-all-clientes" className="text-xs font-bold cursor-pointer">
+                Seleccionar todos ({contactosFiltrados.length})
+              </label>
+            </div>
+
+            <div className="flex items-center gap-2">
+              {/* Botón Eliminar Seleccionados */}
+              <Button
+                variant="destructive"
+                onClick={() => setIsDeleteModalOpen(true)}
+                disabled={countSeleccionados === 0}
+                className="bg-red-600 hover:bg-red-700 text-white font-bold text-xs gap-1.5 h-8 disabled:opacity-50"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Eliminar seleccionados ({countSeleccionados})</span>
+              </Button>
+
+              {/* Botón Enviar Masivo */}
+              <Button
+                onClick={handleAbrirCampanaMasiva}
+                disabled={countSeleccionados === 0}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs gap-1.5 h-8"
+              >
+                <Send className="w-3.5 h-3.5" />
+                <span>Enviar a seleccionados ({countSeleccionados})</span>
+              </Button>
+            </div>
+          </div>
+
+          {/* 3. Listado de Contactos */}
+          {todosLosContactos.length === 0 ? (
+            <div className="py-12 text-center text-muted-foreground space-y-2">
+              <Users className="w-12 h-12 mx-auto text-emerald-500 opacity-40" />
+              <p className="font-semibold text-sm text-gray-800">Aún no hay contactos importados ni registrados</p>
+              <p className="text-xs">Usa el botón &quot;Importar Contactos&quot; (CSV) o &quot;+ Nuevo Cliente&quot; para comenzar.</p>
+            </div>
+          ) : contactosFiltrados.length === 0 ? (
+            <div className="py-12 text-center text-muted-foreground space-y-3 bg-gray-50/50 rounded-2xl border border-dashed">
+              <SearchX className="w-10 h-10 mx-auto text-gray-400" />
+              <p className="font-semibold text-sm text-gray-800">No se encontraron contactos</p>
+              <p className="text-xs text-gray-500">Ningún contacto coincide con los criterios de búsqueda o filtros seleccionados.</p>
+              <Button variant="outline" size="sm" onClick={handleLimpiarFiltros} className="text-xs font-bold">
+                Restablecer filtros
+              </Button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {contactosFiltrados.map((c) => {
+                const isSelected = !!seleccionadosIds[c.id];
+
+                return (
+                  <div
+                    key={c.id}
+                    className={`p-4 rounded-2xl border-2 transition-all flex flex-col justify-between space-y-3 bg-white ${
+                      isSelected ? 'border-emerald-500 bg-emerald-50/10 shadow-xs' : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    <div className="space-y-2">
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-center gap-2">
+                          <Checkbox
+                            checked={isSelected}
+                            onCheckedChange={(ch) => handleToggleSelectOne(c.id, !!ch)}
+                          />
+                          <div>
+                            <span className="font-bold text-sm text-gray-900 block">{c.nombre}</span>
+                            <p className="text-xs font-mono text-muted-foreground">{c.telefono}</p>
+                          </div>
+                        </div>
+
+                        <Badge variant="outline" className="text-[9px] font-bold uppercase">
+                          {c.origen}
+                        </Badge>
+                      </div>
+
+                      {c.email && (
+                        <p className="text-[11px] text-muted-foreground truncate">
+                          ✉️ {c.email}
+                        </p>
+                      )}
+
+                      {!c.tieneWhatsApp && (
+                        <Badge variant="destructive" className="text-[9px] font-bold">
+                          ⚠️ Sin WhatsApp
+                        </Badge>
+                      )}
+                    </div>
+
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setClientesCampana([c]);
+                        setIsCampanaModalOpen(true);
+                      }}
+                      className="w-full text-xs font-bold border-emerald-300 text-emerald-800 hover:bg-emerald-50 gap-1.5 h-8"
+                    >
+                      <MessageSquare className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>Enviar Campaña</span>
+                    </Button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Modales */}
+      <JevModalImportarContactos
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        businessId={businessId}
+        onSuccess={cargarDatos}
+      />
+
+      <JevModalNuevoCliente
+        isOpen={isManualModalOpen}
+        onClose={() => setIsManualModalOpen(false)}
+        businessId={businessId}
+        onSuccess={cargarDatos}
+      />
+
+      <JevModalCampanaClientes
+        isOpen={isCampanaModalOpen}
+        onClose={() => setIsCampanaModalOpen(false)}
+        businessId={businessId}
+        clientes={clientesCampana}
+        onRemoveCliente={(id) => setClientesCampana((prev) => prev.filter((c) => c.id !== id))}
+      />
+
+      <JevModalEliminarClientes
+        isOpen={isDeleteModalOpen}
+        onClose={() => setIsDeleteModalOpen(false)}
+        onConfirm={handleEliminarSeleccionados}
+        count={countSeleccionados}
+        isDeleting={isDeleting}
+      />
+    
+      {/* JEV Copiloto — Clientes Nuevos */}
+      <JevCopilotWidgetClientesNuevos
+        businessId={businessId}
+        onAbrirCampanaConIds={handleAbrirCampanaConIds}
+        onAbrirImportar={() => setIsImportModalOpen(true)}
+      />
+    </div>
+  );
+}

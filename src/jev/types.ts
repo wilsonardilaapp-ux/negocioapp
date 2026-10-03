@@ -5,6 +5,14 @@ export const PILARES_VALIDOS = [
   'resenas',
   'pedidos',
   'resumen',
+  'contabilidad',
+  'pagos',
+  'vencimientos',
+  'empleados',
+  'promociones',
+  'cupones',
+  'sugerencias',
+  'clientes-nuevos',
 ] as const;
 
 export type JevPilarTipo = (typeof PILARES_VALIDOS)[number];

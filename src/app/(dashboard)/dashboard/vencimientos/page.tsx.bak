@@ -28,7 +28,8 @@ import { useToast } from '@/hooks/use-toast';
 
 export default function VencimientosPage() {
   const { isModuleAuthorized, isLoading: isSubLoading } = useSubscription();
-  const { user } = useUser();
+  const { user, profile } = useUser();
+  const isSuperAdmin = profile?.role === 'super_admin';
   const firestore = useFirestore();
   const { toast } = useToast();
 
@@ -242,8 +243,9 @@ export default function VencimientosPage() {
           </p>
         </div>
 
-        {/* Barra de herramientas para pruebas */}
-        <div className="flex items-center gap-2">
+        {/* Barra de herramientas para pruebas (Solo Superadmin) */}
+        {isSuperAdmin && (
+          <div className="flex items-center gap-2">
           <Button
             variant="outline"
             size="sm"
@@ -267,7 +269,8 @@ export default function VencimientosPage() {
               Limpiar Pruebas
             </Button>
           )}
-        </div>
+          </div>
+        )}
       </div>
 
       {/* Tarjetas de Métricas */}

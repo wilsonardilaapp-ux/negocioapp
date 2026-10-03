@@ -236,6 +236,7 @@ function HybridPlanDialog({ isOpen, onClose, plan }: { isOpen: boolean, onClose:
       slug: '',
       basePrice: 0,
       pricePerOrder: 0,
+      tableCommissionRate: 3,
       maxCommissionPerOrder: 0,
       commissionType: 'percent',
       variableBillingFrequency: 'monthly',
@@ -273,8 +274,9 @@ function HybridPlanDialog({ isOpen, onClose, plan }: { isOpen: boolean, onClose:
     if (isOpen) {
       if (plan) {
         const sortedFeatures = [...(plan.features || [])].sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
-        reset({ 
-          ...plan, 
+        reset({
+          ...plan,
+          tableCommissionRate: (plan as any).tableCommissionRate ?? 3,
           features: sortedFeatures,
           extraLimits: plan.extraLimits || []
         });
@@ -418,6 +420,30 @@ function HybridPlanDialog({ isOpen, onClose, plan }: { isOpen: boolean, onClose:
                     <Input type="number" step="0.01" {...register('pricePerOrder', { valueAsNumber: true })} />
                   </div>
                 </div>
+              </div>
+
+              <div className="space-y-2 p-4 border rounded-lg bg-muted/20">
+                <Label className="text-base font-bold">Comisión en Mesa (QR)</Label>
+                <p className="text-xs text-muted-foreground">
+                  Tarifa de servicio Markix sumada a la cuenta del cliente en local por uso del QR (default: 3%).
+                </p>
+                <div className="flex gap-4 items-end">
+                  <div className="w-48">
+                    <Label className="text-xs font-semibold">Valor Comisión en Mesa (%)</Label>
+                    <Input 
+                      type="number" 
+                      step="0.1" 
+                      min="0"
+                      {...register('tableCommissionRate', { valueAsNumber: true })} 
+                      placeholder="3" 
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Resumen en vivo exclusivo para Superadmin */}
+              <div className="p-3 bg-primary/10 border border-primary/20 rounded-lg text-xs font-semibold text-primary">
+                Este plan cobra {watch('commissionType') === 'percent' ? `${watch('pricePerOrder') || 0}%` : `${watch('pricePerOrder') || 0}`} en domicilio y {watch('tableCommissionRate') ?? 3}% en mesa
               </div>
             </TabsContent>
 

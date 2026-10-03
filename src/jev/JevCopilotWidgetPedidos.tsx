@@ -12,21 +12,20 @@ import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Bot,
   X,
-  Copy,
+  Send,
   Check,
   Package,
   Sparkles,
-  Clock,
-  Send,
   Loader2,
   RefreshCw,
   AlertTriangle,
   Info,
-  DollarSign,
+  MessageSquare,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -34,10 +33,31 @@ interface JevWidgetPedidosProps {
   businessId?: string;
 }
 
+const formatPhoneForWhatsApp = (phone: string): string => {
+  let clean = (phone || '').replace(/\D/g, '');
+  if (!clean || clean.length < 7) return '';
+  if (clean.length === 10 && clean.startsWith('3')) {
+    return `57${clean}`;
+  }
+  if (clean.length === 12 && clean.startsWith('57')) {
+    return clean;
+  }
+  if (clean.length === 10) {
+    return `57${clean}`;
+  }
+  return clean;
+};
+
 export function JevCopilotWidgetPedidos({ businessId }: JevWidgetPedidosProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [data, setData] = useState<CopilotoPedidosOutput | null>(null);
-  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [enviandoId, setEnviandoId] = useState<string | null>(null);
+  const [enviadosMap, setEnviadosMap] = useState<Record<string, string>>({}); // id -> hora de envío
+  
+  const [confirmandoBorrador, setConfirmandoBorrador] = useState<BorradorNotificacionPedido | null>(null);
+  const [isEditandoMensaje, setIsEditandoMensaje] = useState(false);
+  const [textoEditado, setTextoEditado] = useState('');
+
   const [isLoading, startTransition] = useTransition();
   const [chatPregunta, setChatPregunta] = useState('');
   const [chatRespuesta, setChatRespuesta] = useState<string | null>(null);
@@ -66,19 +86,36 @@ export function JevCopilotWidgetPedidos({ businessId }: JevWidgetPedidosProps) {
     }
   }, [isOpen, businessId]);
 
-  const handleCopiarNotificacion = async (borrador: BorradorNotificacionPedido) => {
+  const handleAbrirConfirmacion = (borrador: BorradorNotificacionPedido) => {
+    setConfirmandoBorrador(borrador);
+    setTextoEditado(borrador.borradorMensaje);
+    setIsEditandoMensaje(false);
+  };
+
+  const handleEjecutarEnvioWhatsApp = async (borrador: BorradorNotificacionPedido) => {
     if (!businessId) return;
+    const cleanPhone = formatPhoneForWhatsApp(borrador.telefono);
+    if (!cleanPhone) {
+      toast({
+        variant: 'destructive',
+        title: 'Sin teléfono válido',
+        description: `El cliente ${borrador.cliente} no tiene un número de WhatsApp registrado.`,
+      });
+      return;
+    }
+
+    setEnviandoId(borrador.id);
+    setConfirmandoBorrador(null);
+
+    const mensajeFinal = textoEditado || borrador.borradorMensaje;
 
     try {
-      await navigator.clipboard.writeText(borrador.borradorMensaje);
-      setCopiedId(borrador.id);
-
       // Registrar en jev_memory (Regla 6)
       await registrarNotificacionPedidoCopiada({
         businessId,
         pedidoId: borrador.pedidoId,
         cliente: borrador.cliente,
-        borrador: borrador.borradorMensaje,
+        borrador: mensajeFinal,
         metricasAntes: {
           minutosTranscurridos: 0,
           total: borrador.total,
@@ -86,18 +123,24 @@ export function JevCopilotWidgetPedidos({ businessId }: JevWidgetPedidosProps) {
         },
       });
 
-      toast({
-        title: '📋 Notificación copiada al portapapeles',
-        description: 'Pégala en WhatsApp o envíala al cliente. Acción guardada en memoria JEV.',
-      });
+      const horaActual = new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' });
+      setEnviadosMap(prev => ({ ...prev, [borrador.id]: horaActual }));
 
-      setTimeout(() => setCopiedId(null), 2500);
-    } catch (e) {
+      const url = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(mensajeFinal)}`;
+      window.open(url, '_blank');
+
+      toast({
+        title: '✅ WhatsApp abierto con éxito',
+        description: `Notificación enviada a ${borrador.cliente} y registrada en memoria JEV.`,
+      });
+    } catch (e: any) {
       toast({
         variant: 'destructive',
-        title: 'Error al copiar',
-        description: 'No se pudo copiar el texto.',
+        title: 'Error al enviar',
+        description: e.message || 'No se pudo abrir WhatsApp.',
       });
+    } finally {
+      setEnviandoId(null);
     }
   };
 
@@ -200,7 +243,7 @@ export function JevCopilotWidgetPedidos({ businessId }: JevWidgetPedidosProps) {
 
                   {/* Pestaña 1: Urgentes */}
                   <TabsContent value="urgentes" className="space-y-3 pt-2">
-                    {data.pedidosUrgentes.length === 0 ? (
+                    {(data?.pedidosUrgentes || []).length === 0 ? (
                       <div className="py-8 text-center text-muted-foreground space-y-1">
                         <Package className="w-8 h-8 mx-auto text-emerald-500 opacity-40" />
                         <p className="font-semibold text-xs text-gray-800">Cero pedidos pendientes o retrasados</p>
@@ -208,7 +251,7 @@ export function JevCopilotWidgetPedidos({ businessId }: JevWidgetPedidosProps) {
                       </div>
                     ) : (
                       <div className="space-y-2">
-                        {data.pedidosUrgentes.map((p) => (
+                        {(data?.pedidosUrgentes || []).map((p) => (
                           <div
                             key={p.id}
                             className="p-3 rounded-xl border border-gray-200 bg-white hover:border-emerald-200 transition-all space-y-1.5"
@@ -241,9 +284,9 @@ export function JevCopilotWidgetPedidos({ businessId }: JevWidgetPedidosProps) {
                     )}
                   </TabsContent>
 
-                  {/* Pestaña 2: Borradores de Notificación (Regla 3: Solo propone) */}
+                  {/* Pestaña 2: Notificaciones */}
                   <TabsContent value="notificaciones" className="space-y-3 pt-2">
-                    {data.borradoresNotificacion.length === 0 ? (
+                    {(data?.borradoresNotificacion || []).length === 0 ? (
                       <div className="py-8 text-center text-muted-foreground space-y-1">
                         <Sparkles className="w-8 h-8 mx-auto text-emerald-500 opacity-40" />
                         <p className="font-semibold text-xs text-gray-800">No hay borradores pendientes</p>
@@ -251,51 +294,80 @@ export function JevCopilotWidgetPedidos({ businessId }: JevWidgetPedidosProps) {
                       </div>
                     ) : (
                       <div className="space-y-3">
-                        {data.borradoresNotificacion.map((borrador) => (
-                          <Card key={borrador.id} className="border border-gray-200 hover:border-emerald-200 transition-all">
-                            <CardHeader className="p-3 pb-2 flex flex-row items-center justify-between space-y-0">
-                              <div>
-                                <CardTitle className="text-xs font-bold text-gray-900">
-                                  #{borrador.pedidoId.slice(-7).toUpperCase()} — {borrador.cliente}
-                                </CardTitle>
-                                <p className="text-[10px] text-muted-foreground">{borrador.telefono}</p>
-                              </div>
-                              <Badge variant="outline" className="text-[9px] font-bold">
-                                ${borrador.total.toLocaleString('es-CO')}
-                              </Badge>
-                            </CardHeader>
-                            <CardContent className="p-3 pt-0 space-y-2">
-                              <p className="text-[10px] text-muted-foreground italic bg-gray-50 p-2 rounded-lg border border-gray-100">
-                                {borrador.motivoUrgencia}
-                              </p>
+                        {(data?.borradoresNotificacion || []).map((borrador) => {
+                          const horaEnviado = enviadosMap[borrador.id];
+                          const isEnviando = enviandoId === borrador.id;
+                          const hasPhone = !!formatPhoneForWhatsApp(borrador.telefono);
 
-                              <div className="p-2.5 bg-emerald-50/50 rounded-lg border border-emerald-100 text-xs text-gray-800 leading-snug">
-                                {borrador.borradorMensaje}
-                              </div>
+                          return (
+                            <Card key={borrador.id} className="border border-gray-200 hover:border-emerald-200 transition-all">
+                              <CardHeader className="p-3 pb-2 flex flex-row items-center justify-between space-y-0">
+                                <div>
+                                  <CardTitle className="text-xs font-bold text-gray-900">
+                                    #{borrador.pedidoId.slice(-7).toUpperCase()} — {borrador.cliente}
+                                  </CardTitle>
+                                  <p className="text-[10px] text-muted-foreground">{borrador.telefono}</p>
+                                </div>
+                                <Badge variant="outline" className="text-[9px] font-bold">
+                                  ${borrador.total.toLocaleString('es-CO')}
+                                </Badge>
+                              </CardHeader>
+                              <CardContent className="p-3 pt-0 space-y-2">
+                                <p className="text-[10px] text-muted-foreground italic bg-gray-50 p-2 rounded-lg border border-gray-100">
+                                  {borrador.motivoUrgencia}
+                                </p>
 
-                              {/* Botón Copiar (Regla 3: El operador copia y envía) */}
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleCopiarNotificacion(borrador)}
-                                className="w-full text-xs font-bold gap-1.5 h-8 border-emerald-300 text-emerald-800 hover:bg-emerald-50"
-                              >
-                                {copiedId === borrador.id ? (
-                                  <>
+                                <div className="p-2.5 bg-emerald-50/50 rounded-lg border border-emerald-100 text-xs text-gray-800 leading-snug">
+                                  {borrador.borradorMensaje}
+                                </div>
+
+                                {!hasPhone ? (
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    disabled
+                                    className="w-full text-xs font-bold gap-1.5 h-8 border-amber-200 text-amber-800 bg-amber-50/60"
+                                  >
+                                    <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
+                                    <span>⚠️ Sin WhatsApp</span>
+                                  </Button>
+                                ) : horaEnviado ? (
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    disabled
+                                    className="w-full text-xs font-bold gap-1.5 h-8 border-emerald-300 text-emerald-800 bg-emerald-50"
+                                  >
                                     <Check className="w-3.5 h-3.5 text-emerald-600" />
-                                    <span>¡Copiada y Guardada en Memoria!</span>
-                                  </>
+                                    <span>✓ Enviado ({horaEnviado})</span>
+                                  </Button>
                                 ) : (
-                                  <>
-                                    <Copy className="w-3.5 h-3.5" />
-                                    <span>Copiar Notificación</span>
-                                  </>
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    onClick={() => handleAbrirConfirmacion(borrador)}
+                                    disabled={isEnviando}
+                                    className="w-full text-xs font-bold bg-green-600 hover:bg-green-700 text-white gap-1.5 h-9 shadow-xs"
+                                  >
+                                    {isEnviando ? (
+                                      <>
+                                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                        <span>Enviando...</span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <MessageSquare className="w-3.5 h-3.5 fill-current" />
+                                        <span>Enviar WhatsApp</span>
+                                      </>
+                                    )}
+                                  </Button>
                                 )}
-                              </Button>
-                            </CardContent>
-                          </Card>
-                        ))}
+                              </CardContent>
+                            </Card>
+                          );
+                        })}
                       </div>
                     )}
                   </TabsContent>
@@ -362,12 +434,12 @@ export function JevCopilotWidgetPedidos({ businessId }: JevWidgetPedidosProps) {
                 </Tabs>
 
                 {/* Memoria y Aprendizaje (Regla 9) */}
-                {data.patronesAprendidos.length > 0 && (
+                {(data?.patronesAprendidos || []).length > 0 && (
                   <div className="pt-2 border-t">
                     <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground mb-1">
                       Memoria JEV
                     </p>
-                    {data.patronesAprendidos.map((patron, i) => (
+                    {(data?.patronesAprendidos || []).map((patron, i) => (
                       <p key={i} className="text-[11px] text-gray-500 italic">
                         • {patron}
                       </p>
@@ -376,6 +448,85 @@ export function JevCopilotWidgetPedidos({ businessId }: JevWidgetPedidosProps) {
                 )}
               </>
             ) : null}
+          </div>
+        </div>
+      )}
+
+      {/* Mini Modal de Confirmación Previa con Opción de Editar */}
+      {confirmandoBorrador && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4 animate-in fade-in">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-4">
+            <div className="flex items-center justify-between border-b pb-3">
+              <h4 className="font-black text-sm text-gray-900 flex items-center gap-2">
+                <MessageSquare className="w-4 h-4 text-green-600" />
+                Confirmar Envío por WhatsApp
+              </h4>
+              <button onClick={() => setConfirmandoBorrador(null)} className="text-gray-400 hover:text-gray-700">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div className="p-2.5 bg-gray-50 rounded-xl border space-y-1">
+                <p className="font-bold text-gray-900">Destinatario: {confirmandoBorrador.cliente}</p>
+                <p className="text-muted-foreground font-mono">Teléfono: {confirmandoBorrador.telefono} (para: +{formatPhoneForWhatsApp(confirmandoBorrador.telefono)})</p>
+                <p className="text-muted-foreground">Pedido: #{confirmandoBorrador.pedidoId.slice(-7).toUpperCase()}</p>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="font-bold text-[10px] uppercase text-muted-foreground">Mensaje que se enviará:</span>
+                  {!isEditandoMensaje ? (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setIsEditandoMensaje(true)}
+                      className="h-6 text-xs text-emerald-600 hover:text-emerald-700 font-bold px-2"
+                    >
+                      ✏️ Editar Mensaje
+                    </Button>
+                  ) : (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setIsEditandoMensaje(false)}
+                      className="h-6 text-xs text-emerald-700 font-bold px-2 bg-emerald-50"
+                    >
+                      ✓ Guardar Edición
+                    </Button>
+                  )}
+                </div>
+
+                {isEditandoMensaje ? (
+                  <Textarea
+                    rows={4}
+                    value={textoEditado}
+                    onChange={(e) => setTextoEditado(e.target.value)}
+                    className="text-xs leading-relaxed"
+                  />
+                ) : (
+                  <div className="p-3 bg-emerald-50/60 border border-emerald-100 rounded-xl text-gray-800 leading-relaxed italic">
+                    &quot;{textoEditado || confirmandoBorrador.borradorMensaje}&quot;
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-3 border-t">
+              <Button variant="outline" size="sm" onClick={() => setConfirmandoBorrador(null)} className="text-xs font-bold">
+                Cancelar
+              </Button>
+              <Button 
+                size="sm" 
+                onClick={() => handleEjecutarEnvioWhatsApp(confirmandoBorrador)}
+                className="bg-green-600 hover:bg-green-700 text-white text-xs font-bold gap-1.5"
+              >
+                <Send className="w-3.5 h-3.5" />
+                <span>Confirmar y Abrir WhatsApp</span>
+              </Button>
+            </div>
           </div>
         </div>
       )}

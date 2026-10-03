@@ -1,0 +1,147 @@
+'use server';
+
+import { getAdminFirestore } from '@/firebase/server-init';
+import { registrarAccionJev } from './jevMemory';
+
+export interface ImportarContactosInput {
+  businessId: string;
+  filas: { nombre: string; telefono: string; email?: string }[];
+  omitirDuplicados: boolean;
+}
+
+/**
+ * Guarda contactos importados validando límite de 500 y duplicados por teléfono.
+ */
+export async function guardarContactosImportados({ businessId, filas, omitirDuplicados }: ImportarContactosInput) {
+  if (!businessId) throw new Error('Business ID requerido.');
+  if (filas.length > 500) throw new Error('Límite excedido: Máximo 500 contactos por subida.');
+
+  const firestore = await getAdminFirestore();
+  const colRef = firestore.collection(`businesses/${businessId}/importedContacts`);
+
+  // Obtener teléfonos existentes para detectar duplicados
+  const existingSnap = await colRef.get();
+  const existingPhones = new Set<string>();
+  existingSnap.forEach(doc => {
+    const tel = (doc.data().telefono || '').replace(/\D/g, '');
+    if (tel) existingPhones.add(tel);
+  });
+
+  let importados = 0;
+  let duplicadosOmitidos = 0;
+  let sinWhatsApp = 0;
+
+  for (const fila of filas) {
+    const nombre = (fila.nombre || '').trim();
+    const telefono = (fila.telefono || '').trim();
+    const email = (fila.email || '').trim();
+
+    if (!nombre || !telefono) continue;
+
+    const cleanTel = telefono.replace(/\D/g, '');
+    if (existingPhones.has(cleanTel)) {
+      if (omitirDuplicados) {
+        duplicadosOmitidos++;
+        continue;
+      }
+    }
+
+    if (cleanTel.length < 7) {
+      sinWhatsApp++;
+    }
+
+    existingPhones.add(cleanTel);
+
+    await colRef.add({
+      nombre,
+      telefono,
+      email: email || null,
+      origen: 'Importado CSV',
+      createdAt: new Date().toISOString(),
+    });
+    importados++;
+  }
+
+  // Registrar en jev_memory (Regla 6)
+  await registrarAccionJev({
+    tipo: 'clientes-nuevos',
+    accion: `Importación masiva de contactos (${importados} importados, ${duplicadosOmitidos} omitidos)`,
+    datos: { importados, duplicadosOmitidos, sinWhatsApp },
+    origen: 'jevEngineClientesNuevos',
+    usuario: businessId,
+  });
+
+  return { success: true, importados, duplicadosOmitidos, sinWhatsApp };
+}
+
+/**
+ * Guarda un contacto de forma manual con validación de duplicados.
+ */
+export async function guardarClienteManual({
+  businessId,
+  nombre,
+  telefono,
+  email,
+  notas,
+  forzarGuardado = false,
+}: {
+  businessId: string;
+  nombre: string;
+  telefono: string;
+  email?: string;
+  notas?: string;
+  forzarGuardado?: boolean;
+}) {
+  if (!businessId || !nombre || !telefono) throw new Error('Nombre y teléfono son obligatorios.');
+
+  const firestore = await getAdminFirestore();
+  const colRef = firestore.collection(`businesses/${businessId}/importedContacts`);
+
+  const cleanTel = telefono.replace(/\D/g, '');
+  if (!forzarGuardado) {
+    const existingSnap = await colRef.where('telefono', '==', telefono).get();
+    if (!existingSnap.empty) {
+      return { duplicate: true, message: 'Ya existe un cliente registrado con este número de teléfono.' };
+    }
+  }
+
+  await colRef.add({
+    nombre: nombre.trim(),
+    telefono: telefono.trim(),
+    email: email ? email.trim() : null,
+    notas: notas ? notas.trim() : null,
+    origen: 'Manual',
+    createdAt: new Date().toISOString(),
+  });
+
+  await registrarAccionJev({
+    tipo: 'clientes-nuevos',
+    accion: `Alta manual de cliente: ${nombre.trim()}`,
+    datos: { nombre, telefono, origen: 'Manual' },
+    origen: 'jevEngineClientesNuevos',
+    usuario: businessId,
+  });
+
+  return { success: true };
+}
+
+/**
+ * Registra campaña enviada a clientes nuevos en jev_memory.
+ */
+export async function registrarCampanaClientesEnviada({
+  businessId,
+  destinatariosCount,
+  plantillaUsada,
+}: {
+  businessId: string;
+  destinatariosCount: number;
+  plantillaUsada: string;
+}) {
+  return registrarAccionJev({
+    tipo: 'clientes-nuevos',
+    accion: `Campaña WhatsApp enviada a ${destinatariosCount} contacto(s) nuevo(s)`,
+    datos: { destinatariosCount, plantillaUsada },
+    origen: 'JevModalCampanaClientes',
+    usuario: businessId,
+  });
+}

@@ -1,5 +1,6 @@
-'use client';
+"use client";
 
+import { JevCopilotWidgetEmpleados } from "@/jev/JevCopilotWidgetEmpleados";
 import { useState, useEffect } from 'react';
 import { useUser, useFirestore, useCollection, useMemoFirebase, setDocumentNonBlocking, deleteDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase';
 import { collection, doc } from 'firebase/firestore';
@@ -183,6 +184,8 @@ export default function ProfesionalesPage() {
           </div>
         </DialogContent>
       </Dialog>
+    
+      <JevCopilotWidgetEmpleados businessId={user?.uid} />
     </div>
   );
 }

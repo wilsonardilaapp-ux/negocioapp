@@ -202,11 +202,26 @@ export default function BusinessesPage() {
         
         const planModules = (currentPlan as any)?.includedModuleKeys?.map((k: string) => getCanonicalModuleId(k)) || [];
 
-        modulesSnapshot.docs.forEach(doc => {
+        // 1. Inicializar con los defaults del plan
+        DEFAULT_MODULES.forEach(dm => {
+            const canonicalId = getCanonicalModuleId(dm.id);
+            const isPlanDefault = planModules.includes(canonicalId);
+            initialState[canonicalId] = { active: isPlanDefault, isAddon: !isPlanDefault, isPlanDefault };
+        });
+
+        // 2. Sobrescribir con el estado real exacto guardado en Firestore
+                modulesSnapshot.docs.forEach(doc => {
             const data = doc.data();
             const cleanId = getCanonicalModuleId(doc.id);
-            initialState[cleanId] = { active: data.status === 'active', isAddon: data.isAddon === true, isPlanDefault: planModules.includes(cleanId) };
-            if (data.extra !== undefined) extras[cleanId] = data.extra;
+            const isActive = data.status === 'active' || data.status === true || data.active === true;
+            initialState[cleanId] = { 
+                active: isActive, 
+                isAddon: data.isAddon !== undefined ? data.isAddon : !planModules.includes(cleanId), 
+                isPlanDefault: planModules.includes(cleanId) 
+            };
+            if (data.extra !== undefined || data.extraLimit !== undefined) {
+                extras[cleanId] = data.extra ?? data.extraLimit;
+            }
         });
         
         setBusinessModulesState(initialState);
@@ -229,11 +244,18 @@ export default function BusinessesPage() {
         batch.update(businessRef, { status: selectedBusiness.status, planName: selectedBusiness.planName, limitesExtra, updatedAt: new Date().toISOString() });
         
         for (const [modId, state] of Object.entries(businessModulesState)) {
-            const modRef = doc(firestore, `businesses/${selectedBusiness.id}/modules`, modId);
-            batch.set(modRef, { id: modId, status: state.active ? 'active' : 'inactive', isAddon: state.isAddon, extra: moduleExtras[modId] || 0, updatedAt: new Date().toISOString() }, { merge: true });
+            const canonicalId = getCanonicalModuleId(modId);
+            const modRef = doc(firestore, 'businesses', selectedBusiness.id, 'modules', canonicalId);
+            batch.set(modRef, { 
+                id: canonicalId, 
+                status: state.active ? 'active' : 'inactive', 
+                isAddon: state.isAddon, 
+                extra: moduleExtras[canonicalId] || moduleExtras[modId] || 0, 
+                updatedAt: new Date().toISOString() 
+            }, { merge: true });
         }
 
-        await batch.commit();
+                await batch.commit();
         toast({ title: "Cambios guardados con éxito" });
         setShowManageModal(false);
     } catch (e) {
@@ -376,8 +398,17 @@ export default function BusinessesPage() {
                 {displayedModules.map(mod => {
                   const state = businessModulesState[mod.id] || { active: false, isAddon: true, isPlanDefault: false };
                   const extra = moduleExtras[mod.id] || 0;
+                  const currentPlan = allPlans.find(p => p.id === selectedBusiness?.planName || p.name === selectedBusiness?.planName) || allPlans[0];
+                  const isJevCopilot = mod.id === 'jev-copiloto' || mod.id === 'jev_copiloto';
+                  const planExtraItem = isJevCopilot && currentPlan && Array.isArray((currentPlan as any).extraLimits)
+                      ? (currentPlan as any).extraLimits.find((item: any) => ((item.key || '').toLowerCase().includes('jev') || (item.key || '').toLowerCase().includes('copiloto')))
+                      : null;
+                  const jevPlanLimit = planExtraItem?.value || 0;
+
                   const base = mod.limit === -1 ? '∞' : (mod.limit || 0);
-                  const total = mod.limit === -1 ? '∞' : (mod.limit || 0) + extra;
+                  const total = isJevCopilot 
+                      ? jevPlanLimit + extra 
+                      : (mod.limit === -1 ? '∞' : (mod.limit || 0) + extra);
                   return (
                     <Card key={mod.id} className={cn("transition-all border-2", state.active ? "border-primary/20 bg-primary/5" : "border-muted opacity-60")}>
                       <CardContent className="p-4 space-y-4">

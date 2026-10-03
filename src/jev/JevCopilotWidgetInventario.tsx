@@ -68,10 +68,10 @@ export function JevCopilotWidgetInventario({ businessId }: JevWidgetInventarioPr
   }, [isOpen, businessId]);
 
   const handleCopiarOrdenCompra = async () => {
-    if (!businessId || !data || data.borradorOrdenCompra.length === 0) return;
+    if (!businessId || !data || (data?.borradorOrdenCompra || []).length === 0) return;
 
     try {
-      const lineas = data.borradorOrdenCompra.map(
+      const lineas = (data?.borradorOrdenCompra || []).map(
         (item) => `• ${item.nombre}: ${item.cantidadSugerida} unids (Stock actual: ${item.stockActual})`
       );
       const textoCompleto = `ORDEN DE COMPRA SUGERIDA (JEV AI)\nFecha: ${new Date().toLocaleDateString('es-CO')}\n\n${lineas.join(
@@ -204,7 +204,7 @@ export function JevCopilotWidgetInventario({ businessId }: JevWidgetInventarioPr
 
                   {/* Pestaña 1: Riesgo de Quiebre */}
                   <TabsContent value="quiebre" className="space-y-3 pt-2">
-                    {data.productosCriticos.length === 0 && data.productosAlerta.length === 0 ? (
+                    {(data?.productosCriticos || []).length === 0 && (data?.productosAlerta || []).length === 0 ? (
                       <div className="py-8 text-center text-muted-foreground space-y-1">
                         <Package className="w-8 h-8 mx-auto text-emerald-500 opacity-40" />
                         <p className="font-semibold text-xs text-gray-800">Cero quiebres proyectados</p>
@@ -249,7 +249,7 @@ export function JevCopilotWidgetInventario({ businessId }: JevWidgetInventarioPr
 
                   {/* Pestaña 2: Borrador de Orden de Compra (Regla 3: Solo propone) */}
                   <TabsContent value="compras" className="space-y-3 pt-2">
-                    {data.borradorOrdenCompra.length === 0 ? (
+                    {(data?.borradorOrdenCompra || []).length === 0 ? (
                       <div className="py-8 text-center text-muted-foreground space-y-1">
                         <ShoppingCart className="w-8 h-8 mx-auto text-emerald-500 opacity-40" />
                         <p className="font-semibold text-xs text-gray-800">No se requieren compras inmediatas</p>
@@ -265,7 +265,7 @@ export function JevCopilotWidgetInventario({ businessId }: JevWidgetInventarioPr
                         </div>
 
                         <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
-                          {data.borradorOrdenCompra.map((item) => (
+                          {(data?.borradorOrdenCompra || []).map((item) => (
                             <div
                               key={item.id}
                               className="p-2.5 rounded-lg border border-gray-100 bg-gray-50/70 text-xs flex justify-between items-center"
@@ -369,12 +369,12 @@ export function JevCopilotWidgetInventario({ businessId }: JevWidgetInventarioPr
                 </Tabs>
 
                 {/* Memoria y Aprendizaje (Regla 9) */}
-                {data.patronesAprendidos.length > 0 && (
+                {(data?.patronesAprendidos || []).length > 0 && (
                   <div className="pt-2 border-t">
                     <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground mb-1">
                       Memoria JEV
                     </p>
-                    {data.patronesAprendidos.map((patron, i) => (
+                    {(data?.patronesAprendidos || []).map((patron, i) => (
                       <p key={i} className="text-[11px] text-gray-500 italic">
                         • {patron}
                       </p>

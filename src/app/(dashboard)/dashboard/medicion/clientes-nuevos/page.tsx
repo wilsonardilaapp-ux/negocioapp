@@ -1,5 +1,7 @@
-'use client';
+"use client";
 
+import { useUser } from "@/firebase";
+import { JevSeccionClientesNuevos } from "@/jev/JevSeccionClientesNuevos";
 import { useMemo, useState } from 'react';
 import { useMetricAnalysis } from '../hooks/useMetricAnalysis';
 import { MetricsService } from '../services/metrics.service';
@@ -18,6 +20,7 @@ import 'jspdf-autotable';
  * @fileOverview Vista de análisis para la adquisición de clientes nuevos.
  */
 export default function ClientesNuevosPage() {
+  const { user } = useUser();
   const { orders, isLoading } = useMetricAnalysis();
   const { toast } = useToast();
   const [isExporting, setIsExporting] = useState<'excel' | 'pdf' | null>(null);
@@ -186,6 +189,8 @@ export default function ClientesNuevosPage() {
           </ChartContainer>
         </CardContent>
       </Card>
+    
+      <JevSeccionClientesNuevos businessId={user?.uid} />
     </div>
   );
 }

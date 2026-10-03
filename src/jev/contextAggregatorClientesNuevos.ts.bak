@@ -1,0 +1,98 @@
+import { getAdminFirestore } from '@/firebase/server-init';
+import { obtenerAccionesJev } from './jevMemory';
+
+export interface ContactoJev {
+  id: string;
+  nombre: string;
+  telefono: string;
+  email?: string;
+  origen: 'Importado CSV' | 'Manual';
+  tieneWhatsApp: boolean;
+  createdAt: string;
+}
+
+export interface ContextoClientesNuevos {
+  businessId: string;
+  totalContactos: number;
+  contactosConWhatsApp: number;
+  contactosSinWhatsApp: number;
+  contactos: ContactoJev[];
+  historialMemoria: any[];
+  ultimaActualizacion: string;
+}
+
+/**
+ * Agregador de contexto para Clientes Nuevos (SOLO LECTURA).
+ * Consulta importedContacts sin orderBy para evitar errores de índices en Firestore.
+ */
+export async function getClientesNuevosContext(businessId: string): Promise<ContextoClientesNuevos> {
+  if (!businessId || typeof businessId !== 'string') {
+    throw new Error('[JEV CONTEXT CLIENTES NUEVOS] businessId es obligatorio.');
+  }
+
+  const firestore = await getAdminFirestore();
+
+  try {
+    const contactsSnap = await firestore
+      .collection(`businesses/${businessId}/importedContacts`)
+      .limit(600)
+      .get();
+
+    const contactos: ContactoJev[] = [];
+    let conWhatsApp = 0;
+    let sinWhatsApp = 0;
+
+    contactsSnap.forEach((doc) => {
+      const c = doc.data();
+      const telefono = c.telefono || c.phone || '';
+      const cleanPhone = telefono.replace(/\D/g, '');
+      const tieneWhatsApp = cleanPhone.length >= 7;
+
+      if (tieneWhatsApp) conWhatsApp++;
+      else sinWhatsApp++;
+
+      contactos.push({
+        id: doc.id,
+        nombre: c.nombre || c.name || 'Sin nombre',
+        telefono: telefono || 'Sin teléfono',
+        email: c.email || undefined,
+        origen: c.origen || 'Importado CSV',
+        tieneWhatsApp,
+        createdAt: c.createdAt || new Date().toISOString(),
+      });
+    });
+
+    // Ordenar en memoria (más recientes primero)
+    contactos.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+    const historialMemoria = await obtenerAccionesJev({
+      usuario: businessId,
+      tipo: 'clientes-nuevos',
+      limite: 10,
+    });
+
+    const resultadoFinal: ContextoClientesNuevos = {
+      businessId,
+      totalContactos: contactos.length,
+      contactosConWhatsApp: conWhatsApp,
+      contactosSinWhatsApp: sinWhatsApp,
+      contactos,
+      historialMemoria,
+      ultimaActualizacion: new Date().toISOString(),
+    };
+
+    return JSON.parse(JSON.stringify(resultadoFinal));
+  } catch (error: any) {
+    console.error('[JEV CONTEXT CLIENTES NUEVOS] Error:', error);
+    const resultadoVacio: ContextoClientesNuevos = {
+      businessId,
+      totalContactos: 0,
+      contactosConWhatsApp: 0,
+      contactosSinWhatsApp: 0,
+      contactos: [],
+      historialMemoria: [],
+      ultimaActualizacion: new Date().toISOString(),
+    };
+    return JSON.parse(JSON.stringify(resultadoVacio));
+  }
+}

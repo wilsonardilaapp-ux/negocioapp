@@ -159,7 +159,7 @@ export function JevCopilotWidgetWhatsapp({ businessId }: JevWidgetProps) {
                 </Card>
 
                 {/* Lista de sugerencias priorizadas */}
-                {data.sugerencias.length === 0 ? (
+                {(data?.sugerencias || []).length === 0 ? (
                   <div className="py-12 text-center text-muted-foreground space-y-2">
                     <MessageSquare className="w-10 h-10 mx-auto text-emerald-500 opacity-40" />
                     <p className="font-semibold text-xs text-gray-800">No hay respuestas pendientes</p>
@@ -168,10 +168,10 @@ export function JevCopilotWidgetWhatsapp({ businessId }: JevWidgetProps) {
                 ) : (
                   <div className="space-y-3">
                     <p className="text-[11px] font-black uppercase tracking-wider text-muted-foreground">
-                      Borradores Sugeridos ({data.sugerencias.length})
+                      Borradores Sugeridos ({(data?.sugerencias || []).length})
                     </p>
 
-                    {data.sugerencias.map((sug) => (
+                    {(data?.sugerencias || []).map((sug) => (
                       <Card key={sug.id} className="border border-gray-200 hover:border-emerald-200 transition-all">
                         <CardHeader className="p-3 pb-2 flex flex-row items-center justify-between space-y-0">
                           <div>
@@ -228,12 +228,12 @@ export function JevCopilotWidgetWhatsapp({ businessId }: JevWidgetProps) {
                 )}
 
                 {/* Memoria y Aprendizaje (Regla 9) */}
-                {data.patronesAprendidos.length > 0 && (
+                {(data?.patronesAprendidos || []).length > 0 && (
                   <div className="pt-2 border-t">
                     <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground mb-1.5">
                       Memoria JEV
                     </p>
-                    {data.patronesAprendidos.map((patron, i) => (
+                    {(data?.patronesAprendidos || []).map((patron, i) => (
                       <p key={i} className="text-[11px] text-gray-500 italic">
                         • {patron}
                       </p>

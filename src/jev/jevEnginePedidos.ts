@@ -1,5 +1,7 @@
 'use server';
 
+import { getJevCopilotLimitsInfo, consumeJevCopilotCredit } from './jevLimitsService';
+
 import { getPedidosContext, ContextoPedidos, PedidoOperativoJev } from './contextAggregatorPedidos';
 import { registrarAccionJev, cerrarAccionJev } from './jevMemory';
 
@@ -30,6 +32,36 @@ export interface CopilotoPedidosOutput {
  * Motor de IA de JEV para Pedidos y Operaciones (Regla 3: Solo propone. Nunca modifica estados ni ejecuta envíos).
  */
 export async function obtenerCopilotoPedidos(businessId: string): Promise<CopilotoPedidosOutput> {
+
+  // Validación de límites y consumo atómico (Fase 3 & Proxy Universal anti-TypeError)
+  const limitsInfo = await getJevCopilotLimitsInfo(businessId);
+  if (!limitsInfo.isModuleActive) {
+    return new Proxy({
+      diagnostico: "El módulo JEV Copiloto no está activo para el plan actual de este negocio.",
+      fechaGeneracion: new Date().toISOString(),
+    }, {
+      get(target, prop) {
+        if (prop in target) return (target as any)[prop];
+        if (typeof prop === 'string' && (prop.endsWith('Count') || prop.includes('Total') || prop.includes('Debitos') || prop.includes('Creditos') || prop.includes('Inversion'))) return 0;
+        return [];
+      }
+    }) as any;
+  }
+  if (!limitsInfo.canConsume) {
+    return new Proxy({
+      diagnostico: `Has alcanzado el límite diario de consultas (${limitsInfo.usageToday}/${limitsInfo.totalReal}) de JEV Copiloto para hoy. El cupo se reinicia automáticamente mañana o puedes solicitar una ampliación al administrador.`,
+      fechaGeneracion: new Date().toISOString(),
+    }, {
+      get(target, prop) {
+        if (prop in target) return (target as any)[prop];
+        if (typeof prop === 'string' && (prop.endsWith('Count') || prop.includes('Total') || prop.includes('Debitos') || prop.includes('Creditos') || prop.includes('Inversion'))) return 0;
+        return [];
+      }
+    }) as any;
+  }
+  await consumeJevCopilotCredit(businessId);
+  
+
   const contexto: ContextoPedidos = await getPedidosContext(businessId);
 
   // Aprendizaje obligatorio de jev_memory (Regla 9)
@@ -93,6 +125,18 @@ export async function obtenerCopilotoPedidos(businessId: string): Promise<Copilo
  * Consulta en lenguaje natural a JEV sobre operaciones y pedidos.
  */
 export async function consultarJevPedidos(businessId: string, pregunta: string): Promise<string> {
+
+  // Validación de límites y consumo atómico para chat (Fase 3 & Bugfix)
+  const limitsInfo = await getJevCopilotLimitsInfo(businessId);
+  if (!limitsInfo.isModuleActive) {
+    return "El módulo JEV Copiloto no está activo para el plan actual de este negocio.";
+  }
+  if (!limitsInfo.canConsume) {
+    return `Has alcanzado el límite diario de consultas (${limitsInfo.usageToday}/${limitsInfo.totalReal}) de JEV Copiloto para hoy. El cupo se reinicia automáticamente mañana o puedes solicitar una ampliación al administrador.`;
+  }
+  await consumeJevCopilotCredit(businessId);
+
+
   const contexto = await getPedidosContext(businessId);
   const q = (pregunta || '').toLowerCase();
 

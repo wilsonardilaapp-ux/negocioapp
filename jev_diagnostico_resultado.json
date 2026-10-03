@@ -1,0 +1,53 @@
+{
+  "resumen": {
+    "archivos_copiloto_detectados": [
+      "instalar-copiloto.js",
+      "package-lock.json",
+      "scan-jev.js",
+      "src/ai/flows/test-api-key-flow.ts",
+      "src/app/(admin)/superadmin/integraciones/AIProviderForm.tsx",
+      "src/app/(dashboard)/dashboard/contabilidad/page.tsx",
+      "src/app/(dashboard)/dashboard/cupones/page.tsx",
+      "src/app/(dashboard)/dashboard/informes/diagnostico/page.tsx",
+      "src/app/(dashboard)/dashboard/kardex/page.tsx",
+      "src/app/(dashboard)/dashboard/medicion/clientes-nuevos/page.tsx",
+      "src/app/(dashboard)/dashboard/medicion/clientes-recurrentes/page.tsx",
+      "src/app/(dashboard)/dashboard/mensajes/page.tsx",
+      "src/app/(dashboard)/dashboard/pagos/page.tsx",
+      "src/app/(dashboard)/dashboard/pedidos/page.tsx",
+      "src/app/(dashboard)/dashboard/promotions/page.tsx"
+    ],
+    "paginas_con_copiloto": [
+      "src/app/(admin)/superadmin/integraciones/AIProviderForm.tsx",
+      "src/app/(dashboard)/dashboard/contabilidad/page.tsx",
+      "src/app/(dashboard)/dashboard/cupones/page.tsx",
+      "src/app/(dashboard)/dashboard/informes/diagnostico/page.tsx",
+      "src/app/(dashboard)/dashboard/kardex/page.tsx",
+      "src/app/(dashboard)/dashboard/medicion/clientes-nuevos/page.tsx",
+      "src/app/(dashboard)/dashboard/medicion/clientes-recurrentes/page.tsx",
+      "src/app/(dashboard)/dashboard/mensajes/page.tsx",
+      "src/app/(dashboard)/dashboard/pagos/page.tsx",
+      "src/app/(dashboard)/dashboard/pedidos/page.tsx",
+      "src/app/(dashboard)/dashboard/promotions/page.tsx",
+      "src/app/(dashboard)/dashboard/reservas/profesionales/page.tsx",
+      "src/app/(dashboard)/dashboard/suggestions/page.tsx",
+      "src/app/(dashboard)/dashboard/valoraciones-directorio/page.tsx",
+      "src/app/(dashboard)/dashboard/vencimientos/page.tsx",
+      "src/jev/JevCopilotWidgetWhatsapp.tsx",
+      "src/jev/contextAggregatorWhatsapp.ts",
+      "src/jev/jevEngineWhatsapp.ts"
+    ],
+    "archivos_planes_y_modulos": [
+      "scan-jev.js",
+      "src/app/(admin)/superadmin/hybrid-plans/page.tsx",
+      "src/app/(admin)/superadmin/negocios/page.tsx"
+    ],
+    "posibles_llamadas_ia": [
+      "package-lock.json",
+      "scan-jev.js",
+      "src/ai/flows/test-api-key-flow.ts",
+      "src/app/(admin)/superadmin/integraciones/AIProviderForm.tsx",
+      "src/models/integration.ts"
+    ]
+  }
+}

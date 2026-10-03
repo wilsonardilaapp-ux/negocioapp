@@ -1,6 +1,6 @@
+"use client";
 
-'use client';
-
+import { JevCopilotWidgetCupones } from "@/jev/JevCopilotWidgetCupones";
 import { useState, useEffect } from 'react';
 import { useUser, useFirestore, useFirebase } from '@/firebase';
 import { useCoupons } from '@/hooks/use-coupons';
@@ -342,6 +342,7 @@ export default function CuponesPage() {
         </Table>
       </Card>
 
+            <JevCopilotWidgetCupones businessId={user?.uid} />
       <CouponDialog 
         isOpen={isDialogOpen} 
         onOpenChange={(open) => {
@@ -576,7 +577,9 @@ function CouponDialog({
                 disabled={isSaving}
             />
             <Label>Cupón Activo</Label>
-          </div>
+          
+      
+    </div>
 
           <DialogFooter className="pt-4">
             <Button type="submit" className="w-full font-bold" disabled={isSaving || (!coupon && !canCreate)}>

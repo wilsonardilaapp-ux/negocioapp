@@ -201,7 +201,7 @@ export function JevCopilotWidgetRetencion({ businessId }: JevWidgetRetencionProp
 
                   {/* Pestaña 1: Clientes en Riesgo */}
                   <TabsContent value="riesgo" className="space-y-3 pt-2">
-                    {data.clientesEnRiesgo.length === 0 ? (
+                    {(data?.clientesEnRiesgo || []).length === 0 ? (
                       <div className="py-8 text-center text-muted-foreground space-y-1">
                         <Users className="w-8 h-8 mx-auto text-emerald-500 opacity-40" />
                         <p className="font-semibold text-xs text-gray-800">Cero clientes en riesgo de abandono</p>
@@ -209,7 +209,7 @@ export function JevCopilotWidgetRetencion({ businessId }: JevWidgetRetencionProp
                       </div>
                     ) : (
                       <div className="space-y-2">
-                        {data.clientesEnRiesgo.map((cliente) => (
+                        {(data?.clientesEnRiesgo || []).map((cliente) => (
                           <div
                             key={cliente.id}
                             className="p-3 rounded-xl border border-gray-200 bg-white hover:border-emerald-200 transition-all space-y-1.5"
@@ -249,7 +249,7 @@ export function JevCopilotWidgetRetencion({ businessId }: JevWidgetRetencionProp
 
                   {/* Pestaña 2: Borradores de Reconquista (Regla 3: Solo propone) */}
                   <TabsContent value="reconquista" className="space-y-3 pt-2">
-                    {data.borradoresReconquista.length === 0 ? (
+                    {(data?.borradoresReconquista || []).length === 0 ? (
                       <div className="py-8 text-center text-muted-foreground space-y-1">
                         <Sparkles className="w-8 h-8 mx-auto text-emerald-500 opacity-40" />
                         <p className="font-semibold text-xs text-gray-800">No hay reconquistas sugeridas</p>
@@ -257,7 +257,7 @@ export function JevCopilotWidgetRetencion({ businessId }: JevWidgetRetencionProp
                       </div>
                     ) : (
                       <div className="space-y-3">
-                        {data.borradoresReconquista.map((borrador) => (
+                        {(data?.borradoresReconquista || []).map((borrador) => (
                           <Card key={borrador.id} className="border border-gray-200 hover:border-emerald-200 transition-all">
                             <CardHeader className="p-3 pb-2 flex flex-row items-center justify-between space-y-0">
                               <div>
@@ -365,12 +365,12 @@ export function JevCopilotWidgetRetencion({ businessId }: JevWidgetRetencionProp
                 </Tabs>
 
                 {/* Memoria y Aprendizaje (Regla 9) */}
-                {data.patronesAprendidos.length > 0 && (
+                {(data?.patronesAprendidos || []).length > 0 && (
                   <div className="pt-2 border-t">
                     <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground mb-1">
                       Memoria JEV
                     </p>
-                    {data.patronesAprendidos.map((patron, i) => (
+                    {(data?.patronesAprendidos || []).map((patron, i) => (
                       <p key={i} className="text-[11px] text-gray-500 italic">
                         • {patron}
                       </p>

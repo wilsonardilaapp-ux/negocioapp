@@ -39,7 +39,7 @@ export function JevSeccionClientesEnRiesgo({ businessId }: JevSeccionRiesgoProps
     }
   }, [businessId]);
 
-  if (!businessId || !data || data.clientesEnRiesgo.length === 0) {
+  if (!businessId || !data || (data?.clientesEnRiesgo || []).length === 0) {
     return null;
   }
 

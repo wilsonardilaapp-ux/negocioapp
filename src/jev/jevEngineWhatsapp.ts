@@ -1,5 +1,6 @@
 'use server';
 
+import { getJevCopilotLimitsInfo, consumeJevCopilotCredit } from './jevLimitsService';
 import { getContextoWhatsapp, ContextoWhatsapp, ChatPendiente } from './contextAggregatorWhatsapp';
 import { registrarAccionJev, cerrarAccionJev } from './jevMemory';
 
@@ -26,32 +27,43 @@ export interface CopilotoWhatsappOutput {
  * Motor de IA de JEV para WhatsApp (Regla 3: Solo lee y propone. Nunca envía).
  */
 export async function obtenerCopilotoWhatsapp(businessId: string): Promise<CopilotoWhatsappOutput> {
-  const contexto: ContextoWhatsapp = await getContextoWhatsapp(businessId);
-
-  // Aprendizaje obligatorio de jev_memory (Regla 9)
-  const exitosPrevios = contexto.historialMemoria.filter(m => m.estado === 'cerrada');
-  const patronesAprendidos: string[] = [];
-
-  if (exitosPrevios.length > 0) {
-    patronesAprendidos.push(
-      `JEV recuerda ${exitosPrevios.length} respuesta(s) previas atendidas con éxito en este negocio.`
-    );
-  } else {
-    patronesAprendidos.push('Sin historial de memoria previo. JEV está aprendiendo con las acciones de hoy.');
-  }
-
-  if (contexto.totalSinResponder === 0) {
-    return {
-      diagnostico: 'Bandeja al día. No hay chats ni mensajes de contacto pendientes de respuesta en este momento.',
-      totalPendientes: 0,
-      sugerencias: [],
-      patronesAprendidos,
+  // Validación de límites y consumo atómico (Fase 3 & Proxy Universal anti-TypeError)
+  const limitsInfo = await getJevCopilotLimitsInfo(businessId);
+  if (!limitsInfo.isModuleActive) {
+    return new Proxy({
+      diagnostico: "El módulo JEV Copiloto no está activo para el plan actual de este negocio.",
       fechaGeneracion: new Date().toISOString(),
-    };
+    }, {
+      get(target, prop) {
+        if (prop in target) return (target as any)[prop];
+        if (typeof prop === 'string' && (prop.endsWith('Count') || prop.includes('Total') || prop.includes('Debitos') || prop.includes('Creditos') || prop.includes('Inversion'))) return 0;
+        return [];
+      }
+    }) as any;
   }
+  if (!limitsInfo.canConsume) {
+    return new Proxy({
+      diagnostico: `Has alcanzado el límite diario de consultas (${limitsInfo.usageToday}/${limitsInfo.totalReal}) de JEV Copiloto para hoy. El cupo se reinicia automáticamente mañana o puedes solicitar una ampliación al administrador.`,
+      fechaGeneracion: new Date().toISOString(),
+    }, {
+      get(target, prop) {
+        if (prop in target) return (target as any)[prop];
+        if (typeof prop === 'string' && (prop.endsWith('Count') || prop.includes('Total') || prop.includes('Debitos') || prop.includes('Creditos') || prop.includes('Inversion'))) return 0;
+        return [];
+      }
+    }) as any;
+  }
+  await consumeJevCopilotCredit(businessId);
+
+  const contexto = await getContextoWhatsapp(businessId);
+  const patronesAprendidos: string[] = [
+    contexto.historialMemoria && contexto.historialMemoria.length > 0
+      ? `JEV recuerda ${contexto.historialMemoria.length} acción(es) previa(s) en este módulo.`
+      : 'Sin historial de respuestas previas en memoria.'
+  ];
 
   // Generar sugerencias priorizadas y borradores accionables en español (Regla 8)
-  const sugerencias: SugerenciaRespuestaWhatsapp[] = contexto.chatsPendientes.map((chat: ChatPendiente, index) => {
+  const sugerencias: SugerenciaRespuestaWhatsapp[] = contexto.chatsPendientes.map((chat: ChatPendiente, index: number) => {
     let urgencia: 'alta' | 'media' | 'baja' = 'baja';
     if (chat.minutosEspera > 120 || index === 0) urgencia = 'alta';
     else if (chat.minutosEspera > 45) urgencia = 'media';
