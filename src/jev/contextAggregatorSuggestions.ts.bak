@@ -74,9 +74,9 @@ export async function getSuggestionsContext(businessId: string): Promise<Context
     rulesSnap.forEach((doc) => {
       const r = doc.data();
       const active = r.active !== undefined ? !!r.active : true;
-      const shownCount = Number(r.metrics?.timesShown ?? r.shownCount ?? 0);
-      const acceptedCount = Number(r.metrics?.timesAccepted ?? r.acceptedCount ?? 0);
-      const revenueAttributed = Number(r.metrics?.revenueGenerated ?? r.revenueAttributed ?? 0);
+      const shownCount = Number(r.shownCount) || 0;
+      const acceptedCount = Number(r.acceptedCount) || 0;
+      const revenueAttributed = Number(r.revenueAttributed) || 0;
 
       totalMostradas += shownCount;
       totalAceptadas += acceptedCount;
@@ -94,8 +94,8 @@ export async function getSuggestionsContext(businessId: string): Promise<Context
 
       reglas.push({
         id: doc.id,
-        triggerProductId: r.triggerItem || r.triggerProductId || '',
-        suggestedProductId: r.suggestedItem || r.suggestedProductId || '',
+        triggerProductId: r.triggerProductId || '',
+        suggestedProductId: r.suggestedProductId || '',
         active,
         shownCount,
         acceptedCount,

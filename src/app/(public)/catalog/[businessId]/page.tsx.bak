@@ -39,6 +39,8 @@ import ReviewSummary from '@/components/reviews/ReviewSummary';
 import LoyaltyStatus from '@/components/loyalty/LoyaltyStatus';
 import RewardsCatalog from '@/components/loyalty/RewardsCatalog';
 import type { Business } from '@/models/business';
+import type { HybridPlan } from '@/models/hybrid-plan';
+import { calcularPrecioCliente, type PricingContext } from '@/constants/pricingPlans';
 import type { Reward } from '@/services/loyalty-service';
 
 // Carrusel
@@ -70,13 +72,16 @@ function CatalogPageContent({ params }: CatalogPageProps) {
         coupons: Coupon[] | null;
         paymentSettings: PaymentSettings | null;
         resolvedBusinessId: string | null;
-    }>({
-        headerConfig: null,
+        business: Business | null;
+        planConfig?: HybridPlan | null;
+    }>({ headerConfig: null,
         products: null,
         promotions: null,
         coupons: null,
         paymentSettings: null,
         resolvedBusinessId: null,
+        business: null,
+        planConfig: null,
     });
 
     const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
@@ -96,6 +101,20 @@ function CatalogPageContent({ params }: CatalogPageProps) {
     const orderOrigin = useMemo(() => {
         return searchParams.get('ref') || 'web';
     }, [searchParams]);
+
+    const isMesaChannel = orderOrigin === 'qr' || orderOrigin === 'mesa';
+    const activeCanal = isMesaChannel ? 'mesa' : 'domicilio';
+
+    const pricingContext: PricingContext = useMemo(() => {
+        return {
+            planType: pageData.business?.planType || (pageData.planConfig ? 'hibrido' : 'fijo'),
+            planName: pageData.business?.planName || pageData.planConfig?.name,
+            planSlug: (pageData.business as any)?.planSlug || pageData.planConfig?.slug,
+            comisionRate: pageData.planConfig?.pricePerOrder,
+            tableCommissionRate: pageData.planConfig?.tableCommissionRate,
+            channel: activeCanal,
+        };
+    }, [pageData.business, pageData.planConfig, activeCanal]);
 
     // --- PERSISTENCIA DE ATRIBUCIÓN (ADITIVO) ---
     useEffect(() => {
@@ -130,6 +149,7 @@ function CatalogPageContent({ params }: CatalogPageProps) {
                 }
 
                 // 2. OBTENER DATOS CON EL ID CANÓNICO
+                const businessRef = doc(firestore, 'businesses', businessId);
                 const publicCatalogRef = doc(firestore, 'businesses', businessId, 'publicData', 'catalog');
                 const paymentSettingsRef = doc(firestore, 'paymentSettings', businessId);
                 const couponsQuery = query(
@@ -138,10 +158,15 @@ function CatalogPageContent({ params }: CatalogPageProps) {
                     where('activo', '==', true)
                 );
                 
-                const [catalogSnap, paymentSnap, couponsSnap] = await Promise.all([
+                const hybridPlansRef = collection(firestore, 'hybrid_plans');
+                const productsSubcollectionRef = collection(firestore, 'businesses', businessId, 'products');
+                const [catalogSnap, paymentSnap, couponsSnap, businessSnap, hybridPlansSnap, productsSubSnap] = await Promise.all([
                     getDoc(publicCatalogRef),
                     getDoc(paymentSettingsRef),
-                    getDocs(couponsQuery)
+                    getDocs(couponsQuery),
+                    getDoc(businessRef),
+                    getDocs(hybridPlansRef),
+                    getDocs(productsSubcollectionRef),
                 ]);
 
                 if (!catalogSnap.exists()) {
@@ -149,13 +174,26 @@ function CatalogPageContent({ params }: CatalogPageProps) {
                 }
 
                 const data = catalogSnap.data();
+                const businessData = businessSnap.exists() ? (businessSnap.data() as Business) : null;
+                const subcollectionProducts = productsSubSnap.docs.map(doc => ({ ...doc.data(), id: doc.id } as Product));
+                const finalProducts = subcollectionProducts.length > 0 ? subcollectionProducts : ((data.products as Product[]) || []);
+                const hybridPlansList = hybridPlansSnap.docs.map(d => ({ ...d.data(), id: d.id } as HybridPlan));
+                const planKey = String(businessData?.planName || '').toLowerCase().trim();
+                const matchedPlan = hybridPlansList.find(p => 
+                    (p.id && p.id.toLowerCase() === planKey) || 
+                    (p.name && p.name.toLowerCase().trim() === planKey) ||
+                    (p.slug && p.slug.toLowerCase().trim() === planKey)
+                ) || null;
+
                 setPageData({
                     headerConfig: data.headerConfig as LandingHeaderConfigData,
-                    products: data.products as Product[],
+                    products: finalProducts,
                     promotions: (data.promotions as Promotion[]) || [],
                     coupons: couponsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Coupon)),
                     paymentSettings: paymentSnap.exists() ? (paymentSnap.data() as PaymentSettings) : null,
                     resolvedBusinessId: businessId,
+                    business: businessData,
+                    planConfig: matchedPlan,
                 });
 
             } catch (e: any) {
@@ -212,7 +250,10 @@ function CatalogPageContent({ params }: CatalogPageProps) {
     const isPromotionsActive = useMemo(() => isModuleAuthorized('promotions'), [isModuleAuthorized]);
     const isReservasActive = useMemo(() => isModuleAuthorized('reservas-agendamiento'), [isModuleAuthorized]);
 
-    const handleAddToCart = (product: Product, quantity: number) => {
+    const handleAddToCart = (rawProduct: Product, quantity: number) => {
+        const effectiveBase = rawProduct.basePrice ?? rawProduct.price;
+        const effectiveClient = calcularPrecioCliente(effectiveBase, pricingContext);
+        const product: Product = { ...rawProduct, price: effectiveClient, basePrice: effectiveBase };
         const discountInfo = promotionService.calculateDiscountedPrice(product, pageData.promotions || []);
         
         let appliedPromotion = undefined;
@@ -469,6 +510,7 @@ function CatalogPageContent({ params }: CatalogPageProps) {
                                     key={product.id} 
                                     product={product} 
                                     promotions={pageData.promotions || []}
+                                    planContext={pricingContext}
                                     onView={() => setSelectedProduct(product)}
                                     onBuy={() => handleBuyNow(product)}
                                 />
@@ -648,6 +690,7 @@ function CatalogPageContent({ params }: CatalogPageProps) {
             />
 
             <CartDrawer 
+                planContext={pricingContext}
                 isOpen={isCartOpen}
                 onOpenChange={setIsCartOpen}
                 cartItems={cartItems}
@@ -671,6 +714,7 @@ function CatalogPageContent({ params }: CatalogPageProps) {
                 paymentSettings={pageData.paymentSettings}
                 origin={orderOrigin}
                 externalCoupon={appliedCoupon}
+                planContext={pricingContext}
             />
 
             <PublicMenuChatWidget 

@@ -32,7 +32,8 @@ export interface CopilotoCuponesOutput {
  * Motor de IA de JEV para Cupones (Regla 3: Solo propone. Nunca altera cupones por su cuenta).
  */
 export async function obtenerCopilotoCupones(businessId: string): Promise<CopilotoCuponesOutput> {
-  // Acción local de visualización: No consume crédito al abrir el panel (Regla 4)
+
+  // Validación de límites y consumo atómico (Fase 3 & Proxy Universal anti-TypeError)
   const limitsInfo = await getJevCopilotLimitsInfo(businessId);
   if (!limitsInfo.isModuleActive) {
     return new Proxy({
@@ -46,6 +47,19 @@ export async function obtenerCopilotoCupones(businessId: string): Promise<Copilo
       }
     }) as any;
   }
+  if (!limitsInfo.canConsume) {
+    return new Proxy({
+      diagnostico: `Has alcanzado el límite diario de consultas (${limitsInfo.usageToday}/${limitsInfo.totalReal}) de JEV Copiloto para hoy. El cupo se reinicia automáticamente mañana o puedes solicitar una ampliación al administrador.`,
+      fechaGeneracion: new Date().toISOString(),
+    }, {
+      get(target, prop) {
+        if (prop in target) return (target as any)[prop];
+        if (typeof prop === 'string' && (prop.endsWith('Count') || prop.includes('Total') || prop.includes('Debitos') || prop.includes('Creditos') || prop.includes('Inversion'))) return 0;
+        return [];
+      }
+    }) as any;
+  }
+  await consumeJevCopilotCredit(businessId);
   
 
   const contexto: ContextoCupones = await getCuponesContext(businessId);

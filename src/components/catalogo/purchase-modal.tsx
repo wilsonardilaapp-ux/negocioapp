@@ -34,9 +34,9 @@ import { getAttribution } from '@/lib/tracking/attribution';
 
 const purchaseSchema = z.object({
   fullName: z.string().min(3, { message: 'El nombre es requerido.' }),
-  email: z.string().email({ message: 'El correo electrónico no es válido.' }),
+  email: z.string().email({ message: 'El correo electrónico no es válido.' }).optional().or(z.literal('')),
   whatsapp: z.string().min(7, { message: 'Por favor, introduce un número de WhatsApp válido.' }),
-  address: z.string().optional(),
+  address: z.string().min(3, { message: 'La dirección es obligatoria.' }),
   message: z.string().optional(),
 });
 
@@ -296,7 +296,7 @@ export function PurchaseModal({
             id: orderId,
             businessId,
             customerName: data.fullName,
-            customerEmail: data.email,
+            customerEmail: data.email || '',
             customerPhone: data.whatsapp,
             customerPhoneNormalized: normalizePhoneNumber(data.whatsapp),
             customerAddress: tipoEntrega === 'domicilio' ? (data.address || '') : 'Recogida en tienda',
@@ -319,6 +319,11 @@ export function PurchaseModal({
 
         const cleanOrderData = JSON.parse(JSON.stringify(orderData));
         await setDocumentNonBlocking(newOrderRef, cleanOrderData);
+
+        // Incrementar uso del cupón aplicado si existe
+        if (appliedCoupon?.id) {
+          couponService.incrementUsage(appliedCoupon.id).catch(e => console.error("[Coupon] Error al incrementar uso:", e));
+        }
         registerPublicOrderTracking(firestore, businessId, orderData);
         sendOrderConfirmation({ businessId, orderId }).catch(e => console.error(e.message));
 
@@ -441,9 +446,21 @@ export function PurchaseModal({
 
           <form id="purchase-form" onSubmit={handleSubmit(onSubmit)} className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2"><Label>Nombre *</Label><Input {...register('fullName')} /></div>
-                <div className="space-y-2"><Label>WhatsApp *</Label><Input {...register('whatsapp')} /></div>
-                <div className="space-y-2 md:col-span-2"><Label>Correo *</Label><Input {...register('email')} type="email" /></div>
+                <div className="space-y-2">
+                    <Label>Nombre *</Label>
+                    <Input {...register('fullName')} />
+                    {errors.fullName && <p className="text-xs text-destructive">{errors.fullName.message}</p>}
+                </div>
+                <div className="space-y-2">
+                    <Label>WhatsApp *</Label>
+                    <Input {...register('whatsapp')} />
+                    {errors.whatsapp && <p className="text-xs text-destructive">{errors.whatsapp.message}</p>}
+                </div>
+                <div className="space-y-2 md:col-span-2">
+                    <Label>Correo (Opcional)</Label>
+                    <Input {...register('email')} type="email" placeholder="Opcional" />
+                    {errors.email && <p className="text-xs text-destructive">{errors.email.message}</p>}
+                </div>
             </div>
             <div className="space-y-4">
                 <Label>Entrega</Label>
@@ -457,7 +474,13 @@ export function PurchaseModal({
                         <span className="text-sm font-bold">Sede</span>
                     </Label>
                 </RadioGroup>
-                {tipoEntrega === 'domicilio' && <div className="space-y-2"><Label>Dirección *</Label><Textarea {...register('address')} /></div>}
+                {tipoEntrega === 'domicilio' && (
+                    <div className="space-y-2">
+                        <Label>Dirección *</Label>
+                        <Textarea {...register('address')} placeholder="Dirección completa y número de casa/apto" />
+                        {errors.address && <p className="text-xs text-destructive">{errors.address.message}</p>}
+                    </div>
+                )}
             </div>
 
             <div className="space-y-4">

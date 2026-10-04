@@ -682,12 +682,32 @@ function CatalogPageContent({ params }: CatalogPageProps) {
                 isOpen={!!selectedProduct} 
                 onOpenChange={(open) => !open && setSelectedProduct(null)}
                 onAddToCart={(qty) => {
-                    handleAddToCart(selectedProduct!, qty);
+                    const prod = selectedProduct!;
                     setSelectedProduct(null);
-                    setIsCartOpen(true);
+                    if (qty === 1) {
+                        handleBuyNow(prod);
+                    } else {
+                        handleAddToCart(prod, qty);
+                        setIsCartOpen(true);
+                    }
                 }}
                 onRatingUpdated={handleRatingSync}
             />
+
+                        {activeSuggestion && (
+                <SuggestionModal 
+                    isOpen={!!activeSuggestion}
+                    onOpenChange={(open) => !open && setActiveSuggestion(null)}
+                    originalProduct={activeSuggestion.original}
+                    suggestion={activeSuggestion.suggestion}
+                    onAccept={acceptSuggestion}
+                    onDecline={() => {
+                        handleAddToCart(activeSuggestion.original, 1);
+                        setActiveSuggestion(null);
+                        setIsCartOpen(true);
+                    }}
+                />
+            )}
 
             <CartDrawer 
                 planContext={pricingContext}

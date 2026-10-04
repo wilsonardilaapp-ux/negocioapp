@@ -1,6 +1,7 @@
+import { JevCopilotWidgetLoyalty } from '@/jev/JevCopilotWidgetLoyalty';
+
 'use client';
 
-import { JevCopilotWidgetLoyalty } from '@/jev/JevCopilotWidgetLoyalty';
 import React, { useState, useEffect } from 'react';
 import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
 import { doc, collection, query, orderBy } from 'firebase/firestore';

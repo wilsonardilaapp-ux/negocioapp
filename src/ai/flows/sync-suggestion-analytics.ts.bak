@@ -95,20 +95,15 @@ export async function syncMetricsWithOrders(businessId: string): Promise<SyncRes
 
     let matchCount = 0;
 
-    // Procesar cada pedido analizando su arreglo de items
-    ordersSnap.docs.forEach(docSnap => {
-        const orderData = docSnap.data();
-        const items = Array.isArray(orderData.items) ? orderData.items : [];
-        if (items.length === 0) return;
-
-        const purchasedIds = items.map((i: any) => String(i.productId || ''));
+    groupedOrders.forEach(orderGroup => {
+        const purchasedIds = orderGroup.map((item: any) => String(item.productId || ''));
 
         for (const rule of rules) {
             if (purchasedIds.includes(rule.triggerItem) && purchasedIds.includes(rule.suggestedItem)) {
                 const stats = statsMap.get(rule.id)!;
                 
-                const suggestedItem = items.find((i: any) => String(i.productId || '') === rule.suggestedItem);
-                const price = parsePrice(suggestedItem?.subtotal ?? suggestedItem?.unitPrice ?? 0);
+                const suggestedItem = orderGroup.find((i: any) => String(i.productId || '') === rule.suggestedItem);
+                const price = parsePrice(suggestedItem?.subtotal);
 
                 stats.conversions += 1;
                 stats.revenue += price;
