@@ -27,10 +27,9 @@ interface PostsTableProps {
   isLoading: boolean;
   basePath: string; // e.g., '/superadmin/blog' or '/dashboard/blog'
   onDeletePost: (postId: string) => Promise<void>;
-  isFiltered?: boolean;
 }
 
-export function PostsTable({ posts, isLoading, basePath, onDeletePost, isFiltered = false }: PostsTableProps) {
+export function PostsTable({ posts, isLoading, basePath, onDeletePost }: PostsTableProps) {
   const router = useRouter();
 
   const handleEdit = (postId: string) => {
@@ -46,13 +45,6 @@ export function PostsTable({ posts, isLoading, basePath, onDeletePost, isFiltere
   }
 
   if (posts.length === 0) {
-    if (isFiltered) {
-      return (
-        <div className="rounded-md border p-12 text-center text-muted-foreground font-medium text-sm">
-          No se encontraron publicaciones con esos filtros
-        </div>
-      );
-    }
     return (
       <div className="flex flex-col items-center justify-center text-center gap-4 p-10 min-h-[300px]">
         <FileEdit className="h-16 w-16 text-muted-foreground" />

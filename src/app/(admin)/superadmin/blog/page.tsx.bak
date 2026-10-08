@@ -1,7 +1,7 @@
-'use client';
-
 import { useState, useMemo } from 'react';
 import { BlogFilters, type BlogFilterState } from '@/components/blog/blog-filters';
+'use client';
+
 import {
   Card,
   CardContent,
