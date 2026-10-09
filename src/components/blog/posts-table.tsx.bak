@@ -38,8 +38,8 @@ export function PostsTable({ posts, isLoading, basePath, onDeletePost, isFiltere
 
   const handlePreview = (post: BlogPost) => {
     if (!post.slug) return;
-    const businessId = (post as any).businessId;
-    const url = businessId ? `/blog/${businessId}/${post.slug}` : `/blog/${post.slug}`;
+    const businessId = (post as any).businessId || 'global';
+    const url = `/blog/${businessId}/${post.slug}`;
     window.open(url, '_blank', 'noopener,noreferrer');
   };
 

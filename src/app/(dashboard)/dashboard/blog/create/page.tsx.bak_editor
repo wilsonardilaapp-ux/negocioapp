@@ -172,27 +172,6 @@ export default function CreatePostPage() {
                         <div className="mt-2">
                             <div className="editor-dashboard-blog">
                                 <style>{`
-                                  .editor-dashboard-blog .ql-toolbar {
-                                    position: sticky;
-                                    top: 0;
-                                    z-index: 10;
-                                    background: var(--card, var(--background, #ffffff));
-                                    border-top-left-radius: 0.375rem;
-                                    border-top-right-radius: 0.375rem;
-                                  }
-                                  .editor-dashboard-blog .ql-container {
-                                    height: 450px !important;
-                                    overflow: hidden !important;
-                                    border-bottom-left-radius: 0.375rem;
-                                    border-bottom-right-radius: 0.375rem;
-                                  }
-                                  .editor-dashboard-blog .ql-editor {
-                                    height: 100% !important;
-                                    overflow-y: auto !important;
-                                  }
-                                `}</style>
-                                <div className="editor-dashboard-blog">
-                                <style>{`
                                   .editor-dashboard-blog {
                                     display: flex;
                                     flex-direction: column;
@@ -220,7 +199,6 @@ export default function CreatePostPage() {
                                   }
                                 `}</style>
                                 <RichTextEditor value={content} onChange={setContent} />
-                            </div>
                             </div>
                         </div>
                     </CardContent>

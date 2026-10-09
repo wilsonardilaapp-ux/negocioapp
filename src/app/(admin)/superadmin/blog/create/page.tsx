@@ -138,7 +138,29 @@ export default function CreatePostPage() {
                      <CardContent className="p-6">
                         <Label className="text-base font-semibold">Contenido Principal</Label>
                         <div className="mt-2">
-                            <RichTextEditor value={content} onChange={setContent} />
+                            <div className="editor-superadmin">
+                                <style>{ `
+                                  .editor-superadmin .ql-toolbar {
+                                    position: sticky;
+                                    top: 0;
+                                    z-index: 10;
+                                    background: var(--card, var(--background, #ffffff));
+                                    border-top-left-radius: 0.375rem;
+                                    border-top-right-radius: 0.375rem;
+                                  }
+                                  .editor-superadmin .ql-container {
+                                    height: 400px;
+                                    overflow: hidden;
+                                    border-bottom-left-radius: 0.375rem;
+                                    border-bottom-right-radius: 0.375rem;
+                                  }
+                                  .editor-superadmin .ql-editor {
+                                    height: 100%;
+                                    overflow-y: auto;
+                                  }
+                                ` }</style>
+                                <RichTextEditor value={content} onChange={setContent} />
+                            </div>
                         </div>
                     </CardContent>
                 </Card>
@@ -159,14 +181,14 @@ export default function CreatePostPage() {
                 <Card className="shadow-sm">
                     <CardHeader><CardTitle className="text-base">Límite de Posts</CardTitle></CardHeader>
                     <CardContent>
-                        {isLoading ? (
-                            <p className="text-sm text-muted-foreground mb-2">Cargando límite...</p>
+                        {arePostsLoading ? (
+                            <p className="text-sm text-muted-foreground mb-2">Cargando información...</p>
                         ) : (
                             <p className="text-sm text-muted-foreground mb-2">
-                               Has creado {postCount} de {postLimit === -1 ? '∞' : postLimit} posts permitidos.
+                               Has creado {postCount} posts · Ilimitado (∞)
                             </p>
                         )}
-                        <Progress value={isLoading || postLimit === -1 ? 0 : (postCount / postLimit) * 100} />
+                        <Progress value={100} />
                     </CardContent>
                 </Card>
 
