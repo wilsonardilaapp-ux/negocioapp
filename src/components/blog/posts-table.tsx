@@ -1,5 +1,7 @@
-
 'use client';
+
+import { useState } from 'react';
+import { PostDetailsModal } from './post-details-modal';
 
 import {
   Table,
@@ -18,7 +20,7 @@ import {
   DropdownMenuItem,
 } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { MoreHorizontal, Edit, Trash2, Loader2, FileEdit } from 'lucide-react';
+import { MoreHorizontal, Edit, Trash2, Eye, ExternalLink, Loader2, FileEdit } from 'lucide-react';
 import type { BlogPost } from '@/models/blog-post';
 import { useRouter } from 'next/navigation';
 
@@ -32,6 +34,14 @@ interface PostsTableProps {
 
 export function PostsTable({ posts, isLoading, basePath, onDeletePost, isFiltered = false }: PostsTableProps) {
   const router = useRouter();
+  const [detailsPost, setDetailsPost] = useState<BlogPost | null>(null);
+
+  const handlePreview = (post: BlogPost) => {
+    if (!post.slug) return;
+    const businessId = (post as any).businessId || 'global';
+    const url = `/blog/${businessId}/${post.slug}`;
+    window.open(url, '_blank', 'noopener,noreferrer');
+  };
 
   const handleEdit = (postId: string) => {
     router.push(`${basePath}/edit/${postId}`);
@@ -100,6 +110,21 @@ export function PostsTable({ posts, isLoading, basePath, onDeletePost, isFiltere
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
+                    {/* 1. Ver detalles */}
+                    <DropdownMenuItem onClick={() => setDetailsPost(post)}>
+                      <Eye className="mr-2 h-4 w-4" /> Ver detalles
+                    </DropdownMenuItem>
+
+                    {/* 2. Preview */}
+                    <DropdownMenuItem 
+                      onClick={() => handlePreview(post)}
+                      disabled={!post.slug || !post.isActive}
+                      title={!post.isActive ? 'Publica el post para ver la vista previa' : undefined}
+                    >
+                      <ExternalLink className="mr-2 h-4 w-4" /> Preview
+                    </DropdownMenuItem>
+
+                    {/* 3. Editar */}
                     <DropdownMenuItem onClick={() => handleEdit(post.id)}>
                       <Edit className="mr-2 h-4 w-4" /> Editar
                     </DropdownMenuItem>
@@ -134,6 +159,12 @@ export function PostsTable({ posts, isLoading, basePath, onDeletePost, isFiltere
           ))}
         </TableBody>
       </Table>
+      {/* Modal de solo lectura: Ver Detalles */}
+      <PostDetailsModal
+        post={detailsPost}
+        isOpen={!!detailsPost}
+        onClose={() => setDetailsPost(null)}
+      />
     </div>
   );
 }

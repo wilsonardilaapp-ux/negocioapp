@@ -1,8 +1,8 @@
-'use client';
-
 import { uploadMedia } from '@/ai/flows/upload-media-flow';
 import Image from 'next/image';
 import { useRef } from 'react';
+
+'use client';
 
 import { useState, useTransition, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
