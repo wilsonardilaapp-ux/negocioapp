@@ -7,7 +7,7 @@ import { useRef } from 'react';
 import { useState, useTransition, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { createPost, generateBlogSeoAction } from '@/actions/blog';
+import { createPost } from '@/actions/blog';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -74,50 +74,6 @@ export default function CreatePostPage() {
     const { toast } = useToast();
     const [isPending, startTransition] = useTransition();
     const [content, setContent] = useState('');
-    const [seoTitle, setSeoTitle] = useState('');
-    const [seoDescription, setSeoDescription] = useState('');
-    const [seoKeywords, setSeoKeywords] = useState('');
-    const [isGeneratingSeo, setIsGeneratingSeo] = useState(false);
-
-    const handleGenerateSeo = async () => {
-        const titleInput = (document.getElementById('title') as HTMLInputElement)?.value || '';
-        if (!titleInput.trim() && !content.trim()) {
-            toast({
-                variant: 'destructive',
-                title: 'Información insuficiente',
-                description: 'Ingresa al menos el título o contenido del post para generar el SEO con IA.',
-            });
-            return;
-        }
-
-        setIsGeneratingSeo(true);
-        try {
-            const result = await generateBlogSeoAction({ title: titleInput, content });
-            if (result.success) {
-                if (result.seoTitle) setSeoTitle(result.seoTitle);
-                if (result.seoDescription) setSeoDescription(result.seoDescription);
-                if (result.seoKeywords) setSeoKeywords(result.seoKeywords);
-                toast({
-                    title: 'SEO Generado con Éxito',
-                    description: 'Se han completado el Meta Título, Meta Descripción y Keywords.',
-                });
-            } else {
-                toast({
-                    variant: 'destructive',
-                    title: 'No se pudo generar SEO',
-                    description: result.error,
-                });
-            }
-        } catch (err: any) {
-            toast({
-                variant: 'destructive',
-                title: 'Error de IA',
-                description: err.message || 'Ocurrió un error al conectar con el servicio de IA.',
-            });
-        } finally {
-            setIsGeneratingSeo(false);
-        }
-    };
     
     const firestore = useFirestore();
 
@@ -317,28 +273,19 @@ export default function CreatePostPage() {
                     <CardContent className="space-y-4">
                         <div>
                             <Label htmlFor="seoTitle">Meta Título</Label>
-                            <Input id="seoTitle" name="seoTitle" value={seoTitle} onChange={(e) => setSeoTitle(e.target.value)} />
+                            <Input id="seoTitle" name="seoTitle" />
                         </div>
                         <div>
                             <Label htmlFor="seoDescription">Meta Descripción</Label>
-                            <Input id="seoDescription" name="seoDescription" value={seoDescription} onChange={(e) => setSeoDescription(e.target.value)} />
+                            <Input id="seoDescription" name="seoDescription" />
                         </div>
-                        <div>
+                         <div>
                             <Label htmlFor="seoKeywords">Keywords (separadas por coma)</Label>
-                            <Input id="seoKeywords" name="seoKeywords" value={seoKeywords} onChange={(e) => setSeoKeywords(e.target.value)} />
+                            <Input id="seoKeywords" name="seoKeywords" />
                         </div>
-                        <Button variant="outline" className="w-full" type="button" onClick={handleGenerateSeo} disabled={isGeneratingSeo}>
-                            {isGeneratingSeo ? (
-                                <>
-                                    <Loader2 className="mr-2 h-4 w-4 animate-spin text-emerald-600" />
-                                    Generando con IA...
-                                </>
-                            ) : (
-                                <>
-                                    <Bot className="mr-2 h-4 w-4 text-emerald-600" />
-                                    Generar con IA
-                                </>
-                            )}
+                        <Button variant="outline" className="w-full" type="button">
+                            <Bot className="mr-2 h-4 w-4 text-emerald-600" />
+                            Generar con IA
                         </Button>
                     </CardContent>
                 </Card>

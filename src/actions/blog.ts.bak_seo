@@ -1,6 +1,5 @@
 'use server';
 
-import { generateSimpleText } from '@/ai/flows/simple-text-flow';
 import { getBusinessBlogLimitServer } from '@/lib/blog-limits';
 import { revalidatePath } from 'next/cache';
 import { getAdminFirestore } from '@/firebase/server-init';
@@ -182,60 +181,4 @@ export async function deletePost(postId: string) {
   } catch (error: any) {
     return { success: false, error: `Error al eliminar el post: ${error.message}` };
   }
-}
-
-export async function generateBlogSeoAction(params: { title?: string; content?: string }) {
-    const title = (params.title || '').trim();
-    // Limpiar etiquetas HTML de Quill para enviar texto plano
-    const rawContent = (params.content || '')
-        .replace(/<[^>]*>?/gm, ' ')
-        .replace(/\s+/g, ' ')
-        .trim();
-
-    if (!title && !rawContent) {
-        return {
-            success: false,
-            error: 'Debes ingresar al menos el título o contenido del post para generar el SEO.'
-        };
-    }
-
-    const prompt = `Actúa como un especialista en SEO y redacción de contenido digital.
-Analiza la siguiente información de un post de blog y genera los metadatos SEO óptimos:
-- Título del post: "${title || 'Sin título definido'}"
-- Contenido del post: "${rawContent.slice(0, 1800)}"
-
-Genera metadatos altamente persuasivos y optimizados para Google:
-1. "seoTitle": Título optimizado para motores de búsqueda (máximo 60 caracteres).
-2. "seoDescription": Meta descripción concisa con gancho y llamada a la acción (entre 120 y 155 caracteres).
-3. "seoKeywords": Entre 5 y 8 palabras clave o frases relevantes separadas por comas.
-
-IMPORTANTE: Responde ÚNICAMENTE con un JSON válido estricto, sin explicaciones ni markdown:
-{
-  "seoTitle": "...",
-  "seoDescription": "...",
-  "seoKeywords": "..."
-}`;
-
-    try {
-        const aiResponse = await generateSimpleText(prompt);
-        // Limpiar posibles bloques markdown (```json ...)
-        const cleanJson = aiResponse
-            .replace(/```(?:json)?/gi, '')
-            .replace(/```/g, '')
-            .trim();
-
-        const parsed = JSON.parse(cleanJson);
-        return {
-            success: true,
-            seoTitle: String(parsed.seoTitle || '').trim(),
-            seoDescription: String(parsed.seoDescription || '').trim(),
-            seoKeywords: String(parsed.seoKeywords || '').trim(),
-        };
-    } catch (error: any) {
-        console.error('[generateBlogSeoAction] Error:', error);
-        return {
-            success: false,
-            error: 'No se pudo generar el SEO con IA: ' + (error.message || 'Error desconocido.')
-        };
-    }
 }
