@@ -229,14 +229,11 @@ export default function CreatePostPage() {
                                     box-shadow: 0 0 0 1px hsl(var(--ring, 222.2 84% 4.9%));
                                   }
 
-                                  /* Barra de herramientas fija */
+                                  /* Barra de herramientas */
                                   .blog-editor .ql-toolbar.ql-snow {
-                                    position: sticky;
-                                    top: 0;
-                                    z-index: 10;
                                     border: none !important;
                                     border-bottom: 1px solid hsl(var(--border, 214.3 31.8% 91.4%)) !important;
-                                    background-color: hsl(var(--card, var(--background, 0 0% 100%)));
+                                    background-color: hsl(var(--muted, 210 40% 96.1%) / 0.5);
                                     padding: 8px 12px;
                                     display: flex;
                                     flex-wrap: wrap;
@@ -272,17 +269,18 @@ export default function CreatePostPage() {
                                     content: 'Título 3' !important;
                                   }
 
-                                  /* Área de contenido con scroll interno propio */
+                                  /* Área de contenido y altura mínima */
                                   .blog-editor .ql-container.ql-snow {
                                     border: none !important;
                                     font-family: inherit !important;
                                     font-size: 16px;
-                                    height: 450px !important;
-                                    overflow: hidden !important;
+                                    height: auto !important;
+                                    min-height: 400px;
                                   }
                                   .blog-editor .ql-editor {
-                                    height: 100% !important;
-                                    overflow-y: auto !important;
+                                    min-height: 400px;
+                                    height: auto !important;
+                                    overflow: visible !important;
                                     padding: 20px 24px;
                                     font-family: inherit;
                                     font-size: 16px;

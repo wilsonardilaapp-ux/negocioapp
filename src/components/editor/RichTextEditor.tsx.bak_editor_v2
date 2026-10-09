@@ -11,9 +11,7 @@ interface ReactQuillProps {
   value: string;
   onChange: (value: string) => void;
   modules?: any;
-  formats?: string[];
   placeholder?: string;
-  ref?: any;
 }
 
 interface RichTextEditorProps {
@@ -23,7 +21,6 @@ interface RichTextEditorProps {
 }
 
 const RichTextEditor: React.FC<RichTextEditorProps> = ({ value, onChange, placeholder }) => {
-  const quillRef = React.useRef<any>(null);
   const { toast } = useToast();
   const [mounted, setMounted] = useState(false);
   const [EditorComponent, setEditorComponent] = useState<ComponentType<ReactQuillProps> | null>(null);
@@ -53,7 +50,9 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({ value, onChange, placeh
   const modules = useMemo(() => ({
     toolbar: {
       container: [
-        [{ header: [1, 2, 3, false] }],
+        [{ header: [1, 2, 3, 4, 5, 6, false] }],
+        [{ font: [] }],
+        [{ size: [] }],
         ['bold', 'italic', 'underline', 'strike', 'blockquote', 'code-block'],
         [{ color: [] }, { background: [] }],
         [{ align: [] }],
@@ -120,50 +119,6 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({ value, onChange, placeh
     },
   }), [toast]);
 
-  const formats = useMemo(() => [
-    'header',
-    'bold', 'italic', 'underline', 'strike', 'blockquote', 'code-block',
-    'color', 'background',
-    'align',
-    'list',
-    'script',
-    'indent',
-    'link', 'image', 'video',
-    'clean',
-  ], []);
-
-  // Limpieza al pegar (Clipboard Matcher de Quill)
-  useEffect(() => {
-    if (mounted && quillRef.current) {
-      try {
-        const editor = typeof quillRef.current.getEditor === 'function' ? quillRef.current.getEditor() : null;
-        if (editor && editor.clipboard) {
-          editor.clipboard.addMatcher(Node.ELEMENT_NODE, (node: HTMLElement, delta: any) => {
-            if (delta && Array.isArray(delta.ops)) {
-              delta.ops.forEach((op: any) => {
-                if (op.attributes) {
-                  // Quitar estilos ajenos en línea al pegar
-                  delete op.attributes.color;
-                  delete op.attributes.background;
-                  delete op.attributes.font;
-                  delete op.attributes.size;
-                }
-                if (typeof op.insert === 'string') {
-                  // Quitar espacios y &nbsp; iniciales de línea
-                  op.insert = op.insert.replace(/^[  \t]+/gm, '');
-                }
-              });
-            }
-            return delta;
-          });
-        }
-      } catch (e) {
-        console.warn('Error configurando matcher de pegado:', e);
-      }
-    }
-  }, [mounted]);
-
-
   // Mientras no esté montado o el componente no esté cargado, mostramos el esqueleto de carga
   if (!mounted || !EditorComponent) {
     return <div className="h-[200px] w-full rounded-md bg-muted animate-pulse border border-input" />;
@@ -172,12 +127,10 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({ value, onChange, placeh
   return (
     <div className="rich-editor-wrapper text-foreground min-h-[200px]">
       <EditorComponent
-        ref={quillRef}
         theme="snow"
         value={value}
         onChange={onChange}
         modules={modules}
-        formats={formats}
         placeholder={placeholder}
       />
     </div>
