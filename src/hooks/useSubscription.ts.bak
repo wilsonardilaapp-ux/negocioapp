@@ -1,6 +1,5 @@
 'use client';
 
-import { extractBlogLimitValue } from '@/lib/blog-limits';
 import { useMemo, useState, useEffect, useCallback } from 'react';
 import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
 import { doc, collection, query, where, limit, type Timestamp } from 'firebase/firestore';
@@ -146,11 +145,10 @@ export function useSubscription() {
 
     const extras = (businessData as any)?.limitesExtra || {};
     const baseLimits = details?.limits ?? defaultLimits;
-    const blogLimitParsed = extractBlogLimitValue(details?.limits ?? defaultLimits);
 
     const mergedLimits: PlanLimits = {
         products: baseLimits.products === -1 ? -1 : (baseLimits.products + (extras.products || 0)),
-        blogPosts: blogLimitParsed.isUnlimited ? -1 : (blogLimitParsed.limit + (Number(extras.blogPosts || extras['Blog Posts'] || extras.blog_posts || 0))),
+        blogPosts: baseLimits.blogPosts === -1 ? -1 : (baseLimits.blogPosts + (extras.blogPosts || 0)),
         landingPages: baseLimits.landingPages === -1 ? -1 : (baseLimits.landingPages + (extras.landingPages || 0)),
         promotions: baseLimits.promotions === -1 ? -1 : (baseLimits.promotions + (extras.promotions || 0)),
         coupons: baseLimits.coupons === -1 ? -1 : (baseLimits.coupons + (extras.coupons || 0)),

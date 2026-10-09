@@ -283,19 +283,12 @@ export default function BlogPage() {
               Gestiona los artículos y publicaciones para tu negocio.
             </CardDescription>
           </div>
-          {canCreate ? (
-            <Button asChild>
-              <Link href="/dashboard/blog/create">
-                <PlusCircle className="mr-2 h-4 w-4" />
-                Crear Nuevo Post
-              </Link>
-            </Button>
-          ) : (
-            <Button disabled title="Límite de posts alcanzado para tu plan">
+          <Button asChild disabled={!canCreate}>
+            <Link href="/dashboard/blog/create">
               <PlusCircle className="mr-2 h-4 w-4" />
-              Límite Alcanzado
-            </Button>
-          )}
+              Crear Nuevo Post
+            </Link>
+          </Button>
         </CardHeader>
         <CardContent>
             <div className="flex items-center gap-2 rounded-lg border bg-secondary/50 p-3 text-sm">

@@ -1,6 +1,6 @@
+
 'use server';
 
-import { getBusinessBlogLimitServer } from '@/lib/blog-limits';
 import { revalidatePath } from 'next/cache';
 import { getAdminFirestore } from '@/firebase/server-init';
 import type { BlogPost } from '@/models/blog-post';
@@ -44,21 +44,6 @@ export async function createPost(formData: FormData) {
 
     if (!rawData.title || !rawData.content || !rawData.imageUrl) {
         return { success: false, error: 'Título, contenido y URL de imagen son requeridos.' };
-    }
-
-    // Validación de límite del negocio si aplica
-    if (rawData.businessId) {
-        try {
-            const limitInfo = await getBusinessBlogLimitServer(firestore, rawData.businessId);
-            if (!limitInfo.isUnlimited && limitInfo.used >= limitInfo.limit) {
-                return {
-                    success: false,
-                    error: `Has alcanzado el límite de posts de tu plan (${limitInfo.used}/${limitInfo.limit}). Actualiza tu plan para crear más artículos.`
-                };
-            }
-        } catch (limitErr: any) {
-            console.error('[blog-actions] Error al verificar límite del negocio:', limitErr);
-        }
     }
     
     // Admin SDK uses native Date or Timestamp objects

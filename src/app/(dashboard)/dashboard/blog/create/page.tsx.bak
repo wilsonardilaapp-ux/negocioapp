@@ -46,7 +46,7 @@ export default function CreatePostPage() {
     const isLoading = isSubscriptionLoading || arePostsLoading;
 
     useEffect(() => {
-        if (!isLoading && limits.blogPosts !== -1 && !canAddBlogPosts(totalPosts)) {
+        if (!isLoading && isFree && !canAddBlogPosts(totalPosts)) {
             // User is at their limit, but might have navigated here directly.
         }
     }, [isLoading, isFree, canAddBlogPosts, totalPosts, router]);
@@ -106,9 +106,7 @@ export default function CreatePostPage() {
         return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin" /> Cargando...</div>
     }
     
-    const isUnlimitedPosts = limits.blogPosts === -1;
-    const isLimitReached = !isUnlimitedPosts && totalPosts >= limits.blogPosts;
-    if (isLimitReached) {
+    if (isFree && !canAddBlogPosts(totalPosts)) {
         return (
              <Card className="text-center">
                 <CardHeader>
@@ -150,7 +148,7 @@ export default function CreatePostPage() {
                         Cancelar
                     </Link>
                 </Button>
-                <Button type="submit" disabled={isPending || (limits.blogPosts !== -1 && totalPosts >= limits.blogPosts)}>
+                <Button type="submit" disabled={isPending}>
                     {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
                     {isPending ? 'Guardando...' : 'Guardar Post'}
                 </Button>
@@ -195,12 +193,12 @@ export default function CreatePostPage() {
                             <p className="text-sm text-muted-foreground mb-2">Cargando límite...</p>
                         ) : (
                             <p className="text-sm text-muted-foreground mb-2">
-                               {limits.blogPosts === -1
-                                    ? 'Tu plan incluye posts ilimitados ∞'
-                                    : `Has creado ${totalPosts} de ${limits.blogPosts} posts permitidos.`}
+                               {isFree 
+                                    ? `Has creado ${totalPosts} de ${limits.blogPosts} posts permitidos.`
+                                    : 'Tu plan incluye posts ilimitados ∞'}
                             </p>
                         )}
-                        <Progress value={limits.blogPosts === -1 ? 100 : Math.min(100, (totalPosts / Math.max(1, limits.blogPosts)) * 100)} />
+                        <Progress value={isFree ? (totalPosts / limits.blogPosts) * 100 : 100} />
                     </CardContent>
                 </Card>
 
