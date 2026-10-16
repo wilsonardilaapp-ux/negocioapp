@@ -28,5 +28,6 @@ export const DEFAULT_MODULES = [
   { id: 'inventario-kardex', name: 'Inventario Kardex', description: 'Control detallado de inventario, movimientos y valuación de stock.', limit: -1 },
   { id: 'pistola-escaner', name: 'Pistola Escáner', description: 'Gestión de lectores de códigos de barras para POS y bodega.', limit: -1 },
   { id: 'reservas-agendamiento', name: 'Reservas y Citas', description: 'Sistema de agendamiento online, profesionales y recordatorios.', limit: 30 },
-  { id: 'alertas-vencimiento', name: 'Alertas de Vencimiento de Inventario', description: 'Monitoreo preventivo de fechas de caducidad por lote de producto.', limit: -1 }
+  { id: 'alertas-vencimiento', name: 'Alertas de Vencimiento de Inventario', description: 'Monitoreo preventivo de fechas de caducidad por lote de producto.', limit: -1 },
+  { id: 'share-cards', name: 'Tarjetas de seguimiento', description: 'Permite crear tarjetas de seguimiento personalizadas y medir cada canal.', limit: 15 }
 ];

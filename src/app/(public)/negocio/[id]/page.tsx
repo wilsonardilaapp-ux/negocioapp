@@ -131,7 +131,21 @@ export async function generateMetadata({ params }: { params: { id: string } }) {
     };
 }
 
-export default async function BusinessProfilePage({ params }: { params: { id: string } }) {
+export default async function BusinessProfilePage({ params, searchParams }: { params: { id: string }; searchParams?: { [key: string]: string | string[] | undefined } }) {
+    
+    // Construcción de URL con preservación de tracking
+    const sp = new URLSearchParams();
+    if (searchParams) {
+      Object.entries(searchParams).forEach(([k, v]) => {
+        if (typeof v === "string") sp.set(k, v);
+        else if (Array.isArray(v) && v.length > 0) sp.set(k, v[0]);
+      });
+    }
+    if (!sp.has("ref")) {
+      sp.set("ref", "directorio");
+    }
+    const catalogUrl = `/catalog/${params.id}?${sp.toString()}`;
+
     const [entry, ratings, globalFavicon] = await Promise.all([
         getBusinessEntry(params.id),
         getPublishedRatings(params.id),
@@ -356,7 +370,7 @@ export default async function BusinessProfilePage({ params }: { params: { id: st
                             </div>
                             
                             <Button asChild size="lg" className="w-full rounded-[2rem] h-16 text-lg font-black group text-white bg-primary">
-                                <Link href={`/catalog/${entry.id}`} target="_blank" rel="noopener noreferrer">
+                                <Link href={catalogUrl} target="_blank" rel="noopener noreferrer">
                                     Ver Catálogo de Productos <ArrowRight className="ml-2 group-hover:translate-x-2 transition-transform" />
                                 </Link>
                             </Button>

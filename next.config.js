@@ -1,4 +1,3 @@
-
 /** @type {import('next').NextConfig} */
 const nextConfig = {
     // Forced recompile to clear dynamic route resolution errors
@@ -43,6 +42,16 @@ const nextConfig = {
             {
                 protocol: 'https',
                 hostname: 'i.pravatar.cc',
+                pathname: '/**',
+            },
+            {
+                protocol: 'https',
+                hostname: 'seeklogo.com',
+                pathname: '/**',
+            },
+            {
+                protocol: 'https',
+                hostname: 'via.placeholder.com',
                 pathname: '/**',
             },
         ],

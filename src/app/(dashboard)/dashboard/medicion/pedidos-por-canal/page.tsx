@@ -63,6 +63,10 @@ import 'jspdf-autotable';
 import QRCode from "react-qr-code";
 import html2canvas from "html2canvas";
 import { cn, normalizePhoneNumber } from "@/lib/utils";
+import { ShareCardsSection } from "@/components/share-cards/ShareCardsSection";
+import { QrDownloadMenu } from "@/components/share-cards/QrDownloadMenu";
+import { getBusinessShareCards } from "@/actions/share-cards-actions";
+import type { ShareCard } from "@/models/share-card";
 
 // --- CONFIGURACIÓN DE GRÁFICAS (SHADCN CHARTS) ---
 const chartConfig = {
@@ -76,7 +80,7 @@ const chartConfig = {
   web: { label: "Web", color: "#64748b" },
 } satisfies ChartConfig;
 
-const COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#6366f1", "#ec4899", "#14b8a6", "#f43f5e"];
+const COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#6366f1", "#ec4899", "#14b8a6", "#8b5cf6", "#f97316", "#06b6d4", "#84cc16", "#e11d48", "#64748b", "#0284c7", "#d97706", "#4f46e5"];
 
 export default function PedidosPorCanalPage() {
   const { user, profile } = useUser();
@@ -84,6 +88,7 @@ export default function PedidosPorCanalPage() {
   const { toast } = useToast();
   
   const [channelShares, setChannelShares] = useState<ChannelShare[]>([]);
+  const [customShareCards, setCustomShareCards] = useState<ShareCard[]>([]);
   const [isLoadingShares, setIsLoadingShares] = useState(false);
   const [isExporting, setIsExporting] = useState<'excel' | 'pdf' | null>(null);
   const [logEvents, setLogEvents] = useState<TrackingEvent[]>([]);
@@ -107,6 +112,14 @@ export default function PedidosPorCanalPage() {
     user ? collection(firestore, `businesses/${user.uid}/orders`) : null, 
   [firestore, user]);
   const { data: allOrders, isLoading: loadingOrders } = useCollection<Order>(ordersQuery);
+
+  // Suscripción reactiva en tiempo real a las tarjetas de seguimiento
+  const shareCardsQuery = useMemoFirebase(() => {
+    if (!user || !firestore) return null;
+    return collection(firestore, `businesses/${user.uid}/share_cards`);
+  }, [user, firestore]);
+  const { data: rawRealtimeCards } = useCollection<ShareCard>(shareCardsQuery);
+  const activeCustomCards = useMemo(() => rawRealtimeCards || [], [rawRealtimeCards]);
 
   useEffect(() => {
     if (!user?.uid) return;
@@ -148,20 +161,23 @@ export default function PedidosPorCanalPage() {
     };
 
     fetchLogs();
+    getBusinessShareCards(user.uid).then(res => setCustomShareCards(res.cards || [])).catch(() => {});
   }, [user?.uid, filterChannel]);
 
-  const CHANNEL_NAMES: Record<string, string> = {
-    import_manual: 'IMPORT MANUAL',
-    web: 'WEB',
-    whatsapp: 'WHATSAPP',
-    landing: 'LANDING PAGE',
-    redes: 'REDES SOCIALES',
-    qr: 'QR GENERAL',
-    blog: 'BLOG'
-  };
-
   const marketingStats = useMemo(() => {
-    if (!allOrders) return [];
+    // 1. Canales fijos base
+    const baseChannelNames: Record<string, string> = {
+      import_manual: 'IMPORT MANUAL',
+      web: 'WEB',
+      whatsapp: 'WHATSAPP',
+      landing: 'LANDING PAGE',
+      redes: 'REDES SOCIALES',
+      qr: 'QR GENERAL',
+      blog: 'BLOG',
+      directorio: 'DIRECTORIO DE MARKIX'
+    };
+
+    // Inicializar conteos base (incluyendo directorio)
     const counts: Record<string, number> = {
       import_manual: 0,
       web: 0,
@@ -169,23 +185,66 @@ export default function PedidosPorCanalPage() {
       landing: 0,
       redes: 0,
       qr: 0,
-      blog: 0
+      blog: 0,
+      directorio: 0
     };
-    let total = 0;
 
-    allOrders.forEach(o => {
-        const origin = (o.origin || 'web').toLowerCase();
-        counts[origin] = (counts[origin] || 0) + 1;
-        total++;
+    const channelDisplayNames: Record<string, string> = { ...baseChannelNames };
+
+    // 2. Incorporar tarjetas personalizadas activas con 0 ped. iniciales
+    activeCustomCards.forEach(card => {
+      const cleanRef = (card.ref || '').toLowerCase();
+      if (!counts.hasOwnProperty(cleanRef)) {
+        if (!card.isArchived) {
+          counts[cleanRef] = 0;
+          channelDisplayNames[cleanRef] = card.name.toUpperCase();
+        } else {
+          channelDisplayNames[cleanRef] = `${card.name.toUpperCase()} (ARCHIVADO)`;
+        }
+      }
     });
 
-    return Object.entries(counts).map(([key, count]) => ({
-        id: key,
-        name: CHANNEL_NAMES[key] || key.toUpperCase().replace('_', ' '),
-        count,
-        percentage: total > 0 ? (count / total) * 100 : 0
-    })).sort((a, b) => b.count - a.count);
-  }, [allOrders]);
+    // 3. Contabilizar pedidos reales asegurando no duplicación
+    let total = 0;
+    if (allOrders && allOrders.length > 0) {
+      allOrders.forEach(o => {
+        const origin = (o.origin || 'web').toLowerCase().trim();
+        // Si el origen corresponde a una tarjeta o canal conocido
+        if (counts.hasOwnProperty(origin)) {
+          counts[origin] = (counts[origin] || 0) + 1;
+        } else {
+          // Si es una tarjeta archivada con pedidos históricos, se incorpora dinámicamente
+          const matchingCard = activeCustomCards.find(c => (c.ref || '').toLowerCase() === origin);
+          if (matchingCard) {
+            counts[origin] = (counts[origin] || 0) + 1;
+            channelDisplayNames[origin] = matchingCard.isArchived 
+              ? `${matchingCard.name.toUpperCase()} (ARCHIVADO)` 
+              : matchingCard.name.toUpperCase();
+          } else {
+            // Ref desconocido o no atribuible suma a web (Acceso directo)
+            counts.web = (counts.web || 0) + 1;
+          }
+        }
+        total++;
+      });
+    }
+
+    // 4. Transformar a lista de métricas asignando color único por canal
+    const list = Object.entries(counts)
+      .map(([key, count], index) => {
+        const color = COLORS[index % COLORS.length];
+        return {
+          id: key,
+          name: channelDisplayNames[key] || key.toUpperCase().replace('_', ' '),
+          count,
+          percentage: total > 0 ? (count / total) * 100 : 0,
+          color
+        };
+      })
+      .sort((a, b) => b.count - a.count);
+
+    return list;
+  }, [allOrders, activeCustomCards]);
 
   const filteredLogs = useMemo(() => {
     return logEvents.filter(e => {
@@ -417,7 +476,7 @@ export default function PedidosPorCanalPage() {
                         <ResponsiveContainer width="100%" height="100%">
                             <PieChart>
                                 <Pie data={marketingStats.filter(s => s.count > 0)} cx="50%" cy="50%" innerRadius={50} outerRadius={80} dataKey="count" nameKey="name">
-                                    {marketingStats.filter(s => s.count > 0).map((_, index) => <Cell key={index} fill={COLORS[index % COLORS.length]} />)}
+                                    {marketingStats.filter(s => s.count > 0).map((item) => <Cell key={item.id} fill={item.color} />)}
                                 </Pie>
                                 <ChartTooltip />
                             </PieChart>
@@ -433,7 +492,7 @@ export default function PedidosPorCanalPage() {
                         {marketingStats.map((s, i) => (
                             <div key={i} className="flex justify-between items-center text-xs">
                                 <span className="font-bold flex items-center gap-1.5">
-                                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
+                                    <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: s.color }} />
                                     {s.name}
                                 </span>
                                 <span className="font-black text-slate-700">{s.count} ped.</span>
@@ -474,9 +533,7 @@ export default function PedidosPorCanalPage() {
                             <div id={`qr-${chan.id}`} className="bg-white p-2 rounded-xl border group-hover:scale-105 transition-transform duration-500">
                                 <QRCode value={trackedUrl} size={100} level="M" />
                             </div>
-                            <Button variant="ghost" size="sm" className="h-7 text-[10px] font-black uppercase text-muted-foreground hover:text-primary" onClick={() => handleDownloadQR(`qr-${chan.id}`, `QR_${chan.id}`)}>
-                                <Download className="mr-1.5 h-3 w-3" /> Descargar PNG
-                            </Button>
+                            <QrDownloadMenu url={trackedUrl} channelName={chan.id} />
                         </CardContent>
                         <CardFooter className="p-4 pt-0">
                             <div className="relative w-full">
@@ -491,6 +548,8 @@ export default function PedidosPorCanalPage() {
             })}
         </div>
       </section>
+
+      <ShareCardsSection businessId={user?.uid} baseUrl={baseUrl} cardsProp={activeCustomCards} />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
            <Card className="lg:col-span-1">
@@ -508,9 +567,13 @@ export default function PedidosPorCanalPage() {
                     <div id="qr-custom-mesa" className="p-4 bg-white rounded-xl shadow-inner border">
                         <QRCode value={`${baseUrl}?ref=mesa-${customTableNumber || 'general'}`} size={160} level="H" />
                     </div>
-                    <Button className="w-full font-black h-12" onClick={() => handleDownloadQR('qr-custom-mesa', `QR_Mesa_${customTableNumber || 'Local'}`)}>
-                        <Download className="mr-2 h-4 w-4" /> Descargar QR Mesa
-                    </Button>
+                    <QrDownloadMenu 
+                        url={`${baseUrl}?ref=mesa-${customTableNumber || 'general'}`} 
+                        channelName={`mesa-${customTableNumber || 'local'}`}
+                        variant="default"
+                        fullWidth
+                        label="Descargar QR Mesa"
+                    />
                 </div>
              </CardContent>
            </Card>
