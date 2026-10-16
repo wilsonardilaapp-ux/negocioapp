@@ -91,7 +91,7 @@ export function registerPublicOrderTracking(
 
   const eventData: Omit<TrackingEvent, 'trackingId'> = {
     businessId,
-    source,
+    source: (origin as any) || source,
     channel,
     invoiceId: null,
     orderId: order.id,

@@ -82,6 +82,60 @@ const chartConfig = {
 
 const COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#6366f1", "#ec4899", "#14b8a6", "#8b5cf6", "#f97316", "#06b6d4", "#84cc16", "#e11d48", "#64748b", "#0284c7", "#d97706", "#4f46e5"];
 
+// Función centralizada para resolver nombre, color y key del canal
+function resolveChannelInfo(
+  rawOrigin: string | null | undefined, 
+  cards: ShareCard[] = []
+): { label: string; color: string; key: string } {
+  const clean = (rawOrigin || '').toLowerCase().trim();
+
+  // 1. Búsqueda en tarjetas personalizadas (activas y archivadas)
+  const matchingCard = cards.find(c => (c.ref || '').toLowerCase().trim() === clean);
+  if (matchingCard) {
+    return {
+      label: matchingCard.isArchived ? `${matchingCard.name.toUpperCase()} (ARCHIVADO)` : matchingCard.name.toUpperCase(),
+      color: '#8b5cf6',
+      key: matchingCard.ref.toLowerCase()
+    };
+  }
+
+  // 2. Canales del sistema oficiales
+  const BASE_MAP: Record<string, { label: string; color: string; key: string }> = {
+    import_manual: { label: 'IMPORT MANUAL', color: '#3b82f6', key: 'import_manual' },
+    terminal_pos: { label: 'TERMINAL POS', color: '#3b82f6', key: 'presencial' },
+    web: { label: 'CATÁLOGO WEB', color: '#10b981', key: 'web' },
+    catalogo_web: { label: 'CATÁLOGO WEB', color: '#10b981', key: 'web' },
+    whatsapp: { label: 'WHATSAPP', color: '#22c55e', key: 'whatsapp' },
+    whatsapp_link: { label: 'WHATSAPP', color: '#22c55e', key: 'whatsapp' },
+    landing: { label: 'LANDING PAGE', color: '#6366f1', key: 'landing' },
+    redes: { label: 'REDES SOCIALES', color: '#ec4899', key: 'redes' },
+    redes_sociales: { label: 'REDES SOCIALES', color: '#ec4899', key: 'redes' },
+    instagram: { label: 'INSTAGRAM', color: '#ec4899', key: 'redes' },
+    facebook: { label: 'FACEBOOK', color: '#1877f2', key: 'redes' },
+    qr: { label: 'QR GENERAL', color: '#f59e0b', key: 'qr' },
+    blog: { label: 'BLOG', color: '#a855f7', key: 'blog' },
+    directorio: { label: 'DIRECTORIO DE MARKIX', color: '#14b8a6', key: 'directorio' },
+    presencial: { label: 'VENTA PRESENCIAL', color: '#3b82f6', key: 'presencial' },
+    online: { label: 'CATÁLOGO WEB', color: '#10b981', key: 'web' }
+  };
+
+  if (BASE_MAP[clean]) {
+    return BASE_MAP[clean];
+  }
+
+  // Si viene con prefijo mesa-
+  if (clean.startsWith('mesa')) {
+    return { label: clean.toUpperCase().replace('-', ' '), color: '#f59e0b', key: 'qr' };
+  }
+
+  // Fallback seguro sin celdas vacías
+  return {
+    label: clean ? clean.toUpperCase().replace(/_/g, ' ') : 'ONLINE',
+    color: '#64748b',
+    key: clean || 'online'
+  };
+}
+
 export default function PedidosPorCanalPage() {
   const { user, profile } = useUser();
   const firestore = useFirestore();
@@ -246,15 +300,34 @@ export default function PedidosPorCanalPage() {
     return list;
   }, [allOrders, activeCustomCards]);
 
+  const ordersMap = useMemo(() => {
+    const map = new Map<string, Order>();
+    (allOrders || []).forEach(o => {
+      if (o.id) map.set(o.id, o);
+    });
+    return map;
+  }, [allOrders]);
+
   const filteredLogs = useMemo(() => {
     return logEvents.filter(e => {
         const term = searchClient.toLowerCase();
+        const linkedOrder = e.orderId ? ordersMap.get(e.orderId) : null;
+        const rawOrigin = linkedOrder?.origin || (e.source === 'terminal_pos' ? 'terminal_pos' : (e.source || e.channel));
+        const resolved = resolveChannelInfo(rawOrigin, activeCustomCards);
+
         const clientNameMatch = e.customerName?.toLowerCase().includes(term);
-        const invoiceIdMatch = e.invoiceId?.toLowerCase().includes(term);
-        const channelMatch = filterChannel === 'all' || e.channel === filterChannel;
-        return (clientNameMatch || invoiceIdMatch) && channelMatch;
+        const invoiceIdMatch = (e.invoiceId || e.consecutiveNumber || '')?.toLowerCase().includes(term);
+        const channelNameMatch = resolved.label.toLowerCase().includes(term);
+
+        const channelMatch = filterChannel === 'all' || 
+                             resolved.key === filterChannel.toLowerCase() || 
+                             e.channel === filterChannel.toLowerCase() ||
+                             (filterChannel === 'presencial' && (e.channel === 'presencial' || e.source === 'terminal_pos')) ||
+                             (filterChannel === 'online' && e.channel === 'online');
+
+        return (clientNameMatch || invoiceIdMatch || channelNameMatch) && channelMatch;
     });
-  }, [logEvents, searchClient, filterChannel]);
+  }, [logEvents, searchClient, filterChannel, ordersMap, activeCustomCards]);
 
   const handleCopyLink = (url: string, id: string) => {
     navigator.clipboard.writeText(url);
@@ -289,6 +362,9 @@ export default function PedidosPorCanalPage() {
     } catch (e) { console.error(e); }
   };
 
+  
+  
+
   const formatCurrency = (val: number) => 
     new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(val);
 
@@ -318,7 +394,10 @@ export default function PedidosPorCanalPage() {
       const wsLogs = XLSX.utils.json_to_sheet(filteredLogs.map(log => ({
         'Factura / Consecutivo': log.consecutiveNumber || 'N/A',
         'Canal Operativo': log.channel?.toUpperCase(),
-        'Fuente de Tráfico': log.source?.toUpperCase(),
+        'Fuente de Tráfico': (() => {
+        const lo = log.orderId ? ordersMap.get(log.orderId) : null;
+        return resolveChannelInfo(lo?.origin || log.source, activeCustomCards).label;
+      })(),
         'Cliente': log.customerName,
         'Monto Total ($)': log.total,
         'Fecha y Hora': log.createdAt?.toDate ? format(log.createdAt.toDate(), "dd/MM/yyyy HH:mm") : 'N/A'
@@ -391,7 +470,10 @@ export default function PedidosPorCanalPage() {
         body: filteredLogs.map(log => [
           log.consecutiveNumber || 'N/A',
           log.channel?.toUpperCase(),
-          log.source?.toUpperCase(),
+          (() => {
+            const lo = log.orderId ? ordersMap.get(log.orderId) : null;
+            return resolveChannelInfo(lo?.origin || log.source, activeCustomCards).label;
+          })(),
           log.customerName,
           formatCurrency(log.total),
           log.createdAt?.toDate ? format(log.createdAt.toDate(), "dd/MM/yy HH:mm") : '---'
@@ -643,12 +725,34 @@ export default function PedidosPorCanalPage() {
                </TableHeader>
                <TableBody>
                  {isLogsLoading ? <TableRow><TableCell colSpan={6} className="h-32 text-center"><Loader2 className="animate-spin mx-auto" /></TableCell></TableRow> : filteredLogs.length > 0 ? ( 
-                   filteredLogs.map(event => (
+                   filteredLogs.map(event => {
+                     const linkedOrder = event.orderId ? ordersMap.get(event.orderId) : null;
+                     const rawOrigin = linkedOrder?.origin || (event.source === 'terminal_pos' ? 'terminal_pos' : (event.source || event.channel));
+                     const resolved = resolveChannelInfo(rawOrigin, activeCustomCards);
+
+                     return (
                      <TableRow key={event.trackingId} className="hover:bg-muted/30 transition-colors">
                         <TableCell className="pl-6 font-mono text-xs font-bold text-primary">{event.consecutiveNumber || 'S/N'}</TableCell>
-                        <TableCell><Badge variant="secondary" className="text-[9px] uppercase font-black tracking-widest">{event.channel}</Badge></TableCell>
                         <TableCell>
-                           <div className="flex flex-col"><span className="text-xs font-bold text-slate-800">{event.customerName}</span><span className="text-[9px] text-muted-foreground uppercase">{event.source}</span></div>
+                          <div className="flex flex-col items-start gap-1">
+                            <Badge 
+                              variant="outline" 
+                              className="text-[9px] uppercase font-black tracking-wider px-2 py-0.5 border shadow-2xs max-w-[150px] truncate"
+                              style={{ borderColor: `${resolved.color}40`, backgroundColor: `${resolved.color}15`, color: resolved.color }}
+                              title={resolved.label}
+                            >
+                              {resolved.label}
+                            </Badge>
+                            <span className="text-[8px] font-bold text-muted-foreground uppercase tracking-widest pl-0.5">
+                              {event.channel === 'presencial' ? 'Venta Presencial' : 'Venta Online'}
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                           <div className="flex flex-col">
+                             <span className="text-xs font-bold text-slate-800">{event.customerName || 'Cliente'}</span>
+                             <span className="text-[9px] text-muted-foreground font-mono uppercase">{event.source || 'web'}</span>
+                           </div>
                         </TableCell>
                         <TableCell className="text-right font-black text-slate-900 text-xs">{formatCurrency(event.total)}</TableCell>
                         <TableCell className="text-center text-[10px] font-medium text-slate-500">{event.createdAt?.toDate ? format(event.createdAt.toDate(), "dd/MM/yyyy HH:mm") : '---'}</TableCell>
@@ -658,7 +762,8 @@ export default function PedidosPorCanalPage() {
                           </Button>
                         </TableCell>
                      </TableRow>
-                   ))
+                   );
+                 })
                  ) : <TableRow><TableCell colSpan={6} className="h-32 text-center text-muted-foreground italic text-xs">Sin registros que coincidan con los filtros.</TableCell></TableRow>}
                </TableBody>
              </Table>
