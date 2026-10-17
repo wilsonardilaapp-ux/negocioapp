@@ -65,5 +65,7 @@ export type Business = {
         [key: string]: number | undefined;
     };
     loyaltyConfig?: LoyaltyConfig;
+    // ADITIVO: Switch global Prueba Social
+    socialProofEnabled?: boolean;
     updatedAt?: string;
 };

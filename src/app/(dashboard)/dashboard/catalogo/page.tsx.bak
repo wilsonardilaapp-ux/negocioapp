@@ -26,12 +26,13 @@ import { Badge } from '@/components/ui/badge';
 import type { LandingHeaderConfigData } from '../../../../models/landing-page';
 import { v4 as uuidv4 } from 'uuid';
 import { useUser, useFirestore, useMemoFirebase, setDocumentNonBlocking, deleteDocumentNonBlocking, useCollection } from '../../../../firebase';
-import { doc, getDoc, collection, writeBatch } from 'firebase/firestore'; 
+import { doc, getDoc, collection, writeBatch , getDocs } from 'firebase/firestore'; 
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '../../../../components/ui/tooltip';
 import { useToast } from '../../../../hooks/use-toast';
 import { useSubscription } from '../../../../hooks/useSubscription';
 import { LimitBanner } from '../../../../components/dashboard/LimitBanner';
 import type { Business } from '../../../../models/business';
+import { type PricingContext, obtenerTasaComisionHibrida } from '@/constants/pricingPlans';
 import { promotionService } from '../../../../services/promotion-service';
 import * as XLSX from 'xlsx';
 import { cn } from '@/lib/utils';
@@ -87,6 +88,7 @@ const chunkArray = <T,>(array: T[], size: number): T[][] => {
 
 export default function CatalogoPage() {
     const [isFormOpen, setIsFormOpen] = useState(false);
+    const [businessData, setBusinessData] = useState<Business | null>(null);
     const [editingProduct, setEditingProduct] = useState<Product | null>(null);
     const [productToDelete, setProductToDelete] = useState<Product | null>(null);
     
@@ -105,6 +107,20 @@ export default function CatalogoPage() {
         isLoading: isSubscriptionLoading 
     } = useSubscription();
 
+    
+    const pricingContext: PricingContext = useMemo(() => {
+        const pName = typeof plan === 'string' ? plan : ((plan as any)?.name || '');
+        const pLower = pName.toLowerCase();
+        const isHybrid = pLower.includes('crecimiento') || pLower.includes('estándar') || pLower.includes('profesional') || pLower.includes('básico');
+        const type = businessData?.planType || (isHybrid ? 'hibrido' : 'fijo');
+        return {
+            planType: type,
+            planName: businessData?.planName || pName || 'Plan Estándar',
+            planSlug: (plan as any)?.slug,
+            comisionRate: (plan as any)?.comision || (plan as any)?.commission,
+        };
+    }, [businessData, plan]);
+  
     const isAuthorized = useMemo(() => isModuleAuthorized('catalogo'), [isModuleAuthorized]);
 
     const productsQuery = useMemoFirebase(() => 
@@ -134,6 +150,7 @@ export default function CatalogoPage() {
                 const businessRef = doc(firestore, 'businesses', user.uid);
                 const businessSnap = await getDoc(businessRef);
                 const businessRootData = businessSnap.exists() ? businessSnap.data() as Business : null;
+                if (isMounted) setBusinessData(businessRootData);
 
                 const headerConfigRef = doc(firestore, 'businesses', user.uid, 'landingConfig', 'header');
                 const headerConfigSnap = await getDoc(headerConfigRef);
@@ -210,7 +227,7 @@ export default function CatalogoPage() {
             return;
         }
         
-        const dataToSave = { ...productData, businessId: user.uid };
+        const dataToSave = { ...productData, basePrice: (productData as any).basePrice ?? productData.price, businessId: user.uid };
 
         if (editingProduct) {
             const productDocRef = doc(firestore, 'businesses', user.uid, 'products', editingProduct.id);
@@ -413,6 +430,11 @@ export default function CatalogoPage() {
                 await batch.commit();
             }
 
+            // Sincronizar catálogo público tras importación
+            const allCurrentSnap = await getDocs(collection(firestore, `businesses/${user.uid}/products`));
+            const allCurrentProds = allCurrentSnap.docs.map((d: any) => ({ ...d.data(), id: d.id } as Product));
+            updatePublicCatalog(allCurrentProds, headerConfig);
+
             toast({ 
                 title: 'Importación finalizada', 
                 description: `Se importaron ${rowsToImport.length} productos.${omittedByPlan > 0 ? ` Se omitieron ${omittedByPlan} por límite de plan.` : ''}` 
@@ -515,6 +537,7 @@ export default function CatalogoPage() {
                                     </DialogDescription>
                                 </DialogHeader>
                                 <ProductForm 
+                                    planContext={pricingContext}
                                     product={editingProduct} 
                                     onSave={handleSaveProduct} 
                                     onCancel={() => setIsFormOpen(false)}
@@ -534,10 +557,36 @@ export default function CatalogoPage() {
                 </CardContent>
             </Card>
 
+            
+            {/* Banner dinámico de plan Menfy */}
+            <div className="mb-6 p-4 rounded-xl border bg-card/60 backdrop-blur shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Tu Plan:</span>
+                        <span className="text-sm font-bold text-foreground">{pricingContext.planName || 'Plan Menfy'}</span>
+                        <Badge variant={pricingContext.planType === 'hibrido' ? 'default' : 'secondary'}>
+                            {pricingContext.planType === 'hibrido' ? 'Modelo Híbrido' : 'Modelo Fijo'}
+                        </Badge>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                        {(() => {
+                          if (pricingContext.planType === 'fijo') {
+                            return 'Tu plan incluye el servicio Menfy por mensualidad. Sin comisiones.';
+                          }
+                          const nameLower = (pricingContext.planName || '').toLowerCase();
+                          if (nameLower.includes('arranque')) {
+                            return 'Menfy agrega una tarifa de servicio en domicilio y en mesa. Tú recibes siempre el 100% de tu precio base.';
+                          }
+                          return 'Menfy agrega una tarifa de servicio en domicilio y en mesa. Tu mensualidad cubre las herramientas de gestión de tu negocio.';
+                        })()}
+                    </p>
+                </div>
+            </div>
+  
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
                 {products && products.length > 0 ? (
                     products.map(product => (
-                        <ProductCard key={product.id} product={product}>
+                        <ProductCard key={product.id} product={product} planContext={pricingContext}>
                             <div className="flex gap-2">
                                 <Button variant="outline" size="sm" className="w-full" onClick={() => handleEdit(product)}>
                                     <Edit className="mr-2 h-4 w-4" /> Editar

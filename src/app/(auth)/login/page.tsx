@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -38,6 +38,12 @@ export default function LoginPage() {
   const { user, isUserLoading } = useUser();
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [forceShowForm, setForceShowForm] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setForceShowForm(true), 2500);
+    return () => clearTimeout(timer);
+  }, []);
 
   const form = useForm<z.infer<typeof loginSchema>>({
     resolver: zodResolver(loginSchema),
@@ -78,7 +84,7 @@ export default function LoginPage() {
     }
   }
 
-  if (user || isUserLoading) {
+  if (!forceShowForm && (user || isUserLoading)) {
     return (
         <div className="flex flex-col items-center justify-center min-h-[400px] p-6 text-center space-y-4">
             <Loader2 className="h-10 w-10 animate-spin text-primary" />

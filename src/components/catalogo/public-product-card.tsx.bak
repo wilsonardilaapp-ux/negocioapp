@@ -7,6 +7,7 @@ import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { Star, Eye } from 'lucide-react';
 import type { Product } from '../../models/product';
+import { calcularPrecioCliente, type PricingContext } from '@/constants/pricingPlans';
 import type { Promotion } from '../../models/promotion';
 import { promotionService } from '../../services/promotion-service';
 import { stripHtml } from '../../lib/utils';
@@ -16,9 +17,10 @@ interface PublicProductCardProps {
   promotions: Promotion[];
   onView: () => void;
   onBuy: () => void;
+  planContext?: PricingContext;
 }
 
-export default function PublicProductCard({ product, promotions = [], onView, onBuy }: PublicProductCardProps) {
+export default function PublicProductCard({ product, promotions = [], onView, onBuy, planContext }: PublicProductCardProps) {
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('es-CO', {
       style: 'currency',
@@ -83,9 +85,19 @@ export default function PublicProductCard({ product, promotions = [], onView, on
               </span>
             </div>
           ) : (
-            <p className="text-2xl font-black text-primary">
-                {formatCurrency(product.price)}
-            </p>
+            <div className="flex items-baseline flex-wrap">
+              <p className="text-2xl font-black text-primary">
+                  {formatCurrency(calcularPrecioCliente(product.basePrice ?? product.price, planContext))}
+              </p>
+              {planContext?.planType === 'hibrido' && (
+                <span 
+                  className="text-[10px] font-medium text-muted-foreground ml-2 bg-muted px-1.5 py-0.5 rounded cursor-help"
+                  title="Incluye tarifa de servicio Markix"
+                >
+                  Servicio Markix incl.
+                </span>
+              )}
+            </div>
           )}
         </div>
       </CardContent>

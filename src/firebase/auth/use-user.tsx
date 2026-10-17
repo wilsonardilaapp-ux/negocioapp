@@ -47,7 +47,14 @@ export function useUser() {
   useEffect(() => {
     if (!auth || !isNetworkEnabled) return;
     
+    // Timeout preventivo de seguridad: desbloquear tras 2.5s si Firebase no responde
+    const authTimeout = setTimeout(() => {
+      setAuthState(prev => prev.isLoading ? { ...prev, isLoading: false } : prev);
+      setProfileLoading(false);
+    }, 2500);
+
     const unsubscribe = onAuthStateChanged(auth, (user) => {
+        clearTimeout(authTimeout);
         setAuthState({ user, isLoading: false, error: null });
         if (!user) {
             setProfile(null);
@@ -166,6 +173,16 @@ export function useUser() {
             isRedirecting.current = true;
             router.replace('/login');
         }
+        return;
+    }
+
+    // Fast-path: Si hay usuario y estamos en página de auth, deducir rol por email inmediatamente
+    const userEmail = authState.user?.email?.toLowerCase().trim() || '';
+    const isDirectAdmin = SUPER_ADMIN_EMAILS.includes(userEmail);
+
+    if (authState.user && isAuthPage && !isRedirecting.current) {
+        isRedirecting.current = true;
+        router.replace(isDirectAdmin ? '/superadmin' : '/dashboard');
         return;
     }
 

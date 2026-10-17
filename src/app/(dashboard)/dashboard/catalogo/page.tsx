@@ -10,6 +10,8 @@ import ProductForm from '../../../../components/catalogo/product-form';
 import CatalogHeaderForm from '../../../../components/catalogo/catalog-header-form';
 import CatalogQRGenerator from '../../../../components/catalogo/catalog-qr-generator';
 import ShareCatalog from '../../../../components/catalogo/share-catalog';
+import SocialProofGlobalSwitch from '@/components/catalogo/SocialProofGlobalSwitch';
+import ProductSocialProofMenu from '@/components/catalogo/ProductSocialProofMenu';
 import ProductCard from '../../../../components/catalogo/product-card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger, DialogFooter } from '../../../../components/ui/dialog';
 import {
@@ -490,7 +492,15 @@ export default function CatalogoPage() {
             <Card>
                 <CardHeader className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                     <div>
-                        <CardTitle>Tus Productos</CardTitle>
+                        <div className="flex flex-wrap items-center gap-3">
+                            <CardTitle>Tus Productos</CardTitle>
+                            {user && (
+                                <SocialProofGlobalSwitch 
+                                    businessId={user.uid} 
+                                    initialEnabled={businessData?.socialProofEnabled !== false} 
+                                />
+                            )}
+                        </div>
                         <CardDescription>
                             Añade, edita y gestiona los productos de tu negocio.
                         </CardDescription>
@@ -594,6 +604,12 @@ export default function CatalogoPage() {
                                 <Button variant="destructive" size="sm" className="w-full" onClick={() => setProductToDelete(product)}>
                                     <Trash2 className="mr-2 h-4 w-4" /> Eliminar
                                 </Button>
+                                {user && (
+                                    <ProductSocialProofMenu 
+                                        product={product} 
+                                        businessId={user.uid} 
+                                    />
+                                )}
                             </div>
                         </ProductCard>
                     ))

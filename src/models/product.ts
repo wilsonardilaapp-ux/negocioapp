@@ -12,4 +12,7 @@ export type Product = {
     ratingCount: number; // Número de valoraciones
     packagingCost?: number;
     imageSize?: number;
+    // ADITIVO: Configuración Prueba Social
+    socialProofRecentSales?: boolean;
+    socialProofLiveViewers?: boolean;
 };

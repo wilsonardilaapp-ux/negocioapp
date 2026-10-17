@@ -32,6 +32,7 @@ import { promotionService } from '@/services/promotion-service';
 import { couponService } from '@/services/coupon-service';
 import { useSubscription } from '@/hooks/useSubscription';
 import { saveAttribution } from '@/lib/tracking/attribution';
+import { validateAndResolveRef } from '@/actions/share-cards-actions';
 
 // Componentes de Fidelización y Reseñas
 import ReviewForm from '@/components/catalogo/ReviewForm';
@@ -118,11 +119,14 @@ function CatalogPageContent({ params }: CatalogPageProps) {
 
     // --- PERSISTENCIA DE ATRIBUCIÓN (ADITIVO) ---
     useEffect(() => {
-        const ref = searchParams.get('ref');
-        if (ref) {
-            saveAttribution(ref);
+        const rawRef = searchParams.get('ref');
+        if (rawRef) {
+            const bId = pageData.resolvedBusinessId || (params as any)?.businessId;
+            validateAndResolveRef(bId, rawRef)
+                .then(resolved => saveAttribution(resolved))
+                .catch(() => saveAttribution('web'));
         }
-    }, [searchParams]);
+    }, [searchParams, pageData.resolvedBusinessId]);
 
     // Estado para la sesión de fidelización del cliente
     const [loyaltySession, setLoyaltySession] = useState<{ balance: number; whatsapp: string } | null>(null);

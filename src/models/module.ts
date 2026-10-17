@@ -14,6 +14,8 @@ export type Module = {
  * IMPORTANTE: Solo deben existir IDs canónicos unificados.
  */
 export const DEFAULT_MODULES = [
+  { id: 'social-proof', name: 'Prueba Social', description: 'Muestra indicadores en tiempo real de productos populares y concurrencia de compradores en el catálogo público.', limit: -1 },
+
   { id: 'jev-copiloto', name: 'JEV Copiloto (IA)', description: 'Asistente de inteligencia artificial y recomendaciones operativas para el negocio.', limit: -1 },
   { id: 'catalogo', name: 'Catálogo de Productos', description: 'Permite a los negocios gestionar un catálogo digital con carrito de WhatsApp.', limit: -1 },
   { id: 'blog', name: 'Blog Profesional', description: 'Módulo de artículos y noticias para SEO y fidelización.', limit: 5 },
