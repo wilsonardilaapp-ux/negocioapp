@@ -1,5 +1,6 @@
-'use client';
+"use client";
 
+import { JevCopilotWidgetPromociones } from "@/jev/JevCopilotWidgetPromociones";
 import { useState, useEffect, useMemo } from 'react';
 import { useUser, useFirestore, useCollection, useMemoFirebase } from '../../../../firebase';
 import { usePromotions } from '../../../../hooks/use-promotions';
@@ -594,7 +595,9 @@ function PromotionDialog({ isOpen, onClose, promo }: { isOpen: boolean, onClose:
               <Switch checked={formData.showInCheckout} onCheckedChange={v => setFormData({ ...formData, showInCheckout: v })} />
               <Label>Ver en checkout</Label>
             </div>
-          </div>
+          
+      <JevCopilotWidgetPromociones businessId={user?.uid} />
+    </div>
 
           <DialogFooter>
             <Button type="submit" className="w-full h-12 font-bold" disabled={isSaving}>

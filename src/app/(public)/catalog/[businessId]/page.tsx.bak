@@ -33,6 +33,8 @@ import { couponService } from '@/services/coupon-service';
 import { useSubscription } from '@/hooks/useSubscription';
 import { saveAttribution } from '@/lib/tracking/attribution';
 import { validateAndResolveRef } from '@/actions/share-cards-actions';
+import { getSocialProofMetrics } from '@/actions/social-proof-actions';
+import type { SocialProofCatalogMetrics } from '@/models/social-proof';
 
 // Componentes de Fidelización y Reseñas
 import ReviewForm from '@/components/catalogo/ReviewForm';
@@ -65,6 +67,7 @@ function CatalogPageContent({ params }: CatalogPageProps) {
     const { isModuleAuthorized } = useSubscription();
 
     const [isLoading, setIsLoading] = useState(true);
+    const [socialProofData, setSocialProofData] = useState<SocialProofCatalogMetrics | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [pageData, setPageData] = useState<{
         headerConfig: LandingHeaderConfigData | null;
@@ -209,6 +212,13 @@ function CatalogPageContent({ params }: CatalogPageProps) {
 
         fetchData();
     }, [slug, firestore, isNetworkEnabled]);
+
+    useEffect(() => {
+        if (!pageData.resolvedBusinessId) return;
+        getSocialProofMetrics(pageData.resolvedBusinessId)
+            .then(data => setSocialProofData(data))
+            .catch(err => console.error('Error cargando métricas de prueba social:', err));
+    }, [pageData.resolvedBusinessId]);
 
     const categoriesList = useMemo(() => {
         if (!pageData.products) return ['Todas'];
@@ -515,6 +525,7 @@ function CatalogPageContent({ params }: CatalogPageProps) {
                                     product={product} 
                                     promotions={pageData.promotions || []}
                                     planContext={pricingContext}
+                                    socialProof={socialProofData?.metrics?.[product.id]}
                                     onView={() => setSelectedProduct(product)}
                                     onBuy={() => handleBuyNow(product)}
                                 />

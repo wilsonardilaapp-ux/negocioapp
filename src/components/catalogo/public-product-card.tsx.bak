@@ -1,5 +1,7 @@
 'use client';
 
+import SocialProofBadge from './SocialProofBadge';
+import type { SocialProofProductMetrics } from '@/models/social-proof';
 import React from 'react';
 import Image from 'next/image';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '../ui/card';
@@ -18,9 +20,10 @@ interface PublicProductCardProps {
   onView: () => void;
   onBuy: () => void;
   planContext?: PricingContext;
+  socialProof?: SocialProofProductMetrics;
 }
 
-export default function PublicProductCard({ product, promotions = [], onView, onBuy, planContext }: PublicProductCardProps) {
+export default function PublicProductCard({ product, promotions = [], onView, onBuy, planContext, socialProof }: PublicProductCardProps) {
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('es-CO', {
       style: 'currency',
@@ -100,6 +103,7 @@ export default function PublicProductCard({ product, promotions = [], onView, on
             </div>
           )}
         </div>
+        <SocialProofBadge metrics={socialProof} />
       </CardContent>
       <CardFooter className="p-4 pt-0 gap-2">
         <Button variant="outline" size="sm" className="flex-1" onClick={onView}>

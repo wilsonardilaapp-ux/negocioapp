@@ -1,5 +1,7 @@
 'use client';
 
+import { CountdownTimer } from "./countdown-timer";
+
 import SocialProofBadge from './SocialProofBadge';
 import type { SocialProofProductMetrics } from '@/models/social-proof';
 import React from 'react';
@@ -38,12 +40,15 @@ export default function PublicProductCard({ product, promotions = [], onView, on
     <Card className="flex flex-col self-start overflow-hidden hover:shadow-xl transition-all duration-300 border-gray-100 group relative">
       {/* Badge de Descuento sobre la imagen */}
       {discountInfo.hasDiscount && (
-        <div className="absolute top-3 left-3 z-10 animate-in fade-in zoom-in duration-300">
+        <div className="absolute top-3 left-3 z-10 flex flex-col items-start gap-1.5 animate-in fade-in zoom-in duration-300">
           <Badge className="bg-red-600 hover:bg-red-700 text-white font-black border-none shadow-md px-3 py-1">
             {discountInfo.promotion?.type === 'percentage' 
               ? `-${discountInfo.promotion.discountValue}%` 
               : 'OFERTA'}
           </Badge>
+          {discountInfo.promotion?.showCountdown && discountInfo.promotion?.validUntil && (
+            <CountdownTimer targetDate={discountInfo.promotion.validUntil} variant="badge" />
+          )}
         </div>
       )}
 
@@ -86,6 +91,9 @@ export default function PublicProductCard({ product, promotions = [], onView, on
               <span className="text-2xl font-black text-red-600">
                 {formatCurrency(discountInfo.finalPrice)}
               </span>
+              {discountInfo.promotion?.showCountdown && discountInfo.promotion?.validUntil && (
+                <CountdownTimer targetDate={discountInfo.promotion.validUntil} variant="compact" />
+              )}
             </div>
           ) : (
             <div className="flex items-baseline flex-wrap">

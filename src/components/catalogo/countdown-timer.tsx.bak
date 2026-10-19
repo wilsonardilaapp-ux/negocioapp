@@ -1,0 +1,142 @@
+"use client";
+
+import React, { useState, useEffect } from "react";
+import { Clock } from "lucide-react";
+
+interface CountdownTimerProps {
+  targetDate: string;
+  variant?: "badge" | "compact" | "full";
+  className?: string;
+  onExpire?: () => void;
+}
+
+interface TimeRemaining {
+  days: number;
+  hours: number;
+  minutes: number;
+  seconds: number;
+  isExpired: boolean;
+}
+
+export function CountdownTimer({ targetDate, variant = "compact", className = "", onExpire }: CountdownTimerProps) {
+  const calculateTimeRemaining = (): TimeRemaining => {
+    if (!targetDate) {
+      return { days: 0, hours: 0, minutes: 0, seconds: 0, isExpired: true };
+    }
+
+    const normalizedDate = targetDate.includes("T") ? targetDate : targetDate + "T23:59:59";
+    const targetMs = new Date(normalizedDate).getTime();
+    const difference = targetMs - Date.now();
+
+    if (isNaN(difference) || difference <= 0) {
+      return { days: 0, hours: 0, minutes: 0, seconds: 0, isExpired: true };
+    }
+
+    const days = Math.floor(difference / (1000 * 60 * 60 * 24));
+    const hours = Math.floor((difference % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    const minutes = Math.floor((difference % (1000 * 60 * 60)) / (1000 * 60));
+    const seconds = Math.floor((difference % (1000 * 60)) / 1000);
+
+    return { days, hours, minutes, seconds, isExpired: false };
+  };
+
+  const [timeLeft, setTimeLeft] = useState<TimeRemaining>(calculateTimeRemaining);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const updated = calculateTimeRemaining();
+      setTimeLeft(updated);
+      if (updated.isExpired) {
+        clearInterval(timer);
+        if (onExpire) onExpire();
+      }
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [targetDate]);
+
+  if (timeLeft.isExpired) return null;
+
+  const pad = (n: number) => n.toString().padStart(2, "0");
+
+  if (variant === "badge") {
+    return (
+      <div className={"inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/75 backdrop-blur-sm text-white text-[11px] font-bold shadow-md border border-white/20 select-none " + className}>
+        <Clock className="w-3 h-3 text-emerald-400 animate-pulse" />
+        <span>
+          {timeLeft.days > 0 ? timeLeft.days + "d " : ""}
+          {pad(timeLeft.hours)}:{pad(timeLeft.minutes)}:{pad(timeLeft.seconds)}
+        </span>
+      </div>
+    );
+  }
+
+  if (variant === "compact") {
+    return (
+      <div className={"flex flex-col gap-1 py-1 select-none " + className}>
+        <div className="flex items-center gap-1 text-[11px] font-semibold text-emerald-700">
+          <Clock className="w-3.5 h-3.5 text-emerald-600 animate-pulse" />
+          <span>Oferta termina en:</span>
+        </div>
+        <div className="flex items-center gap-1">
+          {timeLeft.days > 0 && (
+            <span className="flex items-center gap-0.5 bg-emerald-50 text-emerald-800 border border-emerald-200/60 rounded px-1.5 py-0.5 text-xs font-black">
+              {timeLeft.days}<span className="text-[10px] text-emerald-600 font-medium">d</span>
+            </span>
+          )}
+          <span className="flex items-center gap-0.5 bg-emerald-50 text-emerald-800 border border-emerald-200/60 rounded px-1.5 py-0.5 text-xs font-black">
+            {pad(timeLeft.hours)}<span className="text-[10px] text-emerald-600 font-medium">h</span>
+          </span>
+          <span className="text-emerald-500 font-bold">:</span>
+          <span className="flex items-center gap-0.5 bg-emerald-50 text-emerald-800 border border-emerald-200/60 rounded px-1.5 py-0.5 text-xs font-black">
+            {pad(timeLeft.minutes)}<span className="text-[10px] text-emerald-600 font-medium">m</span>
+          </span>
+          <span className="text-emerald-500 font-bold">:</span>
+          <span className="flex items-center gap-0.5 bg-emerald-50 text-emerald-800 border border-emerald-200/60 rounded px-1.5 py-0.5 text-xs font-black">
+            {pad(timeLeft.seconds)}<span className="text-[10px] text-emerald-600 font-medium">s</span>
+          </span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={"p-4 rounded-xl border border-emerald-200/80 bg-gradient-to-br from-emerald-50/60 via-emerald-50/30 to-white shadow-sm space-y-2 select-none " + className}>
+      <div className="flex items-center justify-between text-xs font-bold text-emerald-800">
+        <span className="flex items-center gap-1.5">
+          <Clock className="w-4 h-4 text-emerald-600 animate-pulse" />
+          OFERTA POR TIEMPO LIMITADO
+        </span>
+        <span className="text-[11px] font-semibold text-emerald-600">¡Termina pronto!</span>
+      </div>
+      <div className="grid grid-cols-4 gap-2 text-center">
+        <div className="bg-white border border-emerald-200/60 rounded-lg p-2 shadow-xs">
+          <span className="block text-xl md:text-2xl font-black text-emerald-700 tabular-nums">
+            {timeLeft.days}
+          </span>
+          <span className="block text-[10px] uppercase font-bold text-gray-500 tracking-wider">Días</span>
+        </div>
+        <div className="bg-white border border-emerald-200/60 rounded-lg p-2 shadow-xs">
+          <span className="block text-xl md:text-2xl font-black text-emerald-700 tabular-nums">
+            {pad(timeLeft.hours)}
+          </span>
+          <span className="block text-[10px] uppercase font-bold text-gray-500 tracking-wider">Horas</span>
+        </div>
+        <div className="bg-white border border-emerald-200/60 rounded-lg p-2 shadow-xs">
+          <span className="block text-xl md:text-2xl font-black text-emerald-700 tabular-nums">
+            {pad(timeLeft.minutes)}
+          </span>
+          <span className="block text-[10px] uppercase font-bold text-gray-500 tracking-wider">Min</span>
+        </div>
+        <div className="bg-white border border-emerald-200/60 rounded-lg p-2 shadow-xs">
+          <span className="block text-xl md:text-2xl font-black text-emerald-700 tabular-nums">
+            {pad(timeLeft.seconds)}
+          </span>
+          <span className="block text-[10px] uppercase font-bold text-gray-500 tracking-wider">Seg</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default CountdownTimer;

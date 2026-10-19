@@ -692,6 +692,7 @@ function CatalogPageContent({ params }: CatalogPageProps) {
             </main>
 
             <ProductViewModal 
+                promotions={pageData.promotions || []}
                 product={selectedProduct} 
                 businessId={pageData.resolvedBusinessId}
                 isOpen={!!selectedProduct} 

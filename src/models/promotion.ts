@@ -14,7 +14,8 @@ export interface Promotion {
   validUntil: string;                            // ISO date string
   isActive: boolean;
   showInCatalog: boolean;                        // Mostrar en catálogo/vitrina pública
-  showInCheckout: boolean;                       // Mostrar al momento de compra/reserva/orden
+  showInCheckout: boolean;
+  showCountdown?: boolean;                       // Mostrar contador regresivo en producto                       // Mostrar al momento de compra/reserva/orden
   minQuantity?: number;                          // Cantidad/unidades mínimas para aplicar
   usageLimit?: number;                           // 0 = ilimitado
   usageCount: number;

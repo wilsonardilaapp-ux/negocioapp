@@ -56,6 +56,18 @@ export default function PromotionsPage() {
 
   const isLoading = arePromosLoading || isSubLoading;
 
+  const handleToggleCountdown = async (id: string, current: boolean) => {
+    try {
+      await promotionService.updatePromotion(id, { showCountdown: !current });
+      if (user?.uid) {
+        await promotionService.syncPublicCatalog(user.uid);
+      }
+      toast({ title: "Contador actualizado" });
+    } catch (error) {
+      toast({ variant: "destructive", title: "Error al actualizar contador" });
+    }
+  };
+
   const handleToggleActive = async (id: string, current: boolean) => {
     try {
       await promotionService.toggleActive(id, !current);
@@ -284,6 +296,7 @@ export default function PromotionsPage() {
                   <TableHead>Aplica a</TableHead>
                   <TableHead>Vigencia</TableHead>
                   <TableHead>Estado</TableHead>
+                  <TableHead>Contador</TableHead>
                   <TableHead className="text-right">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
@@ -311,6 +324,9 @@ export default function PromotionsPage() {
                           <Badge variant="outline" className="bg-yellow-50 text-yellow-700">Límite alcanzado</Badge>
                         )}
                       </div>
+                    </TableCell>
+                    <TableCell>
+                      <Switch checked={!!promo.showCountdown} onCheckedChange={() => handleToggleCountdown(promo.id, !!promo.showCountdown)} />
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
@@ -381,6 +397,7 @@ function PromotionDialog({ isOpen, onClose, promo }: { isOpen: boolean, onClose:
     isActive: true,
     showInCatalog: true,
     showInCheckout: true,
+    showCountdown: false,
     validFrom: new Date().toISOString().split('T')[0],
     validUntil: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
     discountValue: 0,
@@ -405,6 +422,7 @@ function PromotionDialog({ isOpen, onClose, promo }: { isOpen: boolean, onClose:
           ...promo,
           validFrom: promo.validFrom ? new Date(promo.validFrom).toISOString().split('T')[0] : initialDefaults.validFrom,
           validUntil: promo.validUntil ? new Date(promo.validUntil).toISOString().split('T')[0] : initialDefaults.validUntil,
+          showCountdown: !!promo.showCountdown,
         });
       } else {
         setFormData({ ...initialDefaults });
@@ -432,6 +450,7 @@ function PromotionDialog({ isOpen, onClose, promo }: { isOpen: boolean, onClose:
         isActive: formData.isActive === undefined ? true : !!formData.isActive,
         showInCatalog: formData.showInCatalog === undefined ? true : !!formData.showInCatalog,
         showInCheckout: formData.showInCheckout === undefined ? true : !!formData.showInCheckout,
+        showCountdown: !!formData.showCountdown,
         validFrom: formData.validFrom || initialDefaults.validFrom,
         validUntil: formData.validUntil || initialDefaults.validUntil,
         discountValue: Number(formData.discountValue) || 0,
@@ -594,6 +613,10 @@ function PromotionDialog({ isOpen, onClose, promo }: { isOpen: boolean, onClose:
             <div className="flex items-center gap-2">
               <Switch checked={formData.showInCheckout} onCheckedChange={v => setFormData({ ...formData, showInCheckout: v })} />
               <Label>Ver en checkout</Label>
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch checked={!!formData.showCountdown} onCheckedChange={v => setFormData({ ...formData, showCountdown: v })} />
+              <Label>Mostrar contador regresivo</Label>
             </div>
           
       <JevCopilotWidgetPromociones businessId={user?.uid} />

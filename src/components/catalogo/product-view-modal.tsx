@@ -1,5 +1,9 @@
 'use client';
 
+import { CountdownTimer } from "./countdown-timer";
+import type { Promotion } from "@/models/promotion";
+import { promotionService } from "@/services/promotion-service";
+
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -22,6 +26,7 @@ interface ProductViewModalProps {
   onOpenChange: (open: boolean) => void;
   onAddToCart: (quantity: number) => void;
   onRatingUpdated?: (productId: string, newRating: number, newCount: number) => void;
+  promotions?: Promotion[];
 }
 
 export default function ProductViewModal({ 
@@ -30,9 +35,14 @@ export default function ProductViewModal({
     isOpen, 
     onOpenChange, 
     onAddToCart,
-    onRatingUpdated 
+    onRatingUpdated,
+  promotions = []
 }: ProductViewModalProps) {
   const firestore = useFirestore();
+  const modalDiscountInfo = (product && promotions && promotions.length > 0)
+    ? promotionService.calculateDiscountedPrice(product, promotions)
+    : null;
+  const effectivePrice = modalDiscountInfo?.hasDiscount ? modalDiscountInfo.finalPrice : (product?.price || 0);
   const [quantity, setQuantity] = useState(1);
   const [activeImage, setActiveImage] = useState<string | null>(null);
   
@@ -158,6 +168,16 @@ export default function ProductViewModal({
             {product.images?.[0] && (
               <div className="bg-gray-100 p-4 space-y-4">
                 <div className="relative aspect-square w-full rounded-2xl overflow-hidden bg-white shadow-inner">
+                  {modalDiscountInfo?.hasDiscount && (
+                    <div className="absolute top-3 left-3 z-10 flex flex-col items-start gap-1.5 animate-in fade-in zoom-in duration-200">
+                      <Badge className="bg-red-600 text-white font-black border-none shadow-md px-3 py-1">
+                        {modalDiscountInfo.promotion?.type === "percentage" ? "-" + modalDiscountInfo.promotion.discountValue + "%" : "OFERTA"}
+                      </Badge>
+                      {modalDiscountInfo.promotion?.showCountdown && modalDiscountInfo.promotion?.validUntil && (
+                        <CountdownTimer targetDate={modalDiscountInfo.promotion.validUntil} variant="badge" />
+                      )}
+                    </div>
+                  )}
                   {activeImage && <Image src={activeImage} alt={product.name} fill className="object-contain" />}
                 </div>
                 {product.images.length > 1 && (
@@ -214,9 +234,28 @@ export default function ProductViewModal({
                 </div>
               </div>
 
-              <div className="text-3xl font-black text-primary">
-                {formatCurrency(product.price)}
-              </div>
+              {modalDiscountInfo?.hasDiscount ? (
+                <div className="space-y-3">
+                  <div className="flex items-baseline gap-3">
+                    <span className="text-3xl font-black text-red-600">
+                      {formatCurrency(modalDiscountInfo.finalPrice)}
+                    </span>
+                    <span className="text-base text-muted-foreground line-through decoration-red-400">
+                      {formatCurrency(modalDiscountInfo.originalPrice)}
+                    </span>
+                    <Badge className="bg-red-600 text-white font-black">
+                      {modalDiscountInfo.promotion?.type === "percentage" ? "-" + modalDiscountInfo.promotion.discountValue + "%" : "OFERTA"}
+                    </Badge>
+                  </div>
+                  {modalDiscountInfo.promotion?.showCountdown && modalDiscountInfo.promotion?.validUntil && (
+                    <CountdownTimer targetDate={modalDiscountInfo.promotion.validUntil} variant="full" />
+                  )}
+                </div>
+              ) : (
+                <div className="text-3xl font-black text-primary">
+                  {formatCurrency(product.price)}
+                </div>
+              )}
 
               <div className="space-y-2">
                 <h4 className="font-bold text-gray-700 uppercase text-xs tracking-widest">Descripción</h4>
@@ -243,7 +282,7 @@ export default function ProductViewModal({
             onClick={() => onAddToCart(quantity)}
           >
             <ShoppingCart className="mr-2 h-5 w-5" />
-            Añadir al carrito — {formatCurrency(product.price * quantity)}
+            Añadir al carrito — {formatCurrency(effectivePrice * quantity)}
           </Button>
         </DialogFooter>
       </DialogContent>
