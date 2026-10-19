@@ -187,7 +187,6 @@ export function PurchaseModal({
   const channel: CanalPedido = (tipoEntrega === 'recoger_en_tienda' || origin === 'qr' || origin === 'mesa') ? 'mesa' : 'domicilio';
 
   const serviceFee = useMemo(() => {
-    if (planContext?.planType !== 'hibrido') return 0;
     return cartItems.reduce((acc, item) => {
       const basePrice = item.basePrice ?? item.price;
       const fee = calcularTarifaServicio(basePrice, planContext, channel);
@@ -348,7 +347,7 @@ export function PurchaseModal({
         orderSummary += `Envío:         ${tipoEntrega === 'domicilio' ? formatCurrency(deliveryFee).padStart(12) : 'Gratis'.padStart(12)}\n`;
 
         if (serviceFee > 0) {
-            orderSummary += `Tarifa servicio: ${formatCurrency(serviceFee).padStart(11)}\n`;
+            orderSummary += `Tarifa de servicio: ${formatCurrency(serviceFee).padStart(8)}\n`;
         }
 
         if (vatAmount > 0) {

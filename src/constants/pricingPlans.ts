@@ -20,6 +20,7 @@ export const COMISIONES = {
   fijos: { domicilio: 0, mesa: 0 }
 } as const;
 
+export const DEFAULT_SERVICE_FEE_RATE = 0.04; // 4% tarifa universal por defecto
 export const COMISION_MESA_DEFAULT = 0.03; // 3% universal en mesa para todos los híbridos
 
 export const PORCENTAJES_HIBRIDOS = {
@@ -36,7 +37,8 @@ export const PLANES_FIJOS = {
 export type PricingContext = {
   planType?: PlanType;
   comisionRate?: number; // Para domicilio si viene configurada en el plan
-  tableCommissionRate?: number; // Para mesa si viene configurada en el plan (default 3%)
+  tableCommissionRate?: number;
+  serviceFeeRate?: number; // Para mesa si viene configurada en el plan (default 3%)
   planSlug?: string;
   planName?: string;
   channel?: CanalPedido;
@@ -122,8 +124,17 @@ export function calcularTarifaServicio(
   canal: CanalPedido = 'domicilio'
 ): number {
   const safeBase = Number(basePrice) || 0;
-  if (safeBase <= 0 || context?.planType === 'fijo') return 0;
+  if (safeBase <= 0) return 0;
 
-  const precioFinal = calcularPrecioCliente(safeBase, context, canal);
-  return Math.max(0, precioFinal - safeBase);
+  if (context?.planType === 'hibrido') {
+    const precioFinal = calcularPrecioCliente(safeBase, context, canal);
+    return Math.max(0, precioFinal - safeBase);
+  }
+
+  // Fallback seguro universal para todos los negocios (existentes y futuros)
+  const rateRaw = context?.serviceFeeRate ?? context?.comisionRate ?? DEFAULT_SERVICE_FEE_RATE;
+  const rateNum = Number(rateRaw);
+  const tasa = isNaN(rateNum) ? DEFAULT_SERVICE_FEE_RATE : (rateNum > 1 ? rateNum / 100 : rateNum);
+  const fee = safeBase * tasa;
+  return roundUp100(fee);
 }

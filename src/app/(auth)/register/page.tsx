@@ -248,6 +248,7 @@ function RegisterForm() {
         description: 'Bienvenido a mi negocio en Markix.',
         planName: planDetails?.name || 'Plan Crecimiento',
         planType: resolvedPlanType,
+        serviceFeeRate: 0.04, // Tarifa de servicio universal inicial (4%)
         // --- Referral System ---
         referralCode: generatedReferralCode,
         referredByBusinessId,

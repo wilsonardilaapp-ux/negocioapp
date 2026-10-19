@@ -26,6 +26,7 @@ export type Business = {
     vatRate?: number;
     deliveryFee?: number;
     packagingFee?: number;
+    serviceFeeRate?: number; // ADITIVO: Tarifa de servicio (%)
     planName?: string;
     planType?: 'fijo' | 'hibrido'; // ADITIVO: Tipo de modelo de suscripción
     status: EntityStatus;

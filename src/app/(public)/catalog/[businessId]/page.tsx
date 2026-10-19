@@ -43,7 +43,7 @@ import LoyaltyStatus from '@/components/loyalty/LoyaltyStatus';
 import RewardsCatalog from '@/components/loyalty/RewardsCatalog';
 import type { Business } from '@/models/business';
 import type { HybridPlan } from '@/models/hybrid-plan';
-import { calcularPrecioCliente, type PricingContext } from '@/constants/pricingPlans';
+import { calcularPrecioCliente, DEFAULT_SERVICE_FEE_RATE, type PricingContext } from '@/constants/pricingPlans';
 import type { Reward } from '@/services/loyalty-service';
 
 // Carrusel
@@ -116,6 +116,7 @@ function CatalogPageContent({ params }: CatalogPageProps) {
             planSlug: (pageData.business as any)?.planSlug || pageData.planConfig?.slug,
             comisionRate: pageData.planConfig?.pricePerOrder,
             tableCommissionRate: pageData.planConfig?.tableCommissionRate,
+            serviceFeeRate: (pageData.business as any)?.serviceFeeRate ?? pageData.planConfig?.pricePerOrder ?? DEFAULT_SERVICE_FEE_RATE,
             channel: activeCanal,
         };
     }, [pageData.business, pageData.planConfig, activeCanal]);
