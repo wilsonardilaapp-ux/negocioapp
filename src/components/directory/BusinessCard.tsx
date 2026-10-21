@@ -18,8 +18,9 @@ export default function BusinessCard({ entry }: BusinessCardProps) {
     // Normalización de campos: manejar tanto logoUrl como logoURL
     const logo = entry.logoUrl || entry.logoURL || null;
     const name = entry.name || 'Negocio';
-    const rating = entry.rating || 5;
     const reviewCount = entry.reviewCount || 0;
+    const hasReviews = reviewCount > 0;
+    const rating = hasReviews ? Number(entry.rating || 0) : 0;
 
     return (
         <Card className="group overflow-hidden hover:shadow-xl transition-all duration-300 border-gray-100 h-full flex flex-col">
@@ -66,11 +67,17 @@ export default function BusinessCard({ entry }: BusinessCardProps) {
                 </p>
 
                 <div className="flex items-center gap-4 text-sm text-muted-foreground pt-2">
-                    <div className="flex items-center gap-1">
-                        <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                        <span className="font-bold text-foreground">{rating.toFixed(1)}</span>
-                        <span>({reviewCount})</span>
-                    </div>
+                    {hasReviews ? (
+                        <div className="flex items-center gap-1">
+                            <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                            <span className="font-bold text-foreground">{rating.toFixed(1)}</span>
+                            <span>({reviewCount} {reviewCount === 1 ? 'reseña' : 'reseñas'})</span>
+                        </div>
+                    ) : (
+                        <span className="text-xs text-muted-foreground font-medium">
+                            Sé el primero en reseñar
+                        </span>
+                    )}
                     {entry.address && (
                         <div className="flex items-center gap-1 truncate">
                             <MapPin className="h-3.5 w-3.5" />

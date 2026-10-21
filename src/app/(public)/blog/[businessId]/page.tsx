@@ -112,6 +112,9 @@ export default async function BusinessBlogPage({ params }: { params: { businessI
   if (businessId && businessId !== 'global') {
     redirect(`/blog/cliente/${businessId}`);
   }
+  if (businessId && businessId !== 'global') {
+    redirect(`/blog/cliente/${businessId}`);
+  }
   const { config, posts } = await getBlogData(businessId);
   const { navigation } = await getHeaderData(businessId);
 

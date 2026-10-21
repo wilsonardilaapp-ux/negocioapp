@@ -205,11 +205,17 @@ export default async function BusinessProfilePage({ params, searchParams }: { pa
                                 </div>
                                 
                                 <div className="flex flex-wrap items-center gap-6 text-gray-600">
-                                    <div className="flex items-center gap-1.5">
-                                        <Star className="h-5 w-5 fill-yellow-400 text-yellow-400" />
-                                        <span className="font-bold text-gray-900">{(entry.rating || 5).toFixed(1)}</span>
-                                        <span>({entry.reviewCount || 0} reseñas)</span>
-                                    </div>
+                                    {entry.reviewCount && entry.reviewCount > 0 ? (
+                                        <div className="flex items-center gap-1.5">
+                                            <Star className="h-5 w-5 fill-yellow-400 text-yellow-400" />
+                                            <span className="font-bold text-gray-900">{Number(entry.rating || 0).toFixed(1)}</span>
+                                            <span>({entry.reviewCount} {entry.reviewCount === 1 ? 'reseña' : 'reseñas'})</span>
+                                        </div>
+                                    ) : (
+                                        <a href="#ratings-section" className="text-sm font-medium text-primary hover:underline">
+                                            Sé el primero en reseñar
+                                        </a>
+                                    )}
                                     <div className="flex flex-wrap items-center gap-2">
                                         <Badge variant="secondary" className="font-bold">{entry.category || 'Servicios'}</Badge>
                                         {entry.subcategory && <Badge variant="outline" className="font-bold border-muted">{entry.subcategory}</Badge>}

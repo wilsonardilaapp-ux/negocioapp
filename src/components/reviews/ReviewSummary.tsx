@@ -13,13 +13,22 @@ interface Props {
 }
 
 export default function ReviewSummary({ rating, reviewCount, distribution }: Props) {
-  // Asegurar valores por defecto para evitar errores de renderizado
-  const currentRating = rating || 5.0;
-  const totalReviews = reviewCount || 0;
+  // Validación estricta: solo se consideran datos reales si reviewCount > 0
+  const totalReviews = reviewCount ?? 0;
+  const hasReviews = totalReviews > 0;
+  const currentRating = hasReviews ? (rating || 0) : 0;
 
-  // Si no hay distribución real, simulamos una visualmente atractiva o mostramos vacío
+  // Cálculo real del porcentaje de recomendación (% de reseñas de 4 y 5 estrellas)
+  const recommendationPercentage = React.useMemo(() => {
+    if (!hasReviews || !distribution) return null;
+    const positiveCount = (distribution['4'] || 0) + (distribution['5'] || 0);
+    if (positiveCount === 0) return null;
+    return Math.round((positiveCount / totalReviews) * 100);
+  }, [hasReviews, distribution, totalReviews]);
+
+  // Si no hay distribución real o no hay reseñas, no se renderizan barras
   const renderDistribution = () => {
-    if (!distribution) return null;
+    if (!hasReviews || !distribution) return null;
 
     return (
       <div className="space-y-2 flex-1">
@@ -46,44 +55,57 @@ export default function ReviewSummary({ rating, reviewCount, distribution }: Pro
     <Card className="overflow-hidden border-none shadow-none bg-transparent">
       <CardContent className="p-0">
         <div className="flex flex-col md:flex-row gap-8 items-center">
-          {/* Bloque de Calificación Gigante */}
+          {/* Bloque de Calificación o Estado Vacío */}
           <div className="text-center md:text-left space-y-2 shrink-0">
-            <div className="flex items-center justify-center md:justify-start gap-4">
-              <div className="text-6xl font-black text-gray-900 tracking-tighter">
-                {currentRating.toFixed(1)}
-              </div>
-              <div className="flex flex-col items-start">
-                <div className="flex">
-                  {[1, 2, 3, 4, 5].map((s) => (
-                    <Star
-                      key={s}
-                      className={cn(
-                        "h-5 w-5",
-                        s <= Math.round(currentRating) ? "text-yellow-400 fill-yellow-400" : "text-gray-200"
-                      )}
-                    />
-                  ))}
+            {hasReviews ? (
+              <>
+                <div className="flex items-center justify-center md:justify-start gap-4">
+                  <div className="text-6xl font-black text-gray-900 tracking-tighter">
+                    {currentRating.toFixed(1)}
+                  </div>
+                  <div className="flex flex-col items-start">
+                    <div className="flex">
+                      {[1, 2, 3, 4, 5].map((s) => (
+                        <Star
+                          key={s}
+                          className={cn(
+                            "h-5 w-5",
+                            s <= Math.round(currentRating) ? "text-yellow-400 fill-yellow-400" : "text-gray-200"
+                          )}
+                        />
+                      ))}
+                    </div>
+                    <p className="text-sm font-bold text-muted-foreground mt-1">
+                      {totalReviews} {totalReviews === 1 ? 'opinión verificada' : 'opiniones verificadas'}
+                    </p>
+                  </div>
                 </div>
-                <p className="text-sm font-bold text-muted-foreground mt-1">
-                  {totalReviews} opiniones verificadas
+                
+                {recommendationPercentage !== null && (
+                  <div className="flex items-center gap-2 text-xs font-bold text-green-600 bg-green-50 px-3 py-1 rounded-full w-fit mx-auto md:mx-0">
+                    <TrendingUp className="h-3 w-3" />
+                    {recommendationPercentage}% de clientes recomiendan este negocio
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="space-y-1 py-2">
+                <p className="text-lg font-bold text-gray-900">Aún no hay reseñas</p>
+                <p className="text-sm text-muted-foreground">
+                  ¡Sé el primero en opinar sobre este negocio!
                 </p>
               </div>
-            </div>
-            
-            <div className="flex items-center gap-2 text-xs font-bold text-green-600 bg-green-50 px-3 py-1 rounded-full w-fit mx-auto md:mx-0">
-              <TrendingUp className="h-3 w-3" />
-              98% de clientes recomiendan este negocio
-            </div>
+            )}
           </div>
 
-          {/* Barras de Distribución */}
-          {distribution && (
+          {/* Barras de Distribución (solo si hay reseñas reales y distribución) */}
+          {hasReviews && distribution && (
             <div className="hidden sm:block w-full max-w-xs">
                {renderDistribution()}
             </div>
           )}
 
-          {/* Call to Action Interno */}
+          {/* Call to Action Interno: siempre visible para invitar a reseñar */}
           <div className="hidden lg:flex flex-col gap-2 p-4 bg-muted/30 rounded-2xl border border-dashed border-muted-foreground/20">
              <div className="flex items-center gap-2 font-bold text-sm text-gray-700">
                 <MessageSquare className="h-4 w-4 text-primary" />
