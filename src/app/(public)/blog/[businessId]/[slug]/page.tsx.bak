@@ -45,12 +45,19 @@ async function getPostBySlug(businessId: string, slug: string) {
     
     // Búsqueda resiliente: intentamos con el slug exacto y con el slug sanitizado
     const blogRef = db.collection("blog_posts");
-    const q = blogRef
+    let snapshot = await blogRef
       .where("businessId", "==", businessId)
       .where("slug", "==", decodedSlug)
-      .limit(1);
-
-    const snapshot = await q.get();
+      .limit(1)
+      .get();
+    
+    // Si no se encuentra por businessId específico, buscar por slug directamente (posts globales de plataforma)
+    if (snapshot.empty) {
+      snapshot = await blogRef
+        .where("slug", "==", decodedSlug)
+        .limit(1)
+        .get();
+    }
     
     if (snapshot.empty) {
         return null;

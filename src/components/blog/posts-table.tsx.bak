@@ -32,6 +32,34 @@ interface PostsTableProps {
   isFiltered?: boolean;
 }
 
+function formatPostDate(value: any): string {
+  if (!value) return '—';
+  try {
+    let date: Date | null = null;
+    if (typeof value.toDate === 'function') {
+      date = value.toDate();
+    } else if (typeof value.seconds === 'number') {
+      date = new Date(value.seconds * 1000);
+    } else if (value instanceof Date) {
+      date = value;
+    } else {
+      date = new Date(value);
+    }
+
+    if (!date || isNaN(date.getTime())) {
+      return '—';
+    }
+
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+
+    return `${day}/${month}/${year}`;
+  } catch {
+    return '—';
+  }
+}
+
 export function PostsTable({ posts, isLoading, basePath, onDeletePost, isFiltered = false }: PostsTableProps) {
   const router = useRouter();
   const [detailsPost, setDetailsPost] = useState<BlogPost | null>(null);
@@ -96,7 +124,7 @@ export function PostsTable({ posts, isLoading, basePath, onDeletePost, isFiltere
                 </Badge>
               </TableCell>
               <TableCell>
-                {post.createdAt ? new Date(post.createdAt as string).toLocaleDateString() : 'N/A'}
+                {formatPostDate(post.createdAt)}
               </TableCell>
               <TableCell>
                 {(post as any).businessId ? <Badge variant="outline">Cliente</Badge> : <Badge variant="outline">Global</Badge>}

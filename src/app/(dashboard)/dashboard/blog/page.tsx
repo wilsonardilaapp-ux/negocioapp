@@ -10,7 +10,7 @@ import {
   CardFooter,
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Frown, Save, Loader2, UploadCloud, Trash2, Pencil, Info } from 'lucide-react';
+import { PlusCircle, Frown, Save, Loader2, UploadCloud, Trash2, Pencil, Info, Copy, ExternalLink, Check } from 'lucide-react';
 import Link from 'next/link';
 import { useCollection, useFirestore, useMemoFirebase, useUser, useDoc, setDocumentNonBlocking } from '@/firebase';
 import { collection, query, where, doc, type Timestamp, getDoc } from 'firebase/firestore';
@@ -162,6 +162,43 @@ function BlogHeaderEditor({ businessId }: { businessId: string }) {
                 <CardDescription>Personaliza el título, descripción y el icono que ven tus visitantes.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+                <div className="bg-muted/50 p-3 rounded-lg border flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="space-y-1 overflow-hidden">
+                        <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">URL Pública de tu Blog</Label>
+                        <p className="text-sm font-mono truncate select-all text-primary">
+                            {typeof window !== 'undefined' ? `${window.location.origin}/blog/cliente/${businessId}` : `/blog/cliente/${businessId}`}
+                        </p>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-8 gap-1.5"
+                            onClick={() => {
+                                const url = `${window.location.origin}/blog/cliente/${businessId}`;
+                                navigator.clipboard.writeText(url);
+                                toast({ title: "Enlace copiado", description: "La URL de tu blog se ha copiado al portapapeles." });
+                            }}
+                        >
+                            <Copy className="h-3.5 w-3.5" />
+                            <span>Copiar</span>
+                        </Button>
+                        <Button
+                            type="button"
+                            variant="secondary"
+                            size="sm"
+                            className="h-8 gap-1.5"
+                            onClick={() => {
+                                const url = `/blog/cliente/${businessId}`;
+                                window.open(url, '_blank', 'noopener,noreferrer');
+                            }}
+                        >
+                            <ExternalLink className="h-3.5 w-3.5" />
+                            <span>Abrir blog</span>
+                        </Button>
+                    </div>
+                </div>
                 <div>
                     <Label htmlFor="blog-title">Título</Label>
                     <Input id="blog-title" value={config.title || ''} onChange={e => setConfig(c => ({...c, title: e.target.value}))} />

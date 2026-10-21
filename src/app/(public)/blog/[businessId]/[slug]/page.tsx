@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { notFound } from "next/navigation";
 import { getAdminFirestore } from "@/firebase/server-init";
 import { Timestamp } from "firebase-admin/firestore";

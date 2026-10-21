@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { getAdminFirestore } from "@/firebase/server-init";
 import Link from "next/link";
 import { Calendar, User, ArrowRight, BookOpen, FileText, Newspaper, Rss } from "lucide-react";
@@ -108,6 +109,9 @@ async function getBlogData(businessId: string) {
 
 export default async function BusinessBlogPage({ params }: { params: { businessId: string } }) {
   const { businessId } = params;
+  if (businessId && businessId !== 'global') {
+    redirect(`/blog/cliente/${businessId}`);
+  }
   const { config, posts } = await getBlogData(businessId);
   const { navigation } = await getHeaderData(businessId);
 

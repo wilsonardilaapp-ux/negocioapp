@@ -66,8 +66,10 @@ export function PostsTable({ posts, isLoading, basePath, onDeletePost, isFiltere
 
   const handlePreview = (post: BlogPost) => {
     if (!post.slug) return;
-    const businessId = (post as any).businessId || 'global';
-    const url = `/blog/${businessId}/${post.slug}`;
+    const businessId = (post as any).businessId;
+    const url = (!businessId || businessId === 'global')
+      ? `/blog/global/${post.slug}`
+      : `/blog/cliente/${businessId}/${post.slug}`;
     window.open(url, '_blank', 'noopener,noreferrer');
   };
 
