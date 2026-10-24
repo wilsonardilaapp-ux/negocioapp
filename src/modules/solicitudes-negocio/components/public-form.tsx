@@ -397,10 +397,10 @@ export default function PublicForm() {
           <div className="bg-card border border-border rounded-2xl p-6 shadow-sm space-y-4">
             <h2 className="text-lg font-bold flex items-center gap-2">
               <Package className="w-5 h-5 text-primary" />
-              {config.blocks?.plans?.title || 'Planes de Activación'}
+              {(config.blocks?.plans?.title && config.blocks?.plans?.title !== 'Planes de Activación') ? config.blocks.plans.title : 'Servicios de Configuración'}
             </h2>
             <p className="text-xs text-muted-foreground">
-              {config.blocks?.plans?.description || 'Elige el plan que mejor se adapte a tu negocio.'}
+              {(config.blocks?.plans?.description && !config.blocks?.plans?.description.includes('impulsa')) ? config.blocks.plans.description : 'Selecciona el servicio y te dejamos tu catálogo listo para vender'}
             </p>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-stretch">

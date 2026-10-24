@@ -98,8 +98,8 @@ export const DEFAULT_SOLICITUD_CONFIG: SolicitudFormConfig = {
     plans: {
       enabled: true,
       order: 1,
-      title: 'Planes de Activación',
-      description: 'Selecciona el plan adecuado para impulsar tu negocio'
+      title: 'Servicios de Configuración',
+      description: 'Selecciona el servicio y te dejamos tu catálogo listo para vender'
     },
     generalInfo: {
       enabled: true,
