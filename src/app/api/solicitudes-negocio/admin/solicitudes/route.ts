@@ -1,0 +1,30 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { getSolicitudes, actualizarEstadoSolicitud } from '@/modules/solicitudes-negocio/services/solicitudes-service';
+
+export const dynamic = 'force-dynamic';
+
+export async function GET(req: NextRequest) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const estado = searchParams.get('estado') || undefined;
+    const items = await getSolicitudes(estado);
+    return NextResponse.json(items);
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message || 'Error al listar solicitudes' }, { status: 500 });
+  }
+}
+
+export async function PATCH(req: NextRequest) {
+  try {
+    const body = await req.json();
+    const { id, status, paymentStatus, nota, author } = body;
+    if (!id || !status) {
+      return NextResponse.json({ error: 'Faltan parámetros requeridos (id, status)' }, { status: 400 });
+    }
+
+    await actualizarEstadoSolicitud(id, status, paymentStatus, nota, author);
+    return NextResponse.json({ success: true, message: 'Estado actualizado correctamente' });
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message || 'Error al actualizar solicitud' }, { status: 500 });
+  }
+}

@@ -1,0 +1,177 @@
+import { getAdminFirestore } from '@/firebase/server-init';
+import type { GlobalPaymentConfig, HotmartPlanLink } from '@/models/global-payment-config';
+import type { SolicitudPaymentConfig, PublicPaymentMethodData } from '../types-payments';
+
+const SOLICITUD_PAYMENTS_DOC = 'solicitud_payment_methods/main';
+const GLOBAL_PAYMENTS_DOC = 'globalConfig/payment_methods';
+
+export const initialPaymentConfig: GlobalPaymentConfig = {
+  nequi: { enabled: false, accountNumber: '', holderName: '', instructions: '', qrImageUrl: null },
+  bancolombia: { enabled: false, accountNumber: '', holderName: '', instructions: '', qrImageUrl: null },
+  daviplata: { enabled: false, accountNumber: '', holderName: '', instructions: '', qrImageUrl: null },
+  breB: { enabled: false, holderName: '', keyType: 'Celular', keyValue: '', instructions: '', qrImageUrl: null, commerceCode: '' },
+  stripe: { enabled: false, mode: 'sandbox', secretKey: '', instructions: '', checkoutUrl: '', webhookUrl: '', webhookSecret: '' },
+  paypal: { enabled: false, mode: 'sandbox', clientId: '', clientSecret: '', instructions: '', checkoutUrl: '', webhookUrl: '' },
+  mercadoPago: { enabled: false, mode: 'sandbox', publicKey: '', accessToken: '', instructions: '', checkoutUrl: '', webhookUrl: '' },
+  wompi: { enabled: false, checkoutUrl: '', qrImageUrl: null, accountNumber: '', holderName: '', instructions: '' },
+};
+
+export async function getSolicitudPaymentConfig(): Promise<SolicitudPaymentConfig> {
+  try {
+    const db = await getAdminFirestore();
+    const snap = await db.doc(SOLICITUD_PAYMENTS_DOC).get();
+    if (!snap.exists) {
+      return {
+        enabledInForm: false,
+        config: initialPaymentConfig,
+        hotmartLinks: []
+      };
+    }
+    const data = snap.data() as any;
+    return {
+      enabledInForm: data.enabledInForm ?? false,
+      config: { ...initialPaymentConfig, ...(data.config || {}) },
+      hotmartLinks: Array.isArray(data.hotmartLinks) ? data.hotmartLinks : []
+    };
+  } catch (err) {
+    console.error('Error al leer solicitud_payment_methods:', err);
+    return { enabledInForm: false, config: initialPaymentConfig, hotmartLinks: [] };
+  }
+}
+
+export async function saveSolicitudPaymentConfig(payload: Partial<SolicitudPaymentConfig>): Promise<SolicitudPaymentConfig> {
+  const db = await getAdminFirestore();
+  const current = await getSolicitudPaymentConfig();
+  const updated: SolicitudPaymentConfig = {
+    enabledInForm: payload.enabledInForm ?? current.enabledInForm,
+    config: payload.config ? { ...current.config, ...payload.config } : current.config,
+    hotmartLinks: payload.hotmartLinks !== undefined ? payload.hotmartLinks : current.hotmartLinks,
+    updatedAt: new Date().toISOString()
+  };
+  await db.doc(SOLICITUD_PAYMENTS_DOC).set(updated, { merge: true });
+  return updated;
+}
+
+export async function importFromGlobalPaymentConfig(): Promise<SolicitudPaymentConfig> {
+  const db = await getAdminFirestore();
+  const globalSnap = await db.doc(GLOBAL_PAYMENTS_DOC).get();
+  const globalData = globalSnap.exists ? (globalSnap.data() as GlobalPaymentConfig) : initialPaymentConfig;
+
+  // Leer planes para enlaces de hotmart
+  const hotmartLinks: HotmartPlanLink[] = [];
+  try {
+    const plansSnap = await db.collection('plans').get();
+    plansSnap.forEach(docSnap => {
+      const p = docSnap.data();
+      hotmartLinks.push({
+        planId: docSnap.id,
+        planName: p.name || 'Plan Estándar',
+        hotmartUrl: p.hotmartUrl || '',
+        enabled: p.hotmartEnabled ?? !!p.hotmartUrl
+      });
+    });
+
+    const hybSnap = await db.collection('hybrid_plans').get();
+    hybSnap.forEach(docSnap => {
+      const p = docSnap.data();
+      hotmartLinks.push({
+        planId: docSnap.id,
+        planName: `${p.name || 'Plan Híbrido'} (Híbrido)`,
+        hotmartUrl: p.hotmartUrl || '',
+        enabled: p.hotmartEnabled ?? !!p.hotmartUrl
+      });
+    });
+  } catch (e) {
+    console.warn('Error leyendo planes para Hotmart:', e);
+  }
+
+  const newConfig: SolicitudPaymentConfig = {
+    enabledInForm: true,
+    config: { ...initialPaymentConfig, ...globalData },
+    hotmartLinks,
+    updatedAt: new Date().toISOString()
+  };
+
+  await db.doc(SOLICITUD_PAYMENTS_DOC).set(newConfig);
+  return newConfig;
+}
+
+export async function getPublicPaymentMethods(): Promise<PublicPaymentMethodData> {
+  const full = await getSolicitudPaymentConfig();
+  if (!full.enabledInForm) {
+    return { enabledInForm: false, methods: {}, hotmartLinks: [] };
+  }
+
+  const c = full.config;
+  const methods: PublicPaymentMethodData['methods'] = {};
+
+  if (c.wompi?.enabled) {
+    methods.wompi = {
+      enabled: true,
+      checkoutUrl: c.wompi.checkoutUrl,
+      qrImageUrl: c.wompi.qrImageUrl,
+      accountNumber: c.wompi.accountNumber,
+      holderName: c.wompi.holderName,
+      instructions: c.wompi.instructions
+    };
+  }
+
+  if (c.nequi?.enabled) {
+    methods.nequi = {
+      enabled: true,
+      accountNumber: c.nequi.accountNumber,
+      holderName: c.nequi.holderName,
+      instructions: c.nequi.instructions,
+      qrImageUrl: c.nequi.qrImageUrl
+    };
+  }
+
+  if (c.bancolombia?.enabled) {
+    methods.bancolombia = {
+      enabled: true,
+      accountNumber: c.bancolombia.accountNumber,
+      holderName: c.bancolombia.holderName,
+      instructions: c.bancolombia.instructions,
+      qrImageUrl: c.bancolombia.qrImageUrl
+    };
+  }
+
+  if (c.daviplata?.enabled) {
+    methods.daviplata = {
+      enabled: true,
+      accountNumber: c.daviplata.accountNumber,
+      holderName: c.daviplata.holderName,
+      instructions: c.daviplata.instructions,
+      qrImageUrl: c.daviplata.qrImageUrl
+    };
+  }
+
+  if (c.breB?.enabled) {
+    methods.breB = {
+      enabled: true,
+      holderName: c.breB.holderName,
+      keyType: c.breB.keyType,
+      keyValue: c.breB.keyValue,
+      instructions: c.breB.instructions,
+      qrImageUrl: c.breB.qrImageUrl
+    };
+  }
+
+  if (c.stripe?.enabled) {
+    methods.stripe = { enabled: true, checkoutUrl: c.stripe.checkoutUrl, instructions: c.stripe.instructions };
+  }
+  if (c.paypal?.enabled) {
+    methods.paypal = { enabled: true, checkoutUrl: c.paypal.checkoutUrl, instructions: c.paypal.instructions };
+  }
+  if (c.mercadoPago?.enabled) {
+    methods.mercadoPago = { enabled: true, checkoutUrl: c.mercadoPago.checkoutUrl, instructions: c.mercadoPago.instructions };
+  }
+
+  const hotmartLinks = (full.hotmartLinks || []).filter(h => h.enabled && h.hotmartUrl);
+
+  return {
+    enabledInForm: true,
+    methods,
+    hotmartLinks
+  };
+}

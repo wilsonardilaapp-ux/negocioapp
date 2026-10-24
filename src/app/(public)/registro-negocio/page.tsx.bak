@@ -1,0 +1,15 @@
+import PublicForm from '@/modules/solicitudes-negocio/components/public-form';
+import type { Metadata } from 'next';
+
+export const metadata: Metadata = {
+  title: 'Registro de Negocio | Markix',
+  description: 'Envía los datos de tu negocio para registrarte y activar tu plataforma comercial.'
+};
+
+export default function RegistroNegocioPage() {
+  return (
+    <main className="min-h-screen bg-slate-50 dark:bg-zinc-950 py-10">
+      <PublicForm />
+    </main>
+  );
+}

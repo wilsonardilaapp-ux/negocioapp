@@ -8,6 +8,8 @@ import { collection } from 'firebase/firestore';
 import type { Module } from '@/models/module';
 import {
   LayoutDashboard,
+  ClipboardList,
+  SlidersHorizontal,
   Users,
   Server,
   Box,
@@ -39,6 +41,8 @@ const navItemsList = [
   { href: "/superadmin", icon: LayoutDashboard, label: "Dashboard" },
   { href: "/superadmin/usuarios", icon: Users, label: "Usuarios" },
   { href: "/superadmin/negocios", icon: Building, label: "Negocios" },
+  { href: "/superadmin/solicitudes-negocio", icon: ClipboardList, label: "Solicitudes" },
+  { href: "/superadmin/solicitudes-negocio/configurar", icon: SlidersHorizontal, label: "Config. Solicitudes" },
   { href: "/superadmin/actividad-negocios", icon: Activity, label: "Actividad Negocios" },
   { href: "/superadmin/affiliates", icon: Gift, label: "Programa Socios" },
   { href: "/superadmin/business-directory", icon: Search, label: "Directorio", moduleId: 'business-directory' },

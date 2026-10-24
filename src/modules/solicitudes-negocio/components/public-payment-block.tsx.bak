@@ -1,0 +1,204 @@
+'use client';
+
+import React, { useState, useEffect } from 'react';
+import { CreditCard, QrCode, ExternalLink, ShieldCheck, Wallet, ChevronDown, ChevronUp } from 'lucide-react';
+import type { PublicPaymentMethodData } from '../types-payments';
+
+export default function PublicPaymentBlock() {
+  const [data, setData] = useState<PublicPaymentMethodData | null>(null);
+  const [selectedMethod, setSelectedMethod] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch('/api/solicitudes-negocio/payment-methods')
+      .then(res => res.json())
+      .then(resData => {
+        if (resData && resData.enabledInForm) {
+          setData(resData);
+          // Seleccionar el primer método disponible por defecto
+          const available = Object.keys(resData.methods || {});
+          if (available.length > 0) setSelectedMethod(available[0]);
+          else if (resData.hotmartLinks?.length > 0) setSelectedMethod('hotmart');
+        }
+      })
+      .catch(console.error);
+  }, []);
+
+  if (!data || !data.enabledInForm) return null;
+
+  const hasMethods = Object.keys(data.methods || {}).length > 0 || (data.hotmartLinks && data.hotmartLinks.length > 0);
+  if (!hasMethods) return null;
+
+  return (
+    <div className="bg-card border border-border rounded-2xl p-6 shadow-sm space-y-6 animate-in fade-in">
+      <div className="flex items-center justify-between pb-3 border-b border-border">
+        <div className="flex items-center gap-2.5">
+          <div className="p-2 rounded-lg bg-primary/10 text-primary">
+            <CreditCard className="w-5 h-5" />
+          </div>
+          <div>
+            <h2 className="text-lg font-bold text-foreground">Métodos de Pago Disponibles</h2>
+            <p className="text-xs text-muted-foreground">Opciones habilitadas para formalizar o activar tu cuenta</p>
+          </div>
+        </div>
+        <div className="hidden sm:flex items-center gap-1.5 text-xs text-emerald-600 font-semibold bg-emerald-500/10 px-2.5 py-1 rounded-full">
+          <ShieldCheck className="w-3.5 h-3.5" /> Pago Seguro
+        </div>
+      </div>
+
+      {/* Selector de métodos */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+        {data.methods.nequi && (
+          <button
+            type="button"
+            onClick={() => setSelectedMethod('nequi')}
+            className={`p-3 rounded-xl border text-center transition-all ${selectedMethod === 'nequi' ? 'border-primary bg-primary/5 font-bold shadow-sm' : 'border-border hover:bg-muted/50 text-muted-foreground'}`}
+          >
+            <p className="text-xs">Nequi (QR)</p>
+          </button>
+        )}
+        {data.methods.bancolombia && (
+          <button
+            type="button"
+            onClick={() => setSelectedMethod('bancolombia')}
+            className={`p-3 rounded-xl border text-center transition-all ${selectedMethod === 'bancolombia' ? 'border-primary bg-primary/5 font-bold shadow-sm' : 'border-border hover:bg-muted/50 text-muted-foreground'}`}
+          >
+            <p className="text-xs">Bancolombia</p>
+          </button>
+        )}
+        {data.methods.daviplata && (
+          <button
+            type="button"
+            onClick={() => setSelectedMethod('daviplata')}
+            className={`p-3 rounded-xl border text-center transition-all ${selectedMethod === 'daviplata' ? 'border-primary bg-primary/5 font-bold shadow-sm' : 'border-border hover:bg-muted/50 text-muted-foreground'}`}
+          >
+            <p className="text-xs">Daviplata</p>
+          </button>
+        )}
+        {data.methods.wompi && (
+          <button
+            type="button"
+            onClick={() => setSelectedMethod('wompi')}
+            className={`p-3 rounded-xl border text-center transition-all ${selectedMethod === 'wompi' ? 'border-primary bg-primary/5 font-bold shadow-sm' : 'border-border hover:bg-muted/50 text-muted-foreground'}`}
+          >
+            <p className="text-xs">Wompi</p>
+          </button>
+        )}
+        {data.methods.breB && (
+          <button
+            type="button"
+            onClick={() => setSelectedMethod('breB')}
+            className={`p-3 rounded-xl border text-center transition-all ${selectedMethod === 'breB' ? 'border-primary bg-primary/5 font-bold shadow-sm' : 'border-border hover:bg-muted/50 text-muted-foreground'}`}
+          >
+            <p className="text-xs">BRE-B</p>
+          </button>
+        )}
+        {data.hotmartLinks && data.hotmartLinks.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setSelectedMethod('hotmart')}
+            className={`p-3 rounded-xl border text-center transition-all ${selectedMethod === 'hotmart' ? 'border-primary bg-primary/5 font-bold shadow-sm' : 'border-border hover:bg-muted/50 text-muted-foreground'}`}
+          >
+            <p className="text-xs">Hotmart ({data.hotmartLinks.length})</p>
+          </button>
+        )}
+      </div>
+
+      {/* Detalle del método seleccionado */}
+      <div className="p-5 rounded-xl bg-muted/30 border border-border">
+        {selectedMethod === 'nequi' && data.methods.nequi && (
+          <div className="flex flex-col sm:flex-row items-center gap-6">
+            {data.methods.nequi.qrImageUrl ? (
+              <img src={data.methods.nequi.qrImageUrl} alt="QR Nequi" className="w-36 h-36 object-contain rounded-lg border bg-white p-2 shadow-sm" />
+            ) : (
+              <div className="w-36 h-36 flex flex-col items-center justify-center bg-muted rounded-lg border text-muted-foreground text-xs p-2 text-center">
+                <QrCode className="w-8 h-8 mb-1" />
+                <span>Escanea desde tu App Nequi</span>
+              </div>
+            )}
+            <div className="space-y-1.5 text-xs text-center sm:text-left">
+              <p className="font-bold text-sm text-foreground">Pago por Nequi</p>
+              {data.methods.nequi.accountNumber && <p><strong>Teléfono:</strong> <span className="font-mono text-sm">{data.methods.nequi.accountNumber}</span></p>}
+              {data.methods.nequi.holderName && <p><strong>Titular:</strong> {data.methods.nequi.holderName}</p>}
+              {data.methods.nequi.instructions && <p className="text-muted-foreground mt-2">{data.methods.nequi.instructions}</p>}
+            </div>
+          </div>
+        )}
+
+        {selectedMethod === 'bancolombia' && data.methods.bancolombia && (
+          <div className="flex flex-col sm:flex-row items-center gap-6">
+            {data.methods.bancolombia.qrImageUrl && (
+              <img src={data.methods.bancolombia.qrImageUrl} alt="QR Bancolombia" className="w-36 h-36 object-contain rounded-lg border bg-white p-2 shadow-sm" />
+            )}
+            <div className="space-y-1.5 text-xs text-center sm:text-left">
+              <p className="font-bold text-sm text-foreground">Cuenta Bancolombia</p>
+              {data.methods.bancolombia.accountNumber && <p><strong>Número de Cuenta:</strong> <span className="font-mono text-sm">{data.methods.bancolombia.accountNumber}</span></p>}
+              {data.methods.bancolombia.holderName && <p><strong>Titular:</strong> {data.methods.bancolombia.holderName}</p>}
+              {data.methods.bancolombia.instructions && <p className="text-muted-foreground mt-2">{data.methods.bancolombia.instructions}</p>}
+            </div>
+          </div>
+        )}
+
+        {selectedMethod === 'daviplata' && data.methods.daviplata && (
+          <div className="flex flex-col sm:flex-row items-center gap-6">
+            {data.methods.daviplata.qrImageUrl && (
+              <img src={data.methods.daviplata.qrImageUrl} alt="QR Daviplata" className="w-36 h-36 object-contain rounded-lg border bg-white p-2 shadow-sm" />
+            )}
+            <div className="space-y-1.5 text-xs text-center sm:text-left">
+              <p className="font-bold text-sm text-foreground">Pago por Daviplata</p>
+              {data.methods.daviplata.accountNumber && <p><strong>Teléfono:</strong> <span className="font-mono text-sm">{data.methods.daviplata.accountNumber}</span></p>}
+              {data.methods.daviplata.holderName && <p><strong>Titular:</strong> {data.methods.daviplata.holderName}</p>}
+              {data.methods.daviplata.instructions && <p className="text-muted-foreground mt-2">{data.methods.daviplata.instructions}</p>}
+            </div>
+          </div>
+        )}
+
+        {selectedMethod === 'wompi' && data.methods.wompi && (
+          <div className="space-y-3 text-xs">
+            <p className="font-bold text-sm text-foreground">Pasarela Wompi</p>
+            {data.methods.wompi.instructions && <p className="text-muted-foreground">{data.methods.wompi.instructions}</p>}
+            {data.methods.wompi.checkoutUrl && (
+              <a
+                href={data.methods.wompi.checkoutUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1.5 px-4 py-2 bg-primary text-primary-foreground font-semibold rounded-lg text-xs hover:opacity-90"
+              >
+                Pagar con Wompi <ExternalLink className="w-3.5 h-3.5" />
+              </a>
+            )}
+          </div>
+        )}
+
+        {selectedMethod === 'breB' && data.methods.breB && (
+          <div className="space-y-1.5 text-xs">
+            <p className="font-bold text-sm text-foreground">Transferencia BRE-B</p>
+            {data.methods.breB.holderName && <p><strong>Titular:</strong> {data.methods.breB.holderName}</p>}
+            {data.methods.breB.keyType && <p><strong>Tipo de Llave:</strong> {data.methods.breB.keyType}</p>}
+            {data.methods.breB.keyValue && <p><strong>Llave:</strong> <span className="font-mono">{data.methods.breB.keyValue}</span></p>}
+            {data.methods.breB.instructions && <p className="text-muted-foreground mt-2">{data.methods.breB.instructions}</p>}
+          </div>
+        )}
+
+        {selectedMethod === 'hotmart' && data.hotmartLinks && (
+          <div className="space-y-3">
+            <p className="font-bold text-sm text-foreground">Checkout Oficial en Hotmart</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              {data.hotmartLinks.map(plan => (
+                <a
+                  key={plan.planId}
+                  href={plan.hotmartUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="p-3 rounded-lg border border-border bg-background hover:border-primary flex items-center justify-between text-xs transition-colors"
+                >
+                  <span className="font-semibold text-foreground">{plan.planName}</span>
+                  <ExternalLink className="w-3.5 h-3.5 text-primary" />
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

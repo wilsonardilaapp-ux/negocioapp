@@ -1,0 +1,496 @@
+'use client';
+
+import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
+import { SolicitudNegocio, SolicitudEstado, PaymentStatus } from '../types';
+import { ESTADOS_SOLICITUD, ESTADO_COLORES } from '../constants';
+import { 
+  Trash2, Calendar, AlertTriangle, Search, RefreshCw, Settings, ExternalLink, Send, CheckCircle2, 
+  CreditCard, FileText, Image, Download, X, Plus, ChevronRight, AlertCircle, DollarSign
+} from 'lucide-react';
+
+export default function AdminInbox() {
+  const [solicitudes, setSolicitudes] = useState<SolicitudNegocio[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [filtroEstado, setFiltroEstado] = useState('todos');
+  const [filtroPago, setFiltroPago] = useState('todos');
+  const [search, setSearch] = useState('');
+  const [selectedItem, setSelectedItem] = useState<SolicitudNegocio | null>(null);
+  const [updating, setUpdating] = useState(false);
+  const [nuevaNota, setNuevaNota] = useState('');
+  const [reenviandoWhatsApp, setReenviandoWhatsApp] = useState(false);
+  const [actionMessage, setActionMessage] = useState<string | null>(null);
+
+  // Estados de Eliminación
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteModal, setDeleteModal] = useState({ open: false, ids: [] as string[], message: '' });
+  const [dateModalOpen, setDateModalOpen] = useState(false);
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [dateEstado, setDateEstado] = useState('todos');
+  const [datePago, setDatePago] = useState('todos');
+  const [datePreviewIds, setDatePreviewIds] = useState<string[]>([]);
+  const [datePreviewList, setDatePreviewList] = useState<SolicitudNegocio[]>([]);
+  const [hasPreviewed, setHasPreviewed] = useState(false);
+  const [confirmInput, setConfirmInput] = useState('');
+
+
+  const cargarSolicitudes = async () => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (filtroEstado !== 'todos') params.set('estado', filtroEstado);
+      if (filtroPago !== 'todos') params.set('pago', filtroPago);
+
+      const res = await fetch('/api/solicitudes-negocio/admin/solicitudes?' + params.toString());
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        setSolicitudes(data);
+        if (selectedItem) {
+          const updated = data.find(s => s.id === selectedItem.id);
+          if (updated) setSelectedItem(updated);
+        }
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    cargarSolicitudes();
+  }, [filtroEstado, filtroPago]);
+
+  const handleCambiarEstado = async (nuevoEstado: SolicitudEstado, nuevoEstadoPago?: PaymentStatus) => {
+    if (!selectedItem) return;
+    setUpdating(true);
+    setActionMessage('Guardando...');
+    try {
+      const res = await fetch('/api/solicitudes-negocio/admin/solicitudes', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          id: selectedItem.id, 
+          status: nuevoEstado,
+          paymentStatus: nuevoEstadoPago !== undefined ? nuevoEstadoPago : selectedItem.paymentStatus 
+        })
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'Error al actualizar');
+      
+      setActionMessage('Estado actualizado con éxito');
+      setTimeout(() => setActionMessage(null), 3000);
+      await cargarSolicitudes();
+    } catch (e: any) {
+      setActionMessage('Error: ' + (e.message || 'No se pudo actualizar'));
+      setTimeout(() => setActionMessage(null), 4000);
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const handleAgregarNota = async () => {
+    if (!selectedItem || !nuevaNota.trim()) return;
+    setUpdating(true);
+    try {
+      const res = await fetch('/api/solicitudes-negocio/admin/solicitudes', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: selectedItem.id, status: selectedItem.status, nota: nuevaNota })
+      });
+      if (res.ok) {
+        setNuevaNota('');
+        await cargarSolicitudes();
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  
+  const toggleSelectOne = (id: string) => {
+    setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  };
+
+  const toggleSelectAll = (visibleItems: SolicitudNegocio[]) => {
+    const visibleIds = visibleItems.map(i => i.id);
+    const all = visibleIds.length > 0 && visibleIds.every(id => selectedIds.includes(id));
+    if (all) {
+      setSelectedIds(prev => prev.filter(id => !visibleIds.includes(id)));
+    } else {
+      setSelectedIds(prev => Array.from(new Set([...prev, ...visibleIds])));
+    }
+  };
+
+  const solicitarEliminar = (ids: string[]) => {
+    if (ids.length === 0) return;
+    setDeleteModal({ open: true, ids, message: `¿Eliminar ${ids.length} solicitud(es)? Esta acción no se puede deshacer.` });
+  };
+
+  const ejecutarEliminacion = async () => {
+    if (deleteModal.ids.length === 0) return;
+    setDeleting(true);
+    try {
+      const res = await fetch('/api/solicitudes-negocio/admin/eliminar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: deleteModal.ids })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setActionMessage(`${deleteModal.ids.length} solicitud(es) eliminada(s)`);
+        setTimeout(() => setActionMessage(null), 4000);
+        if (selectedItem && deleteModal.ids.includes(selectedItem.id)) setSelectedItem(null);
+        setSelectedIds(prev => prev.filter(id => !deleteModal.ids.includes(id)));
+        setDeleteModal({ open: false, ids: [], message: '' });
+        await cargarSolicitudes();
+      } else {
+        alert('Error: ' + (data.error || 'Desconocido'));
+      }
+    } catch (e: any) {
+      alert('Error: ' + e.message);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const abrirModalFechas = () => {
+    setDateEstado(filtroEstado);
+    setDatePago(filtroPago);
+    setDateFrom('');
+    setDateTo('');
+    setDatePreviewIds([]);
+    setDatePreviewList([]);
+    setHasPreviewed(false);
+    setConfirmInput('');
+    setDateModalOpen(true);
+  };
+
+  const previsualizarPorFechas = () => {
+    if (!dateFrom || !dateTo) {
+      alert('Selecciona fechas.');
+      return;
+    }
+    const start = new Date(dateFrom + 'T00:00:00').getTime();
+    const end = new Date(dateTo + 'T23:59:59.999').getTime();
+    const matches = solicitudes.filter(s => {
+      const sTime = new Date(s.createdAt || s.updatedAt || '').getTime();
+      const mFecha = !isNaN(sTime) && sTime >= start && sTime <= end;
+      const mEstado = dateEstado === 'todos' || s.status === dateEstado;
+      const mPago = datePago === 'todos' || s.paymentStatus === datePago;
+      return mFecha && mEstado && mPago;
+    });
+    setDatePreviewIds(matches.map(m => m.id));
+    setDatePreviewList(matches.slice(0, 5));
+    setHasPreviewed(true);
+  };
+
+  const ejecutarEliminacionPorFechas = async () => {
+    if (confirmInput.trim().toUpperCase() !== 'ELIMINAR' || datePreviewIds.length === 0) return;
+    setDeleting(true);
+    try {
+      const res = await fetch('/api/solicitudes-negocio/admin/eliminar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: datePreviewIds })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setActionMessage(`${datePreviewIds.length} solicitudes eliminadas`);
+        setTimeout(() => setActionMessage(null), 4000);
+        if (selectedItem && datePreviewIds.includes(selectedItem.id)) setSelectedItem(null);
+        setSelectedIds(prev => prev.filter(id => !datePreviewIds.includes(id)));
+        setDateModalOpen(false);
+        await cargarSolicitudes();
+      } else {
+        alert('Error: ' + data.error);
+      }
+    } catch (e: any) {
+      alert('Error: ' + e.message);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const handleReenviarWhatsApp = async () => {
+    if (!selectedItem) return;
+    setReenviandoWhatsApp(true);
+    try {
+      const res = await fetch('/api/solicitudes-negocio/admin/reenviar-whatsapp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ solicitudId: selectedItem.id })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setActionMessage('WhatsApp enviado correctamente vía WHAPI');
+      } else {
+        setActionMessage('Error: ' + (data.error || 'No se pudo enviar'));
+      }
+      setTimeout(() => setActionMessage(null), 4000);
+      await cargarSolicitudes();
+    } catch (e: any) {
+      setActionMessage('Error: ' + e.message);
+    } finally {
+      setReenviandoWhatsApp(false);
+    }
+  };
+
+  const filtered = solicitudes.filter(s => {
+    if (!search.trim()) return true;
+    const q = search.toLowerCase();
+    return (
+      s.businessName?.toLowerCase().includes(q) ||
+      s.phone?.includes(q) ||
+      s.category?.toLowerCase().includes(q) ||
+      s.planName?.toLowerCase().includes(q) ||
+      s.paymentMethod?.toLowerCase().includes(q)
+    );
+  });
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-border">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Solicitudes de Negocio</h1>
+          <p className="text-xs text-muted-foreground">Gestión de solicitudes, planes de activación y comprobantes de pago recibidos.</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button onClick={() => cargarSolicitudes()} className="p-2 rounded-lg border border-border hover:bg-muted text-muted-foreground">
+            <RefreshCw className={'w-4 h-4 ' + (loading ? 'animate-spin' : '')} />
+          </button>
+          <Link href="/registro-negocio" target="_blank" className="inline-flex items-center gap-1.5 min-h-[38px] px-3 py-1.5 text-xs font-semibold rounded-lg border border-border hover:bg-muted">
+            <ExternalLink className="w-3.5 h-3.5" /> Ver Formulario
+          </Link>
+          <Link href="/superadmin/solicitudes-negocio/configurar" className="inline-flex items-center gap-1.5 min-h-[38px] px-3 py-1.5 text-xs font-bold rounded-lg bg-primary text-primary-foreground hover:opacity-90">
+            <Settings className="w-3.5 h-3.5" /> Configurar
+          </Link>
+        </div>
+      </div>
+
+      {actionMessage && (
+        <div className="p-3 rounded-lg bg-primary/10 border border-primary/20 text-primary text-xs font-semibold flex items-center gap-2">
+          <CheckCircle2 className="w-4 h-4" /> {actionMessage}
+        </div>
+      )}
+
+      <div className="flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between">
+        <div className="relative flex-1 max-w-md">
+          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <input type="text" placeholder="Buscar negocio, plan, teléfono, método..." value={search} onChange={e => setSearch(e.target.value)} className="w-full pl-9 pr-3 py-2 text-xs rounded-lg border border-input bg-background" />
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <select value={filtroEstado} onChange={e => setFiltroEstado(e.target.value)} className="text-xs px-2.5 py-1.5 rounded-lg border border-input bg-background">
+            <option value="todos">Estado Solicitud: Todos</option>
+            {ESTADOS_SOLICITUD.map(st => <option key={st} value={st}>{st}</option>)}
+          </select>
+          <select value={filtroPago} onChange={e => setFiltroPago(e.target.value)} className="text-xs px-2.5 py-1.5 rounded-lg border border-input bg-background">
+            <option value="todos">Estado Pago: Todos</option>
+            <option value="Pendiente de pago">Pendiente de pago</option>
+            <option value="Pagado">Pagado</option>
+            <option value="No aplica">No aplica (Gratis)</option>
+            <option value="Rechazado">Rechazado</option>
+          </select>
+
+          <button type="button" onClick={abrirModalFechas} className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-rose-200 text-rose-600 hover:bg-rose-50 transition-colors"><Calendar className="w-3.5 h-3.5" /> Eliminar por fechas</button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <div className={selectedItem ? 'lg:col-span-7 space-y-2' : 'lg:col-span-12 space-y-2'}>
+          
+          {/* Barra de Selección */}
+          <div className="flex items-center justify-between p-2.5 bg-card border border-border rounded-xl text-xs">
+            <label className="flex items-center gap-2 cursor-pointer font-medium select-none">
+              <input type="checkbox" checked={filtered.length > 0 && filtered.every(i => selectedIds.includes(i.id))} onChange={() => toggleSelectAll(filtered)} className="w-4 h-4 rounded border-border accent-primary cursor-pointer" />
+              <span>Seleccionar todos ({filtered.length})</span>
+            </label>
+            {selectedIds.length > 0 && (
+              <div className="flex items-center gap-2">
+                <span className="font-bold text-primary">{selectedIds.length} seleccionados</span>
+                <button type="button" onClick={() => solicitarEliminar(selectedIds)} className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold rounded-lg bg-rose-600 text-white hover:bg-rose-700"><Trash2 className="w-3.5 h-3.5" /> Eliminar seleccionados</button>
+                <button type="button" onClick={() => setSelectedIds([])} className="px-2 py-1 text-xs text-muted-foreground hover:text-foreground">Cancelar</button>
+              </div>
+            )}
+          </div>
+
+          {filtered.length === 0 ? (
+            <div className="p-12 text-center bg-card rounded-xl border border-border text-xs text-muted-foreground">
+              No se encontraron solicitudes.
+            </div>
+          ) : (
+            filtered.map(item => {
+              const badge = ESTADO_COLORES[item.status] || { bg: 'bg-muted', text: 'text-foreground', border: 'border-border' };
+              const isSelected = selectedItem?.id === item.id;
+              return (
+                <div key={item.id} onClick={() => setSelectedItem(item)} className={'p-4 rounded-xl border cursor-pointer transition-all ' + (isSelected ? 'border-primary bg-primary/5 shadow-sm' : 'border-border bg-card hover:bg-muted/40')}>
+                  <div className="flex items-start justify-between gap-2 mb-2">
+
+          <div className="flex items-start gap-3">
+            <input type="checkbox" checked={selectedIds.includes(item.id)} onClick={e => e.stopPropagation()} onChange={() => toggleSelectOne(item.id)} className="mt-0.5 w-4 h-4 rounded border-border accent-primary cursor-pointer" />
+            <div>
+
+                      <h3 className="font-bold text-sm text-foreground flex items-center gap-2">
+                        {item.businessName}
+                        <span className={'text-[10px] px-2 py-0.5 rounded-full border font-semibold ' + badge.bg + ' ' + badge.text + ' ' + badge.border}>{item.status}</span>
+                        {item.paymentStatus && (
+                          <span className={'text-[10px] px-2 py-0.5 rounded-full border font-semibold ' + (item.paymentStatus === 'Pagado' ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' : item.paymentStatus === 'Pendiente de pago' ? 'bg-amber-500/10 text-amber-600 border-amber-500/20' : 'bg-muted text-muted-foreground')}>
+                            {item.paymentStatus}
+                          </span>
+                        )}
+                      </h3>
+                      <p className="text-xs text-muted-foreground">📦 Plan: <strong>{item.planName || 'Básico'}</strong> {item.planPrice ? ('($' + item.planPrice.toLocaleString('es-CO') + ' COP)') : '(Gratis)'}</p>
+                    </div>
+                  </div>
+                    <span className="text-[11px] text-muted-foreground font-mono">{item.createdAt ? new Date(item.createdAt).toLocaleDateString() : ''}</span>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground mt-2">
+                    <span>📞 {item.phone}</span>
+                    <span>💳 {item.paymentMethod || 'No especificado'}</span>
+                    {item.paymentReceiptUrl && <span className="text-emerald-600 font-bold">🧾 Con Comprobante</span>}
+                    <span className="ml-auto text-primary font-medium text-[11px] flex items-center">Ver <ChevronRight className="w-3 h-3" /></span>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {selectedItem && (
+          <div className="lg:col-span-5 bg-card border border-border rounded-2xl p-5 space-y-5 h-fit sticky top-6">
+            <div className="flex items-start justify-between border-b border-border pb-3">
+              <div>
+                <span className="text-[10px] text-muted-foreground font-mono">ID: #{selectedItem.id.slice(0, 8)}</span>
+                <h2 className="text-lg font-bold">{selectedItem.businessName}</h2>
+              </div>
+              
+          <div className="flex items-center gap-1">
+            <button type="button" onClick={() => solicitarEliminar([selectedItem.id])} className="p-1.5 text-muted-foreground hover:text-rose-600 hover:bg-rose-50 rounded-lg"><Trash2 className="w-4 h-4" /></button>
+            <button onClick={() => setSelectedItem(null)} className="p-1 text-muted-foreground hover:text-foreground"><X className="w-4 h-4" /></button>
+          </div>
+
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-primary/5 border border-primary/20 space-y-2 text-xs">
+              <div className="flex justify-between items-center">
+                <span className="font-bold text-sm text-primary">📦 {selectedItem.planName || 'Plan Estándar'}</span>
+                <span className="font-mono font-bold text-sm">
+                  {selectedItem.planPrice ? ('$' + selectedItem.planPrice.toLocaleString('es-CO') + ' COP') : 'Gratis'}
+                </span>
+              </div>
+              <p><strong>Método de pago:</strong> {selectedItem.paymentMethod || 'No especificado'}</p>
+              {selectedItem.paymentReference && <p><strong>Referencia:</strong> {selectedItem.paymentReference}</p>}
+              
+              <div className="pt-2 flex items-center justify-between border-t border-border/50">
+                <span className="font-semibold">Estado de Pago:</span>
+                <select
+                  disabled={updating}
+                  value={selectedItem.paymentStatus || 'Pendiente de pago'}
+                  onChange={e => handleCambiarEstado(selectedItem.status, e.target.value as PaymentStatus)}
+                  className="text-xs px-2 py-1 rounded border border-input bg-background font-bold disabled:opacity-50"
+                >
+                  <option value="Pendiente de pago">Pendiente de pago</option>
+                  <option value="Pagado">Pagado</option>
+                  <option value="No aplica">No aplica</option>
+                  <option value="Rechazado">Rechazado</option>
+                </select>
+              </div>
+
+              {selectedItem.paymentReceiptUrl && (
+                <div className="pt-2">
+                  <a href={selectedItem.paymentReceiptUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 text-white font-bold text-xs hover:opacity-90">
+                    <Download className="w-3.5 h-3.5" /> Descargar Comprobante de Pago
+                  </a>
+                </div>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold mb-1 text-muted-foreground">Estado Solicitud:</label>
+              <div className="grid grid-cols-2 gap-1.5">
+                {ESTADOS_SOLICITUD.map(st => (
+                  <button key={st} disabled={updating} onClick={() => handleCambiarEstado(st)} className={'px-2.5 py-1.5 text-xs rounded-lg font-medium border text-left ' + (selectedItem.status === st ? 'border-primary bg-primary text-primary-foreground font-bold' : 'border-border bg-background hover:bg-muted')}>
+                    {st}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-muted/40 border border-border space-y-1.5 text-xs">
+              <p><strong>Canal de Difusión:</strong> <span className="font-mono font-bold text-primary">{selectedItem.referralChannel || 'Directo'}</span></p>
+              <p><strong>Nombre completo:</strong> {selectedItem.fullName || 'No registrado'}</p>
+              <p><strong>Teléfono:</strong> {selectedItem.phone}</p>
+              <p><strong>Dirección:</strong> {selectedItem.address}</p>
+              {selectedItem.email && <p><strong>Correo:</strong> {selectedItem.email}</p>}
+              <p><strong>Descripción:</strong> {selectedItem.description}</p>
+            </div>
+
+            <div className="border-t border-border pt-4 flex items-center justify-between">
+              <span className="text-xs font-bold">Notificación WhatsApp:</span>
+              <button onClick={handleReenviarWhatsApp} disabled={reenviandoWhatsApp} className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded bg-emerald-600/10 text-emerald-600 font-semibold disabled:opacity-50">
+                <Send className="w-3 h-3" /> {reenviandoWhatsApp ? 'Enviando...' : 'Reenviar WhatsApp'}
+              </button>
+            </div>
+
+            <div className="border-t border-border pt-4 space-y-2">
+              <p className="text-xs font-bold">Notas Internas:</p>
+              <div className="space-y-1 max-h-28 overflow-y-auto">
+                {selectedItem.internalNotes?.map(n => (
+                  <div key={n.id} className="p-2 rounded bg-muted/60 text-[11px]">
+                    <p>{n.text}</p>
+                    <p className="text-muted-foreground text-[9px]">{n.author || 'Admin'} • {new Date(n.createdAt).toLocaleDateString()}</p>
+                  </div>
+                ))}
+              </div>
+              <div className="flex gap-1.5">
+                <input type="text" placeholder="Nueva nota..." value={nuevaNota} onChange={e => setNuevaNota(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleAgregarNota()} className="flex-1 px-2.5 py-1 text-xs rounded border border-input bg-background" />
+                <button onClick={handleAgregarNota} disabled={updating || !nuevaNota.trim()} className="px-2.5 py-1 bg-primary text-primary-foreground text-xs font-bold rounded">Guardar</button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    
+      {deleteModal.open && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+          <div className="bg-card border border-border rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <div className="flex items-center gap-3 text-rose-600"><AlertTriangle className="w-5 h-5" /><h3 className="font-bold">Confirmar eliminación</h3></div>
+            <p className="text-xs text-muted-foreground">{deleteModal.message}</p>
+            <div className="flex justify-end gap-2"><button onClick={() => setDeleteModal({ open: false, ids: [], message: '' })} className="px-3 py-1.5 text-xs rounded-lg border font-medium">Cancelar</button><button onClick={ejecutarEliminacion} className="px-4 py-1.5 text-xs rounded-lg bg-rose-600 text-white font-bold">{deleting ? 'Eliminando...' : 'Eliminar'}</button></div>
+          </div>
+        </div>
+      )}
+      {dateModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+          <div className="bg-card border border-border rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b pb-3"><div className="flex items-center gap-2 text-rose-600 font-bold"><Calendar className="w-4 h-4" /> Eliminar por Fechas</div><button onClick={() => setDateModalOpen(false)}><X className="w-4 h-4" /></button></div>
+            <div className="grid grid-cols-2 gap-3 text-xs">
+              <div><label>Desde</label><input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="w-full px-2 py-1.5 border rounded-lg bg-background" /></div>
+              <div><label>Hasta</label><input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="w-full px-2 py-1.5 border rounded-lg bg-background" /></div>
+            </div>
+            <div className="grid grid-cols-2 gap-3 text-xs">
+              <div><label>Estado</label><select value={dateEstado} onChange={e => setDateEstado(e.target.value)} className="w-full px-2 py-1.5 border rounded-lg bg-background"><option value="todos">Todos</option>{ESTADOS_SOLICITUD.map(st => <option key={st} value={st}>{st}</option>)}</select></div>
+              <div><label>Pago</label><select value={datePago} onChange={e => setDatePago(e.target.value)} className="w-full px-2 py-1.5 border rounded-lg bg-background"><option value="todos">Todos</option><option value="Pendiente de pago">Pendiente</option><option value="Pagado">Pagado</option></select></div>
+            </div>
+            <button onClick={previsualizarPorFechas} className="w-full py-2 text-xs font-bold rounded-lg bg-primary text-primary-foreground">Buscar / Previsualizar</button>
+            {hasPreviewed && (
+              <div className="p-3 bg-muted/40 border rounded-xl text-xs space-y-2">
+                <div className="font-bold flex justify-between"><span>Coincidencias:</span><span className="text-rose-600">{datePreviewIds.length}</span></div>
+                {datePreviewList.map(item => <div key={item.id} className="flex justify-between bg-card px-2 py-1 rounded border"><span>{item.businessName}</span><span>{item.status}</span></div>)}
+              </div>
+            )}
+            {hasPreviewed && datePreviewIds.length > 0 && (
+              <div className="space-y-1 text-xs"><label>Escribe ELIMINAR:</label><input type="text" value={confirmInput} onChange={e => setConfirmInput(e.target.value)} className="w-full px-3 py-1.5 border border-rose-300 rounded-lg text-rose-600 font-bold" /></div>
+            )}
+            <div className="flex justify-end gap-2 pt-2 border-t"><button onClick={() => setDateModalOpen(false)} className="px-3 py-1.5 text-xs rounded-lg border font-medium">Cancelar</button><button disabled={deleting || confirmInput.trim().toUpperCase() !== 'ELIMINAR'} onClick={ejecutarEliminacionPorFechas} className="px-4 py-1.5 text-xs rounded-lg bg-rose-600 text-white font-bold disabled:opacity-40">Confirmar y Eliminar</button></div>
+          </div>
+        </div>
+      )}
+
+    </div>
+  );
+}

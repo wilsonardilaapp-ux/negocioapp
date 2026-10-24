@@ -1,0 +1,163 @@
+import { SolicitudFormConfig, SolicitudEstado } from './types';
+
+export const ESTADOS_SOLICITUD: SolicitudEstado[] = [
+  'Recibido',
+  'En diseño',
+  'Pendiente de aprobación',
+  'Cambios solicitados',
+  'Aprobado',
+  'Publicado'
+];
+
+export const ESTADO_COLORES: Record<SolicitudEstado, { bg: string; text: string; border: string }> = {
+  'Recibido': { bg: 'bg-blue-500/10', text: 'text-blue-500', border: 'border-blue-500/20' },
+  'En diseño': { bg: 'bg-purple-500/10', text: 'text-purple-500', border: 'border-purple-500/20' },
+  'Pendiente de aprobación': { bg: 'bg-amber-500/10', text: 'text-amber-500', border: 'border-amber-500/20' },
+  'Cambios solicitados': { bg: 'bg-orange-500/10', text: 'text-orange-500', border: 'border-orange-500/20' },
+  'Aprobado': { bg: 'bg-emerald-500/10', text: 'text-emerald-500', border: 'border-emerald-500/20' },
+  'Publicado': { bg: 'bg-green-600/10', text: 'text-green-600', border: 'border-green-600/20' }
+};
+
+export const DEFAULT_PLANS = [
+  {
+    id: 'plan-gratis',
+    name: 'Plan Básico',
+    description: 'Abre tu cuenta hoy sin costo de entrada y comienza a digitalizar tu negocio.',
+    price: 0,
+    currency: 'COP' as const,
+    isFree: true,
+    active: true,
+    highlighted: false,
+    badge: 'Gratis',
+    priceSuffix: 'pago único',
+    features: [
+      'Abre tu cuenta hoy sin riesgo',
+      'Empieza gratis'
+    ]
+  },
+  {
+    id: 'plan-pro',
+    name: 'Plan Pro + Menú Interactivo',
+    description: 'Catálogo con fotos, pedidos por WhatsApp y posicionamiento en el directorio.',
+    price: 49000,
+    currency: 'COP' as const,
+    isFree: false,
+    hotmartUrl: '',
+    active: true,
+    highlighted: true,
+    badge: 'Más popular',
+    priceSuffix: 'pago único',
+    features: [
+      'Menú interactivo listo para vender',
+      'Activación en menos de 48 horas',
+      'Pago único'
+    ]
+  },
+  {
+    id: 'plan-vip',
+    name: 'Plan VIP Completo + Diseño',
+    badge: '⚡ EXPRESS',
+    description: 'Creación profesional de logo, portada, fotos y configuración total de tu menú.',
+    price: 99000,
+    currency: 'COP' as const,
+    isFree: false,
+    hotmartUrl: '',
+    active: true,
+    highlighted: false,
+    priceSuffix: 'pago único',
+    features: [
+      'Diseño y menú completo',
+      'Listo en menos de 2 horas',
+      'Pago único'
+    ]
+  }
+];
+
+export const DEFAULT_SOLICITUD_CONFIG: SolicitudFormConfig = {
+  enabled: true,
+  adminWhatsAppNumber: '',
+  backupEmail: '',
+  whatsappMessageTemplate: String.fromCodePoint(0x1F195) + ' *Nueva Solicitud de Negocio - Markix*\n\n' +
+    String.fromCodePoint(0x1F3EA) + ' *Negocio:* {nombre}\n' +
+    String.fromCodePoint(0x1F4DE) + ' *Teléfono:* {telefono}\n' +
+    String.fromCodePoint(0x1F3F7, 0xFE0F) + ' *Categoría:* {categoria}\n' +
+    String.fromCodePoint(0x1F4E6) + ' *Plan:* {plan} ({valor})\n' +
+    '💳 *Pago:* {metodo_pago}\n' +
+    String.fromCodePoint(0x1F9FE) + ' *Comprobante:* {comprobante}\n' +
+    String.fromCodePoint(0x1F3A8) + ' *Creación de imágenes:* {imagenes}\n\n' +
+    String.fromCodePoint(0x1F517) + ' *Enlace al panel:*\n{enlace}',
+  confirmationMessage: '¡Gracias! Hemos recibido la información de tu negocio. Nuestro equipo revisará los datos y se pondrá en contacto contigo.',
+  branding: {
+    title: 'Registra tu Negocio',
+    subtitle: 'Completa los datos de tu empresa para incorporarte a nuestra plataforma',
+    primaryColor: '#0284c7',
+    buttonColor: '#0284c7',
+    logoUrl: ''
+  },
+  blocks: {
+    plans: {
+      enabled: true,
+      order: 1,
+      title: 'Planes de Activación',
+      description: 'Selecciona el plan adecuado para impulsar tu negocio'
+    },
+    generalInfo: {
+      enabled: true,
+      order: 2,
+      title: 'Información General',
+      description: 'Datos principales para identificar y contactar a tu negocio'
+    },
+    socialMedia: {
+      enabled: true,
+      order: 3,
+      title: 'Redes Sociales',
+      description: 'Canales digitales donde tus clientes te encuentran'
+    },
+    brandingImages: {
+      enabled: true,
+      order: 4,
+      title: 'Identidad Visual (Logo y Banner)',
+      description: 'Sube tus archivos o indícanos si necesitas que diseñemos para ti'
+    },
+    products: {
+      enabled: true,
+      order: 5,
+      title: 'Catálogo de Productos',
+      description: 'Adjunta tu catálogo en plantilla Excel/Word o fotos'
+    }
+  },
+  plans: DEFAULT_PLANS,
+  commissionPercentage: "5",
+  paymentInstructions: {
+    nequi: 'Transfiere a Nequi y adjunta tu soporte abajo.',
+    bancolombia: 'Transfiere a nuestra cuenta Bancolombia.',
+    daviplata: 'Transfiere por Daviplata y carga tu captura.',
+    wompi: 'Paga con tarjeta o PSE mediante el checkout oficial.',
+    breB: 'Envía tu transferencia a la llave BRE-B indicada.'
+  },
+  categories: [
+    {
+      name: 'Restaurantes y Gastronomía',
+      subcategories: ['Comida Rápida', 'Cafetería', 'Panadería y Pastelería', 'Restaurante Gourmet', 'Bebidas y Licores']
+    },
+    {
+      name: 'Comercio y Retail',
+      subcategories: ['Ropa y Calzado', 'Electrónica', 'Hogar y Muebles', 'Supermercado y Bodega', 'Ferretería']
+    },
+    {
+      name: 'Salud y Belleza',
+      subcategories: ['Peluquería y Barbería', 'Spa y Estética', 'Farmacia', 'Consultorio Médico', 'Odontología']
+    },
+    {
+      name: 'Servicios Profesionales',
+      subcategories: ['Consultoría', 'Legal', 'Contabilidad', 'Educación y Cursos', 'Tecnología y Software']
+    },
+    {
+      name: 'Otros',
+      subcategories: ['General']
+    }
+  ],
+  customFields: [],
+  version: 1,
+  updatedAt: new Date().toISOString()
+};

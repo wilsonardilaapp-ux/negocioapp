@@ -1,0 +1,75 @@
+const fs = require('fs');
+
+console.log('==============================================');
+console.log('APLICANDO FIX 100% CODEPOINT EN CONSTANTS Y SERVICE');
+console.log('==============================================');
+
+function backupAndWrite(filePath, content) {
+  if (fs.existsSync(filePath)) {
+    fs.copyFileSync(filePath, filePath + '.bak');
+  }
+  fs.writeFileSync(filePath, content, 'utf8');
+  console.log('[ACTUALIZADO OK] ' + filePath);
+}
+
+// 1. constants.ts -> Usar String.fromCodePoint para todos los emojis
+const constPath = 'src/modules/solicitudes-negocio/constants.ts';
+let constCode = fs.readFileSync(constPath, 'utf8');
+
+const newConstTemplate = `whatsappMessageTemplate: String.fromCodePoint(0x1F195) + ' *Nueva Solicitud de Negocio - Markix*\\n\\n' +
+    String.fromCodePoint(0x1F3EA) + ' *Negocio:* {nombre}\\n' +
+    String.fromCodePoint(0x1F4DE) + ' *Teléfono:* {telefono}\\n' +
+    String.fromCodePoint(0x1F3F7) + ' *Categoría:* {categoria}\\n' +
+    String.fromCodePoint(0x1F4E6) + ' *Plan:* {plan} ({valor})\\n' +
+    String.fromCodePoint(0x1F4B3) + ' *Pago:* {metodo_pago}\\n' +
+    String.fromCodePoint(0x1F9FE) + ' *Comprobante:* {comprobante}\\n' +
+    String.fromCodePoint(0x1F3A8) + ' *Creación de imágenes:* {imagenes}\\n\\n' +
+    String.fromCodePoint(0x1F517) + ' *Enlace al panel:*\\n{enlace}',`;
+
+const regexTemplate = /whatsappMessageTemplate:\s*['`][\s\S]*?['`],/;
+if (regexTemplate.test(constCode)) {
+  constCode = constCode.replace(regexTemplate, newConstTemplate);
+  backupAndWrite(constPath, constCode);
+}
+
+// 2. solicitudes-service.ts -> Usar String.fromCodePoint para todos los emojis en resumenMensajeWa
+const servicePath = 'src/modules/solicitudes-negocio/services/solicitudes-service.ts';
+let serviceCode = fs.readFileSync(servicePath, 'utf8');
+
+const newServiceWaBlock = `  const resumenMensajeWa = [
+    String.fromCodePoint(0x1F195) + ' *Nueva Solicitud de Negocio - Markix*',
+    '',
+    String.fromCodePoint(0x1F3EA) + ' *Negocio:* ' + data.businessName,
+    String.fromCodePoint(0x1F4DE) + ' *Teléfono:* ' + data.phone,
+    String.fromCodePoint(0x1F4CD) + ' *Dirección:* ' + data.address,
+    String.fromCodePoint(0x1F3F7) + ' *Categoría:* ' + data.category,
+    String.fromCodePoint(0x1F4E6) + ' *Plan:* ' + planName + ' (' + valorStr + ')',
+    String.fromCodePoint(0x1F4B3) + ' *Pago:* ' + paymentMethod,
+    data.paymentReference ? String.fromCodePoint(0x1F522) + ' *Ref Pago:* ' + data.paymentReference : null,
+    data.paymentReceiptUrl ? String.fromCodePoint(0x1F9FE) + ' *Comprobante:* ' + data.paymentReceiptUrl : null,
+    String.fromCodePoint(0x1F3A8) + ' *Creación imágenes:* ' + imagenesStr,
+    '',
+    String.fromCodePoint(0x1F517) + ' *Enlace al Panel:*',
+    panelLink
+  ].filter(Boolean).join('\\n');
+
+  const resumenArray = Array.from(resumenMensajeWa);
+  const mensajeFinalWa = resumenArray.length > 1500 
+    ? resumenArray.slice(0, 1450).join('') + '\\n\\n' + String.fromCodePoint(0x1F517) + ' ' + panelLink 
+    : resumenMensajeWa;
+
+  const whatsappUrl = 'https://wa.me/' + targetPhone + '?text=' + encodeURIComponent(mensajeFinalWa);`;
+
+if (serviceCode.includes('resumenMensajeWa')) {
+  const startIdx = serviceCode.indexOf('const resumenMensajeWa = [');
+  const endIdx = serviceCode.indexOf('const whatsappUrl =');
+  const nextSemicolon = serviceCode.indexOf(';', endIdx);
+  if (startIdx !== -1 && nextSemicolon !== -1) {
+    serviceCode = serviceCode.slice(0, startIdx) + newServiceWaBlock + serviceCode.slice(nextSemicolon + 1);
+    backupAndWrite(servicePath, serviceCode);
+  }
+}
+
+console.log('==============================================');
+console.log('FIX 100% CODEPOINT APLICADO CON ÉXITO');
+console.log('==============================================');

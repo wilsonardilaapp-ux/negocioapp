@@ -1,0 +1,93 @@
+
+function formatWhatsappNumber(phone: string): string {
+  if (!phone) return '';
+  // Limpieza agresiva: solo dígitos
+  let clean = phone.replace(/\D/g, '');
+  // Quitar ceros a la izquierda si los hubiera
+  clean = clean.replace(/^0+/, '');
+  return clean;
+}
+
+import { getAdminFirestore } from '@/firebase/server-init';
+
+interface SendWhatsAppParams {
+  toPhone: string;
+  template: string;
+  variables: {
+    nombre: string;
+    telefono: string;
+    categoria: string;
+    imagenes: string;
+    enlace: string;
+  };
+  customToken?: string;
+}
+
+export async function enviarWhatsAppSolicitud(params: SendWhatsAppParams): Promise<{ success: boolean; error?: string }> {
+  try {
+    let cleanPhone = params.toPhone.replace(/[^0-9]/g, '');
+    if (!cleanPhone) {
+      return { success: false, error: 'Número de WhatsApp de destino no configurado' };
+    }
+
+    // Interpolar variables
+    let mensaje = params.template;
+    mensaje = mensaje.replace(/{nombre}/g, params.variables.nombre || 'N/A');
+    mensaje = mensaje.replace(/{telefono}/g, params.variables.telefono || 'N/A');
+    mensaje = mensaje.replace(/{categoria}/g, params.variables.categoria || 'N/A');
+    mensaje = mensaje.replace(/{imagenes}/g, params.variables.imagenes || 'Ninguna');
+    mensaje = mensaje.replace(/{enlace}/g, params.variables.enlace || '');
+
+    // Obtener token de WHAPI (de parámetro, de variable de entorno o de config general)
+    let token = params.customToken || process.env.WHAPI_TOKEN || process.env.WHATSAPP_API_TOKEN;
+
+    if (!token) {
+      try {
+        const db = await getAdminFirestore();
+        const integrationSnap = await db.doc('integrations/whatsapp').get();
+        if (integrationSnap.exists) {
+          const data = integrationSnap.data();
+          token = data?.token || data?.apiKey;
+        }
+      } catch (e) {
+        console.warn('[WhatsApp] No se pudo leer token de integración:', e);
+      }
+    }
+
+    if (!token) {
+      return { success: false, error: 'Token de WHAPI no configurado en entorno ni en integraciones' };
+    }
+
+    // Formatear teléfono si no tiene prefijo internacional
+    if (cleanPhone.length === 9 || cleanPhone.length === 10) {
+      // Si no tiene código de país, asume formato estándar o se deja intacto
+      cleanPhone = cleanPhone.startsWith('51') ? cleanPhone : '51' + cleanPhone;
+    }
+
+    const recipient = cleanPhone.includes('@') ? cleanPhone : cleanPhone + '@s.whatsapp.net';
+
+    const response = await fetch('https://gate.whapi.cloud/messages/text', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify({
+        to: recipient,
+        body: mensaje
+      })
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      console.error('[WhatsApp WHAPI Error]:', errText);
+      return { success: false, error: `WHAPI error: ${response.status} - ${errText.slice(0, 100)}` };
+    }
+
+    return { success: true };
+  } catch (error: any) {
+    console.error('[WhatsApp Service Exception]:', error);
+    return { success: false, error: error?.message || 'Error desconocido al enviar WhatsApp' };
+  }
+}
