@@ -9,6 +9,7 @@ interface SendWhatsAppParams {
     telefono: string;
     categoria: string;
     imagenes: string;
+    estilo?: string;
     enlace: string;
   };
   customToken?: string;
@@ -42,6 +43,8 @@ export async function enviarWhatsAppSolicitud(params: SendWhatsAppParams): Promi
     mensaje = mensaje.replace(/{telefono}/g, params.variables.telefono || 'N/A');
     mensaje = mensaje.replace(/{categoria}/g, params.variables.categoria || 'N/A');
     mensaje = mensaje.replace(/{imagenes}/g, params.variables.imagenes || 'Ninguna');
+    mensaje = mensaje.replace(/{estilo}/g, params.variables.estilo || 'No especificado');
+    mensaje = mensaje.replace(/{estilo_preferido}/g, params.variables.estilo || 'No especificado');
     mensaje = mensaje.replace(/{enlace}/g, params.variables.enlace || '');
 
     // Intentar buscar token de WHAPI (opcional)

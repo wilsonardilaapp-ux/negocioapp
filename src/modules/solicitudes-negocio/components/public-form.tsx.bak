@@ -36,6 +36,7 @@ export default function PublicForm() {
 
   // Form State
   const [businessName, setBusinessName] = useState('');
+  const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
   const [email, setEmail] = useState('');
@@ -206,17 +207,11 @@ export default function PublicForm() {
       return;
     }
 
-    let popupWin: Window | null = null;
-    try {
-      popupWin = window.open('', '_blank');
-    } catch (e) {
-      console.warn('Popup bloqueado inicialmente:', e);
-    }
-
     setSubmitting(true);
     try {
       const fd = new FormData();
       fd.append('businessName', businessName);
+      fd.append('fullName', fullName);
       fd.append('phone', phone);
       fd.append('address', address);
       fd.append('email', email);
@@ -254,36 +249,20 @@ export default function PublicForm() {
 
       fd.append('_hp_website', hpWebsite);
 
-      const res = await fetch('/api/solicitudes-negocio', {
+            const res = await fetch('/api/solicitudes-negocio', {
         method: 'POST',
         body: fd
       });
 
       const resJson = await res.json();
       if (!res.ok) {
-        if (popupWin && !popupWin.closed) popupWin.close();
         throw new Error(resJson.error || 'Ocurrió un error al enviar el formulario.');
       }
 
       if (resJson.whatsappUrl) {
-        if (popupWin && !popupWin.closed) {
-          popupWin.location.href = resJson.whatsappUrl;
-        } else {
-          window.location.href = resJson.whatsappUrl;
-        }
+        window.location.href = resJson.whatsappUrl;
       }
-
-      setSuccessData({
-        message: resJson.message || config.confirmationMessage,
-        id: resJson.solicitudId,
-        plan: currentPlan,
-        isPaid: isPaidPlan,
-        paymentMethod: selectedPaymentMethod,
-        whatsappUrl: resJson.whatsappUrl
-      });
-      window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err: any) {
-      if (popupWin && !popupWin.closed) popupWin.close();
       setErrorMessage(err.message || 'Error de conexión. Intente nuevamente.');
     } finally {
       setSubmitting(false);
@@ -395,10 +374,10 @@ export default function PublicForm() {
           <div className="bg-card border border-border rounded-2xl p-6 shadow-sm space-y-4">
             <h2 className="text-lg font-bold flex items-center gap-2">
               <Package className="w-5 h-5 text-primary" />
-              {config.blocks?.plans?.title || 'Planes de Activación'}
+              {(config.blocks?.plans?.title && config.blocks?.plans?.title !== 'Planes de Activación') ? config.blocks.plans.title : 'Servicios de Configuración'}
             </h2>
             <p className="text-xs text-muted-foreground">
-              {config.blocks?.plans?.description || 'Elige el plan que mejor se adapte a tu negocio.'}
+              {(config.blocks?.plans?.description && !config.blocks?.plans?.description.includes('impulsa')) ? config.blocks.plans.description : 'Selecciona el servicio y te dejamos tu catálogo listo para vender'}
             </p>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-stretch">
@@ -532,6 +511,10 @@ export default function PublicForm() {
               <div className="sm:col-span-2">
                 <label className="block text-sm font-semibold mb-1.5">Nombre comercial <span className="text-red-500">*</span></label>
                 <input type="text" required placeholder="Ej: Cafetería El Molino" value={businessName} onChange={e => setBusinessName(e.target.value)} className="w-full min-h-[44px] px-3.5 py-2 text-sm rounded-lg border border-input bg-background" />
+              </div>
+              <div className="sm:col-span-2">
+                <label className="block text-sm font-semibold mb-1.5">Nombre completo <span className="text-red-500">*</span></label>
+                <input type="text" required minLength={2} maxLength={80} autoComplete="name" placeholder="Ej: María Pérez Gómez" value={fullName} onChange={e => setFullName(e.target.value)} className="w-full min-h-[44px] px-3.5 py-2 text-sm rounded-lg border border-input bg-background" />
               </div>
               <div>
                 <label className="block text-sm font-semibold mb-1.5">Teléfono / WhatsApp <span className="text-red-500">*</span></label>

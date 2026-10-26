@@ -298,12 +298,24 @@ export async function crearSolicitud(data: {
         String.fromCodePoint(0x1F464) + ' *Nombre completo:* ' + (data.fullName || 'No registrado'),
     String.fromCodePoint(0x1F4DE) + ' *Teléfono:* ' + data.phone,
     String.fromCodePoint(0x1F4CD) + ' *Dirección:* ' + data.address,
-    String.fromCodePoint(0x1F3F7) + ' *Categoría:* ' + data.category,
+    String.fromCodePoint(0x1F3F7) + ' *Categoría:* ' + data.category + (data.subcategory ? ' (' + data.subcategory + ')' : ''),
+    data.description ? '📝 *Descripción corta:* ' + data.description : null,
+    (() => {
+      const sm = data.socialMedia;
+      if (!sm) return null;
+      const list = [];
+      if (sm.instagram) list.push('Instagram: ' + sm.instagram);
+      if (sm.facebook) list.push('Facebook: ' + sm.facebook);
+      if (sm.tiktok) list.push('TikTok: ' + sm.tiktok);
+      if (sm.youtube) list.push('YouTube: ' + sm.youtube);
+      return list.length > 0 ? '🌐 *Redes Sociales:* ' + list.join(' | ') : null;
+    })(),
     String.fromCodePoint(0x1F4E6) + ' *Plan:* ' + planName + ' (' + valorStr + ')',
     String.fromCodePoint(0x1F4B3) + ' *Pago:* ' + paymentMethod,
     data.paymentReference ? String.fromCodePoint(0x1F522) + ' *Ref Pago:* ' + data.paymentReference : null,
     data.paymentReceiptUrl ? String.fromCodePoint(0x1F9FE) + ' *Comprobante:* ' + data.paymentReceiptUrl : null,
     String.fromCodePoint(0x1F3A8) + ' *Creación imágenes:* ' + imagenesStr,
+    data.images?.stylePreference ? '✨ *Estilo preferido:* ' + data.images.stylePreference : null,
     '',
     String.fromCodePoint(0x1F517) + ' *Enlace al Panel:*',
     panelLink
@@ -370,6 +382,8 @@ export async function reenviarWhatsAppSolicitud(solicitudId: string): Promise<{ 
   plantilla = plantilla.replace(/{valor}/g, valorStr);
   plantilla = plantilla.replace(/{metodo_pago}/g, solicitud.paymentMethod || 'N/A');
   plantilla = plantilla.replace(/{comprobante}/g, solicitud.paymentReceiptUrl ? 'Adjuntado' : 'No');
+  plantilla = plantilla.replace(/{estilo}/g, solicitud.images?.stylePreference || 'No especificado');
+  plantilla = plantilla.replace(/{estilo_preferido}/g, solicitud.images?.stylePreference || 'No especificado');
 
   const result = await enviarWhatsAppSolicitud({
     toPhone: targetPhone,
@@ -380,6 +394,7 @@ export async function reenviarWhatsAppSolicitud(solicitudId: string): Promise<{ 
       telefono: solicitud.phone,
       categoria: solicitud.category,
       imagenes: imagenesStr,
+      estilo: solicitud.images?.stylePreference || 'No especificado',
       enlace: panelLink
     }
   });

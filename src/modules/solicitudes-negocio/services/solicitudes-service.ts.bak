@@ -304,6 +304,7 @@ export async function crearSolicitud(data: {
     data.paymentReference ? String.fromCodePoint(0x1F522) + ' *Ref Pago:* ' + data.paymentReference : null,
     data.paymentReceiptUrl ? String.fromCodePoint(0x1F9FE) + ' *Comprobante:* ' + data.paymentReceiptUrl : null,
     String.fromCodePoint(0x1F3A8) + ' *Creación imágenes:* ' + imagenesStr,
+    data.images?.stylePreference ? '✨ *Estilo preferido:* ' + data.images.stylePreference : null,
     '',
     String.fromCodePoint(0x1F517) + ' *Enlace al Panel:*',
     panelLink
@@ -317,7 +318,7 @@ export async function crearSolicitud(data: {
   const whatsappUrl = 'https://api.whatsapp.com/send/?phone=' + targetPhone + '&text=' + encodeURIComponent(mensajeFinalWa);
 
   // 4. WHAPI en Servidor (bot interno de alertas)
-  let whatsappResult = { success: false, error: 'No configurado' };
+  let whatsappResult: { success: boolean; whatsappUrl?: string; error?: string } = { success: false, error: 'No configurado' };
   if (config.adminWhatsAppNumber) {
     try {
       whatsappResult = await enviarWhatsAppSolicitud({
@@ -370,6 +371,8 @@ export async function reenviarWhatsAppSolicitud(solicitudId: string): Promise<{ 
   plantilla = plantilla.replace(/{valor}/g, valorStr);
   plantilla = plantilla.replace(/{metodo_pago}/g, solicitud.paymentMethod || 'N/A');
   plantilla = plantilla.replace(/{comprobante}/g, solicitud.paymentReceiptUrl ? 'Adjuntado' : 'No');
+  plantilla = plantilla.replace(/{estilo}/g, solicitud.images?.stylePreference || 'No especificado');
+  plantilla = plantilla.replace(/{estilo_preferido}/g, solicitud.images?.stylePreference || 'No especificado');
 
   const result = await enviarWhatsAppSolicitud({
     toPhone: targetPhone,
@@ -380,6 +383,7 @@ export async function reenviarWhatsAppSolicitud(solicitudId: string): Promise<{ 
       telefono: solicitud.phone,
       categoria: solicitud.category,
       imagenes: imagenesStr,
+      estilo: solicitud.images?.stylePreference || 'No especificado',
       enlace: panelLink
     }
   });

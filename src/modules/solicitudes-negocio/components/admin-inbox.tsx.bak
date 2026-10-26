@@ -1,5 +1,6 @@
 'use client';
 
+import { downloadFile } from '@/lib/downloadFile';
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { SolicitudNegocio, SolicitudEstado, PaymentStatus } from '../types';
@@ -24,6 +25,16 @@ export default function AdminInbox() {
   // Estados de Eliminación
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [deleting, setDeleting] = useState(false);
+  const [downloadingFile, setDownloadingFile] = useState<string | null>(null);
+
+  const handleDescargaDirecta = async (url: string, fallbackName: string) => {
+    try {
+      setDownloadingFile(url);
+      await downloadFile(url, fallbackName);
+    } finally {
+      setDownloadingFile(null);
+    }
+  };
   const [deleteModal, setDeleteModal] = useState({ open: false, ids: [] as string[], message: '' });
   const [dateModalOpen, setDateModalOpen] = useState(false);
   const [dateFrom, setDateFrom] = useState('');
@@ -345,6 +356,7 @@ export default function AdminInbox() {
                       </h3>
                       <p className="text-xs text-muted-foreground">📦 Plan: <strong>{item.planName || 'Básico'}</strong> {item.planPrice ? ('($' + item.planPrice.toLocaleString('es-CO') + ' COP)') : '(Gratis)'}</p>
                     </div>
+                  </div>
                     <span className="text-[11px] text-muted-foreground font-mono">{item.createdAt ? new Date(item.createdAt).toLocaleDateString() : ''}</span>
                   </div>
                   <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground mt-2">
@@ -421,12 +433,156 @@ export default function AdminInbox() {
 
             <div className="p-3.5 rounded-xl bg-muted/40 border border-border space-y-1.5 text-xs">
               <p><strong>Canal de Difusión:</strong> <span className="font-mono font-bold text-primary">{selectedItem.referralChannel || 'Directo'}</span></p>
+              {selectedItem.businessName && (
+                <p><strong>🏢 Negocio:</strong> {selectedItem.businessName}</p>
+              )}
               <p><strong>Nombre completo:</strong> {selectedItem.fullName || 'No registrado'}</p>
               <p><strong>Teléfono:</strong> {selectedItem.phone}</p>
               <p><strong>Dirección:</strong> {selectedItem.address}</p>
               {selectedItem.email && <p><strong>Correo:</strong> {selectedItem.email}</p>}
               <p><strong>Descripción:</strong> {selectedItem.description}</p>
+              {selectedItem.category && (
+                <p>
+                  <strong>🏷️ Categoría:</strong> {selectedItem.category}
+                  {selectedItem.subcategory ? ` (${selectedItem.subcategory})` : ''}
+                </p>
+              )}
+              {(() => {
+                const recursos = [];
+                if (selectedItem.images?.noLogoCreateForMe) recursos.push('Logo');
+                if (selectedItem.images?.noBannerCreateForMe) recursos.push('Banner');
+                if (selectedItem.products?.noProductsPhotosCreateForMe) recursos.push('Fotos de productos');
+                if (recursos.length === 0) return null;
+                return (
+                  <p><strong>🎨 Creación de Recursos solicitada:</strong> {recursos.join(', ')}</p>
+                );
+              })()}
+              {selectedItem.images?.stylePreference && (
+                <p><strong>✨ Estilo preferido:</strong> {selectedItem.images.stylePreference}</p>
+              )}
             </div>
+
+            {/* SECCIÓN DESCARGAR ARCHIVOS */}
+            {(() => {
+              const logo = selectedItem.images?.logoUrl;
+              const banner = selectedItem.images?.bannerUrl;
+              const template = selectedItem.products?.templateFileUrl;
+              const photos = Array.isArray(selectedItem.products?.productPhotosUrls) ? selectedItem.products.productPhotosUrls : [];
+              const hasVisual = Boolean(logo || banner);
+              const hasCatalog = Boolean(template || photos.length > 0);
+              const hasAny = hasVisual || hasCatalog;
+
+              const cleanFileName = (url?: string, fallback: string = ""): string => {
+                if (!url) return fallback;
+                try {
+                  const segs = url.split('/');
+                  const last = segs[segs.length - 1].split('?')[0];
+                  return decodeURIComponent(last) || fallback;
+                } catch {
+                  return fallback;
+                }
+              };
+
+              return (
+                <div className="border-t border-border pt-3 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold">Descargar archivos:</span>
+                  </div>
+
+                  {!hasAny ? (
+                    <p className="text-xs text-muted-foreground italic bg-muted/30 p-2.5 rounded-lg border border-dashed border-border text-center">
+                      Sin archivos adjuntos
+                    </p>
+                  ) : (
+                    <div className="space-y-3">
+                      {/* Identidad Visual */}
+                      {hasVisual && (
+                        <div className="p-2.5 rounded-lg border border-border bg-card/60 space-y-2">
+                          <p className="text-[11px] font-bold text-muted-foreground">🎨 Identidad Visual</p>
+                          <div className="space-y-1.5">
+                            {logo ? (
+                              <div className="flex items-center justify-between gap-2 text-xs p-1.5 rounded bg-muted/40">
+                                <span className="truncate max-w-[180px] font-mono text-[11px]" title={cleanFileName(logo, 'Logo')}>
+                                  {cleanFileName(logo, 'Logo')}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDescargaDirecta(logo, cleanFileName(logo, 'logo.jpg'))}
+                                  disabled={downloadingFile === logo}
+                                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-emerald-600 text-white font-bold text-xs hover:opacity-90 shrink-0 disabled:opacity-60"
+                                >
+                                  <Download className="w-3 h-3" /> {downloadingFile === logo ? 'Descargando...' : 'Descargar'}
+                                </button>
+                              </div>
+                            ) : null}
+
+                            {banner ? (
+                              <div className="flex items-center justify-between gap-2 text-xs p-1.5 rounded bg-muted/40">
+                                <span className="truncate max-w-[180px] font-mono text-[11px]" title={cleanFileName(banner, 'Banner')}>
+                                  {cleanFileName(banner, 'Banner')}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDescargaDirecta(banner, cleanFileName(banner, 'banner.jpg'))}
+                                  disabled={downloadingFile === banner}
+                                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-emerald-600 text-white font-bold text-xs hover:opacity-90 shrink-0 disabled:opacity-60"
+                                >
+                                  <Download className="w-3 h-3" /> {downloadingFile === banner ? 'Descargando...' : 'Descargar'}
+                                </button>
+                              </div>
+                            ) : null}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Catálogo de Productos */}
+                      {hasCatalog && (
+                        <div className="p-2.5 rounded-lg border border-border bg-card/60 space-y-2">
+                          <p className="text-[11px] font-bold text-muted-foreground">📦 Catálogo de Productos</p>
+                          <div className="space-y-1.5">
+                            {template ? (
+                              <div className="flex items-center justify-between gap-2 text-xs p-1.5 rounded bg-muted/40">
+                                <span className="truncate max-w-[180px] font-mono text-[11px]" title={cleanFileName(template, 'Catálogo')}>
+                                  {cleanFileName(template, 'Catálogo')}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDescargaDirecta(template, cleanFileName(template, 'catalogo.xlsx'))}
+                                  disabled={downloadingFile === template}
+                                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-emerald-600 text-white font-bold text-xs hover:opacity-90 shrink-0 disabled:opacity-60"
+                                >
+                                  <Download className="w-3 h-3" /> {downloadingFile === template ? 'Descargando...' : 'Descargar'}
+                                </button>
+                              </div>
+                            ) : null}
+
+                            {photos.map((photoUrl, idx) => (
+                              <div key={idx} className="flex items-center justify-between gap-2 text-xs p-1.5 rounded bg-muted/40">
+                                <span className="truncate max-w-[180px] font-mono text-[11px]" title={cleanFileName(photoUrl, `Foto ${idx + 1}`)}>
+                                  {cleanFileName(photoUrl, `Foto ${idx + 1}`)}
+                                </span>
+                                {photoUrl ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDescargaDirecta(photoUrl, cleanFileName(photoUrl, `foto_${idx + 1}.jpg`))}
+                                    disabled={downloadingFile === photoUrl}
+                                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-emerald-600 text-white font-bold text-xs hover:opacity-90 shrink-0 disabled:opacity-60"
+                                  >
+                                    <Download className="w-3 h-3" /> {downloadingFile === photoUrl ? 'Descargando...' : 'Descargar'}
+                                  </button>
+                                ) : (
+                                  <span className="text-[10px] text-muted-foreground italic">No disponible para descarga</span>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
 
             <div className="border-t border-border pt-4 flex items-center justify-between">
               <span className="text-xs font-bold">Notificación WhatsApp:</span>

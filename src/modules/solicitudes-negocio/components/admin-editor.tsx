@@ -262,7 +262,7 @@ export default function AdminEditor() {
             <input type="email" value={config.backupEmail || ''} onChange={e => setConfig({ ...config, backupEmail: e.target.value })} className="w-full min-h-[42px] px-3 py-2 text-sm rounded-lg border border-input bg-background" />
           </div>
           <div className="md:col-span-2">
-            <label className="text-xs font-semibold mb-1 block">Plantilla WhatsApp (Variables: {'{nombre}'}, {'{nombre_completo}'}, {'{telefono}'}, {'{plan}'}, {'{valor}'}, {'{metodo_pago}'}, {'{comprobante}'}, {'{enlace}'})</label>
+            <label className="text-xs font-semibold mb-1 block">Plantilla WhatsApp (Variables: {'{nombre}'}, {'{nombre_completo}'}, {'{telefono}'}, {'{plan}'}, {'{valor}'}, {'{metodo_pago}'}, {'{comprobante}'}, {'{estilo}'}, {'{enlace}'})</label>
             <textarea rows={6} value={config.whatsappMessageTemplate || ''} onChange={e => setConfig({ ...config, whatsappMessageTemplate: e.target.value })} className="w-full p-3 font-mono text-xs rounded-lg border border-input bg-background resize-none" />
           </div>
         </div>

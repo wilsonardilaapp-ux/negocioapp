@@ -207,13 +207,6 @@ export default function PublicForm() {
       return;
     }
 
-    let popupWin: Window | null = null;
-    try {
-      popupWin = window.open('', '_blank');
-    } catch (e) {
-      console.warn('Popup bloqueado inicialmente:', e);
-    }
-
     setSubmitting(true);
     try {
       const fd = new FormData();
@@ -256,36 +249,29 @@ export default function PublicForm() {
 
       fd.append('_hp_website', hpWebsite);
 
-      const res = await fetch('/api/solicitudes-negocio', {
+            const res = await fetch('/api/solicitudes-negocio', {
         method: 'POST',
         body: fd
       });
 
       const resJson = await res.json();
       if (!res.ok) {
-        if (popupWin && !popupWin.closed) popupWin.close();
         throw new Error(resJson.error || 'Ocurrió un error al enviar el formulario.');
       }
 
-      if (resJson.whatsappUrl) {
-        if (popupWin && !popupWin.closed) {
-          popupWin.location.href = resJson.whatsappUrl;
-        } else {
-          window.location.href = resJson.whatsappUrl;
-        }
-      }
-
       setSuccessData({
-        message: resJson.message || config.confirmationMessage,
         id: resJson.solicitudId,
+        message: resJson.message,
         plan: currentPlan,
         isPaid: isPaidPlan,
         paymentMethod: selectedPaymentMethod,
         whatsappUrl: resJson.whatsappUrl
       });
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+
+      if (resJson.whatsappUrl) {
+        window.open(resJson.whatsappUrl, '_blank');
+      }
     } catch (err: any) {
-      if (popupWin && !popupWin.closed) popupWin.close();
       setErrorMessage(err.message || 'Error de conexión. Intente nuevamente.');
     } finally {
       setSubmitting(false);
