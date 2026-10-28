@@ -67,7 +67,7 @@ const allNavItems = [
   { href: "/dashboard/loyalty", icon: Sparkles, label: "Fidelización", moduleId: 'loyalty' },
   { href: "/dashboard/share", icon: Share2, label: "Compartir Menú" },
   { href: "/dashboard/blog", icon: BookOpen, label: "Blog", moduleId: 'blog' },
-  { href: "/dashboard/valoraciones-directorio", icon: Star, label: "Valoraciones del Directorio" },
+  { href: "/dashboard/valoraciones-directorio", icon: Star, label: "Valoraciones del Directorio", moduleId: 'business-directory' },
   { href: "/dashboard/reservas", icon: CalendarCheck, label: "Reservas y Citas", moduleId: "reservas-agendamiento" },
   
   // 16-19: COMUNICACIÓN

@@ -3,6 +3,7 @@
 import { JevCopilotWidgetVencimientos } from "@/jev/JevCopilotWidgetVencimientos";
 import React, { useState, useMemo } from 'react';
 import { useSubscription } from '@/hooks/useSubscription';
+import { LimitBanner } from '@/components/dashboard/LimitBanner';
 import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, doc, setDoc, deleteDoc } from 'firebase/firestore';
 import type { InventoryBatch } from '@/models/inventory-expiration';
@@ -21,14 +22,15 @@ import {
   Package, 
   Search, 
   Frown, 
-  Loader2, 
+  Loader2,
+  Info, 
   FlaskConical, 
   Trash2 
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 export default function VencimientosPage() {
-  const { isModuleAuthorized, isLoading: isSubLoading } = useSubscription();
+  const { isModuleAuthorized, isLoading: isSubLoading, plan, planDetails, allHybridPlans } = useSubscription();
   const { user, profile } = useUser();
   const isSuperAdmin = profile?.role === 'super_admin';
   const firestore = useFirestore();
@@ -56,6 +58,23 @@ export default function VencimientosPage() {
     return collection(firestore, 'businesses', user.uid, 'inventoryBatches');
   }, [firestore, user]);
   const { data: batches, isLoading: isBatchesLoading } = useCollection<InventoryBatch>(batchesQuery);
+
+  // --- RESOLUCIÓN DINÁMICA DE LÍMITE DE VENCIMIENTOS (PLAN HÍBRIDO) ---
+  const vencimientosLimit = useMemo(() => {
+    const activePlan = planDetails || (allHybridPlans?.[0] as any);
+    const extraLimits = activePlan?.extraLimits;
+    if (Array.isArray(extraLimits)) {
+      const item = extraLimits.find((el: any) => 
+        /vencimiento|alerta/i.test(el.key || '')
+      );
+      if (item && typeof item.value === 'number') {
+        return item.value;
+      }
+    }
+    return 20; // Límite base predeterminado
+  }, [planDetails, allHybridPlans]);
+
+  const totalBatchesCount = batches?.length ?? 0;
 
   const productMap = useMemo(() => {
     const map = new Map<string, Product>();
@@ -232,6 +251,19 @@ export default function VencimientosPage() {
 
   return (
     <div className="space-y-6">
+      {/* Límites del Plan */}
+      <LimitBanner 
+        current={totalBatchesCount} 
+        limit={vencimientosLimit} 
+        label="lotes monitoreados" 
+        plan={typeof plan === 'string' ? plan : (plan as any)?.name || 'Plan'} 
+      />
+
+      <div className="flex items-center gap-2 rounded-2xl border bg-secondary/50 p-3 text-xs text-muted-foreground shadow-sm">
+        <Info className="h-4 w-4 text-primary shrink-0" />
+        <span>Límite de Alertas de Vencimiento del plan: <strong className="text-foreground font-bold">{totalBatchesCount} / {vencimientosLimit === -1 ? '∞' : vencimientosLimit}</strong></span>
+      </div>
+
       {/* Encabezado con Botones de Prueba */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>

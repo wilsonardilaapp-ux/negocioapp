@@ -1,5 +1,6 @@
 "use client";
 
+import { JevCopilotWidgetVencimientos } from "@/jev/JevCopilotWidgetVencimientos";
 import React, { useState, useMemo } from 'react';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
@@ -390,6 +391,8 @@ export default function VencimientosPage() {
           )}
         </CardContent>
       </Card>
+    
+      <JevCopilotWidgetVencimientos businessId={user?.uid} />
     </div>
   );
 }

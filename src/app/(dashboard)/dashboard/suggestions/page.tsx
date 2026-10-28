@@ -115,6 +115,8 @@ export default function SuggestionsPage() {
         );
     }
     
+    const suggestionLimitReached = limits.suggestions !== -1 && suggestionsCount >= limits.suggestions;
+
     return (
         <div className="flex flex-col gap-6">
             <Card>
@@ -130,7 +132,7 @@ export default function SuggestionsPage() {
                             {isSyncing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
                             Sincronizar Métricas
                         </Button>
-                        <Button onClick={handleAddNewRule}>
+                        <Button onClick={handleAddNewRule} disabled={suggestionLimitReached} title={suggestionLimitReached ? "Límite de reglas de sugerencia alcanzado para tu plan" : undefined}>
                             <PlusCircle className="mr-2 h-4 w-4" />
                             Nueva Regla
                         </Button>

@@ -2,6 +2,8 @@
 
 import { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
+import { LimitBanner } from '@/components/dashboard/LimitBanner';
+import { useSubscription } from '@/hooks/useSubscription';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { 
@@ -16,7 +18,8 @@ import {
   CalendarDays,
   Sparkles,
   FileSpreadsheet,
-  FileText
+  FileText,
+  Info
 } from 'lucide-react';
 import { StatusBadge } from './StatusBadge';
 import { StatusActions } from './StatusActions';
@@ -48,6 +51,7 @@ const formatCurrency = (value: number) => {
 };
 
 export function AgendaGrid() {
+  const { plan, planDetails, allHybridPlans } = useSubscription();
   const { user, profile } = useUser();
   const firestore = useFirestore();
   const { toast } = useToast();
@@ -69,6 +73,27 @@ export function AgendaGrid() {
   }, [businessId, firestore]);
 
   const { data: rawReservations, isLoading } = useCollection<Reservation>(resQuery);
+
+  // --- RESOLUCIÓN DINÁMICA DE LÍMITES DE CITAS (PLAN HÍBRIDO) ---
+  const reservasLimit = useMemo(() => {
+    const activePlan = planDetails || (allHybridPlans?.[0] as any);
+    const extraLimits = activePlan?.extraLimits;
+    if (Array.isArray(extraLimits)) {
+      const item = extraLimits.find((el: any) => 
+        /reserva|cita/i.test(el.key || '')
+      );
+      if (item && typeof item.value === 'number') {
+        return item.value;
+      }
+    }
+    return 30; // Límite base predeterminado
+  }, [planDetails, allHybridPlans]);
+
+  const totalReservationsCount = useMemo(() => {
+    return (rawReservations || []).filter(r => r.status !== 'cancelled').length;
+  }, [rawReservations]);
+
+  const isLimitReached = reservasLimit !== -1 && totalReservationsCount >= reservasLimit;
 
   // --- FILTRADO Y ORDENAMIENTO EN MEMORIA (Client-side) ---
   const dayReservations = useMemo(() => {
@@ -185,6 +210,17 @@ export function AgendaGrid() {
 
   return (
     <div className="space-y-6">
+      <LimitBanner 
+        current={totalReservationsCount} 
+        limit={reservasLimit} 
+        label="citas/reservas" 
+        plan={typeof plan === 'string' ? plan : (plan as any)?.name || 'Plan'} 
+      />
+
+      <div className="flex items-center gap-2 rounded-2xl border bg-secondary/50 p-3 text-xs text-muted-foreground shadow-sm">
+        <Info className="h-4 w-4 text-primary shrink-0" />
+        <span>Límite de citas del plan: <strong className="text-foreground font-bold">{totalReservationsCount} / {reservasLimit === -1 ? '∞' : reservasLimit}</strong></span>
+      </div>
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-4 rounded-3xl border shadow-sm">
         <div className="flex items-center gap-4">
             <div className="flex items-center border rounded-xl overflow-hidden bg-muted/20">
@@ -240,7 +276,7 @@ export function AgendaGrid() {
                 {isExporting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <FileText className="mr-2 h-4 w-4" />}
                 PDF
             </Button>
-            <Button onClick={() => { setEditingReservation(null); setIsModalOpen(true); }} className="font-black shadow-lg shadow-primary/10">
+            <Button onClick={() => { setEditingReservation(null); setIsModalOpen(true); }} disabled={isLimitReached} title={isLimitReached ? "Límite de citas alcanzado para tu plan. Actualiza tu suscripción." : undefined} className="font-black shadow-lg shadow-primary/10">
                 <PlusCircle className="mr-2 h-4 w-4" /> Nueva Reserva
             </Button>
         </div>
@@ -326,7 +362,7 @@ export function AgendaGrid() {
                     Aún no tienes registros para esta fecha. ¡Comienza a agendar ahora!
                 </p>
             </div>
-            <Button onClick={() => { setEditingReservation(null); setIsModalOpen(true); }} variant="outline" className="font-bold border-primary text-primary hover:bg-primary/5 h-12 px-8 rounded-xl">
+            <Button onClick={() => { setEditingReservation(null); setIsModalOpen(true); }} disabled={isLimitReached} title={isLimitReached ? "Límite de citas alcanzado para tu plan. Actualiza tu suscripción." : undefined} variant="outline" className="font-bold border-primary text-primary hover:bg-primary/5 h-12 px-8 rounded-xl">
                 Agendar mi primera cita
             </Button>
           </CardContent>

@@ -6,9 +6,10 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/com
 import { BusinessRatingsStats } from '@/components/directory/ratings/BusinessRatingsStats';
 import { BusinessRatingsList } from '@/components/directory/ratings/BusinessRatingsList';
 import { useBusinessRatings } from '@/hooks/useBusinessRatings';
+import { useSubscription } from '@/hooks/useSubscription';
 import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { doc } from 'firebase/firestore';
-import { Loader2, Star, FileSpreadsheet, FileText } from 'lucide-react';
+import { Loader2, Star, FileSpreadsheet, FileText, Frown } from 'lucide-react';
 import type { Business } from '@/models/business';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
@@ -19,6 +20,7 @@ import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
 
 export default function BusinessRatingsPage() {
+  const { isModuleAuthorized, isLoading: isSubLoading } = useSubscription();
   const { user } = useUser();
   const firestore = useFirestore();
   const { toast } = useToast();
@@ -33,7 +35,7 @@ export default function BusinessRatingsPage() {
   
   const { data: business, isLoading: isBusinessLoading } = useDoc<Business>(businessDocRef);
 
-  const isLoading = isRatingsLoading || isBusinessLoading;
+  const isLoading = isRatingsLoading || isBusinessLoading || isSubLoading;
 
   // --- HANDLERS DE EXPORTACIÓN ---
 
@@ -156,6 +158,23 @@ export default function BusinessRatingsPage() {
       <div className="flex h-[400px] items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
+    );
+  }
+
+  if (!isModuleAuthorized('business-directory')) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Módulo de Directorio Desactivado</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col items-center justify-center text-center gap-4 min-h-[400px]">
+          <Frown className="h-12 w-12 text-muted-foreground" />
+          <h3 className="text-xl font-semibold">Funcionalidad no disponible</h3>
+          <p className="text-muted-foreground max-w-sm">
+            El módulo de &quot;Directorio de Negocios&quot; no está activo en tu plan actual. Por favor, contacta al administrador de la plataforma para más información.
+          </p>
+        </CardContent>
+      </Card>
     );
   }
 

@@ -70,7 +70,8 @@ import {
   CheckCircle2,
   MinusCircle,
   FileSpreadsheet,
-  FileText
+  FileText,
+  Frown,
 } from 'lucide-react';
 import { PublicMenuChatbotConfig, DEFAULT_CHATBOT_CONFIG, PublicMenuAutoResponse, PUBLIC_MENU_CHATBOT_MODULE_ID } from '@/models/public-menu-chatbot';
 import { PublicMenuChatWidget } from '@/components/public-menu-chatbot/PublicMenuChatWidget';
@@ -78,6 +79,7 @@ import { uploadMedia } from '@/ai/flows/upload-media-flow';
 import type { Business } from '@/models/business';
 import type { Module } from '@/models/module';
 import { useSubscription } from '@/hooks/useSubscription';
+import { LimitBanner } from '@/components/dashboard/LimitBanner';
 import Image from 'next/image';
 import * as XLSX from 'xlsx';
 import { jsPDF } from 'jspdf';
@@ -112,7 +114,23 @@ export function ChatbotMenuConfigContent({ businessId: activeBusinessId }: Chatb
   const { user } = useUser();
   const firestore = useFirestore();
   const { toast } = useToast();
-  const { isModuleAuthorized, isLoading: isSubLoading } = useSubscription();
+  const { isModuleAuthorized, isLoading: isSubLoading, plan, planDetails, allHybridPlans } = useSubscription();
+
+  // --- RESOLUCIÓN DINÁMICA DE LÍMITE DE CHATBOT (PLAN HÍBRIDO) ---
+  const chatbotLimit = useMemo(() => {
+    const activePlan = planDetails || (allHybridPlans?.[0] as any);
+    const extraLimits = activePlan?.extraLimits;
+    if (Array.isArray(extraLimits)) {
+      const item = extraLimits.find((el: any) => 
+        /chatbot|menu/i.test(el.key || '')
+      );
+      if (item && typeof item.value === 'number') {
+        return item.value;
+      }
+    }
+    return 150; // Límite base predeterminado
+  }, [planDetails, allHybridPlans]);
+
   const [isSaving, setIsSaving] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -155,6 +173,9 @@ export function ChatbotMenuConfigContent({ businessId: activeBusinessId }: Chatb
   const { data: rawResponses, isLoading: loadingResponses } = useCollection<PublicMenuAutoResponse>(
     useMemoFirebase(() => (responsesRef ? query(responsesRef, orderBy('updatedAt', 'desc')) : null), [responsesRef])
   );
+
+  const totalResponsesCount = rawResponses?.length ?? 0;
+  const isChatbotLimitReached = chatbotLimit !== -1 && totalResponsesCount >= chatbotLimit;
 
   // 3. Suscripción a Datos del Negocio
   const businessRef = useMemoFirebase(
@@ -560,6 +581,23 @@ export function ChatbotMenuConfigContent({ businessId: activeBusinessId }: Chatb
     );
   }
 
+  if (!isModuleAuthorized(PUBLIC_MENU_CHATBOT_MODULE_ID) && !isPlatformBot) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Módulo de Chatbot Menú Desactivado</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col items-center justify-center text-center gap-4 min-h-[400px]">
+          <Frown className="h-12 w-12 text-muted-foreground" />
+          <h3 className="text-xl font-semibold">Funcionalidad no disponible</h3>
+          <p className="text-muted-foreground max-w-sm">
+            El módulo de &quot;Chatbot Menú&quot; no está activo en tu plan actual. Por favor, contacta al administrador de la plataforma para más información.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
       
@@ -609,6 +647,18 @@ export function ChatbotMenuConfigContent({ businessId: activeBusinessId }: Chatb
             </Button>
         </div>
       </header>
+
+      <LimitBanner 
+        current={totalResponsesCount} 
+        limit={chatbotLimit} 
+        label="respuestas de chatbot" 
+        plan={typeof plan === 'string' ? plan : (plan as any)?.name || 'Plan'} 
+      />
+
+      <div className="flex items-center gap-2 rounded-2xl border bg-secondary/50 p-3 text-xs text-muted-foreground shadow-sm">
+        <Info className="h-4 w-4 text-primary shrink-0" />
+        <span>Límite de Chatbot Menú del plan: <strong className="text-foreground font-bold">{totalResponsesCount} / {chatbotLimit === -1 ? '∞' : chatbotLimit}</strong></span>
+      </div>
 
       <Tabs defaultValue="apariencia" className="w-full">
         <TabsList className="grid w-full grid-cols-2 md:grid-cols-5 bg-muted/50 p-1 rounded-xl mb-6">
@@ -712,11 +762,11 @@ export function ChatbotMenuConfigContent({ businessId: activeBusinessId }: Chatb
                 <Button variant="outline" size="sm" onClick={downloadTemplate} className="font-bold border-primary text-primary hover:bg-primary/5">
                   <Download className="mr-2 h-4 w-4" /> Plantilla
                 </Button>
-                <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} disabled={!isGlobalActive} className="font-bold border-primary text-primary hover:bg-primary/5">
+                <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} disabled={!isGlobalActive || isChatbotLimitReached} title={isChatbotLimitReached ? "Límite de respuestas de chatbot alcanzado para tu plan" : undefined} className="font-bold border-primary text-primary hover:bg-primary/5">
                   <Upload className="mr-2 h-4 w-4" /> Importar
                 </Button>
                 <input type="file" ref={fileInputRef} className="hidden" accept=".xlsx,.csv" onChange={handleFileImport} />
-                <Button onClick={() => handleOpenResponseDialog()} disabled={!isGlobalActive} className="font-bold shadow-md">
+                <Button onClick={() => handleOpenResponseDialog()} disabled={!isGlobalActive || isChatbotLimitReached} title={isChatbotLimitReached ? "Límite de respuestas de chatbot alcanzado para tu plan" : undefined} className="font-bold shadow-md">
                   <Plus className="mr-2 h-4 w-4" /> Nueva Respuesta
                 </Button>
               </div>

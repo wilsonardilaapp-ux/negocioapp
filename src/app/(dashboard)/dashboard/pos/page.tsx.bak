@@ -199,6 +199,7 @@ export default function POSPage() {
                 tax: financialSummary.tax,
                 discount: financialSummary.discount,
                 tip: financialSummary.tip,
+                serviceFee: financialSummary.serviceFee,
                 total: financialSummary.total,
                 paymentMethod: paymentMethod as any,
                 cashReceived,

@@ -11,10 +11,12 @@ import InvoiceCart from '@/components/billing/InvoiceCart';
 import CashControl from '@/components/billing/CashControl';
 import InvoiceHistoryTable from '@/components/billing/InvoiceHistoryTable';
 import { TrackingConfirmationCard } from '@/components/billing/TrackingConfirmationCard';
-import { Loader2, Calculator, CreditCard } from 'lucide-react';
+import { Loader2, Calculator, CreditCard, Frown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useSubscription } from '@/hooks/useSubscription';
+import { LimitBanner } from '@/components/dashboard/LimitBanner';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { processSale } from '@/services/billing/billing-service';
 import { registerPOSTracking } from '@/services/billing/tracking-service';
 import { useSearchParams } from 'next/navigation';
@@ -58,7 +60,7 @@ export default function POSPage() {
   const [deliveryAddress, setDeliveryAddress] = useState('');
 
   // Tasas dinámicas configuradas desde Super Admin (Planes Híbridos)
-  const { plan: subPlan, allHybridPlans } = useSubscription();
+  const { plan: subPlan, allHybridPlans, isModuleAuthorized, isLoading: isSubLoading, limits, ordersCount } = useSubscription();
   const activeHybridPlan = (subPlan as any)?.tableCommissionRate !== undefined ? subPlan : (allHybridPlans?.[0] || subPlan);
   const tableRate = Number((activeHybridPlan as any)?.tableCommissionRate ?? 2); // Comisión en Mesa (QR) / Para llevar
   const deliveryRate = Number((activeHybridPlan as any)?.pricePerOrder ?? (activeHybridPlan as any)?.comisionRate ?? 4); // Configuración de Comisión / Domicilio
@@ -274,12 +276,29 @@ export default function POSPage() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [cart, isProcessing, handleProcessSale]);
 
-  if (loadingBusiness && !business) {
+  if ((loadingBusiness && !business) || isSubLoading) {
     return (
       <div className="flex flex-col items-center justify-center h-[80vh] gap-4">
         <Loader2 className="h-10 w-10 animate-spin text-primary" />
         <p className="text-muted-foreground font-medium">Iniciando Terminal de Facturación...</p>
       </div>
+    );
+  }
+
+  if (!isModuleAuthorized('catalogo')) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Módulo de Terminal POS Desactivado</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col items-center justify-center text-center gap-4 min-h-[400px]">
+          <Frown className="h-12 w-12 text-muted-foreground" />
+          <h3 className="text-xl font-semibold">Funcionalidad no disponible</h3>
+          <p className="text-muted-foreground max-w-sm">
+            El módulo de &quot;Catálogo y Terminal POS&quot; no está activo en tu plan actual. Por favor, contacta al administrador de la plataforma para más información.
+          </p>
+        </CardContent>
+      </Card>
     );
   }
 
@@ -302,6 +321,15 @@ export default function POSPage() {
             </div>
          </div>
       </header>
+
+      {limits && (
+        <LimitBanner 
+          current={ordersCount} 
+          limit={limits.orders} 
+          label="pedidos/mes" 
+          plan={typeof subPlan === 'string' ? subPlan : (subPlan as any)?.name || 'Plan'} 
+        />
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-auto">
         <div className="lg:col-span-7 xl:col-span-8 overflow-hidden">

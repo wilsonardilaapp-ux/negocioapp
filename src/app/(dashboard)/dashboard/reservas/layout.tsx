@@ -1,5 +1,8 @@
-'use client';
+"use client";
 
+import { useSubscription } from '@/hooks/useSubscription';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Loader2, Frown } from 'lucide-react';
 import React, { useMemo } from 'react';
 import { usePathname } from 'next/navigation';
 import { ReservasTabs } from '@/components/reservas/ReservasTabs';
@@ -69,6 +72,29 @@ export default function ReservasLayout({ children }: { children: React.ReactNode
   }, [pathname]);
 
   const Icon = config.icon;
+
+  const { isModuleAuthorized, isLoading: isSubLoading } = useSubscription();
+
+  if (isSubLoading) {
+    return <div className="flex items-center justify-center h-64"><Loader2 className="animate-spin h-8 w-8 text-primary" /></div>;
+  }
+
+  if (!isModuleAuthorized('reservas-agendamiento')) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Módulo de Reservas y Citas Desactivado</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col items-center justify-center text-center gap-4 min-h-[400px]">
+          <Frown className="h-12 w-12 text-muted-foreground" />
+          <h3 className="text-xl font-semibold">Funcionalidad no disponible</h3>
+          <p className="text-muted-foreground max-w-sm">
+            El módulo de &quot;Reservas y Citas&quot; no está activo en tu plan actual. Por favor, contacta al administrador de la plataforma para más información.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500 pb-20">

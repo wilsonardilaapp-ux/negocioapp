@@ -399,16 +399,27 @@ export default function BusinessesPage() {
                   const state = businessModulesState[mod.id] || { active: false, isAddon: true, isPlanDefault: false };
                   const extra = moduleExtras[mod.id] || 0;
                   const currentPlan = allPlans.find(p => p.id === selectedBusiness?.planName || p.name === selectedBusiness?.planName) || allPlans[0];
-                  const isJevCopilot = mod.id === 'jev-copiloto' || mod.id === 'jev_copiloto';
-                  const planExtraItem = isJevCopilot && currentPlan && Array.isArray((currentPlan as any).extraLimits)
-                      ? (currentPlan as any).extraLimits.find((item: any) => ((item.key || '').toLowerCase().includes('jev') || (item.key || '').toLowerCase().includes('copiloto')))
+                  // Mapeo dinámico y universal de límites técnicos extra del Plan Híbrido
+                  const planExtraItem = currentPlan && Array.isArray((currentPlan as any).extraLimits)
+                      ? (currentPlan as any).extraLimits.find((item: any) => {
+                          const k = (item.key || '').toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]/g, "");
+                          const mName = (mod.name || '').toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]/g, "");
+                          const mId = (mod.id || '').toLowerCase().replace(/[^a-z0-9]/g, "");
+                          if (!k) return false;
+                          return mName.includes(k) || k.includes(mName) || mId.includes(k) || k.includes(mId) ||
+                            (mod.id === 'loyalty' && (k.includes('fideliza') || k.includes('loyalty') || k.includes('inteligencia'))) ||
+                            (mod.id === 'chatbot-menu-publico' && (k.includes('chatbot') || k.includes('menu'))) ||
+                            (mod.id === 'social-proof' && (k.includes('pruebasocial') || k.includes('socialproof'))) ||
+                            (mod.id === 'inventario-kardex' && k.includes('kardex')) ||
+                            (mod.id === 'alertas-vencimiento' && k.includes('vencimiento')) ||
+                            (mod.id === 'reservas-agendamiento' && (k.includes('reserva') || k.includes('cita')));
+                        })
                       : null;
-                  const jevPlanLimit = planExtraItem?.value || 0;
 
-                  const base = mod.limit === -1 ? '∞' : (mod.limit || 0);
-                  const total = isJevCopilot 
-                      ? jevPlanLimit + extra 
-                      : (mod.limit === -1 ? '∞' : (mod.limit || 0) + extra);
+                  const hasPlanLimit = planExtraItem && typeof planExtraItem.value === 'number';
+                  const baseNum = hasPlanLimit ? planExtraItem.value : (mod.limit ?? -1);
+                  const base = baseNum === -1 ? '∞' : baseNum;
+                  const total = baseNum === -1 ? '∞' : baseNum + extra;
                   return (
                     <Card key={mod.id} className={cn("transition-all border-2", state.active ? "border-primary/20 bg-primary/5" : "border-muted opacity-60")}>
                       <CardContent className="p-4 space-y-4">

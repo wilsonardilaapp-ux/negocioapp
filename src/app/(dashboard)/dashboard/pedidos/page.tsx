@@ -61,6 +61,7 @@ export default function PedidosPage() {
   const { toast } = useToast();
 
   const { plan, limits, ordersCount, isLoading: isSubscriptionLoading } = useSubscription();
+  const ordersLimitReached = limits.orders !== -1 && ordersCount >= limits.orders;
 
   const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
   const [dateFrom, setDateFrom] = useState<string>('');
@@ -433,7 +434,7 @@ export default function PedidosPage() {
               <Button variant="outline" size="sm" onClick={handleExportExcel} className="font-bold border-primary text-primary hover:bg-primary/5">
                   <FileSpreadsheet className="mr-2 h-4 w-4" /> Plantilla
               </Button>
-              <Button variant="outline" size="sm" onClick={() => setIsImportModalOpen(true)} className="font-bold border-primary text-primary hover:bg-primary/5">
+              <Button variant="outline" size="sm" onClick={() => setIsImportModalOpen(true)} disabled={ordersLimitReached} title={ordersLimitReached ? "Límite de pedidos alcanzado para tu plan" : undefined} className="font-bold border-primary text-primary hover:bg-primary/5">
                   <Upload className="mr-2 h-4 w-4" /> Importar
               </Button>
               <Button variant="outline" size="sm" onClick={handleExportRealOrdersExcel} disabled={isExportingReal} className="font-bold border-primary text-primary hover:bg-primary/5">

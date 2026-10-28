@@ -1,7 +1,6 @@
-import { JevCopilotWidgetLoyalty } from '@/jev/JevCopilotWidgetLoyalty';
-
 'use client';
 
+import { JevCopilotWidgetLoyalty } from '@/jev/JevCopilotWidgetLoyalty';
 import React, { useState, useEffect } from 'react';
 import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
 import { doc, collection, query, orderBy } from 'firebase/firestore';
@@ -11,7 +10,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { 
-    Loader2, 
+    Loader2,
+    Frown, 
     Sparkles, 
     Star, 
     Trophy, 
@@ -27,6 +27,8 @@ import {
 } from 'lucide-react';
 import type { Business } from '@/models/business';
 import { useToast } from '@/hooks/use-toast';
+import { useSubscription } from '@/hooks/useSubscription';
+import { LimitBanner } from '@/components/dashboard/LimitBanner';
 import { updateBusinessLoyaltyConfig } from '@/actions/business';
 import { syncBusinessLoyaltyHistory, getVipRanking, getChurnStatistics, getRecoveryStats } from '@/actions/loyalty';
 
@@ -53,6 +55,8 @@ import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
 
 export default function LoyaltyDashboardPage() {
+  const { plan, planDetails, allHybridPlans, isModuleAuthorized, isLoading: isSubLoading } = useSubscription();
+  const [recoveryCount, setRecoveryCount] = useState<number>(0);
   const { user, profile } = useUser();
   const firestore = useFirestore();
   const { toast } = useToast();
@@ -82,6 +86,29 @@ export default function LoyaltyDashboardPage() {
   const [syncSummary, setSyncResult] = useState<any>(null);
   
   const [isExporting, setIsExporting] = useState(false);
+
+  // --- RESOLUCIÓN DINÁMICA DE LÍMITES DE FIDELIZACIÓN (PLAN HÍBRIDO) ---
+  const loyaltyLimit = useMemo(() => {
+    const activePlan = planDetails || (allHybridPlans?.[0] as any);
+    const extraLimits = activePlan?.extraLimits;
+    if (Array.isArray(extraLimits)) {
+      const item = extraLimits.find((el: any) => 
+        /fideliza|loyalty|inteligencia/i.test(el.key || '')
+      );
+      if (item && typeof item.value === 'number') {
+        return item.value;
+      }
+    }
+    return 10; // Valor configurado en el plan
+  }, [planDetails, allHybridPlans]);
+
+  useEffect(() => {
+    if (user?.uid) {
+      getRecoveryStats(user.uid)
+        .then(stats => setRecoveryCount(stats?.count || 0))
+        .catch(() => {});
+    }
+  }, [user?.uid]);
 
   useEffect(() => {
     if (business?.googleReviewLink) {
@@ -248,12 +275,29 @@ export default function LoyaltyDashboardPage() {
     }
   };
 
-  if (loadingBusiness) {
+  if (loadingBusiness || isSubLoading) {
     return (
       <div className="flex flex-col items-center justify-center h-[60vh] gap-4">
         <Loader2 className="h-10 w-10 animate-spin text-primary" />
         <p className="text-muted-foreground animate-pulse font-medium">Cargando inteligencia de clientes...</p>
       </div>
+    );
+  }
+
+  if (!isModuleAuthorized('loyalty')) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Módulo de Fidelización e Inteligencia Desactivado</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col items-center justify-center text-center gap-4 min-h-[400px]">
+          <Frown className="h-12 w-12 text-muted-foreground" />
+          <h3 className="text-xl font-semibold">Funcionalidad no disponible</h3>
+          <p className="text-muted-foreground max-w-sm">
+            El módulo de &quot;Fidelización e Inteligencia (IA)&quot; no está activo en tu plan actual. Por favor, contacta al administrador de la plataforma para más información.
+          </p>
+        </CardContent>
+      </Card>
     );
   }
 
@@ -296,6 +340,18 @@ export default function LoyaltyDashboardPage() {
             </Button>
         </div>
       </header>
+
+      <LimitBanner 
+        current={recoveryCount} 
+        limit={loyaltyLimit} 
+        label="acciones de IA / fidelización" 
+        plan={typeof plan === 'string' ? plan : (plan as any)?.name || 'Plan'} 
+      />
+
+      <div className="flex items-center gap-2 rounded-2xl border bg-secondary/50 p-3 text-xs text-muted-foreground shadow-sm">
+        <Info className="h-4 w-4 text-primary shrink-0" />
+        <span>Límite de Fidelización e Inteligencia (IA) del plan: <strong className="text-foreground font-bold">{recoveryCount} / {loyaltyLimit === -1 ? '∞' : loyaltyLimit}</strong></span>
+      </div>
 
       <Tabs defaultValue="overview" className="w-full">
         <TabsList className="grid w-full grid-cols-2 max-w-md bg-muted/50 p-1 rounded-xl mb-8">
